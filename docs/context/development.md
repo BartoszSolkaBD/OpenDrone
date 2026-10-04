@@ -33,7 +33,7 @@ A named part of the repo, such as Physics, Scenarios or Repo rules, with its fol
 _Avoid_: Module, component, team
 
 **Work Count**:
-A machine-independent measure of how much work a fixed recorded flight takes. For physics, that's instructions run. For rendering, it's draw calls, triangles, render passes and the pixels they cover, shader pipelines and GPU memory. It's the same on every computer.
+A count, not a timing, of how much work a fixed recorded flight takes. For physics, that's instructions run. For rendering, it's draw calls, triangles, render passes and the pixels they cover and shade, shader pipelines and GPU memory. It repeats exactly on every run on the same kind of machine.
 _Avoid_: Benchmark score, timing
 
 **Frame Check**:
@@ -58,5 +58,6 @@ _Avoid_: FPS test, perf test
   - **Listed only:** an updated Observed Expectation (with its one-line reason), a new outside library, and a new ADR or glossary term.
 - A check is never weakened unless the ticket asks for it.
 - A Work Count more than 2% above main fails the gate unless the PR names the change and a reason the Reviewer accepts ([ADR-0013](../adr/0013-performance-gates-count-work-not-time.md)). A tidy-up is never a reason. The Review Report also shows each Work Count's total change since the last release.
+- Render Work Counts are counted inside wgpu on GitHub's Linux machine, with Mesa's software GPU on one thread ([ADR-0016](../adr/0016-render-work-counts-from-a-counting-wgpu-on-one-lavapipe-thread.md)). Only counts from the same kind of machine are compared. The M4 matches on passes, draws, triangles and pipelines, but not on uploads or memory, and it can't count pixels shaded.
 - The 45 fps promise is an average. The slowest 1% of frames is reported but not promised. The maintainer runs the Frame Check before each release, and no release is tagged below the promise. The Frame Check never gates a PR.
 - Agent-made assets are CC0. Outside libraries must be permissive or MPL-2.0 ([ADR-0014](../adr/0014-licences-for-libraries-and-assets.md)).
