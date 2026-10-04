@@ -3,10 +3,16 @@ import math
 from blockout_lib import Map, window_row
 
 
-def build():
-    m = Map("bando_a", "A · Unfinished Tower", "Bando",
-            "A five-floor concrete frame on a building site that stopped: open floors on a column grid, "
-            "holes through every slab, an open lift shaft, a collapsed bay and a tower crane still standing.")
+def build(rooms=False):
+    if rooms:
+        m = Map("bando_a_rooms", "A+ · Unfinished Tower, with rooms", "Bando",
+                "Round 2: variant A with brick rooms on the ground and first floors (west half): four rooms per floor "
+                "off a corridor, standard doorways, one smashed gap per floor, windows to the outside.")
+        m.round = 2
+    else:
+        m = Map("bando_a", "A · Unfinished Tower", "Bando",
+                "A five-floor concrete frame on a building site that stopped: open floors on a column grid, "
+                "holes through every slab, an open lift shaft, a collapsed bay and a tower crane still standing.")
     m.core = (-35, -25, 35, 25)
     m.ground()
     m.box("site", (70, 50, 0.2), (0, 0, -0.13), "dirt", core=False)
@@ -59,6 +65,25 @@ def build():
         if sides:
             m.walls_rect("brick_infill", X0 + 0.1, Y0 + 0.1, X1 - 0.1, Y1 - 0.1, z[k], h, 0.25, "brick_old", sides,
                          group=f"above_{k + 1}" if k else None)
+
+    if rooms:
+        # West half of the ground and first floors: rooms either side of a 5 m corridor.
+        # Doorways 0.9 x 2.1 m; one smashed gap per floor (2 x 2.4 m, then 1.8 x 2.2 m).
+        door = lambda u: (u, u + 0.9, 0, 2.1)
+        for k in (0, 1):
+            g = "above_2" if k else None
+            m.wall("room_wall", (-11.6, -2.5), (-0.2, -2.5), z[k], h, 0.2, "brick_old", group=g,
+                   openings=[door(2.0), (7.0, 9.0, 0, 2.4)] if k == 0 else [door(2.0), door(7.6)])
+            m.wall("room_wall", (-11.6, 2.5), (-0.2, 2.5), z[k], h, 0.2, "brick_old", group=g,
+                   openings=[door(2.0), door(7.6)])
+            m.wall("room_wall", (-6, -7.1), (-6, -2.7), z[k], h, 0.2, "brick_old", group=g,
+                   openings=[door(1.75)] if k == 0 else [(1.2, 3.0, 0, 2.2)])
+            m.wall("room_wall", (-6, 2.7), (-6, 7.1), z[k], h, 0.2, "brick_old", group=g, openings=[door(1.75)])
+        # First floor gets outside walls on the west and south-west, with windows
+        m.walls_rect("brick_infill", X0 + 0.1, Y0 + 0.1, X1 - 0.1, Y1 - 0.1, z[1], h, 0.25, "brick_old",
+                     dict(w=win(15)), group="above_2")
+        m.wall("brick_infill", (X0, Y0 + 0.1), (0, Y0 + 0.1), z[1], h, 0.25, "brick_old", openings=win(12),
+               group="above_2")
 
     # Roof: parapet with gaps, water tank on legs, rebar stubs
     m.walls_rect("parapet", X0, Y0, X1, Y1, z[5], 1.0, 0.2, "concrete_structure",
@@ -129,15 +154,27 @@ def build():
     f("Stairs", "One flight per floor in the east bay, through matching floor openings (1.8 × 4.8 m).", (8.5, -5, 8.0))
     f("Broken floors", "Holes 2–5 m across in every floor, at different places on each.", (-8.5, 2.25, 10.2))
     f("Collapsed bay", "Floor 2's slab fell onto floor 1: a 37° ramp-shaped gap.", (-8.9, 4.95, 5.2))
-    f("Brick infill", "Some sides of the lower floors are bricked in, with 1.5 × 1.4 m windows.", (-12, 0, 2.0))
+    if rooms:
+        f("Brick rooms", "Ground and first floors, west half: four 6 × 5 m rooms per floor either side of a 5 m corridor. "
+          "Doorways 0.9 × 2.1 m, one smashed gap per floor (2 × 2.4 m and 1.8 × 2.2 m), windows 1.5 × 1.4 m.",
+          (-9, -5, 1.6))
+    else:
+        f("Brick infill", "Some sides of the lower floors are bricked in, with 1.5 × 1.4 m windows.", (-12, 0, 2.0))
     f("Roof", "Parapet with two gaps, a water tank on 1.2 m legs, rebar stubs.", (-9, -5, 19.0))
     f("Tower crane", "34 m lattice mast (1.3 m openings), 35 m jib over the building, hook hanging at 20 m.",
       (20, 2, 30.0))
     f("Yard", "Containers (one stacked), rubble piles, site office, dirt mound, site fence.", (26, -15, 4.0))
 
-    m.spot("L1", -8.5, 0, 90, "Ground floor inside the frame, facing east between the columns.", z_hint=0.15)
-    m.spot("L2", -3, -4.5, 90, "Roof, +16.9 m, facing the crane.", z_hint=16.9)
+    if not rooms:
+        m.spot("L1", -8.5, 0, 90, "Ground floor inside the frame, facing east between the columns.", z_hint=0.15)
+        m.spot("L2", -3, -4.5, 90, "Roof, +16.9 m, facing the crane.", z_hint=16.9)
     m.spot("L3", 0, -17, 0, "In the yard, facing the building.", recommended=True)
+    if rooms:
+        m.spot_tag = "Chosen in Round 1"
+        m.fly_shot("whoop_rooms", "Whoop at 1.1 m in a ground-floor room, lining up a 0.9 × 2.1 m doorway.",
+                   (-11.2, -4.9, 1.1), 90, 0, "whoop")
+        m.fly_shot("five_gap", "5\" at 1.3 m in the ground-floor corridor, lining up the smashed 2 × 2.4 m gap.",
+                   (-3.6, 1.8, 1.3), 180, -2, "five")
 
     m.fly_shot("whoop_floor2", "Whoop on floor 2, between the columns toward the collapsed bay.", (7, 4.6, 8.0), 270, -6,
                "whoop")

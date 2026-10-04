@@ -109,6 +109,8 @@
   }
  ],
  "recommended_spot": "L3",
+ "spot_tag": null,
+ "round": 1,
  "spots": [
   {
    "id": "L1",
@@ -169,8 +171,8 @@
   "lightmap_cm_2048": 5.0,
   "lightmap_cm_4096": 2.5,
   "glb_kb": 1273,
-  "build_s": 0.6,
-  "total_s": 10.8
+  "build_s": 0.7,
+  "total_s": 11.1
  },
  "shots": [
   {
@@ -363,7 +365,7 @@
    "spot": "L1",
    "quad": "whoop",
    "img": "img/bando_a_fpv_L1_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
   },
   {
    "kind": "landed",
@@ -379,7 +381,7 @@
    "spot": "L2",
    "quad": "whoop",
    "img": "img/bando_a_fpv_L2_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
   },
   {
    "kind": "landed",
@@ -395,7 +397,7 @@
    "spot": "L3",
    "quad": "whoop",
    "img": "img/bando_a_fpv_L3_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 0\u00b0"
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
   },
   {
    "kind": "landed",

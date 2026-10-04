@@ -9,7 +9,7 @@ import json, os, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out")
-ALL = ["skate_park_a", "skate_park_b", "skate_park_c", "bando_a", "bando_b", "bando_c"]
+ALL = ["skate_park_ba", "skate_park_a", "skate_park_b", "skate_park_c", "bando_a_rooms", "bando_a", "bando_b", "bando_c"]
 BLENDER = os.environ.get("BLENDER", "blender")
 
 args = [a for a in sys.argv[1:] if not a.startswith("--")]

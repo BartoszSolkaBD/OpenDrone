@@ -106,6 +106,8 @@ table.stats th { font-weight: 650; background: var(--chip); }
 .lightbox .imgwrap img { max-height: 84vh; width: auto; max-width: 100%; margin: 0 auto; }
 .lightbox p { color: #ddd; max-width: 1100px; text-align: center; margin: 10px 0 0; font-size: 14px; }
 .kbd { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.new { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
 .missing { padding: 24px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; }
 </style>
 </head>
@@ -114,10 +116,13 @@ table.stats th { font-weight: 650; background: var(--chip); }
   <header class="top">
     <span class="badge">Prototype · throwaway</span>
     <h1>What do Skate Park and Bando look like?</h1>
-    <p class="sub">Three rough blockouts per Map for <a href="https://github.com/BartoszSolkaBD/OpenDrone/issues/17">#17</a>.
+    <p class="sub">Rough blockouts for <a href="https://github.com/BartoszSolkaBD/OpenDrone/issues/17">#17</a>.
       Each one is a Python script run by headless Blender 5.2, exported to a <code>.glb</code> with collider tags
-      (the pipeline from #8), then rendered. React to <b>layout, size, features, Launch Spots and style</b>:
-      the grey and orange colours are only blockout colours. Mix freely: "B's bowls with A's stairs" is a fine answer.</p>
+      (the pipeline from #8), then rendered. The grey and orange colours are only blockout colours.</p>
+    <p class="sub"><b>Round 2.</b> Round 1 picked Skate Park B and Bando A, agreed the sizes, the must-have features
+      and the Launch Spot rule, and chose realistic textures. The tabs marked <span class="new">new</span> are the two
+      Round 2 blockouts: <b>B+A</b> (Skate Park B plus A's street corner) and <b>A+</b> (Bando A with brick rooms).
+      The Round 1 variants are still here for comparison. Questions are at the bottom of the page.</p>
     <nav class="tabs maps" id="mapTabs" aria-label="Map"></nav>
     <nav class="tabs" id="variantTabs" aria-label="Variant"></nav>
   </header>
@@ -127,8 +132,8 @@ table.stats th { font-weight: 650; background: var(--chip); }
     <h3>How to read the images</h3>
     <ul>
       <li><b>Grid:</b> thin lines every 1 m, bold lines every 5 m, on every surface. White box figures are 1.8 m people, for scale only (not in the .glb).</li>
-      <li><b>Markers:</b> round numbers are features (listed under the images). Square <b>L1–L3</b> are Launch Spot candidates; ★ is my pick. Every Map gets exactly one Launch Spot, so pick one per Map.</li>
-      <li><b>FPV shots:</b> a plain 110° horizontal lens. Landed camera height 3.5 cm on the whoop, 7 cm on the 5". Camera Tilt 20° on the whoop, 30° on the 5". All placeholders until the FPV-camera ticket (#14) sets them.</li>
+      <li><b>Markers:</b> round numbers are features (listed under the images). Square <b>L1–L3</b> are Launch Spot candidates; ★ marks the pick. Every Map has exactly one Launch Spot; Round 1 chose Skate Park B's L1 and Bando A's L3.</li>
+      <li><b>FPV shots:</b> Camera Tilt 30° on both Quads (the default chosen in the FPV-camera ticket, #14). Landed camera height 3.5 cm on the whoop, 7 cm on the 5". The lens is a plain 110° horizontal placeholder; #14 chose a fisheye look and is still setting the FOV.</li>
       <li><b>Crossing times</b> use rough cruise speeds (estimates): whoop 5 m/s, 5" 20 m/s, corner to corner of the Map's core.</li>
       <li><b>Lightmap texel</b> is an estimate: the core's surface area packed into one lightmap at 65% efficiency. Smaller is sharper baked shadow.</li>
       <li>Keys: <span class="kbd">←</span> <span class="kbd">→</span> change variant (and the side-by-side comparison), <span class="kbd">↑</span> <span class="kbd">↓</span> change Map. Click any image to enlarge.</li>
@@ -147,14 +152,18 @@ table.stats th { font-weight: 650; background: var(--chip); }
 <script src="out/gallery-data.js"></script>
 <script>
 const DATA = window.BLOCKOUTS || [];
+const ROUND1 = [
+  "Skate Park: B (Concrete Bowl Park).", "Bando: A (Unfinished Tower).",
+  "Size and gaps: agreed (Skate Park about 60 × 40 m, Bando site about 70 × 50 m, real-world scale, a mix of whoop-only, shared and big 5\" gaps).",
+  "Map edges: (a) ground to the horizon, collidable backdrop, no invisible walls.",
+  "Must-have features: agreed.", "Launch Spot rule: agreed (Skate Park B L1, Bando A L3).",
+  "Style: (a) realistic CC0 textures with baked light, no photo graffiti.",
+];
 const QUESTIONS = [
-  ["Skate Park layout", "A, B, C, or a mix?", "B's sunken bowls and snake run as the base, plus A's street corner (stairs and handrails, pergola, ring, light poles): about 60 × 40 m. Leave C out; an indoor hall is what Bando already does."],
-  ["Bando layout", "A, B, C, or a mix?", "A, the unfinished tower and crane, with more bricked-in rooms and doorways on the ground and first floors. B is my second choice."],
-  ["Size and gaps", "Are the footprints and gap sizes right for both Quads?", "Skate Park core about 60 × 40 m; Bando site about 70 × 50 m. Real-world scale, 1:1. A deliberate mix of gaps: a few whoop-only (0.5–1 m), most 2–5 m, a few big 5\" dives (15 m+)."],
-  ["Map edges", "What's past the edge of the Map?", "No invisible walls. The ground runs to the horizon, with simple collidable backdrop blocks and nothing worth flying to beyond about 100 m."],
-  ["Must-have features", "Which features, from any variant, must be in?", "Skate Park: pool bowl, cradle, snake run, full pipe, stairs and handrails, pergola slats, ring, light poles. Bando: column grid, lift shaft, stairs, broken floors, collapsed bay, brick rooms, roof tank, tower crane, containers. Small skate pieces stay as set dressing."],
-  ["Launch Spot rule", "Where should a Map's one Launch Spot be?", "Open flat ground, at least 3 m clear all round, open sky above, facing the centrepiece: Skate Park B L1, Bando A L3."],
-  ["Visual style and light", "What should the finished Maps look like?", "Realistic CC0 textures (concrete, brick, rust, plywood) with baked light at one fixed sunny afternoon; no photo graffiti."],
+  ["Skate Park: B alone, or B plus A's street corner?", "Round 1 picked B. But the agreed size (about 60 × 40 m) and must-have list (stairs and handrails, pergola slats, ring) both came from my B-plus-A suggestion. (a) B as it is: 56 × 40 m, keeping the volcano, with no stairs, handrails, pergola or ring. (b) B+A as built in this round: 62 × 40 m, with A's street corner (terrace, stair set and handrails, hubba, bank, pergola, ring) on the east side in place of the volcano.", "(b) B+A. It's what the agreed size and must-have list describe, and it gives both Quads something above head height to fly through. B alone is almost flat from a landed Quad."],
+  ["Bando: are the rooms in A+ right?", "A+ adds brick rooms to the west half of the ground and first floors: four 6 × 5 m rooms per floor either side of a 5 m corridor, real-size 0.9 × 2.1 m doorways, one smashed 2 m gap per floor, and windows (1.5 × 1.4 m) to the outside. The upper three floors stay open. Options: as built, rooms on more floors, or fewer.", "As built. Doorways and rooms make the whoop lines (a 0.9 m doorway is easy for the whoop and a precision gap for the 5\"), the smashed gaps keep the rooms open to the 5\", and the open upper floors keep the 5\" lines and the light."],
+  ["Time of day", "Round 1 chose realistic textures with baked light but didn't settle the time of day. Each Map is baked once, so one fixed light per Map costs the same whichever time it is. (a) The same sunny early afternoon on both Maps (sun about 50° up). (b) A different fixed light per Map, for example Bando in low late-afternoon sun. A pilot-chosen time of day would need a bake per option, so it's out either way.", "(a) Sunny early afternoon on both Maps. It's the easiest light to read for a Beginner on the default whoop, and it keeps Bando A's open floors lit inside. Other times of day can come later as extra bakes."],
+  ["The variants you didn't pick", "Skate Park A (Street Plaza, now mostly inside B+A) and C (Indoor Warehouse Park); Bando B (Factory Hall) and C (Ruined Compound). Record them as ideas for later Maps, out of scope for the alpha with their scripts kept on the prototype branch, or drop them?", "Record Skate Park C, Bando B and Bando C as later Map ideas under Out of scope, pointing at the prototype branch. Drop Skate Park A, since B+A already contains its best parts."],
 ];
 const MAPS = [...new Set(DATA.map(d => d.map))];
 const byMap = m => DATA.filter(d => d.map === m);
@@ -234,7 +243,7 @@ function renderVariant(v) {
     const card = el("section", "spotcard" + (s.id === v.recommended_spot ? " rec" : ""));
     const hdr = el("header");
     hdr.append(el("span", "id", s.id));
-    if (s.id === v.recommended_spot) hdr.append(el("span", "tag", "★ my pick"));
+    if (s.id === v.recommended_spot) hdr.append(el("span", "tag", "★ " + (v.spot_tag || "my pick")));
     hdr.append(el("span", null, s.note));
     hdr.append(el("span", "nums", `Surface at ${fmt(s.z, 2)} m · headroom ${s.headroom == null ? "open sky" : fmt(s.headroom) + " m"} · nearest obstacle ${s.nearest >= 99 ? "over 99 m" : fmt(s.nearest) + " m"} away at 0.3 m up · facing ${fmt(s.heading, 0)}°`));
     card.append(hdr);
@@ -256,7 +265,7 @@ function renderVariant(v) {
 function renderCompare(map) {
   const vs = byMap(map);
   const main = $("#main"); main.innerHTML = "";
-  main.append(el("h2", null, `${map}: the three variants side by side`));
+  main.append(el("h2", null, `${map}: all variants side by side`));
   main.append(el("p", "pitch", "Plans drawn at the same scale, so their sizes compare directly."));
   const row = el("div", "compare");
   for (const v of vs) {
@@ -300,7 +309,8 @@ function render() {
   const vt = $("#variantTabs"); vt.innerHTML = "";
   for (const v of views.filter(v => v.map === cur.map)) {
     const d = DATA.find(d => d.key === v.key);
-    const b = el("button", null, d ? d.title : "Compare all three"); b.setAttribute("aria-current", v.key === cur.key);
+    const b = el("button", null, d ? d.title + (d.round === 2 ? "<span class='new'>new</span>" : "") : "Compare all");
+    b.setAttribute("aria-current", v.key === cur.key);
     b.onclick = () => { location.hash = v.key; }; vt.append(b);
   }
   if (cur.key.startsWith("compare:")) renderCompare(cur.map); else renderVariant(DATA.find(d => d.key === cur.key));
@@ -329,8 +339,9 @@ document.addEventListener("keydown", e => {
   else if (e.key === "ArrowDown") { e.preventDefault(); stepMap(1); }
 });
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
-$("#questions").innerHTML = "<h3>What I'd like you to react to</h3>" + QUESTIONS.map(([t, q, r], i) =>
-  `<p class="q"><b>Q${i + 1} · ${t}.</b> ${q}<br><span class="rec">My recommendation: ${r}</span></p>`).join("");
+$("#questions").innerHTML = "<h3>Round 1 answers</h3><ul>" + ROUND1.map(a => "<li>" + a + "</li>").join("") + "</ul>" +
+  "<h3>Round 2: what I'd like you to react to</h3>" + QUESTIONS.map(([t, q, r], i) =>
+  `<p class="q"><b>Q${i + 8} · ${t}</b> ${q}<br><span class="rec">My recommendation: ${r}</span></p>`).join("");
 render();
 </script>
 </body>

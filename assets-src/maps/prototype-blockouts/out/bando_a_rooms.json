@@ -1,0 +1,368 @@
+{
+ "key": "bando_a_rooms",
+ "title": "A+ \u00b7 Unfinished Tower, with rooms",
+ "map": "Bando",
+ "pitch": "Round 2: variant A with brick rooms on the ground and first floors (west half): four rooms per floor off a corridor, standard doorways, one smashed gap per floor, windows to the outside.",
+ "facts": [
+  "Vertical: 17 m of building plus a 41 m crane.",
+  "Floors are open-sided, so most of the inside is lit and visible from outside."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Concrete frame",
+   "desc": "24 \u00d7 15 m, five floors every 3.35 m, roof at 16.9 m, 0.4 m columns on a 6 \u00d7 5 m grid.",
+   "pos": [
+    -6,
+    -2.5,
+    2.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Open lift shaft",
+   "desc": "2.2 m square, open from the roof to the ground floor: a 17 m dive.",
+   "pos": [
+    1.5,
+    0,
+    16.9
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Stairs",
+   "desc": "One flight per floor in the east bay, through matching floor openings (1.8 \u00d7 4.8 m).",
+   "pos": [
+    8.5,
+    -5,
+    8.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Broken floors",
+   "desc": "Holes 2\u20135 m across in every floor, at different places on each.",
+   "pos": [
+    -8.5,
+    2.25,
+    10.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Collapsed bay",
+   "desc": "Floor 2's slab fell onto floor 1: a 37\u00b0 ramp-shaped gap.",
+   "pos": [
+    -8.9,
+    4.95,
+    5.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Brick rooms",
+   "desc": "Ground and first floors, west half: four 6 \u00d7 5 m rooms per floor either side of a 5 m corridor. Doorways 0.9 \u00d7 2.1 m, one smashed gap per floor (2 \u00d7 2.4 m and 1.8 \u00d7 2.2 m), windows 1.5 \u00d7 1.4 m.",
+   "pos": [
+    -9,
+    -5,
+    1.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Roof",
+   "desc": "Parapet with two gaps, a water tank on 1.2 m legs, rebar stubs.",
+   "pos": [
+    -9,
+    -5,
+    19.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Tower crane",
+   "desc": "34 m lattice mast (1.3 m openings), 35 m jib over the building, hook hanging at 20 m.",
+   "pos": [
+    20,
+    2,
+    30.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Yard",
+   "desc": "Containers (one stacked), rubble piles, site office, dirt mound, site fence.",
+   "pos": [
+    26,
+    -15,
+    4.0
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L3",
+ "spot_tag": "Chosen in Round 1",
+ "round": 2,
+ "spots": [
+  {
+   "id": "L3",
+   "x": 0,
+   "y": -17,
+   "z_hint": 0.0,
+   "heading": 0,
+   "note": "In the yard, facing the building.",
+   "z": -0.03,
+   "headroom": null,
+   "nearest": 6.7
+  }
+ ],
+ "stats": {
+  "core": [
+   -35,
+   -25,
+   35,
+   25
+  ],
+  "core_w": 70,
+  "core_d": 50,
+  "top": 41.0,
+  "low": -0.3,
+  "diag": 86.0,
+  "whoop_cross_s": 17.2,
+  "five_cross_s": 4.3,
+  "tris": 10100,
+  "objects": 679,
+  "colliders": {
+   "box": 531,
+   "trimesh": 5,
+   "convex": 143
+  },
+  "area_core": 7495,
+  "lightmap_cm_2048": 5.2,
+  "lightmap_cm_4096": 2.6,
+  "glb_kb": 1350,
+  "build_s": 0.7,
+  "total_s": 9.9
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Roof plan from above",
+   "img": "img/bando_a_rooms_plan.jpg",
+   "m_per_px_full": 0.049090909957885745,
+   "width_m": 78.54545593261719,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4236,
+     "y": 0.5463
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5191,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.6082,
+     "y": 0.5926
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.3918,
+     "y": 0.4583
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.3867,
+     "y": 0.4083
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.3854,
+     "y": 0.5926
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.3854,
+     "y": 0.5926
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.7546,
+     "y": 0.463
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.831,
+     "y": 0.7778
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5,
+     "y": 0.8148
+    }
+   ]
+  },
+  {
+   "kind": "plan",
+   "name": "plan_ground",
+   "caption": "Ground-floor plan, cut at 1.8 m",
+   "img": "img/bando_a_rooms_plan_ground.jpg",
+   "m_per_px_full": 0.049090909957885745,
+   "width_m": 78.54545593261719,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.3854,
+     "y": 0.5926
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5,
+     "y": 0.8148
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Three-quarter view",
+   "img": "img/bando_a_rooms_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4491,
+     "y": 0.7124
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.4894,
+     "y": 0.4657
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.5611,
+     "y": 0.5856
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.4068,
+     "y": 0.5851
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.3951,
+     "y": 0.6351
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.4382,
+     "y": 0.752
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.4323,
+     "y": 0.5055
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.6044,
+     "y": 0.2187
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.7196,
+     "y": 0.6222
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5675,
+     "y": 0.8201
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/bando_a_rooms_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/bando_a_rooms_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_rooms",
+   "quad": "whoop",
+   "img": "img/bando_a_rooms_fly_whoop_rooms.jpg",
+   "caption": "Whoop at 1.1 m in a ground-floor room, lining up a 0.9 \u00d7 2.1 m doorway."
+  },
+  {
+   "kind": "flight",
+   "name": "five_gap",
+   "quad": "five",
+   "img": "img/bando_a_rooms_fly_five_gap.jpg",
+   "caption": "5\" at 1.3 m in the ground-floor corridor, lining up the smashed 2 \u00d7 2.4 m gap."
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_floor2",
+   "quad": "whoop",
+   "img": "img/bando_a_rooms_fly_whoop_floor2.jpg",
+   "caption": "Whoop on floor 2, between the columns toward the collapsed bay."
+  },
+  {
+   "kind": "flight",
+   "name": "five_crane",
+   "quad": "five",
+   "img": "img/bando_a_rooms_fly_five_crane.jpg",
+   "caption": "5\" diving past the crane toward the building."
+  },
+  {
+   "kind": "flight",
+   "name": "five_shaft",
+   "quad": "five",
+   "img": "img/bando_a_rooms_fly_five_shaft.jpg",
+   "caption": "5\" over the roof, looking straight down the open lift shaft."
+  }
+ ]
+}

@@ -131,6 +131,8 @@
   }
  ],
  "recommended_spot": "L1",
+ "spot_tag": null,
+ "round": 1,
  "spots": [
   {
    "id": "L1",
@@ -192,7 +194,7 @@
   "lightmap_cm_4096": 1.7,
   "glb_kb": 340,
   "build_s": 0.2,
-  "total_s": 6.8
+  "total_s": 7.0
  },
  "shots": [
   {
@@ -387,7 +389,7 @@
    "spot": "L1",
    "quad": "whoop",
    "img": "img/skate_park_a_fpv_L1_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 180\u00b0"
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 180\u00b0"
   },
   {
    "kind": "landed",
@@ -403,7 +405,7 @@
    "spot": "L2",
    "quad": "whoop",
    "img": "img/skate_park_a_fpv_L2_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
   },
   {
    "kind": "landed",
@@ -419,7 +421,7 @@
    "spot": "L3",
    "quad": "whoop",
    "img": "img/skate_park_a_fpv_L3_whoop.jpg",
-   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 225\u00b0"
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 225\u00b0"
   },
   {
    "kind": "landed",

@@ -39,12 +39,12 @@ COLORS = {
 }
 
 QUADS = {
-    # Camera heights when landed and Camera Tilt are placeholders until the FPV-camera
-    # ticket (#14) sets each Quad's defaults.
-    "whoop": dict(label="Whoop (65 mm)", cam_h=0.035, tilt=20.0),
+    # Camera Tilt default: 30 deg on both Quads (decided in the FPV-camera ticket, #14).
+    # Landed camera heights are estimates.
+    "whoop": dict(label="Whoop (65 mm)", cam_h=0.035, tilt=30.0),
     "five": dict(label='5" freestyle', cam_h=0.07, tilt=30.0),
 }
-FPV_HFOV = 110.0  # degrees, horizontal, plain (rectilinear) lens: a placeholder for #14
+FPV_HFOV = 110.0  # degrees, horizontal, plain (rectilinear) lens: a placeholder; #14 chose a fisheye warp
 
 
 def _rad(d):
@@ -110,6 +110,8 @@ class Map:
         self.core_names = set()   # objects inside the flyable core (stats only)
         self.core = None          # (x0, y0, x1, y1) of the flyable core, set by the variant
         self.recommended_spot = None
+        self.spot_tag = None      # e.g. "Chosen in Round 1"; the gallery shows "my pick" otherwise
+        self.round = 1
         self.plans = [dict(name="plan", caption="Plan from above", cut=None)]
         self.three_quarter = dict(az=215.0, elev=32.0, dist=None, lens=28.0, hide=(), target=None)
         self.extra_views = []
@@ -425,7 +427,8 @@ class Map:
         os.makedirs(os.path.join(out_dir, "glb"), exist_ok=True)
         os.makedirs(os.path.join(out_dir, "img"), exist_ok=True)
         meta = dict(key=self.key, title=self.title, map=self.map_name, pitch=self.pitch, facts=self.facts,
-                    features=self.features, recommended_spot=self.recommended_spot)
+                    features=self.features, recommended_spot=self.recommended_spot, spot_tag=self.spot_tag,
+                    round=self.round)
         vl = bpy.context.view_layer
         vl.update()
 

@@ -1,0 +1,386 @@
+{
+ "key": "skate_park_ba",
+ "title": "B+A \u00b7 Bowl Park + Street Corner",
+ "map": "Skate Park",
+ "pitch": "Round 2: variant B's sunken bowls, snake run and full pipe, plus A's street corner on the east side: a terrace with a stair set and handrails, a hubba and a bank, the pergola and the ring sculpture.",
+ "facts": [
+  "Most features sit below the deck: from a landed Quad the Map looks almost flat.",
+  "Heightfield transitions at 20\u201325 cm resolution: the vertical bowl walls show as steep slopes.",
+  "The street corner adds what stands above head height, besides the poles: terrace, pergola, ring."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Pool bowl",
+   "desc": "16 \u00d7 10 m, shallow end 1.8 m deep (west) to deep end 3.2 m (east), 0.6 m of vertical wall, steel coping.",
+   "pos": [
+    -12,
+    6,
+    -1.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Cradle bowl",
+   "desc": "Round, 10 m across, 1.9 m deep, all transition.",
+   "pos": [
+    7,
+    8,
+    -1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Snake run",
+   "desc": "About 55 m long and 4.4 m wide, winding, up to 1.5 m deep; ramps in at both ends.",
+   "pos": [
+    -5,
+    -15.5,
+    -1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Full pipe",
+   "desc": "A concrete tube 3.6 m across inside, 7 m long: fly straight through.",
+   "pos": [
+    18.5,
+    0,
+    1.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Stair set and handrails",
+   "desc": "6 steps up to a +1.2 m terrace, two handrails 0.9 m above the steps.",
+   "pos": [
+    28,
+    11,
+    1.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Hubba and bank",
+   "desc": "A sloped ledge beside the stairs; a 3.6 m bank up to the terrace.",
+   "pos": [
+    27.5,
+    4.5,
+    0.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Pergola",
+   "desc": "10 \u00d7 6 m. Slats at 3.6 m with 0.6 m gaps (a whoop gap, a tight 5\" gap); 3.3 m clear underneath.",
+   "pos": [
+    19,
+    15.5,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Ring sculpture",
+   "desc": "A steel ring with a 3.1 m opening, centre at 2.2 m, flown east-west.",
+   "pos": [
+    18.5,
+    7,
+    2.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Pyramid",
+   "desc": "Four-sided hip, 1 m high, in the middle of the deck.",
+   "pos": [
+    -1,
+    -1.5,
+    1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 10,
+   "name": "Shade shelter",
+   "desc": "8 \u00d7 4 m roof at 3 m on four posts.",
+   "pos": [
+    -20,
+    16,
+    3.1
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 11,
+   "name": "Light poles",
+   "desc": "9 m poles on the corners and the long sides.",
+   "pos": [
+    33.5,
+    -19.5,
+    9
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spot_tag": "Chosen in Round 1",
+ "round": 2,
+ "spots": [
+  {
+   "id": "L1",
+   "x": -1.8,
+   "y": 6,
+   "z_hint": 0.0,
+   "heading": 270,
+   "note": "Deck between the two bowls, facing into the pool bowl's deep end.",
+   "z": -0.0,
+   "headroom": null,
+   "nearest": 5.4
+  }
+ ],
+ "stats": {
+  "core": [
+   -28,
+   -20,
+   34,
+   20
+  ],
+  "core_w": 62,
+  "core_d": 40,
+  "top": 10.3,
+  "low": -3.2,
+  "diag": 73.8,
+  "whoop_cross_s": 14.8,
+  "five_cross_s": 3.7,
+  "tris": 44956,
+  "objects": 193,
+  "colliders": {
+   "box": 64,
+   "trimesh": 10,
+   "convex": 119
+  },
+  "area_core": 3784,
+  "lightmap_cm_2048": 3.7,
+  "lightmap_cm_4096": 1.9,
+  "glb_kb": 1582,
+  "build_s": 0.3,
+  "total_s": 6.4
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Plan from above",
+   "img": "img/skate_park_ba_plan.jpg",
+   "m_per_px_full": 0.04184999942779541,
+   "width_m": 66.95999908447266,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.276,
+     "y": 0.3697
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5597,
+     "y": 0.3262
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.3805,
+     "y": 0.8367
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.7315,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.8734,
+     "y": 0.2611
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.8659,
+     "y": 0.4022
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.7389,
+     "y": 0.1633
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.7315,
+     "y": 0.3479
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.4403,
+     "y": 0.5326
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.1565,
+     "y": 0.1524
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.9555,
+     "y": 0.9236
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.4283,
+     "y": 0.3697
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Three-quarter view",
+   "img": "img/skate_park_ba_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3441,
+     "y": 0.542
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5092,
+     "y": 0.4505
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.474,
+     "y": 0.7718
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.6376,
+     "y": 0.4478
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.6643,
+     "y": 0.3371
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.6884,
+     "y": 0.3937
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.5816,
+     "y": 0.2974
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.6085,
+     "y": 0.3816
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.467,
+     "y": 0.5452
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.2461,
+     "y": 0.412
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.9073,
+     "y": 0.4865
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.438,
+     "y": 0.4852
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/skate_park_ba_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/skate_park_ba_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_bowl",
+   "quad": "whoop",
+   "img": "img/skate_park_ba_fly_whoop_bowl.jpg",
+   "caption": "Whoop at 1.2 m above the pool floor, carving toward the deep-end wall."
+  },
+  {
+   "kind": "flight",
+   "name": "five_snake",
+   "quad": "five",
+   "img": "img/skate_park_ba_fly_five_snake.jpg",
+   "caption": "5\" dropping into the snake run from 5 m."
+  },
+  {
+   "kind": "flight",
+   "name": "five_ring",
+   "quad": "five",
+   "img": "img/skate_park_ba_fly_five_ring.jpg",
+   "caption": "5\" at 2.2 m crossing from the bowls toward the ring and the stair set."
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_rails",
+   "quad": "whoop",
+   "img": "img/skate_park_ba_fly_whoop_rails.jpg",
+   "caption": "Whoop at 0.7 m lining up the stairs between the handrails."
+  }
+ ]
+}
