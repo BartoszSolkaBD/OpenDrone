@@ -42,6 +42,37 @@ pub struct IntervalStats {
 const GRIDS_MS: [f64; 3] = [1.0, 2.0, 4.0];
 const GRID_TOLERANCE_MS: f64 = 0.4;
 
+/// The grids the grid test checks: 1, 2 and 4 ms, plus the expected report period
+/// (`--expect-hz`, e.g. 3 ms or 6.67 ms with a Radio's RF module on).
+fn grids_ms() -> Vec<f64> {
+    let mut g = GRIDS_MS.to_vec();
+    let p = 1000.0 / crate::expect_hz();
+    if !g.iter().any(|x| (x - p).abs() < 0.05) {
+        g.push((p * 100.0).round() / 100.0);
+    }
+    g
+}
+
+/// Issue #30: how a Radio's values move during one step, report by report. Sizes are in the
+/// device's own steps (one EdgeTX count = 32 SDL units on the Pocket).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ValuePattern {
+    pub phase: String,
+    pub axis: u8,
+    pub changes: usize,
+    pub moving_s: f64,
+    /// Changes of 1-2 steps, 3-9 steps and 10 or more steps. EdgeTX's ADC filter ("jitter
+    /// filter") lets only 1-2 step creeps and jumps of about 10 steps or more through.
+    pub small: usize,
+    pub mid: usize,
+    pub big: usize,
+    pub jump_median_steps: Option<f64>,
+    /// Gaps between successive changes, in report periods (1, 2, 3, 4 or more).
+    pub gap_reports: [usize; 4],
+    /// Changes that landed within the grid tolerance of a whole report period after the previous one.
+    pub on_report_grid: f64,
+}
+
 impl IntervalStats {
     pub fn grid(&self, g: f64) -> f64 {
         self.on_grid_share.iter().find(|(x, _)| *x == g).map(|(_, s)| *s).unwrap_or(f64::NAN)
@@ -92,6 +123,8 @@ pub struct DeviceReport {
     pub gyro_at_rest_hz: Option<f64>,
     #[serde(default)]
     pub gyro_at_rest_longest_gap_ms: Option<f64>,
+    #[serde(default)]
+    pub value_patterns: Vec<ValuePattern>,
     pub checks: Vec<String>,
 }
 
@@ -179,7 +212,7 @@ pub fn interval_stats(ts: &[u64], pause_ns: u64) -> Option<IntervalStats> {
         }
         peak = peak.max(i - j + 1);
     }
-    let on_grid_share = GRIDS_MS
+    let on_grid_share = grids_ms()
         .iter()
         .map(|&g| {
             let on = ms.iter().filter(|&&x| (x / g).round() >= 1.0 && (x - (x / g).round() * g).abs() <= GRID_TOLERANCE_MS).count();
@@ -217,6 +250,80 @@ fn device_kind(info: &DeviceInfo) -> String {
     }
 }
 
+/// Issue #30: the size and spacing of every stick change, per step and stick axis (Radios only).
+fn value_patterns(info: &DeviceInfo, recs: &[&Rec]) -> Vec<ValuePattern> {
+    let (v, p) = info.vendor_product();
+    if !(v == 0x1209 && p == 0x4F54) {
+        return Vec::new();
+    }
+    let step = 65535.0 / 2047.0; // EdgeTX's logical range is 0..2047
+    let period_ms = 1000.0 / crate::expect_hz();
+    let mut out = Vec::new();
+    for ph in Phase::ALL {
+        if matches!(ph, Phase::Done | Phase::GetReady | Phase::Connect) {
+            continue;
+        }
+        for axis in 0..4u8 {
+            // last value per SDL timestamp, then changes
+            let mut ch: Vec<(u64, i32)> = Vec::new();
+            for r in recs.iter().filter(|r| r.kind == Kind::Axis && r.idx == axis && r.phase == ph as u8) {
+                match ch.last_mut() {
+                    Some(l) if l.0 == r.t_sdl => l.1 = r.value,
+                    _ => ch.push((r.t_sdl, r.value)),
+                }
+            }
+            if ch.len() < 3 {
+                continue;
+            }
+            let (mut small, mut mid, mut big) = (0, 0, 0);
+            let mut jumps = Vec::new();
+            let mut gaps = [0usize; 4];
+            let mut on_grid = 0usize;
+            let mut moving_ns = 0u64;
+            let mut n = 0usize;
+            for w in ch.windows(2) {
+                let d = ((w[1].1 - w[0].1) as f64 / step).round().abs();
+                if d == 0.0 {
+                    continue;
+                }
+                n += 1;
+                match d as i64 {
+                    1..=2 => small += 1,
+                    3..=9 => mid += 1,
+                    _ => {
+                        big += 1;
+                        jumps.push(d)
+                    }
+                }
+                let gap_ns = w[1].0 - w[0].0;
+                if gap_ns <= PAUSE_NS {
+                    moving_ns += gap_ns;
+                    let ms = gap_ns as f64 / 1e6;
+                    let k = (ms / period_ms).round();
+                    if k >= 1.0 && (ms - k * period_ms).abs() <= GRID_TOLERANCE_MS {
+                        on_grid += 1;
+                    }
+                    gaps[(k.max(1.0) as usize).min(4) - 1] += 1;
+                }
+            }
+            jumps.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            out.push(ValuePattern {
+                phase: ph.key().to_string(),
+                axis,
+                changes: n,
+                moving_s: moving_ns as f64 / 1e9,
+                small,
+                mid,
+                big,
+                jump_median_steps: if jumps.is_empty() { None } else { Some(jumps[jumps.len() / 2]) },
+                gap_reports: gaps,
+                on_report_grid: on_grid as f64 / n.max(1) as f64,
+            });
+        }
+    }
+    out
+}
+
 fn resolution(recs: &[&Rec], axis: u8) -> AxisResolution {
     let vals: BTreeSet<i32> = recs.iter().filter(|r| r.kind == Kind::Axis && r.idx == axis).map(|r| r.value).collect();
     let v: Vec<i32> = vals.iter().copied().collect();
@@ -248,7 +355,7 @@ fn analyse_device(info: &DeviceInfo, all: &[Rec]) -> DeviceReport {
     if let Some(s) = interval_stats(&all_ts, PAUSE_NS) {
         update_rate.insert(ALL_STEPS.to_string(), s);
     }
-    for ph in [Phase::Circles, Phase::Unfocused, Phase::Sensors, Phase::Extremes] {
+    for ph in [Phase::Circles, Phase::Unfocused, Phase::Sensors, Phase::Extremes, Phase::Flicks, Phase::SlowCircles, Phase::SmallSlow] {
         let ts: Vec<u64> =
             recs.iter().filter(|r| r.kind == Kind::Axis && r.phase == ph as u8).map(|r| r.t_sdl).collect();
         if let Some(s) = interval_stats(&ts, PAUSE_NS) {
@@ -338,6 +445,7 @@ fn analyse_device(info: &DeviceInfo, all: &[Rec]) -> DeviceReport {
         buttons_seen,
         activity,
         rest_axis_changes,
+        value_patterns: value_patterns(info, &recs),
         checks: Vec::new(),
     };
     rep.checks = checks(&rep);
@@ -374,6 +482,26 @@ fn rest_and_disconnect(rep: &DeviceReport, recs: &[&Rec]) -> Vec<String> {
         out.push(format!(
             "Hands-off step: {n} axis changes. SDL only reports changes: a perfectly still stick sends nothing, and only sensor noise or a touch shows up. Silence alone can't tell a resting stick from a stalled device."
         ));
+        let (v, p) = rep.info.vendor_product();
+        if v == 0x1209 && p == 0x4F54 {
+            // Issue #30: with the ADC filter off, a resting stick shows the gimbal's noise here.
+            let step = 65535.0 / 2047.0;
+            let mut parts = Vec::new();
+            for axis in 0..4u8 {
+                let vals: Vec<i32> = recs
+                    .iter()
+                    .filter(|r| r.kind == Kind::Axis && r.idx == axis && r.phase == Phase::Rest as u8)
+                    .map(|r| r.value)
+                    .collect();
+                let changes = a.axis_changes.get(&axis).copied().unwrap_or(0);
+                let spread = match (vals.iter().min(), vals.iter().max()) {
+                    (Some(lo), Some(hi)) => format!("{:.0}", (hi - lo) as f64 / step),
+                    _ => "0".into(),
+                };
+                parts.push(format!("axis {axis}: {changes} changes, spread {spread} counts"));
+            }
+            out.push(format!("Hands-off step, stick noise (issue #30): {}.", parts.join("; ")));
+        }
     }
     if let Some(rm) = recs.iter().find(|r| r.kind == Kind::Removed) {
         let same: Vec<String> = recs
@@ -408,7 +536,15 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
     let _ = circles;
     if v == 0x1209 && p == 0x4F54 {
         match rep.update_rate.get(ALL_STEPS) {
-            Some(s) => out.push(rate_line("Report rate", s, "about 1000 Hz with RF off", 800.0, 1100.0, 1.0)),
+            Some(s) => {
+                let hz = crate::expect_hz();
+                let expect = if hz == 1000.0 {
+                    "about 1000 Hz with RF off".to_string()
+                } else {
+                    format!("about {hz:.0} Hz (--expect-hz: RF on, one report per ELRS packet)")
+                };
+                out.push(rate_line("Report rate", s, &expect, 0.8 * hz, 1.1 * hz, (100000.0 / hz).round() / 100.0))
+            }
             None => out.push("Report rate: no stick movement recorded.".into()),
         }
         let centred: Vec<usize> =
@@ -501,7 +637,7 @@ fn in_step_order<V>(m: &BTreeMap<String, V>) -> Vec<(&String, &V)> {
         if k == "whole run" {
             return 0;
         }
-        crate::STEPS
+        crate::steps()
             .iter()
             .position(|p| p.key() == k)
             .map(|i| 2 * i + 2)
@@ -771,6 +907,36 @@ pub fn write_reports(
                 r.levels_full_range.map(|s| format!("{s:.0}")).unwrap_or("-".into()),
                 r.bits.map(|s| format!("{s:.1}")).unwrap_or("-".into()),
             );
+        }
+
+        if !d.value_patterns.is_empty() {
+            let _ = writeln!(
+                md,
+                "\n**How the values move** (issue #30). Every change on stick axes 0-3, sized in EdgeTX counts (1 count = 32 SDL units). \
+EdgeTX's ADC filter lets through only 1-2 count creeps and jumps of about 10 counts or more, so a filtered stick shows almost nothing in the 3-9 column. \
+With the filter off, or RF on, changes should spread over all sizes. Gaps are in report periods ({:.2} ms).\n",
+                1000.0 / crate::expect_hz()
+            );
+            let _ = writeln!(md, "| Step | Axis | Changes | Per moving s | 1-2 counts | 3-9 counts | 10+ counts | Median jump | Gap 1 / 2 / 3 / 4+ reports | On report grid |\n|---|---|---|---|---|---|---|---|---|---|");
+            for v in &d.value_patterns {
+                let _ = writeln!(
+                    md,
+                    "| {} | {} | {} | {:.0} | {} | {} | {} | {} | {} / {} / {} / {} | {:.0}% |",
+                    v.phase,
+                    v.axis,
+                    v.changes,
+                    v.changes as f64 / v.moving_s.max(1e-9),
+                    v.small,
+                    v.mid,
+                    v.big,
+                    v.jump_median_steps.map(|j| format!("{j:.0}")).unwrap_or("-".into()),
+                    v.gap_reports[0],
+                    v.gap_reports[1],
+                    v.gap_reports[2],
+                    v.gap_reports[3],
+                    100.0 * v.on_report_grid
+                );
+            }
         }
 
         let _ = writeln!(md, "\n**What moved in each step** (axis: number of changes)\n");

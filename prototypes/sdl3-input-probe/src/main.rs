@@ -40,10 +40,14 @@ pub enum Phase {
     Done = 8,
     GetReady = 9,
     SensorsRest = 10,
+    // Issue #30 (the Pocket's uneven value updates): moves at different speeds.
+    Flicks = 11,
+    SlowCircles = 12,
+    SmallSlow = 13,
 }
 
 impl Phase {
-    pub const ALL: [Phase; 11] = [
+    pub const ALL: [Phase; 14] = [
         Phase::Connect,
         Phase::Rest,
         Phase::Circles,
@@ -55,6 +59,9 @@ impl Phase {
         Phase::Done,
         Phase::GetReady,
         Phase::SensorsRest,
+        Phase::Flicks,
+        Phase::SlowCircles,
+        Phase::SmallSlow,
     ];
     pub fn from_u8(v: u8) -> Phase {
         Phase::ALL.into_iter().find(|p| *p as u8 == v).unwrap_or(Phase::GetReady)
@@ -72,6 +79,9 @@ impl Phase {
             Phase::Done => "done",
             Phase::GetReady => "get-ready",
             Phase::SensorsRest => "sensors-rest",
+            Phase::Flicks => "flicks",
+            Phase::SlowCircles => "slow-circles",
+            Phase::SmallSlow => "small-slow",
         }
     }
     fn prompt(self) -> &'static str {
@@ -85,6 +95,9 @@ impl Phase {
             Phase::Unfocused => "CLICK ON THE TERMINAL WINDOW (so this window loses focus),\nthen keep moving both sticks in fast circles.",
             Phase::Sensors => "Motion sensors are now ON. Move BOTH sticks in FAST, continuous circles again.",
             Phase::SensorsRest => "HANDS OFF again (sensors stay on). Put the controller down and don't touch it.",
+            Phase::Flicks => "FAST FLICKS, one stick direction at a time: snap the right stick fully left and back\nto centre, then fully up and back, then the left stick fully left and back. Repeat.",
+            Phase::SlowCircles => "SLOW circles with BOTH sticks: about one full circle every 3 seconds,\nsmooth and steady, all the way round.",
+            Phase::SmallSlow => "SMALL, SLOW corrections with the right stick, like holding a steady hover:\ngentle nudges of about a quarter of the travel, around centre.",
             Phase::Done => "Done. Writing results...",
             Phase::GetReady => "",
         }
@@ -102,9 +115,42 @@ impl Phase {
             Phase::Unfocused => 10.0,
             Phase::Sensors => 12.0,
             Phase::SensorsRest => 6.0,
+            Phase::Flicks => 10.0,
+            Phase::SlowCircles => 15.0,
+            Phase::SmallSlow => 12.0,
             _ => 0.0,
         }
     }
+}
+
+/// Issue #30: the Pocket session. Hands off first (ADC noise with the filter off), then moves from
+/// fast to slow. No yaw-only, switch, focus or sensor steps; #18 settled those.
+pub const POCKET_STEPS: [Phase; 8] = [
+    Phase::Connect,
+    Phase::Rest,
+    Phase::Flicks,
+    Phase::Circles,
+    Phase::SlowCircles,
+    Phase::SmallSlow,
+    Phase::Extremes,
+    Phase::Done,
+];
+
+/// Issue #30: a shorter Pocket session for the extra RF-on packet rates.
+pub const POCKET_SHORT_STEPS: [Phase; 5] = [Phase::Connect, Phase::Rest, Phase::Flicks, Phase::SlowCircles, Phase::Done];
+
+static STEP_LIST: std::sync::OnceLock<&'static [Phase]> = std::sync::OnceLock::new();
+static EXPECT_HZ: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// The steps this run walks through (`--steps pocket` picks the #30 session).
+pub fn steps() -> &'static [Phase] {
+    STEP_LIST.get().copied().unwrap_or(&STEPS)
+}
+
+/// The Radio's expected report rate: 1000 with RF off, or the ELRS packet rate with RF on
+/// (`--expect-hz 250`), because EdgeTX then runs its mixer, and sends a USB report, once per packet.
+pub fn expect_hz() -> f64 {
+    EXPECT_HZ.get().copied().unwrap_or(1000.0)
 }
 
 // Sensor steps come right after the first circles (sensors off), so a short session still reaches
@@ -153,8 +199,21 @@ fn parse_args() -> Args {
             "--reanalyse" => reanalyse(&PathBuf::from(it.next().expect("--reanalyse needs a results folder"))),
             "--poll-us" => a.poll_us = it.next().and_then(|v| v.parse().ok()).expect("--poll-us needs a number"),
             "--out" => a.out_root = PathBuf::from(it.next().expect("--out needs a path")),
+            "--steps" => match it.next().as_deref() {
+                Some("pocket") => {
+                    let _ = STEP_LIST.set(&POCKET_STEPS);
+                }
+                Some("pocket-short") => {
+                    let _ = STEP_LIST.set(&POCKET_SHORT_STEPS);
+                }
+                Some("all") => {}
+                other => panic!("--steps takes pocket, pocket-short or all, not {other:?}"),
+            },
+            "--expect-hz" => {
+                let _ = EXPECT_HZ.set(it.next().and_then(|v| v.parse().ok()).expect("--expect-hz needs a number"));
+            }
             "-h" | "--help" => {
-                println!("sdl3-input-probe [--label NAME] [--quick] [--no-gilrs] [--no-qos] [--selftest] [--poll-us N] [--out DIR]");
+                println!("sdl3-input-probe [--label NAME] [--steps pocket|pocket-short|all] [--expect-hz N] [--quick] [--no-gilrs] [--no-qos] [--selftest] [--poll-us N] [--out DIR] [--reanalyse DIR]");
                 std::process::exit(0);
             }
             other if other.starts_with("-psn_") => {} // macOS Finder launch argument
@@ -350,7 +409,7 @@ fn main() {
         .unwrap_or(false);
     let hid_start = input_monitoring_status();
 
-    println!("PROTOTYPE sdl3-input-probe for issue #18");
+    println!("PROTOTYPE sdl3-input-probe for issues #18, #27 and #30");
     println!("Question: {QUESTION}");
     println!(
         "Run label: {} | quick: {} | Bevy gilrs: {} | poll sleep: {} us | Input Monitoring at start: {}",
@@ -458,7 +517,7 @@ fn guide(
     mut exit: MessageWriter<AppExit>,
 ) {
     let now = Instant::now();
-    let step = STEPS[g.idx];
+    let step = steps()[g.idx];
 
     if let Some(t) = g.done_at {
         if now - t > Duration::from_secs_f32(if run.quick { 1.0 } else { 5.0 }) {
@@ -472,7 +531,7 @@ fn guide(
     let elapsed = (now - g.step_started).as_secs_f32();
 
     if abort && step != Phase::Done {
-        g.idx = STEPS.len() - 1;
+        g.idx = steps().len() - 1;
         g.step_started = now;
         g.lead_in = false;
         return;
@@ -493,7 +552,7 @@ fn guide(
             }
             if g.announced != (g.idx, false) {
                 g.announced = (g.idx, false);
-                println!("\n[step 1/{}] {}", STEPS.len() - 1, step.prompt());
+                println!("\n[step 1/{}] {}", steps().len() - 1, step.prompt());
             }
         }
         Phase::Done => {
@@ -546,7 +605,7 @@ fn guide(
                 }
                 if g.announced != (g.idx, true) {
                     g.announced = (g.idx, true);
-                    println!("\n[step {}/{}] GET READY: {}", g.idx + 1, STEPS.len() - 1, step.prompt().replace('\n', " "));
+                    println!("\n[step {}/{}] GET READY: {}", g.idx + 1, steps().len() - 1, step.prompt().replace('\n', " "));
                 }
                 if elapsed >= lead_in_secs(run.quick) {
                     g.lead_in = false;
@@ -556,7 +615,7 @@ fn guide(
                 shared.phase.store(step as u8, Ordering::Relaxed);
                 if g.announced != (g.idx, false) {
                     g.announced = (g.idx, false);
-                    println!("[step {}/{}] GO ({} s)", g.idx + 1, STEPS.len() - 1, step.seconds(run.quick));
+                    println!("[step {}/{}] GO ({} s)", g.idx + 1, steps().len() - 1, step.seconds(run.quick));
                 }
                 if elapsed >= step.seconds(run.quick) {
                     advance = true;
@@ -568,7 +627,7 @@ fn guide(
     if advance {
         g.idx += 1;
         g.step_started = now;
-        g.lead_in = STEPS[g.idx] != Phase::Done;
+        g.lead_in = steps()[g.idx] != Phase::Done;
     }
 }
 
@@ -588,12 +647,12 @@ fn hud(
 ) {
     let Ok(mut text) = text.single_mut() else { return };
     let live = shared.live.lock().map(|l| l.clone()).unwrap_or_default();
-    let step = STEPS[g.idx];
+    let step = steps()[g.idx];
     let elapsed = g.step_started.elapsed().as_secs_f32();
     let focused = windows.single().map(|w| w.focused).unwrap_or(false);
 
     let mut s = String::new();
-    s.push_str(&format!("SDL3 INPUT PROBE (prototype for issue #18)   run: {}\n\n", run.label));
+    s.push_str(&format!("SDL3 INPUT PROBE (prototype for issues #18, #27, #30)   run: {}\n\n", run.label));
     match step {
         Phase::Done => {
             s.push_str("DONE.\n");
@@ -601,11 +660,11 @@ fn hud(
             s.push('\n');
         }
         Phase::Connect => {
-            s.push_str(&format!("Step 1 of {}:\n{}\n", STEPS.len() - 1, step.prompt()));
+            s.push_str(&format!("Step 1 of {}:\n{}\n", steps().len() - 1, step.prompt()));
         }
         _ if g.lead_in => {
             let left = (lead_in_secs(run.quick) - elapsed).max(0.0);
-            s.push_str(&format!("Step {} of {}: GET READY ({:.0} s)\n{}\n", g.idx + 1, STEPS.len() - 1, left.ceil(), step.prompt()));
+            s.push_str(&format!("Step {} of {}: GET READY ({:.0} s)\n{}\n", g.idx + 1, steps().len() - 1, left.ceil(), step.prompt()));
         }
         _ => {
             let left = (step.seconds(run.quick) - elapsed).max(0.0);
