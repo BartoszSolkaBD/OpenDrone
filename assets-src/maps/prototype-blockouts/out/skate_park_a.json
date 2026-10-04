@@ -1,0 +1,447 @@
+{
+ "key": "skate_park_a",
+ "title": "A \u00b7 Street Plaza",
+ "map": "Skate Park",
+ "pitch": "An open city plaza on two levels: stairs, rails, ledges and a few big sculptural gaps. Mostly low obstacles under open sky.",
+ "facts": [
+  "Open sky everywhere: no ceilings except the pergola.",
+  "Two levels, 1.2 m apart."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Stair set and handrails",
+   "desc": "6 steps, 1.2 m drop, two handrails 0.9 m above the steps.",
+   "pos": [
+    -3,
+    7,
+    1.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Hubba ledge",
+   "desc": "A sloped ledge beside the stairs, 0.45\u20130.5 m above them.",
+   "pos": [
+    0.35,
+    6.5,
+    1.3
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Bank to the terrace",
+   "desc": "Flat bank, 3.6 m run up to the +1.2 m terrace.",
+   "pos": [
+    12,
+    6,
+    0.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Upper terrace",
+   "desc": "50 \u00d7 8 m at +1.2 m, railing, planter trees (7 m), kiosk roof at +4.2 m.",
+   "pos": [
+    -12,
+    12,
+    1.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Pergola",
+   "desc": "10 \u00d7 6 m. Slats at 3.6 m with 0.6 m gaps (a whoop gap, a tight 5\" gap); 3.3 m clear underneath.",
+   "pos": [
+    -15,
+    -11,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Ring sculpture",
+   "desc": "A steel ring with a 3.1 m opening, centre at 2.2 m.",
+   "pos": [
+    0,
+    -8,
+    2.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Wall with windows",
+   "desc": "8 \u00d7 3 m wall; openings 1.4 \u00d7 1.0 m and 1.8 \u00d7 1.4 m.",
+   "pos": [
+    12,
+    -13,
+    1.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Ledges, manual pad, kicker",
+   "desc": "Ledges 0.45\u20130.5 m, a 7 \u00d7 2.5 m manual pad, a 0.5 m kicker.",
+   "pos": [
+    -15,
+    1,
+    0.45
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Flat rail",
+   "desc": "6 m long, 0.35 m high.",
+   "pos": [
+    15,
+    -1,
+    0.35
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 10,
+   "name": "Step seating",
+   "desc": "Three 0.45 m steps along the east edge, 20 m long.",
+   "pos": [
+    23,
+    -4,
+    0.9
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 11,
+   "name": "Light poles",
+   "desc": "8 m poles at the corners: something tall to dive around.",
+   "pos": [
+    -24,
+    -15,
+    8
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spots": [
+  {
+   "id": "L1",
+   "x": -3,
+   "y": 10.5,
+   "z_hint": 1.2,
+   "heading": 180,
+   "note": "Top of the stairs on the terrace, facing the whole plaza.",
+   "z": 1.2,
+   "headroom": null,
+   "nearest": 4.2
+  },
+  {
+   "id": "L2",
+   "x": -22,
+   "y": -3,
+   "z_hint": 0.0,
+   "heading": 90,
+   "note": "Ground level at the west edge, facing east along the plaza.",
+   "z": 0.0,
+   "headroom": null,
+   "nearest": 5.6
+  },
+  {
+   "id": "L3",
+   "x": 19,
+   "y": 12.5,
+   "z_hint": 4.2,
+   "heading": 225,
+   "note": "Kiosk roof, +4.2 m, facing south-west over the plaza.",
+   "z": 4.2,
+   "headroom": null,
+   "nearest": 7.3
+  }
+ ],
+ "stats": {
+  "core": [
+   -25,
+   -16,
+   25,
+   16
+  ],
+  "core_w": 50,
+  "core_d": 32,
+  "top": 9.3,
+  "low": -0.3,
+  "diag": 59.4,
+  "whoop_cross_s": 11.9,
+  "five_cross_s": 3.0,
+  "tris": 3796,
+  "objects": 142,
+  "colliders": {
+   "box": 53,
+   "trimesh": 6,
+   "convex": 83
+  },
+  "area_core": 3186,
+  "lightmap_cm_2048": 3.4,
+  "lightmap_cm_4096": 1.7,
+  "glb_kb": 340,
+  "build_s": 0.2,
+  "total_s": 6.8
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Plan from above",
+   "img": "img/skate_park_a_plan.jpg",
+   "m_per_px_full": 0.03375,
+   "width_m": 54.0,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4444,
+     "y": 0.3114
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5065,
+     "y": 0.3249
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.7222,
+     "y": 0.3384
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.2778,
+     "y": 0.1768
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.2222,
+     "y": 0.7963
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.5,
+     "y": 0.7155
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.7222,
+     "y": 0.8502
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.2222,
+     "y": 0.4731
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.7778,
+     "y": 0.5269
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.9259,
+     "y": 0.6077
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.0556,
+     "y": 0.904
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.4444,
+     "y": 0.2172
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.0926,
+     "y": 0.5808
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.8519,
+     "y": 0.1633
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Three-quarter view",
+   "img": "img/skate_park_a_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4302,
+     "y": 0.4722
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.4635,
+     "y": 0.456
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.5629,
+     "y": 0.4114
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.3174,
+     "y": 0.4828
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.4114,
+     "y": 0.7102
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.557,
+     "y": 0.573
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.7058,
+     "y": 0.5512
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.3399,
+     "y": 0.6204
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.6321,
+     "y": 0.4502
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.7128,
+     "y": 0.4227
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.3,
+     "y": 0.7804
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.4115,
+     "y": 0.4449
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.2758,
+     "y": 0.7368
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5768,
+     "y": 0.2875
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/skate_park_a_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 180\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/skate_park_a_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 180\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_whoop",
+   "spot": "L2",
+   "quad": "whoop",
+   "img": "img/skate_park_a_fpv_L2_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_five",
+   "spot": "L2",
+   "quad": "five",
+   "img": "img/skate_park_a_fpv_L2_five.jpg",
+   "caption": "5\" freestyle landed on L2, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/skate_park_a_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 225\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/skate_park_a_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 225\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_rails",
+   "quad": "whoop",
+   "img": "img/skate_park_a_fly_whoop_rails.jpg",
+   "caption": "Whoop at 0.7 m, cruising toward the stairs between the handrails."
+  },
+  {
+   "kind": "flight",
+   "name": "five_ring",
+   "quad": "five",
+   "img": "img/skate_park_a_fly_five_ring.jpg",
+   "caption": "5\" at 3 m, lining up the ring sculpture from the road."
+  }
+ ]
+}

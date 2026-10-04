@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Blockouts</title>
+<!-- PROTOTYPE, throwaway (#17). Open directly from disk; reads out/gallery-data.js. -->
+<style>
+:root {
+  --bg: #f4f3ef; --panel: #ffffff; --ink: #1c1c1e; --muted: #5d6066; --line: #dedcd5;
+  --chip: #eceae4; --accent: #b35400; --accent-soft: #fbeee2; --mark: #1c1c1e; --mark-ink: #ffffff;
+  --spot: #0a4fc4; --spot-ink: #ffffff; --bar: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141518; --panel: #1d1f23; --ink: #ecebe7; --muted: #a3a6ad; --line: #30333a;
+    --chip: #2a2d33; --accent: #ff9b45; --accent-soft: #3a2a1c; --mark: #f4f3ef; --mark-ink: #141518;
+    --spot: #6ea2ff; --spot-ink: #0d1424; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141518; --panel: #1d1f23; --ink: #ecebe7; --muted: #a3a6ad; --line: #30333a;
+  --chip: #2a2d33; --accent: #ff9b45; --accent-soft: #3a2a1c; --mark: #f4f3ef; --mark-ink: #141518;
+  --spot: #6ea2ff; --spot-ink: #0d1424; --shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-bottom: 84px; }
+a { color: var(--accent); }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; }
+header.top { padding: 22px 0 8px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 4px; padding: 2px 8px; }
+h1 { font-size: 26px; line-height: 1.2; margin: 10px 0 6px; }
+h2 { font-size: 20px; margin: 28px 0 10px; }
+h3 { font-size: 16px; margin: 0 0 6px; }
+.sub { color: var(--muted); margin: 0 0 14px; max-width: 900px; }
+nav.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+nav.tabs button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+  border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+nav.tabs button[aria-current="true"] { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+nav.maps button { font-weight: 650; }
+.pitch { font-size: 17px; max-width: 980px; margin: 4px 0 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; padding: 0; list-style: none; }
+.chips li { background: var(--chip); border-radius: 6px; padding: 3px 9px; font-size: 13.5px; }
+.chips b { font-weight: 650; }
+.facts { color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+@media (max-width: 520px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+figure.shot { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  box-shadow: var(--shadow); }
+.imgwrap { position: relative; cursor: zoom-in; line-height: 0; }
+.imgwrap img { width: 100%; height: auto; display: block; background: #888; }
+figcaption { padding: 8px 12px 10px; font-size: 13.5px; color: var(--muted); }
+figcaption b { color: var(--ink); }
+.mk { position: absolute; transform: translate(-50%, -50%); min-width: 22px; height: 22px; padding: 0 5px;
+  font: 700 12px/22px system-ui, sans-serif; text-align: center; pointer-events: none; white-space: nowrap;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 1px 4px rgba(0,0,0,.5); }
+.mk.feat { background: #1c1c1e; color: #fff; border-radius: 999px; }
+.mk.spot { background: #0a4fc4; color: #fff; border-radius: 4px; }
+.mk.spot.rec::after { content: " ★"; }
+.scalerow { padding-top: 8px; }
+.scalebar { position: relative; height: 6px; border: 2px solid var(--ink); border-top: 0; margin: 4px 0 0 12px; }
+.scalebar span { position: absolute; left: calc(100% + 8px); top: -9px; color: var(--ink); font: 700 12px/1 system-ui, sans-serif;
+  white-space: nowrap; }
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 6px 18px;
+  list-style: none; padding: 0; margin: 12px 0 0; }
+.legend li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; }
+.legend .key { flex: none; display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center;
+  font-weight: 700; font-size: 12px; background: var(--mark); color: var(--mark-ink); border-radius: 999px; }
+.legend .key.spot { background: var(--spot); color: var(--spot-ink); border-radius: 4px; padding: 0 4px; }
+.spotcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 14px;
+  box-shadow: var(--shadow); }
+.spotcard.rec { border: 2px solid var(--spot); }
+.spotcard header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; margin-bottom: 10px; }
+.spotcard .id { font-weight: 800; font-size: 18px; }
+.tag { font-size: 12px; font-weight: 700; color: var(--spot); border: 1px solid var(--spot); border-radius: 4px; padding: 1px 6px; }
+.nums { color: var(--muted); font-size: 13.5px; }
+.compare { display: flex; gap: 12px; align-items: flex-start; }
+.compare > figure { flex-basis: 0; min-width: 0; }
+@media (max-width: 760px) { .compare { flex-direction: column; } .compare > figure { width: 100%; } }
+table.stats { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--panel); border-radius: 10px;
+  overflow: hidden; border: 1px solid var(--line); }
+table.stats th, table.stats td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.stats th { font-weight: 650; background: var(--chip); }
+.tablewrap { overflow-x: auto; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin: 14px 0; }
+.box ul, .box ol { margin: 6px 0; padding-left: 20px; }
+.box li { margin: 3px 0; }
+.q { margin: 0 0 10px; }
+.q b { font-weight: 700; }
+.q .rec { color: var(--muted); }
+.switcher { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 4px; background: #111; color: #fff; border-radius: 999px;
+  padding: 5px; box-shadow: 0 6px 24px rgba(0,0,0,.35); max-width: calc(100vw - 32px); }
+.switcher button { font: 700 18px/1 system-ui, sans-serif; background: #2a2a2e; color: #fff; border: 0;
+  width: 38px; height: 38px; border-radius: 999px; cursor: pointer; flex: none; }
+.switcher .label { padding: 0 12px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.switcher .label small { color: #aaa; margin-left: 8px; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 30; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 16px; cursor: zoom-out; }
+.lightbox[hidden] { display: none; }
+.lightbox .imgwrap { max-width: min(96vw, 1600px); cursor: zoom-out; }
+.lightbox .imgwrap img { max-height: 84vh; width: auto; max-width: 100%; margin: 0 auto; }
+.lightbox p { color: #ddd; max-width: 1100px; text-align: center; margin: 10px 0 0; font-size: 14px; }
+.kbd { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.missing { padding: 24px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="badge">Prototype · throwaway</span>
+    <h1>What do Skate Park and Bando look like?</h1>
+    <p class="sub">Three rough blockouts per Map for <a href="https://github.com/BartoszSolkaBD/OpenDrone/issues/17">#17</a>.
+      Each one is a Python script run by headless Blender 5.2, exported to a <code>.glb</code> with collider tags
+      (the pipeline from #8), then rendered. React to <b>layout, size, features, Launch Spots and style</b>:
+      the grey and orange colours are only blockout colours. Mix freely: "B's bowls with A's stairs" is a fine answer.</p>
+    <nav class="tabs maps" id="mapTabs" aria-label="Map"></nav>
+    <nav class="tabs" id="variantTabs" aria-label="Variant"></nav>
+  </header>
+  <main id="main"></main>
+
+  <section class="box" id="howto">
+    <h3>How to read the images</h3>
+    <ul>
+      <li><b>Grid:</b> thin lines every 1 m, bold lines every 5 m, on every surface. White box figures are 1.8 m people, for scale only (not in the .glb).</li>
+      <li><b>Markers:</b> round numbers are features (listed under the images). Square <b>L1–L3</b> are Launch Spot candidates; ★ is my pick. Every Map gets exactly one Launch Spot, so pick one per Map.</li>
+      <li><b>FPV shots:</b> a plain 110° horizontal lens. Landed camera height 3.5 cm on the whoop, 7 cm on the 5". Camera Tilt 20° on the whoop, 30° on the 5". All placeholders until the FPV-camera ticket (#14) sets them.</li>
+      <li><b>Crossing times</b> use rough cruise speeds (estimates): whoop 5 m/s, 5" 20 m/s, corner to corner of the Map's core.</li>
+      <li><b>Lightmap texel</b> is an estimate: the core's surface area packed into one lightmap at 65% efficiency. Smaller is sharper baked shadow.</li>
+      <li>Keys: <span class="kbd">←</span> <span class="kbd">→</span> change variant (and the side-by-side comparison), <span class="kbd">↑</span> <span class="kbd">↓</span> change Map. Click any image to enlarge.</li>
+    </ul>
+  </section>
+  <section class="box" id="questions"></section>
+</div>
+
+<div class="switcher" role="navigation" aria-label="Variant switcher">
+  <button id="prev" aria-label="Previous variant">‹</button>
+  <div class="label" id="switchLabel"></div>
+  <button id="next" aria-label="Next variant">›</button>
+</div>
+<div class="lightbox" id="lightbox" hidden></div>
+
+<script src="out/gallery-data.js"></script>
+<script>
+const DATA = window.BLOCKOUTS || [];
+const QUESTIONS = [
+  ["Skate Park layout", "A, B, C, or a mix?", "B's sunken bowls and snake run as the base, plus A's street corner (stairs and handrails, pergola, ring, light poles): about 60 × 40 m. Leave C out; an indoor hall is what Bando already does."],
+  ["Bando layout", "A, B, C, or a mix?", "A, the unfinished tower and crane, with more bricked-in rooms and doorways on the ground and first floors. B is my second choice."],
+  ["Size and gaps", "Are the footprints and gap sizes right for both Quads?", "Skate Park core about 60 × 40 m; Bando site about 70 × 50 m. Real-world scale, 1:1. A deliberate mix of gaps: a few whoop-only (0.5–1 m), most 2–5 m, a few big 5\" dives (15 m+)."],
+  ["Map edges", "What's past the edge of the Map?", "No invisible walls. The ground runs to the horizon, with simple collidable backdrop blocks and nothing worth flying to beyond about 100 m."],
+  ["Must-have features", "Which features, from any variant, must be in?", "Skate Park: pool bowl, cradle, snake run, full pipe, stairs and handrails, pergola slats, ring, light poles. Bando: column grid, lift shaft, stairs, broken floors, collapsed bay, brick rooms, roof tank, tower crane, containers. Small skate pieces stay as set dressing."],
+  ["Launch Spot rule", "Where should a Map's one Launch Spot be?", "Open flat ground, at least 3 m clear all round, open sky above, facing the centrepiece: Skate Park B L1, Bando A L3."],
+  ["Visual style and light", "What should the finished Maps look like?", "Realistic CC0 textures (concrete, brick, rust, plywood) with baked light at one fixed sunny afternoon; no photo graffiti."],
+];
+const MAPS = [...new Set(DATA.map(d => d.map))];
+const byMap = m => DATA.filter(d => d.map === m);
+const views = MAPS.flatMap(m => [...byMap(m).map(d => ({ map: m, key: d.key })), { map: m, key: "compare:" + m }]);
+const $ = (s, r = document) => r.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const fmt = (n, d = 1) => Number(n).toFixed(d).replace(/\.0+$/, "");
+
+function niceBar(widthM) {
+  for (const len of [50, 25, 20, 10, 5, 2]) if (len / widthM <= 0.22) return len;
+  return 1;
+}
+function figure(shot, v, extraCaption) {
+  const fig = el("figure", "shot");
+  const wrap = el("div", "imgwrap");
+  const img = new Image();
+  img.src = "out/" + shot.img; img.alt = shot.caption; img.loading = "lazy";
+  wrap.append(img);
+  for (const m of shot.markers || []) {
+    const isSpot = m.kind === "spot";
+    const d = el("span", "mk " + (isSpot ? "spot" : "feat") + (isSpot && v && v.recommended_spot === m.n ? " rec" : ""));
+    d.textContent = m.n; d.style.left = m.x * 100 + "%"; d.style.top = m.y * 100 + "%";
+    wrap.append(d);
+  }
+  fig.append(wrap);
+  if (shot.kind === "plan" && shot.width_m) {
+    const len = niceBar(shot.width_m);
+    const row = el("div", "scalerow"), bar = el("div", "scalebar");
+    bar.style.width = (len / shot.width_m * 100) + "%";
+    bar.append(el("span", null, len + " m")); row.append(bar); fig.append(row);
+  }
+  const cap = el("figcaption", null, "<b>" + shot.caption + "</b>" + (extraCaption ? " · " + extraCaption : ""));
+  fig.append(cap);
+  wrap.addEventListener("click", () => openLightbox(wrap, cap.textContent));
+  return fig;
+}
+function openLightbox(wrap, text) {
+  const lb = $("#lightbox"); lb.innerHTML = "";
+  lb.append(wrap.cloneNode(true), el("p", null, text)); lb.hidden = false;
+}
+$("#lightbox").addEventListener("click", () => { $("#lightbox").hidden = true; });
+
+function chips(v) {
+  const s = v.stats;
+  const items = [
+    `<b>Core</b> ${fmt(s.core_w)} × ${fmt(s.core_d)} m`,
+    `<b>Tallest</b> ${fmt(s.top)} m`,
+    s.low < -0.5 ? `<b>Deepest</b> ${fmt(s.low)} m` : null,
+    `<b>Corner to corner</b> ${fmt(s.diag, 0)} m: whoop ≈ ${fmt(s.whoop_cross_s)} s, 5" ≈ ${fmt(s.five_cross_s)} s`,
+    `<b>Lightmap</b> ≈ ${fmt(s.lightmap_cm_2048)} cm/texel at 2048² (${fmt(s.lightmap_cm_4096)} at 4096²)`,
+    `<b>Geometry</b> ${s.tris.toLocaleString()} triangles, ${s.objects} objects, .glb ${s.glb_kb} KB`,
+    `<b>Build</b> ${fmt(s.build_s)} s to .glb, ${fmt(s.total_s)} s with renders`,
+  ].filter(Boolean);
+  return "<ul class='chips'>" + items.map(i => "<li>" + i + "</li>").join("") + "</ul>";
+}
+function renderVariant(v) {
+  const main = $("#main"); main.innerHTML = "";
+  const head = el("section");
+  head.append(el("h2", null, `${v.map} · ${v.title}`), el("p", "pitch", v.pitch));
+  head.insertAdjacentHTML("beforeend", chips(v));
+  if (v.facts.length) head.insertAdjacentHTML("beforeend", "<ul class='facts'>" + v.facts.map(f => "<li>" + f + "</li>").join("") + "</ul>");
+  main.append(head);
+
+  main.append(el("h2", null, "Layout"));
+  const g = el("div", "grid2");
+  for (const sh of v.shots.filter(s => s.kind === "plan" || s.kind === "view"))
+    g.append(figure(sh, v, sh.kind === "plan" ? `${fmt(v.stats.core_w)} × ${fmt(v.stats.core_d)} m core, north up` : null));
+  main.append(g);
+  const leg = el("ul", "legend");
+  for (const f of v.features) leg.insertAdjacentHTML("beforeend", `<li><span class="key">${f.n}</span><span><b>${f.name}.</b> ${f.desc}</span></li>`);
+  for (const s of v.spots) leg.insertAdjacentHTML("beforeend",
+    `<li><span class="key spot">${s.id}${s.id === v.recommended_spot ? " ★" : ""}</span><span><b>Launch Spot candidate.</b> ${s.note}</span></li>`);
+  main.append(leg);
+
+  main.append(el("h2", null, "Launch Spot candidates, seen from a landed Quad"));
+  for (const s of v.spots) {
+    const card = el("section", "spotcard" + (s.id === v.recommended_spot ? " rec" : ""));
+    const hdr = el("header");
+    hdr.append(el("span", "id", s.id));
+    if (s.id === v.recommended_spot) hdr.append(el("span", "tag", "★ my pick"));
+    hdr.append(el("span", null, s.note));
+    hdr.append(el("span", "nums", `Surface at ${fmt(s.z, 2)} m · headroom ${s.headroom == null ? "open sky" : fmt(s.headroom) + " m"} · nearest obstacle ${s.nearest >= 99 ? "over 99 m" : fmt(s.nearest) + " m"} away at 0.3 m up · facing ${fmt(s.heading, 0)}°`));
+    card.append(hdr);
+    const row = el("div", "grid2");
+    for (const sh of v.shots.filter(x => x.kind === "landed" && x.spot === s.id)) row.append(figure(sh, v));
+    card.append(row); main.append(card);
+  }
+  const flights = v.shots.filter(s => s.kind === "flight");
+  if (flights.length) {
+    main.append(el("h2", null, "In the air"));
+    const fg = el("div", "grid2");
+    for (const sh of flights) fg.append(figure(sh, v, sh.quad === "whoop" ? "whoop camera" : '5" camera'));
+    main.append(fg);
+  }
+  const c = v.stats.colliders;
+  main.append(el("p", "nums", `Collider tags in the .glb: ${Object.entries(c).map(([k, n]) => `${k} × ${n}`).join(", ")}. ` +
+    `File: <code>out/glb/${v.key}.glb</code> (Launch Spot candidates are empty nodes tagged <code>od_launch_spot</code>).`));
+}
+function renderCompare(map) {
+  const vs = byMap(map);
+  const main = $("#main"); main.innerHTML = "";
+  main.append(el("h2", null, `${map}: the three variants side by side`));
+  main.append(el("p", "pitch", "Plans drawn at the same scale, so their sizes compare directly."));
+  const row = el("div", "compare");
+  for (const v of vs) {
+    const plan = v.shots.find(s => s.kind === "plan");
+    const f = figure(plan, v, `${v.title}: ${fmt(v.stats.core_w)} × ${fmt(v.stats.core_d)} m`);
+    f.style.flexGrow = plan.width_m; row.append(f);
+  }
+  main.append(row);
+  main.append(el("h2", null, "Three-quarter views"));
+  const g = el("div", "grid3");
+  for (const v of vs) g.append(figure(v.shots.find(s => s.name === "three_quarter"), v, v.title));
+  main.append(g);
+  main.append(el("h2", null, "Numbers"));
+  const rows = [
+    ["Pitch", v => v.pitch],
+    ["Core size", v => `${fmt(v.stats.core_w)} × ${fmt(v.stats.core_d)} m`],
+    ["Height range", v => `${fmt(v.stats.low)} to ${fmt(v.stats.top)} m`],
+    ["Corner to corner", v => `${fmt(v.stats.diag, 0)} m: whoop ≈ ${fmt(v.stats.whoop_cross_s)} s, 5" ≈ ${fmt(v.stats.five_cross_s)} s`],
+    ["Features", v => v.features.map(f => f.name).join(", ")],
+    ["Launch Spot pick", v => { const s = v.spots.find(s => s.id === v.recommended_spot); return s ? `${s.id}: ${s.note}` : "none"; }],
+    ["Triangles / objects", v => `${v.stats.tris.toLocaleString()} / ${v.stats.objects}`],
+    ["Lightmap at 2048²", v => `≈ ${fmt(v.stats.lightmap_cm_2048)} cm per texel`],
+  ];
+  const t = el("table", "stats");
+  t.innerHTML = "<tr><th></th>" + vs.map(v => `<th>${v.title}</th>`).join("") + "</tr>" +
+    rows.map(([k, f]) => `<tr><th>${k}</th>${vs.map(v => `<td>${f(v)}</td>`).join("")}</tr>`).join("");
+  const tw = el("div", "tablewrap"); tw.append(t); main.append(tw);
+}
+function current() {
+  const h = decodeURIComponent(location.hash.slice(1));
+  return views.find(v => v.key === h) || views[0];
+}
+function render() {
+  if (!DATA.length) { $("#main").innerHTML = "<div class='missing'>No data yet. Run <code>python3 build_all.py</code> in this folder.</div>"; return; }
+  const cur = current();
+  const mt = $("#mapTabs"); mt.innerHTML = "";
+  for (const m of MAPS) {
+    const b = el("button", null, m); b.setAttribute("aria-current", m === cur.map);
+    b.onclick = () => { location.hash = byMap(m)[0].key; }; mt.append(b);
+  }
+  const vt = $("#variantTabs"); vt.innerHTML = "";
+  for (const v of views.filter(v => v.map === cur.map)) {
+    const d = DATA.find(d => d.key === v.key);
+    const b = el("button", null, d ? d.title : "Compare all three"); b.setAttribute("aria-current", v.key === cur.key);
+    b.onclick = () => { location.hash = v.key; }; vt.append(b);
+  }
+  if (cur.key.startsWith("compare:")) renderCompare(cur.map); else renderVariant(DATA.find(d => d.key === cur.key));
+  const within = views.filter(v => v.map === cur.map);
+  const d = DATA.find(d => d.key === cur.key);
+  $("#switchLabel").innerHTML = `${cur.map} · ${d ? d.title : "Compare"}<small>${within.indexOf(cur) + 1}/${within.length} · ↑↓ Map</small>`;
+  document.title = `${cur.map} ${d ? d.title.split(" · ")[0] : "compare"} · Map Blockouts`;
+}
+function step(dir) {
+  const cur = current(); const within = views.filter(v => v.map === cur.map);
+  location.hash = within[(within.indexOf(cur) + dir + within.length) % within.length].key;
+}
+function stepMap(dir) {
+  const cur = current(); const i = MAPS.indexOf(cur.map);
+  location.hash = byMap(MAPS[(i + dir + MAPS.length) % MAPS.length])[0].key;
+}
+$("#prev").onclick = () => step(-1);
+$("#next").onclick = () => step(1);
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, textarea, [contenteditable]")) return;
+  if (e.key === "Escape") $("#lightbox").hidden = true;
+  if (!$("#lightbox").hidden) return;
+  if (e.key === "ArrowLeft") step(-1);
+  else if (e.key === "ArrowRight") step(1);
+  else if (e.key === "ArrowUp") { e.preventDefault(); stepMap(-1); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); stepMap(1); }
+});
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+$("#questions").innerHTML = "<h3>What I'd like you to react to</h3>" + QUESTIONS.map(([t, q, r], i) =>
+  `<p class="q"><b>Q${i + 1} · ${t}.</b> ${q}<br><span class="rec">My recommendation: ${r}</span></p>`).join("");
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,448 @@
+{
+ "key": "bando_c",
+ "title": "C \u00b7 Ruined Compound",
+ "map": "Bando",
+ "pitch": "Two-storey brick ruins around an overgrown courtyard: roofs gone to bare rafters, a tunnel through one wing, a walkway bridge to a three-storey tower, and a water tower outside the walls.",
+ "facts": [
+  "Spread out and mostly low (2.4\u201311 m), with one 19.5 m landmark.",
+  "Lots of small openings: windows 1.4 \u00d7 1.8 m, doors 1\u20132.5 m."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "North wing",
+   "desc": "40 \u00d7 8 m, two storeys; the roof is gone except rafters every 1.2 m (about 1 m gaps).",
+   "pos": [
+    -2,
+    14,
+    8.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Tunnel",
+   "desc": "A 3 \u00d7 3.2 m passage through the west wing's ground floor.",
+   "pos": [
+    -18,
+    -1.5,
+    1.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "East tower",
+   "desc": "10 \u00d7 16 m, three storeys, flat roof at 10.8 m with a parapet and a tank.",
+   "pos": [
+    17,
+    -6,
+    10.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Walkway bridge",
+   "desc": "1.5 m wide, 8 m long, at 3.6 m, joining the north wing and the tower.",
+   "pos": [
+    15.25,
+    6,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Broken floors",
+   "desc": "Timber floors with holes on the first floor of both wings and in the tower.",
+   "pos": [
+    -13,
+    12.5,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Courtyard",
+   "desc": "About 28 \u00d7 26 m: three trees (9\u201311 m), a dry fountain, rubble, a burned-out car.",
+   "pos": [
+    0,
+    -6,
+    2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Boundary wall and gate",
+   "desc": "2.4 m walls with breaches; the gate is 4.8 \u00d7 3.5 m.",
+   "pos": [
+    0,
+    -26,
+    3.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Collapsed shed",
+   "desc": "A roof sheet leaning on the south wall: a wedge-shaped gap underneath.",
+   "pos": [
+    -21,
+    -22.9,
+    1.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Water tower",
+   "desc": "14 m legs with X-bracing, tank top at 19.5 m, outside the walls.",
+   "pos": [
+    34,
+    28,
+    16
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spots": [
+  {
+   "id": "L1",
+   "x": 0,
+   "y": -14,
+   "z_hint": 0.0,
+   "heading": 0,
+   "note": "Courtyard, facing the north wing.",
+   "z": -0.03,
+   "headroom": null,
+   "nearest": 5.3
+  },
+  {
+   "id": "L2",
+   "x": 15.25,
+   "y": 6,
+   "z_hint": 3.6,
+   "heading": 270,
+   "note": "On the walkway bridge, +3.6 m, facing across the courtyard.",
+   "z": 3.6,
+   "headroom": null,
+   "nearest": 0.7
+  },
+  {
+   "id": "L3",
+   "x": 0,
+   "y": -31,
+   "z_hint": 0.0,
+   "heading": 0,
+   "note": "Outside the gate on the road, facing in.",
+   "z": -0.02,
+   "headroom": null,
+   "nearest": 5.2
+  }
+ ],
+ "stats": {
+  "core": [
+   -40,
+   -35,
+   40,
+   35
+  ],
+  "core_w": 80,
+  "core_d": 70,
+  "top": 19.5,
+  "low": -0.3,
+  "diag": 106.3,
+  "whoop_cross_s": 21.3,
+  "five_cross_s": 5.3,
+  "tris": 9136,
+  "objects": 566,
+  "colliders": {
+   "box": 417,
+   "trimesh": 3,
+   "convex": 146
+  },
+  "area_core": 9001,
+  "lightmap_cm_2048": 5.7,
+  "lightmap_cm_4096": 2.9,
+  "glb_kb": 1143,
+  "build_s": 0.6,
+  "total_s": 10.5
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Roof plan from above",
+   "img": "img/bando_c_plan.jpg",
+   "m_per_px_full": 0.06872727394104004,
+   "width_m": 109.96363830566406,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4818,
+     "y": 0.3148
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.3363,
+     "y": 0.5198
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.6546,
+     "y": 0.5794
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.6387,
+     "y": 0.4206
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.3818,
+     "y": 0.3347
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.5,
+     "y": 0.5794
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.5,
+     "y": 0.8439
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.309,
+     "y": 0.8029
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.8092,
+     "y": 0.1296
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.5,
+     "y": 0.6852
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.6387,
+     "y": 0.4206
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5,
+     "y": 0.9101
+    }
+   ]
+  },
+  {
+   "kind": "plan",
+   "name": "plan_ground",
+   "caption": "Ground-floor plan, cut at 2.2 m",
+   "img": "img/bando_c_plan_ground.jpg",
+   "m_per_px_full": 0.06872727394104004,
+   "width_m": 109.96363830566406,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.3363,
+     "y": 0.5198
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.5,
+     "y": 0.5794
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.309,
+     "y": 0.8029
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.5,
+     "y": 0.6852
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.5,
+     "y": 0.9101
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Three-quarter view",
+   "img": "img/bando_c_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4326,
+     "y": 0.3492
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.3681,
+     "y": 0.6136
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.6481,
+     "y": 0.3774
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5756,
+     "y": 0.3944
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.3613,
+     "y": 0.4573
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.5255,
+     "y": 0.5585
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.6325,
+     "y": 0.7281
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.4267,
+     "y": 0.8728
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.5995,
+     "y": 0.1019
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.5626,
+     "y": 0.6523
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.5756,
+     "y": 0.3944
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.6606,
+     "y": 0.8357
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/bando_c_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/bando_c_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_whoop",
+   "spot": "L2",
+   "quad": "whoop",
+   "img": "img/bando_c_fpv_L2_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_five",
+   "spot": "L2",
+   "quad": "five",
+   "img": "img/bando_c_fpv_L2_five.jpg",
+   "caption": "5\" freestyle landed on L2, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/bando_c_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/bando_c_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_rafters",
+   "quad": "whoop",
+   "img": "img/bando_c_fly_whoop_rafters.jpg",
+   "caption": "Whoop on the north wing's first floor, under the bare rafters."
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_tunnel",
+   "quad": "whoop",
+   "img": "img/bando_c_fly_whoop_tunnel.jpg",
+   "caption": "Whoop at 1.3 m lining up the tunnel from the courtyard."
+  },
+  {
+   "kind": "flight",
+   "name": "five_tower",
+   "quad": "five",
+   "img": "img/bando_c_fly_five_tower.jpg",
+   "caption": "5\" diving off the water tower toward the compound."
+  }
+ ]
+}

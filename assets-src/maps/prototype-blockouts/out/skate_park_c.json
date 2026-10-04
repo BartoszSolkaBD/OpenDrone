@@ -1,0 +1,574 @@
+{
+ "key": "skate_park_c",
+ "title": "C \u00b7 Indoor Warehouse Park",
+ "map": "Skate Park",
+ "pitch": "A skate park inside a 48 \u00d7 28 m shed: wooden vert ramp, mini ramp, spine and funbox under roof trusses, a caf\u00e9 mezzanine, open roller doors and skylights to escape through.",
+ "facts": [
+  "Indoors with a roof at 7\u201310 m: the ceiling is part of the Map.",
+  "Exits: two roller doors, three skylights, a ring of high windows."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Vert ramp",
+   "desc": "10 m wide, 3.6 m tall (3 m transition plus 0.6 m vertical), 4 m flat, decks with railings.",
+   "pos": [
+    -10,
+    0,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Mini ramp",
+   "desc": "7 m wide, 1.8 m tall, 3 m flat.",
+   "pos": [
+    4,
+    7.5,
+    1.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Spine",
+   "desc": "Two 1.5 m transitions back to back, 8 m wide.",
+   "pos": [
+    16,
+    -8,
+    1.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Funbox and rail",
+   "desc": "8.6 \u00d7 3.5 m, 0.6 m high, banks both ends, rail on top.",
+   "pos": [
+    4,
+    -6,
+    0.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Wall quarter pipe",
+   "desc": "9 m wide, 2.5 m tall, against the east wall.",
+   "pos": [
+    22,
+    7.5,
+    2.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Mezzanine caf\u00e9",
+   "desc": "+3.2 m deck along the west wall; three rooms underneath with 1 \u00d7 2.1 m doors.",
+   "pos": [
+    -20.5,
+    0,
+    3.2
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Roof trusses",
+   "desc": "Steel trusses every 6 m from 7 m (eaves) to 10 m (ridge); triangles about 3 m across.",
+   "pos": [
+    0,
+    -7,
+    8.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Skylights",
+   "desc": "Three open 3 \u00d7 3 m holes in the south roof: a way out to the sky.",
+   "pos": [
+    -12.8,
+    -7.6,
+    8.4
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Roller doors",
+   "desc": "Open: 5 \u00d7 5 m (south, to the yard) and 4 \u00d7 4.5 m (east).",
+   "pos": [
+    0,
+    -14,
+    2.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 10,
+   "name": "High windows",
+   "desc": "3 \u00d7 1.5 m openings at 4.5 m all round.",
+   "pos": [
+    -24,
+    4.5,
+    5.2
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spots": [
+  {
+   "id": "L1",
+   "x": -20.5,
+   "y": 2,
+   "z_hint": 3.2,
+   "heading": 90,
+   "note": "On the mezzanine, +3.2 m, facing the whole hall.",
+   "z": 3.2,
+   "headroom": 6.31,
+   "nearest": 3.4
+  },
+  {
+   "id": "L2",
+   "x": 0,
+   "y": -11.5,
+   "z_hint": 0.0,
+   "heading": 0,
+   "note": "Hall floor just inside the big roller door, facing in.",
+   "z": -0.0,
+   "headroom": 6.85,
+   "nearest": 2.0
+  },
+  {
+   "id": "L3",
+   "x": 0,
+   "y": -24,
+   "z_hint": 0.0,
+   "heading": 0,
+   "note": "Outside in the yard, facing the open roller door.",
+   "z": -0.03,
+   "headroom": null,
+   "nearest": 10.1
+  }
+ ],
+ "stats": {
+  "core": [
+   -26,
+   -16,
+   26,
+   16
+  ],
+  "core_w": 52,
+  "core_d": 32,
+  "top": 10.1,
+  "low": -0.3,
+  "diag": 61.1,
+  "whoop_cross_s": 12.2,
+  "five_cross_s": 3.1,
+  "tris": 4764,
+  "objects": 291,
+  "colliders": {
+   "box": 215,
+   "trimesh": 11,
+   "convex": 65
+  },
+  "area_core": 8475,
+  "lightmap_cm_2048": 5.6,
+  "lightmap_cm_4096": 2.8,
+  "glb_kb": 594,
+  "build_s": 0.3,
+  "total_s": 10.5
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Floor plan, cut at 6.5 m (roof and trusses removed)",
+   "img": "img/skate_park_c_plan.jpg",
+   "m_per_px_full": 0.03509999990463257,
+   "width_m": 56.15999984741211,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3219,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5712,
+     "y": 0.3057
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.7849,
+     "y": 0.7072
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5712,
+     "y": 0.6554
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.8917,
+     "y": 0.3057
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.135,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.5,
+     "y": 0.8626
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.0726,
+     "y": 0.3834
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.135,
+     "y": 0.4482
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.5,
+     "y": 0.7979
+    }
+   ]
+  },
+  {
+   "kind": "plan",
+   "name": "plan_roof",
+   "caption": "Roof plan from above",
+   "img": "img/skate_park_c_plan_roof.jpg",
+   "m_per_px_full": 0.03509999990463257,
+   "width_m": 56.15999984741211,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3219,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5712,
+     "y": 0.3057
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.7849,
+     "y": 0.7072
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5712,
+     "y": 0.6554
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.8917,
+     "y": 0.3057
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.135,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.5,
+     "y": 0.6813
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.2721,
+     "y": 0.6968
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.5,
+     "y": 0.8626
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.0726,
+     "y": 0.3834
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.135,
+     "y": 0.4482
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.5,
+     "y": 0.7979
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Cutaway three-quarter view (roof, south and west walls hidden)",
+   "img": "img/skate_park_c_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3771,
+     "y": 0.5228
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5052,
+     "y": 0.3898
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.7257,
+     "y": 0.5068
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5804,
+     "y": 0.57
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.6761,
+     "y": 0.3003
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.233,
+     "y": 0.602
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.5434,
+     "y": 0.4683
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.3642,
+     "y": 0.5614
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.5896,
+     "y": 0.689
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.1652,
+     "y": 0.5206
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.2281,
+     "y": 0.5716
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.5691,
+     "y": 0.692
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.6722,
+     "y": 0.9407
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "exterior",
+   "caption": "Exterior three-quarter view",
+   "img": "img/skate_park_c_exterior.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3923,
+     "y": 0.4982
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.4642,
+     "y": 0.4198
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.6201,
+     "y": 0.463
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5289,
+     "y": 0.5146
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.5756,
+     "y": 0.3509
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.3007,
+     "y": 0.5569
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.5055,
+     "y": 0.4337
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.4005,
+     "y": 0.4935
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.5448,
+     "y": 0.5645
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.2485,
+     "y": 0.5118
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.2931,
+     "y": 0.5418
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.5297,
+     "y": 0.5812
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.6089,
+     "y": 0.6874
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/skate_park_c_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/skate_park_c_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_whoop",
+   "spot": "L2",
+   "quad": "whoop",
+   "img": "img/skate_park_c_fpv_L2_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_five",
+   "spot": "L2",
+   "quad": "five",
+   "img": "img/skate_park_c_fpv_L2_five.jpg",
+   "caption": "5\" freestyle landed on L2, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/skate_park_c_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/skate_park_c_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 0\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_trusses",
+   "quad": "whoop",
+   "img": "img/skate_park_c_fly_whoop_trusses.jpg",
+   "caption": "Whoop at 8 m, threading the roof trusses along the hall."
+  },
+  {
+   "kind": "flight",
+   "name": "five_vert",
+   "quad": "five",
+   "img": "img/skate_park_c_fly_five_vert.jpg",
+   "caption": "5\" dropping into the vert ramp from above the north deck."
+  }
+ ]
+}

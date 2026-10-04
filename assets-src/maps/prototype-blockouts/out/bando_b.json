@@ -1,0 +1,561 @@
+{
+ "key": "bando_b",
+ "title": "B \u00b7 Factory Hall",
+ "map": "Bando",
+ "pitch": "One huge abandoned factory hall (60 \u00d7 24 m, 11\u201314 m high) with a saw-tooth roof you can fly out of, a gantry crane, an office block of small rooms, and silos, pipe racks and a chimney outside.",
+ "facts": [
+  "Mostly one big interior volume: room for a 5\" to fly fast indoors.",
+  "Outside structures (silos, rack, chimney) give the 5\" its high lines."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Main hall",
+   "desc": "60 \u00d7 24 m, 11 m to the eaves, saw-tooth roof to 14 m.",
+   "pos": [
+    -14,
+    2,
+    6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Saw-tooth roof openings",
+   "desc": "Each tooth has a 3 m tall open face with posts every 2.4 m; two teeth have missing sheets.",
+   "pos": [
+    -7.5,
+    -4,
+    13
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Central column row",
+   "desc": "0.4 m columns every 7.5 m down the middle: a slalom.",
+   "pos": [
+    -7.5,
+    0,
+    3
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Gantry crane",
+   "desc": "Runway beams at 8.5 m, a bridge across the hall, a hook hanging to 3 m.",
+   "pos": [
+    6,
+    0,
+    9.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Office block",
+   "desc": "Two storeys of small rooms (doors 1 \u00d7 2.1 m, inner windows), roof deck at 7 m.",
+   "pos": [
+    24,
+    -7,
+    7.1
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Service pit",
+   "desc": "16 m long, 1.2 m wide, 1.5 m deep.",
+   "pos": [
+    -14,
+    -6,
+    0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Machines and tank",
+   "desc": "Presses (3.5 m), lathes, a lying 2.4 m tank.",
+   "pos": [
+    -10,
+    6,
+    3.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Breach and windows",
+   "desc": "A 5 \u00d7 7 m hole in the north wall; 4 \u00d7 4 m broken windows all round.",
+   "pos": [
+    -10.5,
+    12,
+    3.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 9,
+   "name": "Loading dock",
+   "desc": "1.2 m dock under a 5 m canopy; two trailers with a 1.2 m gap underneath.",
+   "pos": [
+    38,
+    -3.5,
+    4
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 10,
+   "name": "Silos and pipe rack",
+   "desc": "Two 17.5 m silos on legs (2 m under the hoppers); a 6 m pipe rack along the north wall.",
+   "pos": [
+    -42,
+    13,
+    12
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 11,
+   "name": "Chimney",
+   "desc": "42 m brick chimney.",
+   "pos": [
+    40,
+    20,
+    42
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spots": [
+  {
+   "id": "L1",
+   "x": -27,
+   "y": 3,
+   "z_hint": 0.15,
+   "heading": 90,
+   "note": "Inside the west end on the floor, facing down the 60 m hall.",
+   "z": 0.15,
+   "headroom": 11.97,
+   "nearest": 3.0
+  },
+  {
+   "id": "L2",
+   "x": 22,
+   "y": -5.6,
+   "z_hint": 3.6,
+   "heading": 270,
+   "note": "Office block, first floor, facing out of an inner window over the hall.",
+   "z": 3.6,
+   "headroom": 3.2,
+   "nearest": 2.4
+  },
+  {
+   "id": "L3",
+   "x": 31.6,
+   "y": 0,
+   "z_hint": 1.2,
+   "heading": 270,
+   "note": "Loading dock, +1.2 m, facing in through the open loading door.",
+   "z": 1.2,
+   "headroom": 3.8,
+   "nearest": 1.6
+  }
+ ],
+ "stats": {
+  "core": [
+   -50,
+   -30,
+   50,
+   30
+  ],
+  "core_w": 100,
+  "core_d": 60,
+  "top": 42.0,
+  "low": -1.6,
+  "diag": 116.6,
+  "whoop_cross_s": 23.3,
+  "five_cross_s": 5.8,
+  "tris": 9756,
+  "objects": 590,
+  "colliders": {
+   "box": 354,
+   "trimesh": 17,
+   "convex": 219
+  },
+  "area_core": 18600,
+  "lightmap_cm_2048": 8.3,
+  "lightmap_cm_4096": 4.1,
+  "glb_kb": 1178,
+  "build_s": 0.6,
+  "total_s": 11.1
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Roof plan from above",
+   "img": "img/bando_b_plan.jpg",
+   "m_per_px_full": 0.0675,
+   "width_m": 108.0,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3704,
+     "y": 0.4731
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.4306,
+     "y": 0.5539
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.4306,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5556,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.7222,
+     "y": 0.5943
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.3704,
+     "y": 0.5808
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.4074,
+     "y": 0.4192
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.4028,
+     "y": 0.3384
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.8519,
+     "y": 0.5471
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.1111,
+     "y": 0.3249
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.8704,
+     "y": 0.2306
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.25,
+     "y": 0.4596
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.7037,
+     "y": 0.5754
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.7926,
+     "y": 0.5
+    }
+   ]
+  },
+  {
+   "kind": "plan",
+   "name": "plan_ground",
+   "caption": "Floor plan, cut at 2.5 m (roof hidden)",
+   "img": "img/bando_b_plan_ground.jpg",
+   "m_per_px_full": 0.0675,
+   "width_m": 108.0,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.3704,
+     "y": 0.5808
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.25,
+     "y": 0.4596
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.7926,
+     "y": 0.5
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Cutaway three-quarter view (roof sheets and south wall hidden)",
+   "img": "img/bando_b_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3631,
+     "y": 0.5274
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.4492,
+     "y": 0.439
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.4349,
+     "y": 0.5537
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5511,
+     "y": 0.39
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.7276,
+     "y": 0.4001
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.4021,
+     "y": 0.6985
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.3872,
+     "y": 0.5036
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.361,
+     "y": 0.4571
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.7901,
+     "y": 0.3603
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.0054,
+     "y": 0.4847
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.2365,
+     "y": 0.6793
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.6995,
+     "y": 0.4466
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.7254,
+     "y": 0.3972
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "exterior",
+   "caption": "Exterior three-quarter view",
+   "img": "img/bando_b_exterior.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.4405,
+     "y": 0.5882
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5025,
+     "y": 0.5094
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.4833,
+     "y": 0.5988
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.5456,
+     "y": 0.4762
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.6498,
+     "y": 0.4621
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.4798,
+     "y": 0.6911
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.4436,
+     "y": 0.5773
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.4156,
+     "y": 0.5551
+    },
+    {
+     "kind": "feature",
+     "n": 9,
+     "x": 0.6776,
+     "y": 0.4353
+    },
+    {
+     "kind": "feature",
+     "n": 10,
+     "x": 0.2124,
+     "y": 0.6053
+    },
+    {
+     "kind": "feature",
+     "n": 11,
+     "x": 0.595,
+     "y": 0.0164
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.3654,
+     "y": 0.7113
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.6339,
+     "y": 0.4975
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.6394,
+     "y": 0.4689
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/bando_b_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/bando_b_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 90\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_whoop",
+   "spot": "L2",
+   "quad": "whoop",
+   "img": "img/bando_b_fpv_L2_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_five",
+   "spot": "L2",
+   "quad": "five",
+   "img": "img/bando_b_fpv_L2_five.jpg",
+   "caption": "5\" freestyle landed on L2, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/bando_b_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/bando_b_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_office",
+   "quad": "whoop",
+   "img": "img/bando_b_fly_whoop_office.jpg",
+   "caption": "Whoop on the office's first floor, lining up the door into the next room."
+  },
+  {
+   "kind": "flight",
+   "name": "five_hall",
+   "quad": "five",
+   "img": "img/bando_b_fly_five_hall.jpg",
+   "caption": "5\" at 9.5 m flying down the hall toward the gantry crane."
+  }
+ ]
+}

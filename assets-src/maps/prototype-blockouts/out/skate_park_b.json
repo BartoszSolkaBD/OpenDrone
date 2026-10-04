@@ -1,0 +1,378 @@
+{
+ "key": "skate_park_b",
+ "title": "B \u00b7 Concrete Bowl Park",
+ "map": "Skate Park",
+ "pitch": "A sunken concrete park: a deep pool bowl, a round cradle, a long winding snake run and a full pipe. Everything is carved into the ground, so lines flow down and up rather than over.",
+ "facts": [
+  "Most features sit below the deck: from a landed Quad the Map looks almost flat.",
+  "Heightfield transitions at 20\u201325 cm resolution: the vertical bowl walls show as steep slopes."
+ ],
+ "features": [
+  {
+   "n": 1,
+   "name": "Pool bowl",
+   "desc": "16 \u00d7 10 m, shallow end 1.8 m deep (west) to deep end 3.2 m (east), 0.6 m of vertical wall, steel coping.",
+   "pos": [
+    -12,
+    6,
+    -1.5
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 2,
+   "name": "Cradle bowl",
+   "desc": "Round, 10 m across, 1.9 m deep, all transition.",
+   "pos": [
+    7,
+    8,
+    -1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 3,
+   "name": "Snake run",
+   "desc": "About 55 m long and 4.4 m wide, winding, up to 1.5 m deep; ramps in at both ends.",
+   "pos": [
+    -5,
+    -15.5,
+    -1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 4,
+   "name": "Full pipe",
+   "desc": "A concrete tube 3.6 m across inside, 7 m long: fly straight through.",
+   "pos": [
+    18.5,
+    0,
+    1.8
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 5,
+   "name": "Volcano",
+   "desc": "9 m across at the base, 1.6 m high, flat 3 m top.",
+   "pos": [
+    21,
+    13,
+    1.6
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 6,
+   "name": "Pyramid",
+   "desc": "Four-sided hip, 1 m high, in the middle of the deck.",
+   "pos": [
+    -1,
+    -1.5,
+    1.0
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 7,
+   "name": "Shade shelter",
+   "desc": "8 \u00d7 4 m roof at 3 m on four posts.",
+   "pos": [
+    -20,
+    16,
+    3.1
+   ],
+   "suits": "both"
+  },
+  {
+   "n": 8,
+   "name": "Light poles",
+   "desc": "9 m poles on the corners and the long sides.",
+   "pos": [
+    27.5,
+    -19.5,
+    9
+   ],
+   "suits": "both"
+  }
+ ],
+ "recommended_spot": "L1",
+ "spots": [
+  {
+   "id": "L1",
+   "x": -1.8,
+   "y": 6,
+   "z_hint": 0.0,
+   "heading": 270,
+   "note": "Deck between the two bowls, facing into the pool bowl's deep end.",
+   "z": -0.0,
+   "headroom": null,
+   "nearest": 5.4
+  },
+  {
+   "id": "L2",
+   "x": -7,
+   "y": 6,
+   "z_hint": -3.2,
+   "heading": 270,
+   "note": "Flat bottom of the pool bowl's deep end, 3.2 m down, walls all round.",
+   "z": -3.2,
+   "headroom": null,
+   "nearest": 1.6
+  },
+  {
+   "id": "L3",
+   "x": 21,
+   "y": 13,
+   "z_hint": 1.6,
+   "heading": 225,
+   "note": "Top of the volcano, +1.6 m, facing across the park.",
+   "z": 1.6,
+   "headroom": null,
+   "nearest": 9.1
+  }
+ ],
+ "stats": {
+  "core": [
+   -28,
+   -20,
+   28,
+   20
+  ],
+  "core_w": 56,
+  "core_d": 40,
+  "top": 9.1,
+  "low": -3.2,
+  "diag": 68.8,
+  "whoop_cross_s": 13.8,
+  "five_cross_s": 3.4,
+  "tris": 42884,
+  "objects": 133,
+  "colliders": {
+   "box": 41,
+   "trimesh": 6,
+   "convex": 86
+  },
+  "area_core": 3041,
+  "lightmap_cm_2048": 3.3,
+  "lightmap_cm_4096": 1.7,
+  "glb_kb": 1410,
+  "build_s": 0.3,
+  "total_s": 7.1
+ },
+ "shots": [
+  {
+   "kind": "plan",
+   "name": "plan",
+   "caption": "Plan from above",
+   "img": "img/skate_park_b_plan.jpg",
+   "m_per_px_full": 0.039272727966308596,
+   "width_m": 62.83636474609375,
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.309,
+     "y": 0.3611
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.6114,
+     "y": 0.3148
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.4204,
+     "y": 0.8588
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.7944,
+     "y": 0.5
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.8342,
+     "y": 0.1991
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.4841,
+     "y": 0.5347
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.1817,
+     "y": 0.1296
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.9376,
+     "y": 0.9514
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.4714,
+     "y": 0.3611
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.3886,
+     "y": 0.3611
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.8342,
+     "y": 0.1991
+    }
+   ]
+  },
+  {
+   "kind": "view",
+   "name": "three_quarter",
+   "caption": "Three-quarter view",
+   "img": "img/skate_park_b_three_quarter.jpg",
+   "markers": [
+    {
+     "kind": "feature",
+     "n": 1,
+     "x": 0.3624,
+     "y": 0.5333
+    },
+    {
+     "kind": "feature",
+     "n": 2,
+     "x": 0.5366,
+     "y": 0.4367
+    },
+    {
+     "kind": "feature",
+     "n": 3,
+     "x": 0.5077,
+     "y": 0.7806
+    },
+    {
+     "kind": "feature",
+     "n": 4,
+     "x": 0.6754,
+     "y": 0.433
+    },
+    {
+     "kind": "feature",
+     "n": 5,
+     "x": 0.6358,
+     "y": 0.3163
+    },
+    {
+     "kind": "feature",
+     "n": 6,
+     "x": 0.4953,
+     "y": 0.5362
+    },
+    {
+     "kind": "feature",
+     "n": 7,
+     "x": 0.2573,
+     "y": 0.3949
+    },
+    {
+     "kind": "feature",
+     "n": 8,
+     "x": 0.9168,
+     "y": 0.4994
+    },
+    {
+     "kind": "spot",
+     "n": "L1",
+     "x": 0.4623,
+     "y": 0.4728
+    },
+    {
+     "kind": "spot",
+     "n": "L2",
+     "x": 0.4137,
+     "y": 0.5374
+    },
+    {
+     "kind": "spot",
+     "n": "L3",
+     "x": 0.6358,
+     "y": 0.3163
+    }
+   ]
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_whoop",
+   "spot": "L1",
+   "quad": "whoop",
+   "img": "img/skate_park_b_fpv_L1_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L1, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L1_five",
+   "spot": "L1",
+   "quad": "five",
+   "img": "img/skate_park_b_fpv_L1_five.jpg",
+   "caption": "5\" freestyle landed on L1, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_whoop",
+   "spot": "L2",
+   "quad": "whoop",
+   "img": "img/skate_park_b_fpv_L2_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L2, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L2_five",
+   "spot": "L2",
+   "quad": "five",
+   "img": "img/skate_park_b_fpv_L2_five.jpg",
+   "caption": "5\" freestyle landed on L2, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 270\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_whoop",
+   "spot": "L3",
+   "quad": "whoop",
+   "img": "img/skate_park_b_fpv_L3_whoop.jpg",
+   "caption": "Whoop (65 mm) landed on L3, camera 3.5 cm up, Camera Tilt 20\u00b0, facing 225\u00b0"
+  },
+  {
+   "kind": "landed",
+   "name": "fpv_L3_five",
+   "spot": "L3",
+   "quad": "five",
+   "img": "img/skate_park_b_fpv_L3_five.jpg",
+   "caption": "5\" freestyle landed on L3, camera 7.0 cm up, Camera Tilt 30\u00b0, facing 225\u00b0"
+  },
+  {
+   "kind": "flight",
+   "name": "whoop_bowl",
+   "quad": "whoop",
+   "img": "img/skate_park_b_fly_whoop_bowl.jpg",
+   "caption": "Whoop at 1.2 m above the pool floor, carving toward the deep-end wall."
+  },
+  {
+   "kind": "flight",
+   "name": "five_snake",
+   "quad": "five",
+   "img": "img/skate_park_b_fly_five_snake.jpg",
+   "caption": "5\" dropping into the snake run from 5 m."
+  }
+ ]
+}
