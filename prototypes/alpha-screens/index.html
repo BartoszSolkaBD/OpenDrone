@@ -132,7 +132,7 @@ table.chg-t td,table.chg-t th{border-bottom:1px solid var(--line);padding:.2em .
 .fpv .frame{position:absolute;inset:0;overflow:hidden}
 .fpv .frame.f43{left:50%;right:auto;width:auto;height:100%;aspect-ratio:4/3;transform:translateX(-50%)}
 .a-tsrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.5em;align-items:center;margin-bottom:.4em}
-.a-tsrow .row{grid-template-columns:minmax(0,1fr) auto;margin:0}
+.a-tsrow .row{grid-template-columns:minmax(0,1fr) auto;margin:.15em 0}
 .a-tsrow .row .rmk{display:none}
 .loading{background:#07090c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;text-align:center}
 .loading .big{font-size:2.4em;font-weight:900}
@@ -650,8 +650,8 @@ function b(id, html, act, cls, extra){
 }
 
 const QUADS = {
-  whoop: { name:'Whoop 65', sub:'65 mm whoop, modelled on the BetaFPV Meteor65 Pro', spec:'35 mm props in ducts', tilt:30, fov:135, minTilt:0, maxTilt:80, minFov:90, maxFov:160 },
-  five:  { name:'Freestyle 5″', sub:'A generic 5-inch freestyle Quad', spec:'5-inch open props', tilt:30, fov:120, minTilt:0, maxTilt:80, minFov:90, maxFov:160 },
+  whoop: { name:'Whoop 65', sub:'65 mm whoop, modelled on the BetaFPV Meteor65 Pro', spec:'35 mm props in ducts', tilt:30, fov:160, minTilt:0, maxTilt:80, minFov:90, maxFov:170 },
+  five:  { name:'Freestyle 5″', sub:'A generic 5-inch freestyle Quad', spec:'5-inch open props', tilt:30, fov:155, minTilt:0, maxTilt:80, minFov:90, maxFov:170 },
 };
 const MAPS = {
   skate: { name:'Skate Park', sub:'Open concrete with ramps, rails and bowls. Room to learn.' },
@@ -689,7 +689,7 @@ const DEFS = {
   autoArm:      { label:'Auto-arm', kind:'bool' },
   look:         { label:'Video Look', kind:'enum', options:['Analog','Digital'] },
   imageShape:   { label:'Image shape', kind:'enum', options:['4:3','16:9'] },
-  linkRate:     { label:'Radio Link rate', kind:'enum', options:['50','100','150','250','333','500','1000'], fmt:v => v + ' Hz' },
+  linkRate:     { label:'Packet Rate', kind:'enum', options:['50','100','150','250','333','500','1000'], fmt:v => v + ' Hz' },
   blackbox:     { label:'Record Blackbox logs (.bbl)', kind:'bool' },
   noise:        { label:'Analog noise strength', kind:'enum', options:['Light','Medium','Realistic'] },
   tier:         { label:'Quality tier', kind:'enum', options:['Low','Medium','High'] },
@@ -844,7 +844,7 @@ function preflightWarnings(){
   const d = curDev(), w = [];
   if (!d) return ['No Input Device connected. Connect a Radio or Gamepad to fly.'];
   if (!S.v.autoArm && S.binds.Arm[S.device] === '—') w.push(`Arm isn’t bound on your ${d.name}. Bind it in Input Devices, or turn on Auto-arm.`);
-  const lw = linkWarning(); if (lw) w.push('Radio Link rate: ' + lw);
+  const lw = linkWarning(); if (lw) w.push('Packet Rate: ' + lw);
   return w;
 }
 function deviceBody(){
@@ -905,7 +905,7 @@ function flyingTab(){
   return `<section><h3>Preset</h3>
     <div class="presetrow">${PRESET_NAMES.map(p => b('pre-' + p, `<b>${p}</b>${S.base === p ? `<small>${ch.length ? 'you started here' : '✓ current'}</small>` : '<small>&nbsp;</small>'}`, 'pick:preset:' + p, 'preset' + (S.base === p ? ' on' : ''))).join('')}
       <div class="plabel">Now: <b>${esc(presetLabel())}</b>${ch.length ? `<small>${ch.length} setting${ch.length > 1 ? 's' : ''} changed (marked ◆)</small>` : ''}</div></div>
-    <p class="note">A Preset sets Flight Mode, Rates, Assists, each Quad’s Camera Tilt and FOV, and analog noise strength. It never touches Blackbox, the Radio Link rate, the Video Look, Image shape, Graphics or Accessibility.</p></section>
+    <p class="note">A Preset sets Flight Mode, Rates, Assists, each Quad’s Camera Tilt and FOV, and analog noise strength. It never touches Blackbox, the Packet Rate, the Video Look, Image shape, Graphics or Accessibility.</p></section>
   <section><h3>Flight Mode</h3>${row('flightMode', { hint: fmBound ? 'A Flight Mode switch is bound, so the switch decides in flight. This is used when it isn’t.' : 'Angle and Horizon level the Quad for you. They are Assists.' })}</section>
   <section><h3>Rates ${b('paste', 'Paste from Betaflight CLI…', 'paste')}</h3>
     ${row('ratesType', { hint:'Actual is Betaflight’s default since 4.3.' })}
@@ -916,7 +916,7 @@ function flyingTab(){
   <section><h3>Assists</h3>
     ${row('smoothing')}${row('endless', { hint:'Voltage still sags under load, but the pack never runs flat.' })}${row('autoArm', { hint:'Arms the first time you raise the throttle from low. Only the sim has this. With no Arm switch bound, only Reset disarms.' })}</section>
   <section><h3>Blackbox <span class="muted" style="text-transform:none;letter-spacing:0">(not set by Presets)</span></h3>
-    ${row('blackbox', { hint:'Writes Betaflight-style .bbl logs of every flight, for Blackbox Explorer. Off by default.' })}
+    ${row('blackbox', { hint:'Writes one Betaflight-style .bbl log per arm-to-disarm, for Blackbox Explorer. Off by default.' })}
     ${b('bb-folder', 'Open the log folder', 'note:bb')}</section>`;
 }
 function quadCamBlock(q, withPicker){
@@ -924,13 +924,12 @@ function quadCamBlock(q, withPicker){
   return `<section><h3>FPV Camera on each Quad</h3>
     ${withPicker ? `<div class="seg">${Object.keys(QUADS).map(k => b('cq-' + k, QUADS[k].name + (k === q ? ' ✓' : ''), 'camq:' + k, 'segb' + (k === q ? ' on' : ''))).join('')}</div>` : ''}
     ${row(`cam_${q}_tilt`, { label:'Camera Tilt', hint:`${Q.name} default ${Q.tilt}°, range ${Q.minTilt}–${Q.maxTilt}°` })}
-    ${row(`cam_${q}_fov`, { label:'FOV', hint:`${Q.name} default ${Q.fov}° (placeholder until #14)` })}
+    ${row(`cam_${q}_fov`, { label:'FOV', hint:`${Q.name} default ${Q.fov}°, range ${Q.minFov}–${Q.maxFov}°, measured corner to corner of the 4:3 picture` })}
     ${b('camdef-' + q, 'Back to Preset values', 'camdef:' + q)}
     <p class="note">Each Quad keeps its own Camera Tilt and FOV. In flight, ↑ / ↓ change Camera Tilt and ← / → change FOV, 1° per press, saved to that Quad.</p></section>`;
 }
 function videoBlock(){
-  const dig = S.v.look === 'Digital';
-  return `<section><h3>Video</h3>${row('look', { hint:'Analog, or one generic Digital look. No Preset changes it.' })}${row('noise', { disabled:dig, hint: dig ? 'Only used with the Analog look.' : 'The Preset sets this: light, medium or realistic.' })}${row('imageShape', { hint:'4:3 by default. Never stretched: the image keeps its shape and the rest of the screen stays black. No Preset changes it.' })}</section>`;
+  return `<section><h3>Video</h3>${row('look', { hint:'Analog, or one generic Digital look. No Preset changes it.' })}${row('noise', { hint:'Breakup strength for both looks (digital breaks up too). #14 will rename it. The Preset sets it: light, medium or realistic.' })}${row('imageShape', { hint:'4:3 by default. Never stretched: the image keeps its shape and the rest of the screen stays black. No Preset changes it.' })}</section>`;
 }
 function cameraTab(){ return quadCamBlock(S.camQuad || S.quad, true) + videoBlock(); }
 function graphicsTab(){
@@ -941,7 +940,7 @@ function graphicsTab(){
 function accessTab(){
   return `<section><h3>Accessibility</h3><p class="note">Belongs to you. No Preset changes it.</p>
     ${row('textSize', { hint:'Try 150%: this prototype resizes its text too.' })}
-    ${row('reduceMotion', { hint:'Turns off camera shake, vibration effects and menu animations.' })}
+    ${row('reduceMotion', { hint:'Turns off camera shake, vibration effects and menu animations, and limits video static flashing to 3 per second.' })}
     <p>${b('acc-rebind', 'Rebind Actions ▸', 'tab:input')} <span class="muted">Every Action can be rebound. That lives in Input Devices.</span></p>
     <p class="note">Design rule: nothing is shown by colour alone. Every warning also has a shape or text (see ◆ and ⚠).</p></section>`;
 }
@@ -957,7 +956,7 @@ function inputTab(){
     ${devList()}
     <div class="placeholder"><b>Placeholder.</b> Stick mapping, calibration (centre, endpoints, deadzone) and setup tips for the Pocket. Decided in #19.</div></section>
   <section><h3>Radio Link <span class="muted" style="text-transform:none;letter-spacing:0">(not set by Presets)</span></h3>
-    ${row('linkRate', { hint:'How often the simulated radio link carries your sticks to the Flight Controller, like an ELRS packet rate. Default 250 Hz.' })}
+    ${row('linkRate', { hint:'How often the Radio Link carries your sticks to the Flight Controller, like an ELRS packet rate. Default 250 Hz.' })}
     ${lw ? `<p class="warn">⚠ ${esc(lw)}</p>` : `<p class="note">${curDev() ? `Your ${curDev().name} delivers about ${curDev().hz} Hz (${curDev().how}).` : 'No Input Device connected.'}</p>`}</section>
   <section><h3>Actions</h3><p class="note">The keyboard only triggers Actions; it can’t fly. With Auto-arm on and no Arm switch bound, only Reset disarms. Prototype: pressing a binding just cycles sample values. Arm on SA is assumed to come from setup.</p>
     <table class="binds"><tr><th>Action</th><th>Keyboard</th><th>Radio</th><th>Gamepad</th></tr>${rows}</table></section>
@@ -1006,12 +1005,12 @@ const BANDO_PROPS = `<i class="pr wall" style="left:-6%;width:40%;height:20em"><
 function freshFlight(){ return { thr:'low', armSw:false, armed:false, airborne:false, msg:'On the Launch Spot: landed, disarmed, full battery.' }; }
 function flightView(){
   const q = S.quad, tilt = S.v[`cam_${q}_tilt`], fov = S.v[`cam_${q}_fov`], f = S.flight || freshFlight();
-  const vfov = fov * 0.5625, pitch = f.airborne ? tilt * 0.85 : 0, hy = clamp(50 + ((tilt - pitch) / vfov) * 100, 5, 97);
+  const vfov = fov * 0.48, pitch = f.airborne ? tilt * 0.85 : 0, hy = clamp(50 + ((tilt - pitch) / vfov) * 100, 5, 97);
   const frozen = S.paused || S.countdown > 0 || (S.variant === 'D' && S.nav.first);
-  return `<div class="fpv map-${S.map}${f.airborne ? ' air' : ''}${frozen ? ' frozen' : ''}" style="--hy:${hy.toFixed(1)}%;--zoom:${(120 / fov).toFixed(3)}">
+  return `<div class="fpv map-${S.map}${f.airborne ? ' air' : ''}${frozen ? ' frozen' : ''}" style="--hy:${hy.toFixed(1)}%;--zoom:${(150 / fov).toFixed(3)}">
     <div class="frame${S.v.imageShape === '4:3' ? ' f43' : ''}">
       <div class="sky"></div><div class="ground"></div><div class="scene">${S.map === 'skate' ? SKATE_PROPS : BANDO_PROPS}</div>
-      ${S.v.look === 'Analog' ? `<div class="noise n-${S.v.noise}"></div>` : ''}
+      <div class="noise n-${S.v.noise}"></div>
       <div class="osdph">OSD goes here · not yet specified (map fog)</div>
       ${S.readout ? `<div class="readout">${esc(S.readout)}</div>` : ''}</div>
     <div class="ptag">PROTOTYPE · Free Flight · ${MAPS[S.map].name} · ${QUADS[q].name} · ${S.v.look} · ${S.v.imageShape}</div>
@@ -1026,7 +1025,7 @@ const V = {};
 /* ---------- A: Quick Fly hub ---------- */
 V.A = {
   name:'Quick Fly hub (agreed in round 1)', pauseName:'Pause menu',
-  flow:'The agreed shape. One home screen. First launch: the question (with Text size on the same screen), then Input Device, then the hub with FLY focused. The hub shows Map, Quad and Preset as chips next to a big FLY button, plus pre-flight warnings when something would stop you flying. FLY shows a short loading screen. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a pause menu that can also swap the Map or Quad.',
+  flow:'The agreed shape. One home screen. First launch: the question (with Text size, Reduce motion and a proposed flashing-images notice on the same screen), then Input Device, then the hub with FLY focused. The hub shows Map, Quad and Preset as chips next to a big FLY button, plus pre-flight warnings when something would stop you flying. FLY shows a short loading screen. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a pause menu that can also swap the Map or Quad.',
   best:'Returning pilot: 1 press (FLY). First launch: 3 (answer, Continue, FLY). New Map: 3 (Map chip, pick, FLY). From the air, new Map: 3 (Esc, Map, pick).',
   start(){ S.nav = { screen:S.firstDone ? 'hub' : 'welcome', picker:null, drawer:false, pp:null }; },
   where(){ const n = S.nav; if (n.screen === 'welcome') return 'First launch › Have you flown FPV before?'; if (n.screen === 'device') return 'First launch › Input Device';
@@ -1036,7 +1035,8 @@ V.A = {
   afterDevice(){ S.nav.screen = 'hub'; },
   render(){
     const n = S.nav;
-    if (n.screen === 'welcome') return `<div class="layer scr a-center"><div class="a-qcard"><div class="a-tsrow"><div class="logo">OpenDrone</div>${row('textSize', { hint:'Bigger text before you read on.' })}</div>${questionBody()}</div></div>`;
+    if (n.screen === 'welcome') return `<div class="layer scr a-center"><div class="a-qcard"><div class="a-tsrow"><div class="logo">OpenDrone</div><div>${row('textSize', { hint:'Bigger text before you read on.' })}${row('reduceMotion', { label:'Reduce motion' })}</div></div>
+      <p class="warn">⚠ <b>Flashing images.</b> FPV video static and breakup can flash. If that bothers you, turn on Reduce motion: it limits flashing to 3 per second. <span class="muted">(Proposed in round 3.)</span></p>${questionBody()}</div></div>`;
     if (n.screen === 'device') return `<div class="layer scr a-center"><div class="a-qcard">${deviceBody()}</div></div>`;
     const chips = ['map','quad','preset'].map(k => b('chip-' + k, `<span class="k">${PK[k]}</span><span class="val">${esc(k === 'map' ? MAPS[S.map].name : k === 'quad' ? QUADS[S.quad].name : presetLabel())}</span><span class="go">change ▸</span>`, 'v:chip:' + k, 'chip')).join('');
     let h = `<div class="layer scr a-hub">
@@ -1229,7 +1229,7 @@ function enterFlight(label){
 }
 let loadTimer = null;
 /* Failsafe copies Betaflight (#21): a lost Input Device drops the Quad. Nothing pauses. */
-function failsafe(){ const f = S.flight; if (!f) return; f.armed = false; f.airborne = false; f.armSw = false; f.msg = 'Failsafe: no Input Device. As in Betaflight, the Quad disarms and drops. Nothing pauses.'; }
+function failsafe(){ const f = S.flight; if (!f) return; f.armed = false; f.airborne = false; f.armSw = false; f.msg = 'Failsafe: Input Device lost. As in Betaflight the Quad drops (OSD: RXLOSS, then FAILSAFE, plus a notice naming the device). Nothing pauses.'; }
 function armName(){ const d = curDev(); if (!d) return 'no Input Device'; const bnd = S.binds.Arm[S.device]; return bnd === '—' ? '⚠ not bound' : `${d.kind} ${bnd}`; }
 function loadingHtml(){
   const rb = curDev() ? S.binds.Reset[S.device] : '—';
@@ -1249,7 +1249,7 @@ function displayModal(){
     <p class="warn">⚠ Going back to the old setting in <b>${m.left} s</b> unless you keep it.</p>
     <div class="btnrow">${b('disp-revert', 'Go back', 'dispRevert', '', 'data-autofocus')}${b('disp-keep', 'Keep', 'dispKeep', 'primary')}</div></div></div>`;
 }
-const NOTES = { bb:'Prototype: this would open the folder holding your .bbl logs.' };
+const NOTES = { bb:'Prototype: this would open the Blackbox folder next to the settings file (one .bbl log per arm-to-disarm).' };
 function clearPauseNav(){ const n = S.nav; ['pp','pit','panel'].forEach(k => { if (k in n) n[k] = null; }); if ('drawer' in n) n.drawer = false; if ('pset' in n) n.pset = false; }
 function pause(){ camKeyUp(); S.paused = true; S.counting = true; S.steps = 1; S.moves = 0; S.countFrom = 'Esc in flight'; S.camQuad = null; render(); }
 let cdTimer = null;
@@ -1452,7 +1452,7 @@ function renderSide(){
       <tr><th>Flight Mode</th><td>${S.v.flightMode}${fms.radio !== '—' || fms.pad !== '—' ? ' (a switch is bound and decides in flight)' : ''}</td></tr>
       <tr><th>Assists on</th><td>${assistsOn()}</td></tr>
       <tr><th>Input Device</th><td>${curDev() ? curDev().name + ' (about ' + curDev().hz + ' Hz)' : 'none'}</td></tr>
-      <tr><th>Radio Link</th><td>${S.v.linkRate} Hz${linkWarning() ? ' ⚠ above the device' : ''}</td></tr>
+      <tr><th>Packet Rate</th><td>${S.v.linkRate} Hz${linkWarning() ? ' ⚠ above the device' : ''}</td></tr>
       <tr><th>Blackbox</th><td>${S.v.blackbox ? 'recording .bbl' : 'off'}</td></tr>
       <tr><th>Warnings</th><td>${preflightWarnings().length ? preflightWarnings().map(esc).join('<br>') : 'none'}</td></tr>
     </table>
@@ -1461,7 +1461,7 @@ function renderSide(){
     <h4>Camera on each Quad</h4>
     <ul>${Object.entries(QUADS).map(([q, Q]) => `<li>${Q.name}: Camera Tilt ${S.v[`cam_${q}_tilt`]}° · FOV ${S.v[`cam_${q}_fov`]}°</li>`).join('')}</ul>
     <h4>Not touched by Presets</h4>
-    <p>Video Look ${S.v.look}, image ${S.v.imageShape}. Radio Link ${S.v.linkRate} Hz. Blackbox ${S.v.blackbox ? 'on' : 'off'}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
+    <p>Video Look ${S.v.look}, image ${S.v.imageShape}. Packet Rate ${S.v.linkRate} Hz. Blackbox ${S.v.blackbox ? 'on' : 'off'}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
     <h4>Prototype toggles</h4>
     <p><button data-side="cd">Resume countdown after pause: ${S.countdownOn ? 'on' : 'off'}</button></p>
     <h4>Keys</h4>
@@ -1503,6 +1503,7 @@ function pad(x){
     const was = S.device; if (x === was) return; S.device = x;
     const flyingNow = S.inFlight && !S.paused && !S.loading && !(S.variant === 'D' && S.nav.first);
     if (x === 'none' && flyingNow) failsafe();
+    else if (was === 'none' && flyingNow && S.flight) S.flight.msg = S.v.autoArm ? 'Input Device back. Auto-arm: throttle low, then up, re-arms.' : 'Input Device back. Arm again with the throttle low.';
     else if (!S.inFlight || S.paused) toast(x === 'none' ? `${DEVICES[was].name} disconnected` : `${DEVICES[x].name} connected`);
     render(); return;
   }
