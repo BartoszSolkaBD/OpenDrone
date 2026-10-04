@@ -14,4 +14,5 @@ sdl3-sys = { version = "=0.7.2", default-features = false, features = [
     "no-default-subsystems",
     "sdl-joystick",
     "sdl-hidapi",
+    "sdl-unix-console-build",
 ] }

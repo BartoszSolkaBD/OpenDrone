@@ -16,6 +16,9 @@ sdl-from-source = [
     "sdl3-sys/no-default-subsystems",
     "sdl3-sys/sdl-joystick",
     "sdl3-sys/sdl-hidapi",
+    # Linux: SDL's CMake refuses to configure without X11/Wayland headers unless told this is a
+    # deliberate no-window build. We never use SDL's video, so no window-system libraries needed.
+    "sdl3-sys/sdl-unix-console-build",
 ]
 
 [dependencies]
