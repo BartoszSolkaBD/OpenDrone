@@ -62,10 +62,12 @@ _Avoid_: Playtest, vibe check
 - A Scenario is readable by a non-programmer. Every number carries its unit, sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.
 - The whole simulation is bit-exact on every platform. The same starting state and the same inputs give exactly the same flight, to the last bit, on every OS ([ADR-0001](../adr/0001-bit-exact-determinism-with-ordinary-floats.md)). Picture, camera, sound and Breakup are outside it.
 - A Scenario's starting state spells out everything, every time, with no hidden defaults ([ADR-0002](../adr/0002-scenario-starting-state-spells-out-everything.md)). That includes the active Rates, every Assist and the Packet Rate, because all are part of the simulation. State nobody can write by hand is named in one word: "settled" motors and a "fresh" Flight Controller.
-- A Scenario names its Quad and its Map but never copies their numbers. So changing a Quad definition moves every Scenario that uses it.
+- A Scenario names its Quad and its Map by id, such as `opendrone/whoop-65`, but never copies their numbers. So changing a Quad definition moves every Scenario that uses it. The Results record a fingerprint of the Quad and Map they ran on, so a moved value can be traced to a changed Quad.
 - World values such as wind come from the Map. A Scenario that needs wind uses a Test Map that has wind.
 - Every Expectation has a Basis. Source and Rule Expectations are locked: if the sim disagrees, the sim is fixed. Observed Expectations may be updated to match the sim, each with a one-line reason.
 - A change to simulation behaviour shows up in the Results, which show every measured value that moved, even inside its tolerance. The change is reviewed by reading which values moved and which didn't.
 - The Test Pilot moves only the sticks, as a human would, and never touches the physics. Pilots never get it.
 - Rust and maths-library updates count as behaviour changes, and each one gets its own PR.
 - To test one effect alone, a Scenario uses a Test Quad. The physics has no hidden switches that turn effects off.
+- A Test Quad is written as the Quad it's based on, plus only the numbers it changes and why. A change to the real Quad carries into its Test Quads.
+- Every Estimate a Feel Test moves is logged beside its Quad: the date, the old and new value, and the reason. It stays inside its range.
