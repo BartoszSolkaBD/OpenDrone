@@ -39,10 +39,11 @@ pub enum Phase {
     Sensors = 7,
     Done = 8,
     GetReady = 9,
+    SensorsRest = 10,
 }
 
 impl Phase {
-    pub const ALL: [Phase; 10] = [
+    pub const ALL: [Phase; 11] = [
         Phase::Connect,
         Phase::Rest,
         Phase::Circles,
@@ -53,6 +54,7 @@ impl Phase {
         Phase::Sensors,
         Phase::Done,
         Phase::GetReady,
+        Phase::SensorsRest,
     ];
     pub fn from_u8(v: u8) -> Phase {
         Phase::ALL.into_iter().find(|p| *p as u8 == v).unwrap_or(Phase::GetReady)
@@ -69,6 +71,7 @@ impl Phase {
             Phase::Sensors => "sensors",
             Phase::Done => "done",
             Phase::GetReady => "get-ready",
+            Phase::SensorsRest => "sensors-rest",
         }
     }
     fn prompt(self) -> &'static str {
@@ -81,6 +84,7 @@ impl Phase {
             Phase::Switches => "Flip EVERY switch through every position, turn the pot/knob,\npress every button, squeeze both triggers.",
             Phase::Unfocused => "CLICK ON THE TERMINAL WINDOW (so this window loses focus),\nthen keep moving both sticks in fast circles.",
             Phase::Sensors => "Motion sensors are now ON. Move BOTH sticks in FAST, continuous circles again.",
+            Phase::SensorsRest => "HANDS OFF again (sensors stay on). Put the controller down and don't touch it.",
             Phase::Done => "Done. Writing results...",
             Phase::GetReady => "",
         }
@@ -97,20 +101,24 @@ impl Phase {
             Phase::Switches => 15.0,
             Phase::Unfocused => 10.0,
             Phase::Sensors => 12.0,
+            Phase::SensorsRest => 6.0,
             _ => 0.0,
         }
     }
 }
 
-const STEPS: [Phase; 9] = [
+// Sensor steps come right after the first circles (sensors off), so a short session still reaches
+// them; on Bluetooth that also gives simple-report and enhanced-report modes back to back.
+pub const STEPS: [Phase; 10] = [
     Phase::Connect,
     Phase::Rest,
     Phase::Circles,
+    Phase::Sensors,
+    Phase::SensorsRest,
     Phase::Yaw,
     Phase::Extremes,
     Phase::Switches,
     Phase::Unfocused,
-    Phase::Sensors,
     Phase::Done,
 ];
 
@@ -528,7 +536,7 @@ fn guide(
             return;
         }
         _ => {
-            let skip = step == Phase::Sensors && !shared.live.lock().map(|l| l.any_sensors).unwrap_or(false);
+            let skip = matches!(step, Phase::Sensors | Phase::SensorsRest) && !shared.live.lock().map(|l| l.any_sensors).unwrap_or(false);
             if skip {
                 advance = true;
             } else if g.lead_in {

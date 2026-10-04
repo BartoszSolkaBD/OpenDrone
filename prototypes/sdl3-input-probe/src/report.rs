@@ -86,6 +86,12 @@ pub struct DeviceReport {
     pub buttons_seen: Vec<u8>,
     pub activity: Vec<PhaseActivity>,
     pub rest_axis_changes: BTreeMap<u8, usize>,
+    /// Gyro readings per second while the controller lay untouched with sensors on: a
+    /// heartbeat that keeps coming at rest, unlike stick changes.
+    #[serde(default)]
+    pub gyro_at_rest_hz: Option<f64>,
+    #[serde(default)]
+    pub gyro_at_rest_longest_gap_ms: Option<f64>,
     pub checks: Vec<String>,
 }
 
@@ -305,7 +311,22 @@ fn analyse_device(info: &DeviceInfo, all: &[Rec]) -> DeviceReport {
     }
     let rest_axis_changes = activity.iter().find(|a| a.phase == Phase::Rest.key()).map(|a| a.axis_changes.clone()).unwrap_or_default();
 
+    let rest_gyro: Vec<u64> = recs
+        .iter()
+        .filter(|r| r.kind == Kind::Gyro && r.phase == Phase::SensorsRest as u8)
+        .map(|r| r.t_sdl)
+        .collect();
+    let (gyro_at_rest_hz, gyro_at_rest_longest_gap_ms) = if rest_gyro.len() >= 2 {
+        let span = (rest_gyro[rest_gyro.len() - 1] - rest_gyro[0]) as f64 / 1e9;
+        let longest = rest_gyro.windows(2).map(|w| w[1] - w[0]).max().unwrap_or(0) as f64 / 1e6;
+        (Some((rest_gyro.len() - 1) as f64 / span), Some(longest))
+    } else {
+        (None, None)
+    };
+
     let mut rep = DeviceReport {
+        gyro_at_rest_hz,
+        gyro_at_rest_longest_gap_ms,
         info: info.clone(),
         device_kind: kind,
         update_rate,
@@ -450,6 +471,12 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
                 s.median_ms,
                 rep.info.sdl_sensor_rate_hz,
                 verdict((lo..hi).contains(&s.rate_from_mean_hz))
+            ));
+        }
+        if let Some(hz) = rep.gyro_at_rest_hz {
+            out.push(format!(
+                "Reports at rest (sensors on, controller untouched): {hz:.0} gyro readings per second, longest gap {:.1} ms. A steady rate here means a connected DualSense keeps reporting while the sticks rest, which a stall check could use.",
+                rep.gyro_at_rest_longest_gap_ms.unwrap_or(f64::NAN)
             ));
         }
         out.push(format!(
