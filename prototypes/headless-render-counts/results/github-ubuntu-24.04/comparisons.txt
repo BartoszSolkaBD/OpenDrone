@@ -1,0 +1,27 @@
+PROTOTYPE #29: GitHub Actions run 37218830542 (2026-10-04), ubuntu-latest = image ubuntu-24.04
+20260927.320.1, 4 cores AMD EPYC 7763, Mesa 25.2.8 lavapipe (LLVM 20.1.2, 256 bits).
+60 flight frames per Map. Made with ./compare.sh from the run's artifact.
+
+Times: job 24 min 49 s in all. Cold build 8 min 31 s. Run 1 6 min 48 s and run 2 6 min 50 s
+(Bando 262 s, about 3.8 s per frame; Skate Park 146 s, about 2.1 s per frame; lavapipe on one
+thread). Run 3, Bando only with lavapipe on 4 threads: 115 s, about 1.7 s per frame.
+
+1. The gate: run 1 vs run 2, LP_NUM_THREADS=1
+SAME      bando/frames.csv (61 rows)
+SAME      bando/passes.csv (854 rows)
+SAME      skate-park/frames.csv (61 rows)
+SAME      skate-park/passes.csv (854 rows)
+
+2. Run 3 (lavapipe's default threading) vs run 1
+DIFFERENT bando/frames.csv
+          gpu_fragment_invocations: 39 of 61 rows differ, by up to 10.7%
+DIFFERENT bando/passes.csv
+          gpu_fragment_invocations: 39 of 854 rows differ, by up to 14.6%
+(Every other count is identical.)
+
+3. Metal on the M4 (./run.sh --frames 60) vs run 1, same 60 poses
+Identical: passes, target pixels, draws, non-empty draws, triangles, dispatches, pipelines,
+shader modules, bind groups, buffers and textures created, texture bytes.
+Different: upload_bytes (all rows, up to 4.9% Bando, 8.8% Skate Park), buffer_bytes_new (1 row,
+0.1%), live_buffer_bytes (under 0.05%), and the gpu_* and hal_* columns, which are
+backend-specific (no pipeline statistics or driver memory on Metal).
