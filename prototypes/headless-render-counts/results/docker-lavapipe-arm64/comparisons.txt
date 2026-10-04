@@ -1,0 +1,39 @@
+PROTOTYPE #29: comparisons from a local Ubuntu 24.04 container (arm64, 4 CPUs) on the M4,
+Mesa 25.2.8 lavapipe (LLVM 20.1.2), 30 flight frames per Map unless noted. Made with ./compare.sh.
+
+1. Gate setup (LP_NUM_THREADS=1, lavapipe on one rasterizer thread): run 1 vs run 2
+SAME      bando/frames.csv (31 rows)
+SAME      bando/passes.csv (434 rows)
+SAME      skate-park/frames.csv (31 rows)
+SAME      skate-park/passes.csv (434 rows)
+
+2. lavapipe's default threading (4 rasterizer threads): run 1 vs run 2
+DIFFERENT bando/frames.csv
+          gpu_fragment_invocations: 19 of 31 rows differ, by up to 14.2%
+DIFFERENT bando/passes.csv
+          gpu_fragment_invocations: 19 of 434 rows differ, by up to 18.8%
+DIFFERENT skate-park/frames.csv
+          gpu_fragment_invocations: 9 of 31 rows differ, by up to 5.5%
+DIFFERENT skate-park/passes.csv
+          gpu_fragment_invocations: 9 of 434 rows differ, by up to 9.7%
+(Only the main opaque pass's fragment count moves; every other column is identical.)
+
+3. Bevy on 1 worker thread, lavapipe threaded (Bando, 10 frames): run a vs run b
+DIFFERENT bando/frames.csv
+          gpu_fragment_invocations: 6 of 11 rows differ, by up to 6.8%
+DIFFERENT bando/passes.csv
+          gpu_fragment_invocations: 6 of 154 rows differ, by up to 9.4%
+(So the variation comes from lavapipe's threads, not Bevy's. With LP_NUM_THREADS=1, with or
+without Bevy on 1 thread, Bando 10 frames repeated exactly.)
+
+4. Metal on the M4 vs the lavapipe gate run (same 30 poses)
+Identical: render and compute passes, target pixels, draws (all kinds), non-empty draws,
+triangles, dispatches, pipelines / shader modules / bind groups / buffers / textures created,
+texture bytes. Different (backend-specific, so compare only within one runner):
+          upload_bytes: all rows, by up to 4.9% (Bando) and 8.8% (Skate Park)
+          buffer_bytes_new: 1 of 31 rows, by 0.1%
+          live_buffer_bytes: all rows, by under 0.05%
+          gpu_*: not available on Metal
+          hal_*: wgpu's own counters differ by backend (Metal has no driver memory counts,
+                 Vulkan doesn't count textures; compute pipelines 36 on Metal vs 34 on Vulkan,
+                 bind groups 56 vs 31, buffers 78 vs 73: wgpu's own internal objects)

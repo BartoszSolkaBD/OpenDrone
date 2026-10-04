@@ -12,6 +12,10 @@
 # Each Map writes frames.csv (one row per frame), passes.csv (per frame, per render pass),
 # load.csv (loading, not compared), summary.md (totals, per-frame min / max / mean, times)
 # and mid-flight.png (taken after the flight, to check the picture isn't blank).
+#
+# On Linux with Mesa's software Vulkan (lavapipe), run with LP_NUM_THREADS=1 and
+# WGPU_BACKEND=vulkan. With more lavapipe threads, the fragment-shader counts change from run to
+# run (everything else repeats); see results/docker-lavapipe-arm64/comparisons.txt.
 set -euo pipefail
 cd "$(dirname "$0")"
 

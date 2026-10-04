@@ -2,7 +2,9 @@
 # render counts?" Throwaway; it lives only on branch prototype/headless-render-counts.
 #
 # Builds the harness in prototypes/headless-render-counts, renders both blockout Maps twice on
-# Mesa's software Vulkan (lavapipe), fails if the two runs' counts differ, and uploads both runs.
+# Mesa's software Vulkan (lavapipe), fails if the two runs' counts differ, and uploads the runs.
+# A third, informational run uses lavapipe's default threading, which makes fragment-shader
+# counts vary between runs (seen in a local Ubuntu 24.04 container); it never fails the job.
 name: "Prototype #29: headless render counts"
 
 on:
@@ -13,7 +15,7 @@ on:
     inputs:
       frames:
         description: Flight frames per Map
-        default: "120"
+        default: "60"
 
 permissions:
   contents: read
@@ -27,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      FRAMES: ${{ inputs.frames || '120' }}
+      FRAMES: ${{ inputs.frames || '60' }}
       # Mesa's software Vulkan driver is the only GPU on the runner.
       WGPU_BACKEND: vulkan
       CARGO_TERM_COLOR: always
@@ -60,13 +62,18 @@ jobs:
           cargo build --release
           echo "BUILD_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
 
+      # The gate runs: lavapipe on one rasterizer thread, so fragment-shader counts repeat too.
       - name: Run 1
+        env:
+          LP_NUM_THREADS: "1"
         run: |
           start=$(date +%s)
           timeout 30m ./run.sh --frames "$FRAMES" --out results/runs/run-1
           echo "RUN1_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
 
       - name: Run 2
+        env:
+          LP_NUM_THREADS: "1"
         run: |
           start=$(date +%s)
           timeout 30m ./run.sh --frames "$FRAMES" --out results/runs/run-2
@@ -75,6 +82,15 @@ jobs:
       - name: Compare the two runs
         run: ./compare.sh results/runs/run-1 results/runs/run-2
 
+      # Informational: lavapipe's default threading (one rasterizer thread per core), Bando only.
+      - name: Run 3 (lavapipe threaded, informational)
+        if: always()
+        continue-on-error: true
+        run: |
+          start=$(date +%s)
+          timeout 20m ./run.sh --maps bando --frames "$FRAMES" --out results/runs/run-3-threaded
+          echo "RUN3_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
       - name: Report
         if: always()
         run: |
@@ -82,12 +98,20 @@ jobs:
             echo "## Headless render counts (prototype #29)"
             echo
             echo "- Flight frames per Map: $FRAMES"
-            echo "- Build: ${BUILD_SECS:-?} s. Run 1: ${RUN1_SECS:-?} s, run 2: ${RUN2_SECS:-?} s (both Maps each)"
+            echo "- Build: ${BUILD_SECS:-?} s"
+            echo "- Run 1: ${RUN1_SECS:-?} s, run 2: ${RUN2_SECS:-?} s (both Maps each, lavapipe on 1 thread)"
+            echo "- Run 3: ${RUN3_SECS:-?} s (Bando only, lavapipe threaded)"
             echo
-            echo '### Same counts in both runs?'
+            echo '### Same counts in runs 1 and 2? (the gate)'
             echo
             echo '```'
             ./compare.sh results/runs/run-1 results/runs/run-2 || true
+            echo '```'
+            echo
+            echo '### Run 3 (threaded lavapipe) against run 1 (informational)'
+            echo
+            echo '```'
+            ./compare.sh results/runs/run-3-threaded results/runs/run-1 || true
             echo '```'
             for f in results/runs/run-1/*/summary.md; do
               [ -f "$f" ] && { echo; sed 's/^# /### /' "$f"; }
