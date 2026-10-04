@@ -688,10 +688,10 @@ const DEFS = {
   endless:      { label:'Endless Battery', kind:'bool' },
   autoArm:      { label:'Auto-arm', kind:'bool' },
   look:         { label:'Video Look', kind:'enum', options:['Analog','Digital'] },
-  imageShape:   { label:'Image shape', kind:'enum', options:['4:3','16:9'] },
+  imageShape:   { label:'Aspect ratio', kind:'enum', options:['4:3','16:9'] },
   linkRate:     { label:'Packet Rate', kind:'enum', options:['50','100','150','250','333','500','1000'], fmt:v => v + ' Hz' },
   blackbox:     { label:'Record Blackbox logs (.bbl)', kind:'bool' },
-  noise:        { label:'Analog noise strength', kind:'enum', options:['Light','Medium','Realistic'] },
+  noise:        { label:'Breakup', kind:'enum', options:['Light','Medium','Realistic'] },
   tier:         { label:'Quality tier', kind:'enum', options:['Low','Medium','High'] },
   resolution:   { label:'Resolution', kind:'enum', options:['2560 × 1440 (native)','1920 × 1080','3840 × 2160'] },
   windowMode:   { label:'Window mode', kind:'enum', options:['Fullscreen','Borderless window','Window'] },
@@ -828,7 +828,7 @@ function presetFacts(name){
     <li>Flight Mode: <b>${p.flightMode}</b>${p.flightMode === 'Angle' ? ' (the Quad levels itself when you let go)' : ''}</li>
     <li>Rates: max <b>${p.s * 10} °/s</b>, expo ${f2(p.e)}; throttle limit <b>${p.thrLimitType === 'Off' ? 'off' : p.thrLimitType.toLowerCase() + ' ' + p.thrLimitPct + '%'}</b></li>
     <li>Other Assists: <b>${other}</b></li>
-    <li>Camera Tilt: <b>${p.tilt ? `each Quad’s default ${p.tilt}°` : 'each Quad’s default'}</b>; analog noise <b>${p.noise.toLowerCase()}</b></li></ul>`;
+    <li>Camera Tilt: <b>${p.tilt ? `each Quad’s default ${p.tilt}°` : 'each Quad’s default'}</b>; Breakup <b>${p.noise}</b></li></ul>`;
 }
 /* Input Devices the emulator can "connect" (rates from the input research, #3) */
 const DEVICES = { radio:{ name:'Radiomaster Pocket', kind:'Radio', hz:1000, how:'USB with RF off' }, pad:{ name:'DualSense', kind:'Gamepad', hz:250, how:'USB' } };
@@ -905,7 +905,7 @@ function flyingTab(){
   return `<section><h3>Preset</h3>
     <div class="presetrow">${PRESET_NAMES.map(p => b('pre-' + p, `<b>${p}</b>${S.base === p ? `<small>${ch.length ? 'you started here' : '✓ current'}</small>` : '<small>&nbsp;</small>'}`, 'pick:preset:' + p, 'preset' + (S.base === p ? ' on' : ''))).join('')}
       <div class="plabel">Now: <b>${esc(presetLabel())}</b>${ch.length ? `<small>${ch.length} setting${ch.length > 1 ? 's' : ''} changed (marked ◆)</small>` : ''}</div></div>
-    <p class="note">A Preset sets Flight Mode, Rates, Assists, each Quad’s Camera Tilt and FOV, and analog noise strength. It never touches Blackbox, the Packet Rate, the Video Look, Image shape, Graphics or Accessibility.</p></section>
+    <p class="note">A Preset sets Flight Mode, Rates, Assists, each Quad’s Camera Tilt and FOV, and Breakup. It never touches Blackbox, the Packet Rate, the Video Look, Aspect ratio, Graphics or Accessibility.</p></section>
   <section><h3>Flight Mode</h3>${row('flightMode', { hint: fmBound ? 'A Flight Mode switch is bound, so the switch decides in flight. This is used when it isn’t.' : 'Angle and Horizon level the Quad for you. They are Assists.' })}</section>
   <section><h3>Rates ${b('paste', 'Paste from Betaflight CLI…', 'paste')}</h3>
     ${row('ratesType', { hint:'Actual is Betaflight’s default since 4.3.' })}
@@ -929,7 +929,7 @@ function quadCamBlock(q, withPicker){
     <p class="note">Each Quad keeps its own Camera Tilt and FOV. In flight, ↑ / ↓ change Camera Tilt and ← / → change FOV, 1° per press, saved to that Quad.</p></section>`;
 }
 function videoBlock(){
-  return `<section><h3>Video</h3>${row('look', { hint:'Analog, or one generic Digital look. No Preset changes it.' })}${row('noise', { hint:'Breakup strength for both looks (digital breaks up too). #14 will rename it. The Preset sets it: light, medium or realistic.' })}${row('imageShape', { hint:'4:3 by default. Never stretched: the image keeps its shape and the rest of the screen stays black. No Preset changes it.' })}</section>`;
+  return `<section><h3>Video</h3>${row('look', { hint:'Analog, or one generic Digital look. No Preset changes it.' })}${row('noise', { hint:'How much the picture breaks up as the Video Signal weakens, in both Video Looks. The Preset sets it: Light, Medium or Realistic.' })}${row('imageShape', { hint:'4:3 by default. Never stretched: the image keeps its shape and the rest of the screen stays black. No Preset changes it.' })}</section>`;
 }
 function cameraTab(){ return quadCamBlock(S.camQuad || S.quad, true) + videoBlock(); }
 function graphicsTab(){
@@ -1013,7 +1013,7 @@ function flightView(){
       <div class="noise n-${S.v.noise}"></div>
       <div class="osdph">OSD goes here · not yet specified (map fog)</div>
       ${S.readout ? `<div class="readout">${esc(S.readout)}</div>` : ''}</div>
-    <div class="ptag">PROTOTYPE · Free Flight · ${MAPS[S.map].name} · ${QUADS[q].name} · ${S.v.look} · ${S.v.imageShape}</div>
+    <div class="ptag">PROTOTYPE · Free Flight · ${MAPS[S.map].name} · ${QUADS[q].name} · ${S.v.look} · Breakup ${S.v.noise} · ${S.v.imageShape}</div>
     <div class="fmsg">${esc(f.msg)}</div></div>`;
 }
 
@@ -1025,7 +1025,7 @@ const V = {};
 /* ---------- A: Quick Fly hub ---------- */
 V.A = {
   name:'Quick Fly hub (agreed in round 1)', pauseName:'Pause menu',
-  flow:'The agreed shape. One home screen. First launch: the question (with Text size, Reduce motion and a proposed flashing-images notice on the same screen), then Input Device, then the hub with FLY focused. The hub shows Map, Quad and Preset as chips next to a big FLY button, plus pre-flight warnings when something would stop you flying. FLY shows a short loading screen. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a pause menu that can also swap the Map or Quad.',
+  flow:'The agreed shape. One home screen. First launch: the question (with Text size, Reduce motion and a flashing-images notice on the same screen), then Input Device, then the hub with FLY focused. The hub shows Map, Quad and Preset as chips next to a big FLY button, plus pre-flight warnings when something would stop you flying. FLY shows a short loading screen. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a pause menu that can also swap the Map or Quad.',
   best:'Returning pilot: 1 press (FLY). First launch: 3 (answer, Continue, FLY). New Map: 3 (Map chip, pick, FLY). From the air, new Map: 3 (Esc, Map, pick).',
   start(){ S.nav = { screen:S.firstDone ? 'hub' : 'welcome', picker:null, drawer:false, pp:null }; },
   where(){ const n = S.nav; if (n.screen === 'welcome') return 'First launch › Have you flown FPV before?'; if (n.screen === 'device') return 'First launch › Input Device';
@@ -1036,7 +1036,7 @@ V.A = {
   render(){
     const n = S.nav;
     if (n.screen === 'welcome') return `<div class="layer scr a-center"><div class="a-qcard"><div class="a-tsrow"><div class="logo">OpenDrone</div><div>${row('textSize', { hint:'Bigger text before you read on.' })}${row('reduceMotion', { label:'Reduce motion' })}</div></div>
-      <p class="warn">⚠ <b>Flashing images.</b> FPV video static and breakup can flash. If that bothers you, turn on Reduce motion: it limits flashing to 3 per second. <span class="muted">(Proposed in round 3.)</span></p>${questionBody()}</div></div>`;
+      <p class="warn">⚠ <b>Flashing images.</b> FPV video static and Breakup can flash. If that bothers you, turn on Reduce motion: it limits flashing to 3 per second.</p>${questionBody()}</div></div>`;
     if (n.screen === 'device') return `<div class="layer scr a-center"><div class="a-qcard">${deviceBody()}</div></div>`;
     const chips = ['map','quad','preset'].map(k => b('chip-' + k, `<span class="k">${PK[k]}</span><span class="val">${esc(k === 'map' ? MAPS[S.map].name : k === 'quad' ? QUADS[S.quad].name : presetLabel())}</span><span class="go">change ▸</span>`, 'v:chip:' + k, 'chip')).join('');
     let h = `<div class="layer scr a-hub">
@@ -1461,7 +1461,7 @@ function renderSide(){
     <h4>Camera on each Quad</h4>
     <ul>${Object.entries(QUADS).map(([q, Q]) => `<li>${Q.name}: Camera Tilt ${S.v[`cam_${q}_tilt`]}° · FOV ${S.v[`cam_${q}_fov`]}°</li>`).join('')}</ul>
     <h4>Not touched by Presets</h4>
-    <p>Video Look ${S.v.look}, image ${S.v.imageShape}. Packet Rate ${S.v.linkRate} Hz. Blackbox ${S.v.blackbox ? 'on' : 'off'}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
+    <p>Video Look ${S.v.look}, Aspect ratio ${S.v.imageShape}. Packet Rate ${S.v.linkRate} Hz. Blackbox ${S.v.blackbox ? 'on' : 'off'}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
     <h4>Prototype toggles</h4>
     <p><button data-side="cd">Resume countdown after pause: ${S.countdownOn ? 'on' : 'off'}</button></p>
     <h4>Keys</h4>
