@@ -1,6 +1,6 @@
 # SDL3 input probe: pocket-usb-rf-off
 
-> Re-analysed on 2026-10-04 08:39:31 UTC from this folder's raw events with the updated estimator (busiest 100 ms and grid test). The poll-loop and frame tables are copied from the original run. The original output is in git history.
+> Re-analysed on 2026-10-04 11:19:41 UTC from this folder's raw events with the updated estimator (busiest 100 ms and grid test). The poll-loop and frame tables are copied from the original run. The original output is in git history.
 
 PROTOTYPE output for [issue #18](https://github.com/BartoszSolkaBD/OpenDrone/issues/18). Raw data: `events.csv` (every change SDL reported) and `stats.json`.
 
@@ -61,7 +61,7 @@ Main thread (Bevy rendering the window) at the same time:
 - Yaw-only step: the sticks were not moved in this step, so it can't single out the yaw axis.
 - Channels 5-8 (axes 4-7): moved = [4, 5, 6, 7]. They only move if the radio model mixes switches or the pot onto CH5-CH8.
 - Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.
-- Hands-off step: 0 axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device.
+- Hands-off step: 0 axis changes. SDL only reports changes: a perfectly still stick sends nothing, and only sensor noise or a touch shows up. Silence alone can't tell a resting stick from a stalled device.
 - Disconnected: SDL reported the removal 45.41 s into the run (the probe can't see when the cable was actually pulled). In the same poll it also delivered last-moment value changes that the pilot didn't make: axis 5 -> 15, axis 6 -> 15.
 
 **Identity**

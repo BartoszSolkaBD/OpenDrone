@@ -199,7 +199,7 @@
       "median_ms": 0.29,
       "p95_ms": 0.296,
       "max_ms": 0.36,
-      "jitter_std_ms": 0.0036782157029634707,
+      "jitter_std_ms": 0.0036782157029634703,
       "rate_from_median_hz": 3448.2758620689656,
       "rate_from_mean_hz": 3438.850157199585,
       "peak_100ms_hz": 3500.0,
@@ -282,7 +282,7 @@
       "median_ms": 0.291,
       "p95_ms": 0.296,
       "max_ms": 0.337,
-      "jitter_std_ms": 0.0036837057547397614,
+      "jitter_std_ms": 0.003683705754739762,
       "rate_from_median_hz": 3436.4261168384883,
       "rate_from_mean_hz": 3433.400360525385,
       "peak_100ms_hz": 3490.0,
@@ -626,8 +626,8 @@
     },
     "get-ready": {
       "frames": 1651,
-      "seconds": 10.007550750000005,
-      "max_frame_ms": 12.718708000000001,
+      "seconds": 10.007550750000004,
+      "max_frame_ms": 12.718708,
       "focused_frames": 1651
     },
     "rest": {
@@ -1441,7 +1441,7 @@
         "Stick report rate, sensors off (circles step): expected 250 Hz over USB. Busiest 100 ms: 260 updates per second. Gaps between updates on a 1 ms grid: 100.0%, 2 ms: 100.0%, 4 ms: 100.0%. Average while moving: 127 per second (lower whenever a stick moves too slowly to change value on every report). MATCHES",
         "Resolution: expected 8 bits (hardware limit); measured about 8.0 bits on the sticks. MATCHES",
         "Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.",
-        "Hands-off step: 548 axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device."
+        "Hands-off step: 548 axis changes. SDL only reports changes: a perfectly still stick sends nothing, and only sensor noise or a touch shows up. Silence alone can't tell a resting stick from a stalled device."
       ]
     }
   ]

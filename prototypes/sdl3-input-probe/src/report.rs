@@ -351,7 +351,7 @@ fn rest_and_disconnect(rep: &DeviceReport, recs: &[&Rec]) -> Vec<String> {
     if let Some(a) = rep.activity.iter().find(|a| a.phase == Phase::Rest.key()) {
         let n: usize = a.axis_changes.values().sum();
         out.push(format!(
-            "Hands-off step: {n} axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device."
+            "Hands-off step: {n} axis changes. SDL only reports changes: a perfectly still stick sends nothing, and only sensor noise or a touch shows up. Silence alone can't tell a resting stick from a stalled device."
         ));
     }
     if let Some(rm) = recs.iter().find(|r| r.kind == Kind::Removed) {

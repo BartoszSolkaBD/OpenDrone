@@ -1,5 +1,7 @@
 # SDL3 input probe: run
 
+> Re-analysed on 2026-10-04 11:19:41 UTC from this folder's raw events with the updated estimator (busiest 100 ms and grid test). The poll-loop and frame tables are copied from the original run. The original output is in git history.
+
 PROTOTYPE output for [issue #18](https://github.com/BartoszSolkaBD/OpenDrone/issues/18). Raw data: `events.csv` (every change SDL reported) and `stats.json`.
 
 - Started: 2026-10-04 11:06:11 (UTC), lasted 44.7 s, macOS 26.6.2 (aarch64)
@@ -50,7 +52,7 @@ Main thread (Bevy rendering the window) at the same time:
 - Stick report rate, sensors off (circles step): expected 250 Hz over USB. Busiest 100 ms: 260 updates per second. Gaps between updates on a 1 ms grid: 100.0%, 2 ms: 100.0%, 4 ms: 100.0%. Average while moving: 127 per second (lower whenever a stick moves too slowly to change value on every report). MATCHES
 - Resolution: expected 8 bits (hardware limit); measured about 8.0 bits on the sticks. MATCHES
 - Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.
-- Hands-off step: 548 axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device.
+- Hands-off step: 548 axis changes. SDL only reports changes: a perfectly still stick sends nothing, and only sensor noise or a touch shows up. Silence alone can't tell a resting stick from a stalled device.
 
 **Identity**
 
