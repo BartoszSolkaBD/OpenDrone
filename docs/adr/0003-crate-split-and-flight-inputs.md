@@ -60,7 +60,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 |---|---|
 | device → `input` | raw device reports |
 | `input` → the game | Channels at the device's full resolution, with every button's state, and lost / back; all stamped with the computer's clock |
-| the game, `scenario` or `test-pilot` → `sim` | Flight Inputs: Channels (Arm and Flight Mode are switch Channels), an Input Device lost or back, and Reset; each stamped with Simulation Time |
+| the game, `scenario` or `test-pilot` → `sim` | Flight Inputs: Channels (Arm, Flight Mode and Crash Flip are switch Channels with fixed meanings, [ADR-0017](0017-switches-reach-the-flight-controller-with-fixed-meanings.md)), an Input Device lost or back, and Reset; each stamped with Simulation Time |
 | `pack` → `sim` (set-up) | Quad definitions with their Tune, Map collision shapes, the Launch Spot, world values; plus the pilot's settings and a random seed from the caller |
 | `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts |
 | `sim` → its caller, when asked | the flight log stream: setpoint, gyro, P, I, D and F terms, motor commands and battery voltage at the loop rate. It's off by default and costs nothing while off |
