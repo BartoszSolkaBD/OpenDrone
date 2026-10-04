@@ -1,0 +1,1448 @@
+{
+  "meta": {
+    "label": "run",
+    "started_utc": "2026-10-04 11:06:11",
+    "os": "macOS 26.6.2 (aarch64)",
+    "quick": false,
+    "bevy_gilrs_enabled": true,
+    "launched_as_app_bundle": true,
+    "input_monitoring_at_start": "Unknown (never asked)",
+    "input_monitoring_at_end": "Unknown (never asked)",
+    "duration_s": 44.667635166
+  },
+  "init": {
+    "sdl_version": "3.4.18",
+    "sdl_revision": "SDL-3.4.18",
+    "thread_name": "sdl-input",
+    "pthread_main_np": 0,
+    "qos_requested": true,
+    "qos_result": 0,
+    "sdl_init_ok": true,
+    "sdl_init_ms": 21.076459,
+    "sdl_error": "",
+    "poll_sleep_us": 250
+  },
+  "poll_loop": {
+    "circles": {
+      "samples": 41153,
+      "intervals": 41152,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29126657270611933,
+      "min_ms": 0.258,
+      "p05_ms": 0.288,
+      "median_ms": 0.291,
+      "p95_ms": 0.296,
+      "max_ms": 0.354,
+      "jitter_std_ms": 0.0035887969956153085,
+      "rate_from_median_hz": 3436.4261168384883,
+      "rate_from_mean_hz": 3433.2810343086467,
+      "peak_100ms_hz": 3480.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          41152
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "connect": {
+      "samples": 11207,
+      "intervals": 11206,
+      "pauses_excluded": 0,
+      "mean_ms": 0.2910390862038304,
+      "min_ms": 0.261,
+      "p05_ms": 0.285,
+      "median_ms": 0.29,
+      "p95_ms": 0.295,
+      "max_ms": 9.01,
+      "jitter_std_ms": 0.08245652989192061,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3435.964608889838,
+      "peak_100ms_hz": 3510.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0000892379082634303
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          11205
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          1
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "extremes": {
+      "samples": 28096,
+      "intervals": 28095,
+      "pauses_excluded": 0,
+      "mean_ms": 0.2907948745328137,
+      "min_ms": 0.257,
+      "p05_ms": 0.286,
+      "median_ms": 0.29,
+      "p95_ms": 0.296,
+      "max_ms": 0.36,
+      "jitter_std_ms": 0.0036782157029634707,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3438.850157199585,
+      "peak_100ms_hz": 3500.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          28095
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "get-ready": {
+      "samples": 34304,
+      "intervals": 34303,
+      "pauses_excluded": 0,
+      "mean_ms": 0.2912564498732033,
+      "min_ms": 0.258,
+      "p05_ms": 0.287,
+      "median_ms": 0.291,
+      "p95_ms": 0.296,
+      "max_ms": 0.337,
+      "jitter_std_ms": 0.0036837057547397614,
+      "rate_from_median_hz": 3436.4261168384883,
+      "rate_from_mean_hz": 3433.400360525385,
+      "peak_100ms_hz": 3490.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          34303
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "rest": {
+      "samples": 17149,
+      "intervals": 17148,
+      "pauses_excluded": 0,
+      "mean_ms": 0.2912830650804847,
+      "min_ms": 0.266,
+      "p05_ms": 0.288,
+      "median_ms": 0.29,
+      "p95_ms": 0.296,
+      "max_ms": 0.341,
+      "jitter_std_ms": 0.0035965149306753986,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3433.086642794318,
+      "peak_100ms_hz": 3460.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          17148
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "whole run": {
+      "samples": 152487,
+      "intervals": 152486,
+      "pauses_excluded": 0,
+      "mean_ms": 0.2911591031309006,
+      "min_ms": 0.257,
+      "p05_ms": 0.287,
+      "median_ms": 0.29,
+      "p95_ms": 0.296,
+      "max_ms": 9.01,
+      "jitter_std_ms": 0.022626610836710633,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3434.5482907687606,
+      "peak_100ms_hz": 3510.0,
+      "on_grid_share": [
+        [
+          1.0,
+          6.557979093162651e-6
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          152485
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          1
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "yaw": {
+      "samples": 20578,
+      "intervals": 20577,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29124119162171186,
+      "min_ms": 0.267,
+      "p05_ms": 0.288,
+      "median_ms": 0.29,
+      "p95_ms": 0.296,
+      "max_ms": 0.355,
+      "jitter_std_ms": 0.003650911154283613,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3433.580237849331,
+      "peak_100ms_hz": 3480.0,
+      "on_grid_share": [
+        [
+          1.0,
+          0.0
+        ],
+        [
+          2.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ]
+      ],
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          20577
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    }
+  },
+  "main_thread_frames": {
+    "circles": {
+      "frames": 1981,
+      "seconds": 12.006058166999978,
+      "max_frame_ms": 12.384958,
+      "focused_frames": 1981
+    },
+    "connect": {
+      "frames": 543,
+      "seconds": 3.287083999999998,
+      "max_frame_ms": 14.146542,
+      "focused_frames": 543
+    },
+    "extremes": {
+      "frames": 1351,
+      "seconds": 8.18353950000001,
+      "max_frame_ms": 15.570791,
+      "focused_frames": 1351
+    },
+    "get-ready": {
+      "frames": 1651,
+      "seconds": 10.007550750000005,
+      "max_frame_ms": 12.718708000000001,
+      "focused_frames": 1651
+    },
+    "rest": {
+      "frames": 826,
+      "seconds": 5.003625874999999,
+      "max_frame_ms": 9.51825,
+      "focused_frames": 826
+    },
+    "yaw": {
+      "frames": 989,
+      "seconds": 6.0030112079999975,
+      "max_frame_ms": 12.370167,
+      "focused_frames": 989
+    }
+  },
+  "devices": [
+    {
+      "info": {
+        "instance_id": 1,
+        "name": "DualSense Wireless Controller",
+        "path": "DevSrvsID:4295181314",
+        "vendor_id": "0x054C",
+        "product_id": "0x0CE6",
+        "product_version": 256,
+        "firmware_version": 1584,
+        "serial": "4c-b9-9b-09-a5-de",
+        "guid": "030057564c050000e60c000000016800",
+        "bus": "USB",
+        "sdl_driver": "HIDAPI (SDL's own HID driver)",
+        "joystick_type": "gamepad",
+        "connection": "wired",
+        "is_gamepad": true,
+        "gamepad_type": "ps5",
+        "num_axes": 6,
+        "num_buttons": 13,
+        "num_hats": 1,
+        "has_gyro": true,
+        "has_accel": true,
+        "sdl_sensor_rate_hz": null,
+        "initial_axis_state": [
+          0,
+          0,
+          0,
+          0,
+          -32768,
+          -32768
+        ],
+        "opened_at_s": 0.187579083,
+        "removed_at_s": null
+      },
+      "device_kind": "Gamepad (DualSense) over USB",
+      "update_rate": {
+        "all steps": {
+          "samples": 2127,
+          "intervals": 2029,
+          "pauses_excluded": 97,
+          "mean_ms": 6.850786224741241,
+          "min_ms": 3.726084,
+          "p05_ms": 3.782459,
+          "median_ms": 4.0845,
+          "p95_ms": 20.001041,
+          "max_ms": 48.166625,
+          "jitter_std_ms": 6.631508942228061,
+          "rate_from_median_hz": 244.82800832415228,
+          "rate_from_mean_hz": 145.96864756756742,
+          "peak_100ms_hz": 260.0,
+          "on_grid_share": [
+            [
+              1.0,
+              0.9995071463775259
+            ],
+            [
+              2.0,
+              0.9995071463775259
+            ],
+            [
+              4.0,
+              0.9995071463775259
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              1443
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              177
+            ],
+            [
+              "8.00-12.00 ms",
+              194
+            ],
+            [
+              "12.00-20.00 ms",
+              113
+            ],
+            [
+              "20.00-50.00 ms",
+              102
+            ]
+          ]
+        },
+        "circles": {
+          "samples": 451,
+          "intervals": 432,
+          "pauses_excluded": 18,
+          "mean_ms": 7.8526642592592575,
+          "min_ms": 3.751209,
+          "p05_ms": 3.787334,
+          "median_ms": 4.093125,
+          "p95_ms": 20.119708,
+          "max_ms": 43.943292,
+          "jitter_std_ms": 6.618405324599192,
+          "rate_from_median_hz": 244.3121087188884,
+          "rate_from_mean_hz": 127.34531453078195,
+          "peak_100ms_hz": 260.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              244
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              52
+            ],
+            [
+              "8.00-12.00 ms",
+              70
+            ],
+            [
+              "12.00-20.00 ms",
+              40
+            ],
+            [
+              "20.00-50.00 ms",
+              26
+            ]
+          ]
+        },
+        "extremes": {
+          "samples": 137,
+          "intervals": 122,
+          "pauses_excluded": 14,
+          "mean_ms": 5.250757508196721,
+          "min_ms": 3.758417,
+          "p05_ms": 3.786125,
+          "median_ms": 4.074041,
+          "p95_ms": 8.100333,
+          "max_ms": 48.166625,
+          "jitter_std_ms": 5.9781205307514815,
+          "rate_from_median_hz": 245.45653811535033,
+          "rate_from_mean_hz": 190.4487111505235,
+          "peak_100ms_hz": 190.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              113
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              1
+            ],
+            [
+              "8.00-12.00 ms",
+              3
+            ],
+            [
+              "12.00-20.00 ms",
+              1
+            ],
+            [
+              "20.00-50.00 ms",
+              4
+            ]
+          ]
+        }
+      },
+      "per_axis_circles": {
+        "0": {
+          "samples": 98,
+          "intervals": 84,
+          "pauses_excluded": 13,
+          "mean_ms": 7.001137380952382,
+          "min_ms": 3.751209,
+          "p05_ms": 3.782083,
+          "median_ms": 4.088125,
+          "p95_ms": 16.04675,
+          "max_ms": 27.963875,
+          "jitter_std_ms": 4.941587442255557,
+          "rate_from_median_hz": 244.6109157621159,
+          "rate_from_mean_hz": 142.83393477189097,
+          "peak_100ms_hz": 250.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              53
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              5
+            ],
+            [
+              "8.00-12.00 ms",
+              12
+            ],
+            [
+              "12.00-20.00 ms",
+              12
+            ],
+            [
+              "20.00-50.00 ms",
+              2
+            ]
+          ]
+        },
+        "1": {
+          "samples": 50,
+          "intervals": 41,
+          "pauses_excluded": 8,
+          "mean_ms": 8.001808975609755,
+          "min_ms": 3.775667,
+          "p05_ms": 3.787334,
+          "median_ms": 4.08925,
+          "p95_ms": 20.149125,
+          "max_ms": 40.192291,
+          "jitter_std_ms": 7.222640667662471,
+          "rate_from_median_hz": 244.54362046830104,
+          "rate_from_mean_hz": 124.97174114604476,
+          "peak_100ms_hz": 150.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              25
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              3
+            ],
+            [
+              "8.00-12.00 ms",
+              6
+            ],
+            [
+              "12.00-20.00 ms",
+              3
+            ],
+            [
+              "20.00-50.00 ms",
+              4
+            ]
+          ]
+        },
+        "2": {
+          "samples": 316,
+          "intervals": 299,
+          "pauses_excluded": 16,
+          "mean_ms": 9.580107996655515,
+          "min_ms": 3.765917,
+          "p05_ms": 3.787334,
+          "median_ms": 7.844667,
+          "p95_ms": 32.0195,
+          "max_ms": 47.985041,
+          "jitter_std_ms": 8.775721540055004,
+          "rate_from_median_hz": 127.4751369306052,
+          "rate_from_mean_hz": 104.38295688828427,
+          "peak_100ms_hz": 240.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              146
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              36
+            ],
+            [
+              "8.00-12.00 ms",
+              53
+            ],
+            [
+              "12.00-20.00 ms",
+              31
+            ],
+            [
+              "20.00-50.00 ms",
+              33
+            ]
+          ]
+        },
+        "3": {
+          "samples": 80,
+          "intervals": 74,
+          "pauses_excluded": 5,
+          "mean_ms": 8.706206662162161,
+          "min_ms": 3.779917,
+          "p05_ms": 3.789167,
+          "median_ms": 4.109417,
+          "p95_ms": 28.068084,
+          "max_ms": 44.275708,
+          "jitter_std_ms": 8.132176900960365,
+          "rate_from_median_hz": 243.34352050424673,
+          "rate_from_mean_hz": 114.86058610876725,
+          "peak_100ms_hz": 180.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              1.0
+            ],
+            [
+              4.0,
+              1.0
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              0
+            ],
+            [
+              "0.75-1.25 ms",
+              0
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              0
+            ],
+            [
+              "2.50-3.50 ms",
+              0
+            ],
+            [
+              "3.50-4.50 ms",
+              39
+            ],
+            [
+              "4.50-6.00 ms",
+              0
+            ],
+            [
+              "6.00-8.00 ms",
+              11
+            ],
+            [
+              "8.00-12.00 ms",
+              11
+            ],
+            [
+              "12.00-20.00 ms",
+              7
+            ],
+            [
+              "20.00-50.00 ms",
+              6
+            ]
+          ]
+        }
+      },
+      "sensor_device_clock": null,
+      "sensor_arrival": null,
+      "resolution": [
+        {
+          "axis": 0,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 169,
+          "step_min": 128,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        },
+        {
+          "axis": 1,
+          "min": -3984,
+          "max": 32767,
+          "distinct_values": 117,
+          "step_min": 128,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        },
+        {
+          "axis": 2,
+          "min": -32511,
+          "max": 32767,
+          "distinct_values": 102,
+          "step_min": 128,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        },
+        {
+          "axis": 3,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 133,
+          "step_min": 128,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        },
+        {
+          "axis": 4,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 175,
+          "step_min": 257,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        },
+        {
+          "axis": 5,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 181,
+          "step_min": 257,
+          "step_mode": 257,
+          "levels_full_range": 256.0,
+          "bits": 8.0
+        }
+      ],
+      "axes_that_moved": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "buttons_seen": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "activity": [
+        {
+          "phase": "connect",
+          "axis_changes": {
+            "0": 90,
+            "1": 66,
+            "2": 11,
+            "3": 12
+          },
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": 0
+        },
+        {
+          "phase": "rest",
+          "axis_changes": {
+            "0": 32,
+            "1": 14,
+            "2": 259,
+            "3": 225,
+            "5": 18
+          },
+          "buttons_pressed": [
+            10
+          ],
+          "hat_changes": 0,
+          "most_active_axis": 2
+        },
+        {
+          "phase": "circles",
+          "axis_changes": {
+            "0": 98,
+            "1": 50,
+            "2": 316,
+            "3": 80
+          },
+          "buttons_pressed": [
+            7,
+            8
+          ],
+          "hat_changes": 34,
+          "most_active_axis": 2
+        },
+        {
+          "phase": "yaw",
+          "axis_changes": {
+            "2": 10,
+            "4": 251
+          },
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": 4
+        },
+        {
+          "phase": "extremes",
+          "axis_changes": {
+            "0": 15,
+            "2": 2,
+            "5": 120
+          },
+          "buttons_pressed": [
+            10
+          ],
+          "hat_changes": 0,
+          "most_active_axis": 5
+        },
+        {
+          "phase": "switches",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "unfocused",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "sensors",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        }
+      ],
+      "rest_axis_changes": {
+        "0": 32,
+        "1": 14,
+        "2": 259,
+        "3": 225,
+        "5": 18
+      },
+      "checks": [
+        "Stick report rate, sensors off (circles step): expected 250 Hz over USB. Busiest 100 ms: 260 updates per second. Gaps between updates on a 1 ms grid: 100.0%, 2 ms: 100.0%, 4 ms: 100.0%. Average while moving: 127 per second (lower whenever a stick moves too slowly to change value on every report). MATCHES",
+        "Resolution: expected 8 bits (hardware limit); measured about 8.0 bits on the sticks. MATCHES",
+        "Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.",
+        "Hands-off step: 548 axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device."
+      ]
+    }
+  ]
+}
