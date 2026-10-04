@@ -22,6 +22,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |
 | Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Test Pilot, Test Map, Test Quad, Feel Test | [docs/context/verification.md](docs/context/verification.md) |
 | Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning | [docs/context/screens.md](docs/context/screens.md) |
+| Development | Phase 1, Phase 2, Review Report, Red Flag, Reviewer, Verdict, Area, Work Count, Frame Check | [docs/context/development.md](docs/context/development.md) |
 
 ## Terms to avoid
 
@@ -45,3 +46,5 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | PID profile, FC settings | Tune |
 | main menu, lobby, home screen | Hub |
 | onboarding, tutorial | First Launch |
+| CI comment, PR summary | Review Report |
+| benchmark score, timing (as a CI gate) | Work Count |
