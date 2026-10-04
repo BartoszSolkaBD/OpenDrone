@@ -1,0 +1,1255 @@
+{
+  "meta": {
+    "label": "pocket-usb-rf-off",
+    "started_utc": "2026-10-04 08:30:10",
+    "os": "macOS 26.6.2 (aarch64)",
+    "quick": false,
+    "bevy_gilrs_enabled": true,
+    "launched_as_app_bundle": true,
+    "input_monitoring_at_start": "Unknown (never asked)",
+    "input_monitoring_at_end": "Unknown (never asked)",
+    "duration_s": 78.925196958
+  },
+  "init": {
+    "sdl_version": "3.4.18",
+    "sdl_revision": "SDL-3.4.18",
+    "thread_name": "sdl-input",
+    "pthread_main_np": 0,
+    "qos_requested": true,
+    "qos_result": 0,
+    "sdl_init_ok": true,
+    "sdl_init_ms": 39.519999999999996,
+    "sdl_error": "",
+    "poll_sleep_us": 250
+  },
+  "poll_loop": {
+    "circles": {
+      "samples": 33314,
+      "intervals": 33313,
+      "pauses_excluded": 0,
+      "mean_ms": 0.3597277038993705,
+      "min_ms": 0.305,
+      "p05_ms": 0.346,
+      "median_ms": 0.36,
+      "p95_ms": 0.381,
+      "max_ms": 0.52,
+      "jitter_std_ms": 0.012718924891785426,
+      "rate_from_median_hz": 2777.777777777778,
+      "rate_from_mean_hz": 2779.880418328131,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          33312
+        ],
+        [
+          "0.50-0.75 ms",
+          1
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "connect": {
+      "samples": 9103,
+      "intervals": 9102,
+      "pauses_excluded": 0,
+      "mean_ms": 0.35920358163041466,
+      "min_ms": 0.309,
+      "p05_ms": 0.315,
+      "median_ms": 0.346,
+      "p95_ms": 0.462,
+      "max_ms": 0.813,
+      "jitter_std_ms": 0.04459746197874959,
+      "rate_from_median_hz": 2890.1734104046245,
+      "rate_from_mean_hz": 2783.936606258292,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          9062
+        ],
+        [
+          "0.50-0.75 ms",
+          39
+        ],
+        [
+          "0.75-1.25 ms",
+          1
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "extremes": {
+      "samples": 35237,
+      "intervals": 35236,
+      "pauses_excluded": 0,
+      "mean_ms": 0.3400573561131288,
+      "min_ms": 0.262,
+      "p05_ms": 0.289,
+      "median_ms": 0.352,
+      "p95_ms": 0.378,
+      "max_ms": 4.601,
+      "jitter_std_ms": 0.04318557120253153,
+      "rate_from_median_hz": 2840.909090909091,
+      "rate_from_mean_hz": 2940.6803941254084,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          35233
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          1
+        ],
+        [
+          "2.50-3.50 ms",
+          1
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          1
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "get-ready": {
+      "samples": 44874,
+      "intervals": 44873,
+      "pauses_excluded": 0,
+      "mean_ms": 0.3429862277985135,
+      "min_ms": 0.259,
+      "p05_ms": 0.289,
+      "median_ms": 0.35,
+      "p95_ms": 0.45,
+      "max_ms": 0.636,
+      "jitter_std_ms": 0.04820876644678511,
+      "rate_from_median_hz": 2857.1428571428573,
+      "rate_from_mean_hz": 2915.568961525323,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          44724
+        ],
+        [
+          "0.50-0.75 ms",
+          149
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "rest": {
+      "samples": 12540,
+      "intervals": 12539,
+      "pauses_excluded": 0,
+      "mean_ms": 0.397814179759145,
+      "min_ms": 0.315,
+      "p05_ms": 0.341,
+      "median_ms": 0.371,
+      "p95_ms": 0.477,
+      "max_ms": 1.424,
+      "jitter_std_ms": 0.051767913060317035,
+      "rate_from_median_hz": 2695.4177897574123,
+      "rate_from_mean_hz": 2513.7364399766893,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          12379
+        ],
+        [
+          "0.50-0.75 ms",
+          158
+        ],
+        [
+          "0.75-1.25 ms",
+          1
+        ],
+        [
+          "1.25-1.75 ms",
+          1
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "switches": {
+      "samples": 50096,
+      "intervals": 50095,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29920371294545994,
+      "min_ms": 0.263,
+      "p05_ms": 0.292,
+      "median_ms": 0.299,
+      "p95_ms": 0.306,
+      "max_ms": 0.5,
+      "jitter_std_ms": 0.004328584360615748,
+      "rate_from_median_hz": 3344.481605351171,
+      "rate_from_mean_hz": 3342.2045139603065,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          50094
+        ],
+        [
+          "0.50-0.75 ms",
+          1
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "unfocused": {
+      "samples": 33433,
+      "intervals": 33432,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29909846853315863,
+      "min_ms": 0.262,
+      "p05_ms": 0.291,
+      "median_ms": 0.299,
+      "p95_ms": 0.306,
+      "max_ms": 0.395,
+      "jitter_std_ms": 0.004215615241994779,
+      "rate_from_median_hz": 3344.481605351171,
+      "rate_from_mean_hz": 3343.3805425491105,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          33432
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "whole run": {
+      "samples": 235210,
+      "intervals": 235209,
+      "pauses_excluded": 0,
+      "mean_ms": 0.33416833964688697,
+      "min_ms": 0.259,
+      "p05_ms": 0.29,
+      "median_ms": 0.342,
+      "p95_ms": 0.401,
+      "max_ms": 4.601,
+      "jitter_std_ms": 0.04266925837824072,
+      "rate_from_median_hz": 2923.9766081871344,
+      "rate_from_mean_hz": 2992.50372149765,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          234855
+        ],
+        [
+          "0.50-0.75 ms",
+          348
+        ],
+        [
+          "0.75-1.25 ms",
+          2
+        ],
+        [
+          "1.25-1.75 ms",
+          1
+        ],
+        [
+          "1.75-2.50 ms",
+          1
+        ],
+        [
+          "2.50-3.50 ms",
+          1
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          1
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "yaw": {
+      "samples": 16613,
+      "intervals": 16612,
+      "pauses_excluded": 0,
+      "mean_ms": 0.36085077052732323,
+      "min_ms": 0.308,
+      "p05_ms": 0.347,
+      "median_ms": 0.36,
+      "p95_ms": 0.382,
+      "max_ms": 0.482,
+      "jitter_std_ms": 0.012076071835005229,
+      "rate_from_median_hz": 2777.777777777778,
+      "rate_from_mean_hz": 2771.2286675698842,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          16612
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    }
+  },
+  "main_thread_frames": {
+    "circles": {
+      "frames": 1977,
+      "seconds": 12.000077249999979,
+      "max_frame_ms": 13.001125,
+      "focused_frames": 1977
+    },
+    "connect": {
+      "frames": 363,
+      "seconds": 2.51261125,
+      "max_frame_ms": 250.0,
+      "focused_frames": 351
+    },
+    "extremes": {
+      "frames": 1981,
+      "seconds": 11.999284541999991,
+      "max_frame_ms": 7.2660420000000006,
+      "focused_frames": 1981
+    },
+    "get-ready": {
+      "frames": 1847,
+      "seconds": 14.646074333,
+      "max_frame_ms": 250.0,
+      "focused_frames": 1543
+    },
+    "rest": {
+      "frames": 534,
+      "seconds": 5.0233205839999995,
+      "max_frame_ms": 23.937666999999998,
+      "focused_frames": 368
+    },
+    "switches": {
+      "frames": 901,
+      "seconds": 14.986262625000005,
+      "max_frame_ms": 19.169583,
+      "focused_frames": 0
+    },
+    "unfocused": {
+      "frames": 601,
+      "seconds": 10.017439708000007,
+      "max_frame_ms": 19.262291,
+      "focused_frames": 0
+    },
+    "yaw": {
+      "frames": 991,
+      "seconds": 6.003001499999995,
+      "max_frame_ms": 7.346291,
+      "focused_frames": 991
+    }
+  },
+  "devices": [
+    {
+      "info": {
+        "instance_id": 1,
+        "name": "EdgeTX Radiomaster Pocket Joystick",
+        "path": "",
+        "vendor_id": "0x1209",
+        "product_id": "0x4F54",
+        "product_version": 512,
+        "firmware_version": 0,
+        "serial": "",
+        "guid": "0300fcb609120000544f000000020000",
+        "bus": "USB",
+        "sdl_driver": "platform driver (IOKit on macOS)",
+        "joystick_type": "unknown",
+        "connection": "unknown",
+        "is_gamepad": false,
+        "gamepad_type": "",
+        "num_axes": 8,
+        "num_buttons": 24,
+        "num_hats": 0,
+        "has_gyro": false,
+        "has_accel": false,
+        "sdl_sensor_rate_hz": null,
+        "initial_axis_state": [
+          15,
+          15,
+          -32768,
+          15,
+          -32768,
+          -32768,
+          -32768,
+          -32768
+        ],
+        "opened_at_s": 0.19168275,
+        "removed_at_s": 45.4063315
+      },
+      "device_kind": "Radio (EdgeTX USB joystick, e.g. Radiomaster Pocket)",
+      "update_rate": {
+        "circles": {
+          "samples": 1643,
+          "intervals": 1624,
+          "pauses_excluded": 18,
+          "mean_ms": 1.8979839649014796,
+          "min_ms": 0.684792,
+          "p05_ms": 0.705958,
+          "median_ms": 1.110833,
+          "p95_ms": 3.90725,
+          "max_ms": 49.19075,
+          "jitter_std_ms": 2.6902072328949957,
+          "rate_from_median_hz": 900.2253263991978,
+          "rate_from_mean_hz": 526.8748411433012,
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              193
+            ],
+            [
+              "0.75-1.25 ms",
+              709
+            ],
+            [
+              "1.25-1.75 ms",
+              3
+            ],
+            [
+              "1.75-2.50 ms",
+              474
+            ],
+            [
+              "2.50-3.50 ms",
+              147
+            ],
+            [
+              "3.50-4.50 ms",
+              41
+            ],
+            [
+              "4.50-6.00 ms",
+              21
+            ],
+            [
+              "6.00-8.00 ms",
+              15
+            ],
+            [
+              "8.00-12.00 ms",
+              9
+            ],
+            [
+              "12.00-20.00 ms",
+              5
+            ],
+            [
+              "20.00-50.00 ms",
+              7
+            ]
+          ]
+        }
+      },
+      "per_axis_circles": {
+        "0": {
+          "samples": 524,
+          "intervals": 515,
+          "pauses_excluded": 8,
+          "mean_ms": 1.7738495145631068,
+          "min_ms": 0.684792,
+          "p05_ms": 0.705542,
+          "median_ms": 1.106042,
+          "p95_ms": 3.877333,
+          "max_ms": 18.750417,
+          "jitter_std_ms": 1.5574040759088525,
+          "rate_from_median_hz": 904.1247981541388,
+          "rate_from_mean_hz": 563.7456795461574,
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              57
+            ],
+            [
+              "0.75-1.25 ms",
+              226
+            ],
+            [
+              "1.25-1.75 ms",
+              1
+            ],
+            [
+              "1.75-2.50 ms",
+              162
+            ],
+            [
+              "2.50-3.50 ms",
+              39
+            ],
+            [
+              "3.50-4.50 ms",
+              17
+            ],
+            [
+              "4.50-6.00 ms",
+              4
+            ],
+            [
+              "6.00-8.00 ms",
+              3
+            ],
+            [
+              "8.00-12.00 ms",
+              2
+            ],
+            [
+              "12.00-20.00 ms",
+              4
+            ],
+            [
+              "20.00-50.00 ms",
+              0
+            ]
+          ]
+        },
+        "1": {
+          "samples": 581,
+          "intervals": 574,
+          "pauses_excluded": 6,
+          "mean_ms": 2.0836099738675955,
+          "min_ms": 0.695667,
+          "p05_ms": 0.719583,
+          "median_ms": 1.823333,
+          "p95_ms": 4.7995,
+          "max_ms": 36.849833,
+          "jitter_std_ms": 2.042197348335238,
+          "rate_from_median_hz": 548.4461697342175,
+          "rate_from_mean_hz": 479.9362704833864,
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              66
+            ],
+            [
+              "0.75-1.25 ms",
+              183
+            ],
+            [
+              "1.25-1.75 ms",
+              1
+            ],
+            [
+              "1.75-2.50 ms",
+              186
+            ],
+            [
+              "2.50-3.50 ms",
+              80
+            ],
+            [
+              "3.50-4.50 ms",
+              24
+            ],
+            [
+              "4.50-6.00 ms",
+              20
+            ],
+            [
+              "6.00-8.00 ms",
+              11
+            ],
+            [
+              "8.00-12.00 ms",
+              1
+            ],
+            [
+              "12.00-20.00 ms",
+              1
+            ],
+            [
+              "20.00-50.00 ms",
+              1
+            ]
+          ]
+        },
+        "2": {
+          "samples": 99,
+          "intervals": 95,
+          "pauses_excluded": 3,
+          "mean_ms": 4.854120621052632,
+          "min_ms": 0.695708,
+          "p05_ms": 0.705958,
+          "median_ms": 2.11775,
+          "p95_ms": 15.310625,
+          "max_ms": 44.187625,
+          "jitter_std_ms": 7.5770100957130655,
+          "rate_from_median_hz": 472.19926809113446,
+          "rate_from_mean_hz": 206.01053786404398,
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              9
+            ],
+            [
+              "0.75-1.25 ms",
+              24
+            ],
+            [
+              "1.25-1.75 ms",
+              0
+            ],
+            [
+              "1.75-2.50 ms",
+              25
+            ],
+            [
+              "2.50-3.50 ms",
+              8
+            ],
+            [
+              "3.50-4.50 ms",
+              5
+            ],
+            [
+              "4.50-6.00 ms",
+              2
+            ],
+            [
+              "6.00-8.00 ms",
+              4
+            ],
+            [
+              "8.00-12.00 ms",
+              10
+            ],
+            [
+              "12.00-20.00 ms",
+              4
+            ],
+            [
+              "20.00-50.00 ms",
+              4
+            ]
+          ]
+        },
+        "3": {
+          "samples": 503,
+          "intervals": 498,
+          "pauses_excluded": 4,
+          "mean_ms": 1.483687500000001,
+          "min_ms": 0.692333,
+          "p05_ms": 0.702875,
+          "median_ms": 1.080875,
+          "p95_ms": 2.907333,
+          "max_ms": 9.098917,
+          "jitter_std_ms": 0.860424300461641,
+          "rate_from_median_hz": 925.1763617439574,
+          "rate_from_mean_hz": 673.9963772694717,
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              59
+            ],
+            [
+              "0.75-1.25 ms",
+              260
+            ],
+            [
+              "1.25-1.75 ms",
+              2
+            ],
+            [
+              "1.75-2.50 ms",
+              136
+            ],
+            [
+              "2.50-3.50 ms",
+              34
+            ],
+            [
+              "3.50-4.50 ms",
+              3
+            ],
+            [
+              "4.50-6.00 ms",
+              1
+            ],
+            [
+              "6.00-8.00 ms",
+              2
+            ],
+            [
+              "8.00-12.00 ms",
+              1
+            ],
+            [
+              "12.00-20.00 ms",
+              0
+            ],
+            [
+              "20.00-50.00 ms",
+              0
+            ]
+          ]
+        }
+      },
+      "sensor_device_clock": null,
+      "sensor_arrival": null,
+      "resolution": [
+        {
+          "axis": 0,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 366,
+          "step_min": 31,
+          "step_mode": 32,
+          "levels_full_range": 2048.96875,
+          "bits": 11.000682265807816
+        },
+        {
+          "axis": 1,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 461,
+          "step_min": 31,
+          "step_mode": 32,
+          "levels_full_range": 2048.96875,
+          "bits": 11.000682265807816
+        },
+        {
+          "axis": 2,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 591,
+          "step_min": 32,
+          "step_mode": 32,
+          "levels_full_range": 2048.96875,
+          "bits": 11.000682265807816
+        },
+        {
+          "axis": 3,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 405,
+          "step_min": 31,
+          "step_mode": 32,
+          "levels_full_range": 2048.96875,
+          "bits": 11.000682265807816
+        },
+        {
+          "axis": 4,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 2,
+          "step_min": 65535,
+          "step_mode": 65535,
+          "levels_full_range": 2.0,
+          "bits": 1.0
+        },
+        {
+          "axis": 5,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 3,
+          "step_min": 32752,
+          "step_mode": 32783,
+          "levels_full_range": 2.9990543879449714,
+          "bits": 1.5845076857635072
+        },
+        {
+          "axis": 6,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 3,
+          "step_min": 32752,
+          "step_mode": 32783,
+          "levels_full_range": 2.9990543879449714,
+          "bits": 1.5845076857635072
+        },
+        {
+          "axis": 7,
+          "min": -32768,
+          "max": 32767,
+          "distinct_values": 2,
+          "step_min": 65535,
+          "step_mode": 65535,
+          "levels_full_range": 2.0,
+          "bits": 1.0
+        }
+      ],
+      "axes_that_moved": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "buttons_seen": [
+        0,
+        1
+      ],
+      "activity": [
+        {
+          "phase": "connect",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "rest",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "circles",
+          "axis_changes": {
+            "0": 525,
+            "1": 582,
+            "2": 99,
+            "3": 503,
+            "4": 3,
+            "7": 3
+          },
+          "buttons_pressed": [
+            0
+          ],
+          "hat_changes": 0,
+          "most_active_axis": 1
+        },
+        {
+          "phase": "yaw",
+          "axis_changes": {
+            "5": 4,
+            "6": 4
+          },
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": 6
+        },
+        {
+          "phase": "extremes",
+          "axis_changes": {
+            "4": 2,
+            "5": 1,
+            "6": 1,
+            "7": 1
+          },
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": 4
+        },
+        {
+          "phase": "switches",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "unfocused",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        },
+        {
+          "phase": "sensors",
+          "axis_changes": {},
+          "buttons_pressed": [],
+          "hat_changes": 0,
+          "most_active_axis": null
+        }
+      ],
+      "rest_axis_changes": {},
+      "checks": [
+        "Update rate while moving: expected about 1000 Hz with RF off; measured 527 Hz (mean interval 1.898 ms; 90% of single intervals between 0.71 and 3.91 ms). DIFFERS",
+        "Axes: expected 8 (CH1-CH8); SDL reports 8; 8 of them moved during the run (axes [0, 1, 2, 3, 4, 5, 6, 7]). MATCHES",
+        "Buttons: expected 24 (CH9-CH32); SDL reports 24; pressed during the run: [0, 1].",
+        "Resolution: expected about 11 bits (0-2048); measured about 11.0 bits on the busiest axes. MATCHES",
+        "Yaw: during the yaw-only step the most active axis was Some(6) (EdgeTX AETR puts yaw/rudder on CH4, which is axis 3).",
+        "Channels 5-8 (axes 4-7): moved = [4, 5, 6, 7]. They only move if the radio model mixes switches or the pot onto CH5-CH8."
+      ]
+    }
+  ]
+}

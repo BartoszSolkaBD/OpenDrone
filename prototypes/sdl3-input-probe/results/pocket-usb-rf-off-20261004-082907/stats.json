@@ -1,0 +1,172 @@
+{
+  "meta": {
+    "label": "pocket-usb-rf-off",
+    "started_utc": "2026-10-04 08:29:07",
+    "os": "macOS 26.6.2 (aarch64)",
+    "quick": false,
+    "bevy_gilrs_enabled": true,
+    "launched_as_app_bundle": true,
+    "input_monitoring_at_start": "Unknown (never asked)",
+    "input_monitoring_at_end": "Unknown (never asked)",
+    "duration_s": 10.207045208
+  },
+  "init": {
+    "sdl_version": "3.4.18",
+    "sdl_revision": "SDL-3.4.18",
+    "thread_name": "sdl-input",
+    "pthread_main_np": 0,
+    "qos_requested": true,
+    "qos_result": 0,
+    "sdl_init_ok": true,
+    "sdl_init_ms": 7.053208,
+    "sdl_error": "",
+    "poll_sleep_us": 250
+  },
+  "poll_loop": {
+    "connect": {
+      "samples": 34500,
+      "intervals": 34499,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29039235919885337,
+      "min_ms": 0.257,
+      "p05_ms": 0.286,
+      "median_ms": 0.29,
+      "p95_ms": 0.295,
+      "max_ms": 0.365,
+      "jitter_std_ms": 0.003742435972216348,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3443.616776828571,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          34499
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    },
+    "whole run": {
+      "samples": 34500,
+      "intervals": 34499,
+      "pauses_excluded": 0,
+      "mean_ms": 0.29039235919885337,
+      "min_ms": 0.257,
+      "p05_ms": 0.286,
+      "median_ms": 0.29,
+      "p95_ms": 0.295,
+      "max_ms": 0.365,
+      "jitter_std_ms": 0.003742435972216348,
+      "rate_from_median_hz": 3448.2758620689656,
+      "rate_from_mean_hz": 3443.616776828571,
+      "histogram": [
+        [
+          "0.00-0.25 ms",
+          0
+        ],
+        [
+          "0.25-0.50 ms",
+          34499
+        ],
+        [
+          "0.50-0.75 ms",
+          0
+        ],
+        [
+          "0.75-1.25 ms",
+          0
+        ],
+        [
+          "1.25-1.75 ms",
+          0
+        ],
+        [
+          "1.75-2.50 ms",
+          0
+        ],
+        [
+          "2.50-3.50 ms",
+          0
+        ],
+        [
+          "3.50-4.50 ms",
+          0
+        ],
+        [
+          "4.50-6.00 ms",
+          0
+        ],
+        [
+          "6.00-8.00 ms",
+          0
+        ],
+        [
+          "8.00-12.00 ms",
+          0
+        ],
+        [
+          "12.00-20.00 ms",
+          0
+        ],
+        [
+          "20.00-50.00 ms",
+          0
+        ]
+      ]
+    }
+  },
+  "main_thread_frames": {
+    "connect": {
+      "frames": 1634,
+      "seconds": 10.040895542000001,
+      "max_frame_ms": 135.586041,
+      "focused_frames": 1634
+    }
+  },
+  "devices": []
+}
