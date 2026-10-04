@@ -189,7 +189,7 @@ Measured motor time constants are 30–72 ms [S6, S24, S25, S26, S56], so `dt/τ
 ### 2.4 Determinism
 
 - Rust's `sin`, `cos` and `exp` are documented as platform-dependent in precision [S39].
-- The model above uses `exp` for motor lag and `sin`/`cos` for attitude. These must go through `libm`, as the [determinism research](https://github.com/BartoszSolkaBD/OpenDrone/blob/research/determinism/docs/research/determinism.md) for #7 already recommends.
+- The model above uses `exp` for motor lag and `sin`/`cos` for attitude. These must go through `libm`, as the [determinism research](determinism.md) for #7 already recommends.
 - Rapier offers cross-platform determinism with its `enhanced-determinism` feature, IEEE-compliant targets and identical insertion order [S38].
 
 ## 3. Motors, props and ESC
