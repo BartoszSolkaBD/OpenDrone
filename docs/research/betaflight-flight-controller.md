@@ -217,6 +217,64 @@ The mixer runs in this order ([mixer.c L676–L845](https://github.com/betafligh
 
 Bidirectional DShot only feeds RPM to the RPM filter and dynamic idle. Our physics knows every motor's RPM exactly.
 
+### 4.1 Crash flip, crash detection and yaw spin recovery (2026.6.2)
+
+Added for [#26](https://github.com/BartoszSolkaBD/OpenDrone/issues/26), which put Crash Flip and yaw spin recovery into the alpha and left automatic disarm out ([ADR-0012](../adr/0012-crashes-behave-like-a-real-quad.md)). Checked against the source on 2026-10-04.
+
+**Crash flip** (mode `BOXCRASHFLIP`, permanent id 35, "FLIP OVER AFTER CRASH"):
+
+- **Where the code lives:**
+  - Entry and exit: [core.c L294–L313](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L294-L313) and [L597–L610](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L597-L610).
+  - Motor output: [mixer.c L278–L401](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/mixer.c#L278-L401).
+  - Defaults: [mixer_init.c L62–L69](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/mixer_init.c#L62-L69).
+- **Entering:**
+  - The switch is latched only at the moment of arming, and only with DShot.
+  - Turning it on while armed does nothing.
+  - Arming with the switch on sends DShot "spin direction reversed" (command 21) to all motors. Every other arm sends "normal" (20). The commands are sent 10 times, 1 ms apart, after a 10 ms wait, once the motors are idle.
+- **Arming checks:** with the switch on, the `small_angle` check and runaway takeoff detection are both skipped ([core.c L389–L393](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L389-L393), [L879](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L879)).
+- **Motor output:**
+  - It's open loop: the PID output is thrown away ([mixer.c L684–L689](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/mixer.c#L684-L689)), and throttle is ignored.
+  - Pitch forward drives the front pair, pitch back the rear pair, and roll right the right pair.
+  - A stick within 30° of a diagonal drives one motor. Yaw, when it dominates, drives a diagonal pair.
+  - There's a 15 % stick deadband, and power is linear in the stick.
+  - Motors whose mix would be negative get `crashflip_motor_percent` of it (default 0, so off). Any motor below 2 % is stopped.
+- **Leaving:**
+  - With `crashflip_auto_rearm` OFF, the default, turning the switch off while armed disarms (reason `CRASHFLIP`). Arming stays blocked ("FLIP_SWITCH") until the pilot disarms with the Arm switch.
+  - With it ON, the Quad stays armed and flies normally. Nothing checks that the flip succeeded.
+- **`crashflip_rate`** (default 0, which is off): above it, power fades with rotation rate and with how far the Quad has turned since the mode started.
+- **What changed since 4.3 and 4.4,** which are identical:
+  - Those had `crashflip_expo` (default 35), which 2026.6 removed.
+  - Turning the switch off while armed did nothing until disarm.
+  - The changes came in PRs #13905, #14410, #14734, #14777 and #14803.
+
+**Crash detection** (`crash_recovery`: OFF, ON, BEEP or DISARM; default OFF):
+
+- **It detects a crash when** all of these hold on one axis ([pid.c L691–L721](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid.c#L691-L721)):
+  - the mixer is saturated
+  - the gyro's rate of change (through the D-term filter) is above `crash_dthreshold`
+  - the rate error is above `crash_gthreshold`
+  - the setpoint is below `crash_setpoint_threshold`
+- **DISARM** disarms at once and blocks arming ("CRASH") until the Arm switch is cycled.
+- **Disarm on impact:** `landing_disarm_threshold` (default 0, which is off) disarms on an accelerometer jerk with the sticks and throttle low ([pid.c L881–L908](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid.c#L881-L908)).
+- **The docs disagree with the source in places.** For example, the docs say DISARM means "recover then disarm", but the source disarms at once.
+
+**Yaw spin recovery** (`yaw_spin_recovery` AUTO by default, `yaw_spin_threshold` 1950):
+
+- **The AUTO threshold** is the max yaw rate + max(25 %, 200 °/s), clamped to 500–1950 °/s ([gyro.c L714–L738](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/sensors/gyro.c#L714-L738)).
+- **While active:**
+  - The yaw setpoint is 0, I is zeroed on all axes, and roll and pitch P, D and F are zeroed.
+  - The yaw PID-sum limit rises to 1000.
+  - Throttle is forced to 50 %, but only without Airmode.
+- **It ends** after yaw stays 100 °/s below the threshold for 20 ms ([gyro.c L355–L392](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/sensors/gyro.c#L355-L392)).
+- **Gyro range:** Betaflight sets the BMI270, ICM-42688-P and MPU6000 to ±2000 °/s, so readings can't go beyond that.
+
+**An armed Quad on the ground with Airmode active** keeps its PIDs running at zero throttle. I-term winds up to its static clamp of 400 on roll and pitch, and 320 on yaw ([core.c L842–L867](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L842-L867)).
+
+**ESC side (Bluejay):**
+- A stopped motor waits 100 ms before it starts.
+- A stall waits 100 ms and retries. After 3 failed starts the ESC stops until it sees zero throttle.
+- Start-up power is limited.
+
 ## 5. Filtering: what matters without simulated noise
 
 The gyro path, in order ([gyro_filter_impl.c L52–L80](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/sensors/gyro_filter_impl.c#L52-L80)):

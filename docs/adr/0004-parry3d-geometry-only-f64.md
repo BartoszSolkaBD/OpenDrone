@@ -4,7 +4,7 @@ Collision against the Map lives inside `opendrone-physics`, where the same-resul
 - what the Quad hits when it moves from here to there, and where
 - how far the nearest surface is above or below each rotor
 
-We write the contact response ourselves: bounce and slide, with a 5" Quad's props as solid discs. We keep our own flight integrator. Every core crate counts in 64-bit floats (f64) through `opendrone-maths`, and the game converts to 32-bit only for drawing. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
+We write the contact response ourselves: bounce and slide, plus Prop Strikes, in which a spinning prop disc rubs against what it touches and brakes its motor. That replaces the 5" Quad's solid prop discs ([ADR-0012](0012-crashes-behave-like-a-real-quad.md)). We keep our own flight integrator. Every core crate counts in 64-bit floats (f64) through `opendrone-maths`, and the game converts to 32-bit only for drawing. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
 
 ## Considered options
 

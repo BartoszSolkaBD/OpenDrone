@@ -38,6 +38,6 @@ _Avoid_: Link rate, refresh rate, polling rate
 - The keyboard triggers Actions only. It isn't an Input Device and can't fly a Quad.
 - Every Action can be rebound.
 - Channels keep the Input Device's full resolution, after its calibration and channel mapping.
-- Arm and the Flight Mode switch reach the Flight Controller as switch Channels, whatever they're bound to, as in Betaflight's Modes tab.
+- Arm, the Flight Mode switch and the Crash Flip switch reach the Flight Controller as switch Channels, whatever they're bound to, as in Betaflight's Modes tab.
 - Stick input reaches the Flight Controller only through the Radio Link, never straight from the Input Device.
 - Unplugging the Input Device loses the Radio Link, and the Flight Controller runs Failsafe.

@@ -48,6 +48,14 @@ _Avoid_: Difficulty, profile
 The shaking a Quad suffers when it descends into its own disturbed air, for example after a chop-and-dive. It comes from the physics and the Flight Controller's real delays, never from an artificial effect or a setting.
 _Avoid_: Propwash effect, prop wash strength (as a setting)
 
+**Prop Strike**:
+A spinning prop touching the Map. The prop rubs against what it touches, which brakes its motor and pushes and twists the Quad. Nothing breaks.
+_Avoid_: Prop hit, prop clip
+
+**Crash Flip**:
+A Betaflight mode that spins the motors backwards so an upside-down Quad can flip itself back over. It is chosen with a switch Channel at the moment of arming.
+_Avoid_: Turtle mode, flip over after crash
+
 **Confidence**:
 How well a number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every number carries one.
 _Avoid_: Accuracy, certainty
@@ -63,3 +71,6 @@ _Avoid_: Accuracy, certainty
 - No pilot setting changes a physics effect, Prop Wash strength included. How strong each effect is comes from the Quad's definition.
 - Only Estimate numbers move in a Feel Test. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong.
 - Whoop numbers come from whoop data, never from scaled-down 5" numbers.
+- A crash never disarms or resets the Quad on its own. As in Betaflight, the pilot disarms, Failsafe drops the Quad, or the pilot presses Reset.
+- Nothing on a Quad breaks or wears out in the alpha. A Prop Strike only brakes the motor, and the ESC restarts it as Bluejay does.
+- The gyro reads the Quad's true rotation up to the real sensor's limit of ±2000 °/s, with no vibration.
