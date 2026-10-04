@@ -10,5 +10,5 @@ Commercial sims fake Prop Wash. Liftoff adds an artificial shake (42 % by defaul
 ## Consequences
 
 - The Flight Controller must keep Betaflight's real filter and motor-lag delays. An idealised one would erase Prop Wash, which is what happened to Liftoff.
-- The flicker comes from a seeded random generator kept in the simulation state, so Scenarios and replays repeat exactly (ADR-0001, bit-exact determinism).
+- The flicker comes from a seeded random generator kept in the simulation state, so Scenarios and replays repeat exactly ([ADR-0001](0001-bit-exact-determinism-with-ordinary-floats.md), bit-exact determinism).
 - The simulated gyro is clean in the alpha, with no motor vibration. Prop Wash shake still reaches it, because the Quad really moves.

@@ -1,6 +1,6 @@
 # Crate split: a deterministic core, entered only through Flight Inputs
 
-The code is one Cargo workspace of eleven unpublished crates that share one version number. Five core crates make up the Simulation. They follow the same-results house rules (ADR-0001, bit-exact determinism with ordinary floats), use no Bevy, and never read a clock or open a file. Everything that can change a flight enters through one front door, as Flight Inputs stamped with Simulation Time. We chose this so that the game, the Scenario runner and, later, multiplayer all drive exactly the same Simulation. It also means the build tools enforce the walls, so a maintainer who doesn't read Rust doesn't have to police them in review. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
+The code is one Cargo workspace of eleven unpublished crates that share one version number. Five core crates make up the Simulation. They follow the same-results house rules ([ADR-0001](0001-bit-exact-determinism-with-ordinary-floats.md), bit-exact determinism with ordinary floats), use no Bevy, and never read a clock or open a file. Everything that can change a flight enters through one front door, as Flight Inputs stamped with Simulation Time. We chose this so that the game, the Scenario runner and, later, multiplayer all drive exactly the same Simulation. It also means the build tools enforce the walls, so a maintainer who doesn't read Rust doesn't have to police them in review. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
 
 ## The crates
 
