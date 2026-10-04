@@ -12,4 +12,5 @@ Real FPV lenses are fisheyes: the Meteor65 Pro's C03 camera is 160° corner to c
 
 - The centre softens as FOV widens, and the widest FOVs (up to 170°) look soft.
 - Digital is the look that shows it. Where the 2 ms cap and 45 fps allow, Digital may draw the Map larger than the screen and use a gentler lens curve. The FPV camera prototype decides by eye.
+  - Settled in [#28](https://github.com/BartoszSolkaBD/OpenDrone/issues/28): Digital uses a gentler lens curve and the Map stays drawn at the picture's own size. Drawing it 1.5× larger would have added about 2.2 ms a frame.
 - Don't fix the soft centre by drawing the Map more than once. Reopen this decision first.

@@ -9,7 +9,7 @@ The simulated aircraft: its frame, motors, props, battery and the physics that g
 _Avoid_: Drone (in code and specs), aircraft, model
 
 **Quad definition**:
-The data that defines one Quad in a Pack: its physics numbers, each with a Confidence, its Tune, its camera defaults and its on-screen name. It is named by a fixed id, such as `opendrone/whoop-65`, which never changes even if the on-screen name does.
+The data that defines one Quad in a Pack: its physics numbers and its FPV Camera's limits, each with a Confidence, its Tune, its camera defaults and its on-screen name. It is named by a fixed id, such as `opendrone/whoop-65`, which never changes even if the on-screen name does.
 _Avoid_: Quad config, quad profile, airframe file
 
 **Flight Controller**:
@@ -61,7 +61,7 @@ A Betaflight mode that spins the motors backwards so an upside-down Quad can fli
 _Avoid_: Turtle mode, flip over after crash
 
 **Confidence**:
-How well a physics number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every physics number carries one, with its source. Counts and choices, such as blade count or prop direction, don't, and neither do the Tune or the camera defaults. An Estimate also carries the range it may move within.
+How well a physics number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every physics number carries one, with its source, and so does each of the FPV Camera's limits: its Dynamic Range, lines and sharpness. Counts and choices, such as blade count or prop direction, don't, and neither do the Tune or the camera defaults (FOV and Camera Tilt). An Estimate also carries the range it may move within.
 _Avoid_: Accuracy, certainty
 
 ## Rules
