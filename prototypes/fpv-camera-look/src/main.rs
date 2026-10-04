@@ -8,6 +8,7 @@ mod bench;
 mod input_sdl;
 mod map;
 mod paths;
+mod profile;
 mod quad_model;
 mod render;
 mod rig;
@@ -48,6 +49,8 @@ pub struct LaunchArgs {
     pub latency_test: bool,
     pub screenshots: bool,
     pub debug_shots: bool,
+    pub signal_profile: bool,
+    pub look_shots: bool,
     /// Render the final picture into an offscreen image instead of the window (works with the screen locked).
     pub offscreen: bool,
     /// Frames allowed on the GPU at once (1-3; Bevy's default is 2). Fewer = less latency.
@@ -105,6 +108,12 @@ pub struct Measurements {
 }
 
 #[derive(Resource, Default)]
+pub struct CompCurve {
+    pub key: Option<(i32, i32, i32)>,
+    pub handle: Option<Handle<bevy::post_process::auto_exposure::AutoExposureCompensationCurve>>,
+}
+
+#[derive(Resource, Default)]
 pub struct MeterMask {
     pub key: (i32, i32, i32, bool),
     pub handle: Option<Handle<Image>>,
@@ -127,6 +136,8 @@ fn parse_args() -> LaunchArgs {
         latency_test: false,
         screenshots: false,
         debug_shots: false,
+        signal_profile: false,
+        look_shots: false,
         offscreen: false,
         frames_in_flight: 2,
         load: None,
@@ -143,6 +154,8 @@ fn parse_args() -> LaunchArgs {
             "--latency" => a.latency_test = true,
             "--screenshots" => a.screenshots = true,
             "--debug-shots" => a.debug_shots = true,
+            "--signal-profile" => a.signal_profile = true,
+            "--look-shots" => a.look_shots = true,
             "--offscreen" => a.offscreen = true,
             "--frames-in-flight" => {
                 i += 1;
@@ -156,7 +169,7 @@ fn parse_args() -> LaunchArgs {
         }
         i += 1;
     }
-    if a.screenshots || a.debug_shots {
+    if a.screenshots || a.debug_shots || a.signal_profile || a.look_shots {
         a.offscreen = true;
     }
     a
@@ -385,11 +398,13 @@ fn apply_tuning(
     device: Option<Res<RenderDevice>>,
     mut src: ResMut<SourceTexture>,
     mut manual: ResMut<ManualTextureViews>,
-    mut cams: Query<(Entity, &mut Projection, &mut Msaa, Option<&mut AutoExposure>, &mut RenderTarget), With<FpvCam3d>>,
+    mut cams: Query<(Entity, &mut Projection, &mut Msaa, Option<&mut AutoExposure>, &mut RenderTarget, &mut Tonemapping), With<FpvCam3d>>,
     mut display: Query<&mut Camera, (With<FpvDisplay>, Without<FpvCam3d>)>,
     mut suns: Query<&mut DirectionalLight, With<map::Sun>>,
     mut ambient: ResMut<GlobalAmbientLight>,
     mut mask: ResMut<MeterMask>,
+    mut comp: Local<CompCurve>,
+    mut curves: ResMut<Assets<bevy::post_process::auto_exposure::AutoExposureCompensationCurve>>,
     mut images: ResMut<Assets<Image>>,
     mut commands: Commands,
     bypass: Res<Bypass>,
@@ -417,7 +432,7 @@ fn apply_tuning(
         mask.handle = Some(images.add(img));
     }
 
-    for (e, mut proj, mut msaa, ae, mut target) in &mut cams {
+    for (e, mut proj, mut msaa, ae, mut target, mut tonemap) in &mut cams {
         if let Projection::Perspective(p) = proj.as_mut() {
             let fov = if bypass.0 { 2.0 * ((110f32.to_radians() * 0.5).tan() * 9.0 / 16.0).atan() } else { 2.0 * ext.y.atan() };
             if (p.fov - fov).abs() > 1e-5 {
@@ -445,15 +460,51 @@ fn apply_tuning(
             *msaa = want_msaa;
         }
         let ex = tuning.exposure();
+        let want_tone = match ex.tone {
+            settings::ToneCurve::Soft => Tonemapping::TonyMcMapface,
+            settings::ToneCurve::Punchy => Tonemapping::AcesFitted,
+            settings::ToneCurve::HardClip => Tonemapping::None,
+        };
+        if *tonemap != want_tone {
+            *tonemap = want_tone;
+        }
         if ex.enabled {
+            // Round 2 fix: Bevy's `range` is the metering window (log2 luminance), NOT how far the
+            // camera may adapt; round 1 used it as the limits. The limits now live in the
+            // compensation curve: target = clamp(target_ev - average, -max_darken, +max_brighten),
+            // relative to the sunlit baseline exposure.
+            let ckey = (
+                (ex.target_ev * 100.0) as i32,
+                (ex.max_brighten_ev * 100.0) as i32,
+                (ex.max_darken_ev * 100.0) as i32,
+            );
+            if comp.key != Some(ckey) {
+                let (t, bmax, dmax) = (ex.target_ev, ex.max_brighten_ev.max(0.0), ex.max_darken_ev.max(0.0));
+                let (lo, hi) = (-14.0f32, 6.0f32);
+                let pts = vec![
+                    Vec2::new(lo, bmax + lo),
+                    Vec2::new((t - bmax).max(lo + 0.01), t),
+                    Vec2::new((t + dmax).min(hi - 0.01).max(t - bmax + 0.02), t),
+                    Vec2::new(hi, hi - dmax),
+                ];
+                match bevy::post_process::auto_exposure::AutoExposureCompensationCurve::from_curve(
+                    bevy::math::cubic_splines::LinearSpline::new(pts),
+                ) {
+                    Ok(c) => {
+                        comp.handle = Some(curves.add(c));
+                        comp.key = Some(ckey);
+                    }
+                    Err(e) => warn!("compensation curve: {e}"),
+                }
+            }
             let want = AutoExposure {
-                range: -ex.max_darken_ev..=ex.max_brighten_ev,
+                range: -14.0..=6.0,
                 filter: 0.10..=0.90,
                 speed_brighten: ex.speed_brighten,
                 speed_darken: ex.speed_darken,
                 exponential_transition_distance: 1.5,
                 metering_mask: mask.handle.clone().unwrap_or_default(),
-                ..default()
+                compensation_curve: comp.handle.clone().unwrap_or_default(),
             };
             match ae {
                 Some(mut cur) => {
@@ -461,6 +512,7 @@ fn apply_tuning(
                         || cur.speed_brighten != want.speed_brighten
                         || cur.speed_darken != want.speed_darken
                         || cur.metering_mask != want.metering_mask
+                        || cur.compensation_curve != want.compensation_curve
                     {
                         *cur = want;
                     }
@@ -573,8 +625,8 @@ fn update_frame(
         ),
         analog: Vec4::new(apx, a.softness, a.grain, a.colour_bleed),
         analog2: Vec4::new(a.contrast, a.saturation, a.brightness, if reduce { 0.0 } else { 1.0 }),
-        breakup_a: Vec4::new(ab, smooth(0.35, 0.8, ab), smooth(0.55, 0.95, ab), if reduce { 0.0 } else { smooth(0.9, 1.0, ab) }),
-        breakup_d: Vec4::new((db / 0.5).min(1.0) * 0.6, smooth(0.15, 0.7, db) * 0.7, 0.0, 0.0),
+        breakup_a: Vec4::new(ab, smooth(0.45, 0.85, ab), smooth(0.7, 0.97, ab), if reduce { 0.0 } else { smooth(0.95, 1.0, ab) }),
+        breakup_d: Vec4::new(smooth(0.0, 0.6, db) * 0.6, smooth(0.25, 0.85, db) * 0.7, 0.0, 0.0),
         digital: Vec4::new(d.sharpen, d.contrast, d.saturation, d.brightness),
         misc: Vec4::new(debug.0, 0.0, 0.0, 0.0),
     };

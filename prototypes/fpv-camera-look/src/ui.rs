@@ -464,6 +464,8 @@ pub fn panel(
                 slider(ui, &mut s.digital_perfect_dbm, -100.0..=-50.0, "Digital: perfect above (dBm)");
                 slider(ui, &mut s.digital_lost_dbm, -110.0..=-60.0, "Digital: lost (freeze) at (dBm)");
                 slider(ui, &mut s.flutter_db, 0.0..=8.0, "flutter (dB)");
+                slider(ui, &mut s.fresnel_m, 0.0..=2.0, "spread walls over (m) — 0 = thin line, abrupt");
+                slider(ui, &mut s.smoothing_s, 0.0..=1.5, "signal follows changes over (s)");
                 slider(ui, &mut s.light_cap_analog, 0.3..=1.0, "Light: Analog tops out at");
                 slider(ui, &mut s.light_cap_digital, 0.3..=0.99, "Light: Digital tops out at (0.5+ = stutter)");
                 slider(ui, &mut s.receiver_height_m, 0.5..=3.0, "receiver height above Launch Spot (m)");
@@ -571,7 +573,14 @@ fn exposure_ui(ui: &mut egui::Ui, e: &mut settings::ExposureTuning, id: &str) {
         ui.checkbox(&mut e.enabled, "auto-exposure");
         slider(ui, &mut e.speed_brighten, 0.1..=10.0, "brightens at (stops/s)");
         slider(ui, &mut e.speed_darken, 0.1..=10.0, "darkens at (stops/s)");
-        slider(ui, &mut e.max_brighten_ev, 0.0..=8.0, "may brighten up to (stops)");
-        slider(ui, &mut e.max_darken_ev, 0.0..=8.0, "may darken up to (stops)");
+        slider(ui, &mut e.max_brighten_ev, 0.0..=8.0, "may brighten up to (stops above the sunlit setting)");
+        slider(ui, &mut e.max_darken_ev, 0.0..=8.0, "may darken up to (stops below the sunlit setting)");
+        slider(ui, &mut e.target_ev, -5.0..=1.0, "aims the average at (stops; lower = darker picture)");
+        ui.horizontal(|ui| {
+            ui.label("bright light:");
+            for t in settings::ToneCurve::ALL {
+                ui.selectable_value(&mut e.tone, t, t.label());
+            }
+        });
     });
 }

@@ -93,8 +93,32 @@ impl BreakupLevel {
     }
 }
 
+/// How the camera squeezes bright light into the picture (Bevy's tonemapper on the Map render).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ToneCurve {
+    /// Bevy's default (TonyMcMapface): soft, holds a lot of range, can look flat.
+    Soft,
+    /// ACES: more contrast, brights roll off to white sooner.
+    #[default]
+    Punchy,
+    /// No curve: anything too bright clips to white, like a cheap sensor.
+    HardClip,
+}
+
+impl ToneCurve {
+    pub const ALL: [ToneCurve; 3] = [ToneCurve::Soft, ToneCurve::Punchy, ToneCurve::HardClip];
+    pub fn label(self) -> &'static str {
+        match self {
+            ToneCurve::Soft => "soft (Bevy default)",
+            ToneCurve::Punchy => "punchy (ACES)",
+            ToneCurve::HardClip => "hard clip",
+        }
+    }
+}
+
 /// Auto-exposure, per Video Look. Speeds are in stops (EV) per second; the range is how far the
-/// camera may brighten or darken from the sunlit baseline.
+/// camera may brighten or darken from the sunlit baseline. A small range keeps shade darker than
+/// sun, as on a real FPV camera.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ExposureTuning {
@@ -103,11 +127,23 @@ pub struct ExposureTuning {
     pub speed_darken: f32,
     pub max_brighten_ev: f32,
     pub max_darken_ev: f32,
+    pub tone: ToneCurve,
+    /// How bright the camera wants the scene's average, in stops (log2 of the average after
+    /// exposure; Bevy's own default is 0, which suits its soft curve but is too bright for ACES).
+    pub target_ev: f32,
 }
 
 impl Default for ExposureTuning {
     fn default() -> Self {
-        Self { enabled: true, speed_brighten: 3.0, speed_darken: 4.0, max_brighten_ev: 4.0, max_darken_ev: 3.0 }
+        Self {
+            enabled: true,
+            speed_brighten: 3.0,
+            speed_darken: 4.0,
+            max_brighten_ev: 2.0,
+            max_darken_ev: 1.0,
+            tone: ToneCurve::Punchy,
+            target_ev: -2.0,
+        }
     }
 }
 
@@ -137,18 +173,24 @@ impl Default for AnalogTuning {
             source_scale: 1.0,
             lines: 720.0,
             softness: 1.0,
-            grain: 0.035,
+            // Round 2: the maintainer prefers grain near 0.1.
+            grain: 0.1,
             colour_bleed: 3.0,
-            contrast: 1.12,
+            contrast: 1.1,
             saturation: 0.9,
             brightness: 1.0,
             lens_curve: 0.0,
+            // Round 2: a camera-like tone curve (ACES) so the picture holds fewer stops: shade is
+            // darker, sun brighter, bright windows clip. Adapting indoors stays (up to +3 stops,
+            // slowly); darkening is limited to 1.5 stops so sunny scenes stay bright.
             exposure: ExposureTuning {
                 enabled: true,
                 speed_brighten: 1.5,
                 speed_darken: 2.5,
                 max_brighten_ev: 3.0,
-                max_darken_ev: 2.0,
+                max_darken_ev: 1.5,
+                tone: ToneCurve::Punchy,
+                target_ev: -2.0,
             },
         }
     }
@@ -176,7 +218,9 @@ impl Default for DigitalTuning {
     fn default() -> Self {
         Self {
             source_scale: 1.0,
-            lens_curve: 0.0,
+            // Round 2: the maintainer chose a gentler lens curve over drawing the Map larger;
+            // 0.35 is a starting value for them to set by eye.
+            lens_curve: 0.35,
             sharpen: 0.0,
             contrast: 1.0,
             saturation: 1.0,
@@ -186,10 +230,12 @@ impl Default for DigitalTuning {
             relock_s: 1.0,
             exposure: ExposureTuning {
                 enabled: true,
-                speed_brighten: 4.0,
-                speed_darken: 6.0,
-                max_brighten_ev: 5.0,
-                max_darken_ev: 3.0,
+                speed_brighten: 3.0,
+                speed_darken: 4.0,
+                max_brighten_ev: 3.5,
+                max_darken_ev: 1.5,
+                tone: ToneCurve::Punchy,
+                target_ev: -2.0,
             },
         }
     }
@@ -217,6 +263,11 @@ pub struct SignalTuning {
     pub digital_lost_dbm: f32,
     /// Random slow wobble of the signal, in dB (makes Breakup come and go).
     pub flutter_db: f32,
+    /// Walls are averaged over lines spread this far around the Quad (a radio wave's Fresnel
+    /// zone, about 0.5-1 m here), so edges and doorways fade the signal instead of switching it.
+    pub fresnel_m: f32,
+    /// The received level follows changes over about this long.
+    pub smoothing_s: f32,
     /// On Light, Analog tops out here (1 = full static).
     pub light_cap_analog: f32,
     /// On Light, Digital tops out here (stutter starts at 0.5, freeze at 1).
@@ -232,14 +283,20 @@ impl Default for SignalTuning {
             light_power_mult: 16.0,
             medium_power_mult: 4.0,
             realistic_power_mult: 1.0,
-            wall_db_per_m: 60.0,
-            wall_max_m: 0.6,
-            open_surface_m: 0.3,
-            analog_clean_dbm: -78.0,
-            analog_lost_dbm: -92.0,
-            digital_perfect_dbm: -82.0,
-            digital_lost_dbm: -93.0,
-            flutter_db: 2.0,
+            // Round 2 (#28): round 1 snapped from clean to full noise inside the Bando. Now about
+            // 11 dB per brick wall, each wall counted at most 0.35 m (slanted lines through slabs
+            // no longer count a metre of concrete), a 25 dB Analog band and a 20 dB Digital band,
+            // Fresnel-zone averaging and 0.3 s smoothing.
+            wall_db_per_m: 45.0,
+            wall_max_m: 0.35,
+            open_surface_m: 0.25,
+            analog_clean_dbm: -72.0,
+            analog_lost_dbm: -97.0,
+            digital_perfect_dbm: -78.0,
+            digital_lost_dbm: -98.0,
+            flutter_db: 1.5,
+            fresnel_m: 0.6,
+            smoothing_s: 0.3,
             light_cap_analog: 0.75,
             light_cap_digital: 0.8,
             receiver_height_m: 1.7,
@@ -260,7 +317,9 @@ pub struct SceneTuning {
 
 impl Default for SceneTuning {
     fn default() -> Self {
-        Self { sun_lux: 100_000.0, ambient_nits: 1500.0, shadows: true, msaa: true, detail_texture: true }
+        // Round 2: shade 3 stops below sun (skylight is about 1/8 of direct sun); round 1's
+        // 1500 nits made it 4.4 stops, which only looked fine because auto-exposure hid it.
+        Self { sun_lux: 100_000.0, ambient_nits: 4000.0, shadows: true, msaa: true, detail_texture: true }
     }
 }
 

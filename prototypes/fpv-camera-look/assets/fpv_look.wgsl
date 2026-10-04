@@ -159,14 +159,16 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
     // Faint grain on the analog grid, new every frame.
     let a = rel / apx;
     let gn = vnoise(a * vec2<f32>(1.0, 1.0), frame * 3u + 1u) - 0.5;
-    yiq.x = yiq.x + gn * grain * 2.0;
+    // The noise floor rises as the signal weakens: the first sign, before any sparkles.
+    yiq.x = yiq.x + gn * (grain * 2.0 + stat * 0.45);
 
     if (stat > 0.0) {
         // Sparkles: short white/black streaks along the lines.
         let seg = 2.0 + 10.0 * hash3(i32(line), 7, frame);
         let cell = floor(a.x / seg);
         let h = hash3(i32(cell), i32(line), frame ^ 40503u);
-        let p_sp = stat * stat * 0.32;
+        let sp = smoothstep(0.2, 1.0, stat);
+        let p_sp = sp * sp * 0.3;
         if (h < p_sp) {
             let s = select(-1.0, 1.0, hash3(i32(cell), i32(line), frame + 5u) > 0.35);
             yiq.x = mix(yiq.x, 0.5 + 0.55 * s, 0.85);
@@ -176,7 +178,7 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
         let sn = vnoise(a * vec2<f32>(1.0, 1.0), frame * 7u + 3u);
         let sn2 = vnoise(a * vec2<f32>(0.5, 1.0), frame * 7u + 4u);
         let snow = clamp(sn * 0.75 + sn2 * 0.5 - 0.15, 0.0, 1.0);
-        let m = smoothstep(0.35, 1.0, stat);
+        let m = smoothstep(0.55, 1.0, stat);
         // Brightness pumps with the static (off with Reduce motion).
         let pump = 1.0 + flicker * (hash3(0, 0, frame) - 0.5) * 0.25 * stat;
         yiq = mix(yiq, vec3<f32>(snow * pump, 0.0, 0.0), m);

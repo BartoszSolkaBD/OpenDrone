@@ -77,6 +77,88 @@ pub fn fspl_db(d_m: f32) -> f32 {
     20.0 * d_m.max(1.0).log10() + 47.7
 }
 
+/// Concrete crossed by one line, in metres, counting each wall at most `wall_max_m`.
+fn concrete_on_line(geom: &crate::map::MapGeom, a: Vec3, b: Vec3, s: &crate::settings::SignalTuning) -> (f32, u32, u32) {
+    let len = a.distance(b);
+    let crossings = geom.crossings(a, b);
+    let mut walls = 0u32;
+    let mut open = 0u32;
+    let mut concrete = 0.0f32;
+    let mut per_obj: std::collections::HashMap<usize, Vec<(f32, bool)>> = Default::default();
+    for c in &crossings {
+        per_obj.entry(c.obj).or_default().push((c.t, c.entering));
+    }
+    for (obj, hits) in per_obj {
+        if !geom.objects[obj].closed {
+            open += hits.len() as u32;
+            concrete += hits.len() as f32 * s.open_surface_m;
+            continue;
+        }
+        let mut start: Option<f32> = None;
+        let mut first = true;
+        for (t, entering) in hits.iter().copied() {
+            if entering {
+                start = Some(t);
+            } else {
+                // Exiting: if we never saw the entry, the Quad (or the pilot) is inside the solid.
+                let a0 = start.take().unwrap_or(if first { 0.0 } else { t });
+                concrete += ((t - a0) * len).min(s.wall_max_m);
+                walls += 1;
+            }
+            first = false;
+        }
+        if let Some(a0) = start {
+            concrete += ((1.0 - a0) * len).min(s.wall_max_m);
+            walls += 1;
+        }
+    }
+    (concrete, walls, open)
+}
+
+/// What lies between Quad and pilot.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Path {
+    pub distance_m: f32,
+    pub fspl_db: f32,
+    /// Walls on the straight line (for the readout).
+    pub walls: u32,
+    pub open_surfaces: u32,
+    pub concrete_m: f32,
+    /// Wall loss after averaging over the Fresnel zone (what the signal actually uses).
+    pub wall_db: f32,
+}
+
+/// Walls, averaged over a ring of lines around the straight one (radius `fresnel_m` at the Quad):
+/// a radio wave isn't a thin line, so going behind a wall edge or through a doorway fades the
+/// signal over about a metre instead of switching it, and partly blocked paths lose part of it.
+pub fn path(geom: &crate::map::MapGeom, quad: Vec3, rx: Vec3, s: &crate::settings::SignalTuning) -> Path {
+    let distance_m = quad.distance(rx);
+    let (concrete, walls, open) = concrete_on_line(geom, quad, rx, s);
+    let dir = (rx - quad).normalize_or(Vec3::Z);
+    let u = dir.any_orthonormal_vector();
+    let v = dir.cross(u);
+    let r = s.fresnel_m.max(0.0);
+    let mut power = 10f32.powf(-concrete * s.wall_db_per_m / 10.0);
+    let mut n = 1.0;
+    if r > 0.01 {
+        for k in 0..8 {
+            let a = k as f32 * std::f32::consts::TAU / 8.0;
+            let off = (u * a.cos() + v * a.sin()) * r;
+            let (c, _, _) = concrete_on_line(geom, quad + off, rx, s);
+            power += 10f32.powf(-c * s.wall_db_per_m / 10.0);
+            n += 1.0;
+        }
+    }
+    let wall_db = -10.0 * (power / n).max(1e-12).log10();
+    Path { distance_m, fspl_db: fspl_db(distance_m), walls, open_surfaces: open, concrete_m: concrete, wall_db }
+}
+
+/// Received power (dBm) to raw Analog and Digital Breakup (0 = clean, 1 = lost), before the Light cap.
+pub fn breakup_from(rx_dbm: f32, s: &crate::settings::SignalTuning) -> (f32, f32) {
+    let lin = |v: f32, good: f32, bad: f32| ((good - v) / (good - bad)).clamp(0.0, 1.0);
+    (lin(rx_dbm, s.analog_clean_dbm, s.analog_lost_dbm), lin(rx_dbm, s.digital_perfect_dbm, s.digital_lost_dbm))
+}
+
 /// Work out the signal from the Quad's true position (never the delayed one).
 pub fn update_signal(
     mut sig: ResMut<VideoSignal>,
@@ -93,65 +175,40 @@ pub fn update_signal(
     let rx = map.launch_pos + Vec3::Y * s.receiver_height_m;
     sig.receiver = rx;
     let quad = rig.pos;
-    sig.distance_m = quad.distance(rx);
 
     // Walls between Quad and pilot.
     let t0 = std::time::Instant::now();
-    let crossings = if map.built { map.geom.crossings(quad, rx) } else { Vec::new() };
+    let p = if map.built {
+        path(&map.geom, quad, rx, s)
+    } else {
+        Path { distance_m: quad.distance(rx), fspl_db: fspl_db(quad.distance(rx)), ..default() }
+    };
     sig.ray_us = t0.elapsed().as_secs_f32() * 1e6;
-    let len = sig.distance_m;
-    let mut walls = 0u32;
-    let mut open = 0u32;
-    let mut concrete = 0.0f32;
-    let mut per_obj: std::collections::HashMap<usize, Vec<(f32, bool)>> = Default::default();
-    for c in &crossings {
-        per_obj.entry(c.obj).or_default().push((c.t, c.entering));
-    }
-    for (obj, hits) in per_obj {
-        if !map.geom.objects[obj].closed {
-            open += hits.len() as u32;
-            concrete += hits.len() as f32 * s.open_surface_m;
-            continue;
-        }
-        let mut start: Option<f32> = None;
-        let mut first = true;
-        for (t, entering) in hits.iter().copied() {
-            if entering {
-                start = Some(t);
-            } else {
-                // Exiting: if we never saw the entry, the Quad (or the pilot) is inside the solid.
-                let a = start.take().unwrap_or(if first { 0.0 } else { t });
-                concrete += ((t - a) * len).min(s.wall_max_m);
-                walls += 1;
-            }
-            first = false;
-        }
-        if let Some(a) = start {
-            concrete += ((1.0 - a) * len).min(s.wall_max_m);
-            walls += 1;
-        }
-    }
-    sig.walls = walls;
-    sig.open_surfaces = open;
-    sig.concrete_m = concrete;
-    sig.wall_db = concrete * s.wall_db_per_m;
-    sig.fspl_db = fspl_db(len);
+    sig.distance_m = p.distance_m;
+    sig.walls = p.walls;
+    sig.open_surfaces = p.open_surfaces;
+    sig.concrete_m = p.concrete_m;
+    sig.wall_db = p.wall_db;
+    sig.fspl_db = p.fspl_db;
 
-    // Flutter: a slow random wobble (a few times a second).
+    // Flutter: a slow random wobble.
     let target = (sig.rand() - 0.5) * 2.0;
-    let a = (dt * 6.0).min(1.0);
+    let a = (dt * 2.5).min(1.0);
     sig.flutter_state += (target - sig.flutter_state) * a;
     sig.flutter_db = sig.flutter_state * s.flutter_db;
 
     let mult = tuning.power_mult();
     sig.tx_dbm = 10.0 * (tuning.vtx_mw() * mult.unwrap_or(1.0)).max(1e-6).log10();
-    sig.rx_dbm = sig.tx_dbm - sig.fspl_db - sig.wall_db + sig.flutter_db;
+    // The receiver doesn't jump instantly either: smooth the level over `smoothing_s`.
+    let target_dbm = sig.tx_dbm - sig.fspl_db - sig.wall_db + sig.flutter_db;
+    if !sig.rx_dbm.is_finite() || sig.rx_dbm == 0.0 || s.smoothing_s <= 0.0 {
+        sig.rx_dbm = target_dbm;
+    } else {
+        let k = (dt / s.smoothing_s).min(1.0);
+        sig.rx_dbm += (target_dbm - sig.rx_dbm) * k;
+    }
 
-    let lin = |v: f32, good: f32, bad: f32| ((good - v) / (good - bad)).clamp(0.0, 1.0);
-    let (mut a_raw, mut d_raw) = (
-        lin(sig.rx_dbm, s.analog_clean_dbm, s.analog_lost_dbm),
-        lin(sig.rx_dbm, s.digital_perfect_dbm, s.digital_lost_dbm),
-    );
+    let (mut a_raw, mut d_raw) = breakup_from(sig.rx_dbm, s);
     if tuning.breakup == BreakupLevel::Off {
         a_raw = 0.0;
         d_raw = 0.0;
@@ -185,7 +242,7 @@ pub fn update_signal(
             if lost {
                 sig.digital_state = DigitalState::Frozen;
                 sig.relock_left_s = relock;
-            } else if d_target < 0.97 {
+            } else if d_target < 0.9 {
                 if sig.digital_state == DigitalState::Frozen {
                     sig.digital_state = DigitalState::Relocking;
                     sig.relock_left_s = relock;
@@ -204,15 +261,15 @@ pub fn update_signal(
                 sig.digital_state = DigitalState::Frozen;
                 sig.relock_left_s = relock;
                 sig.digital_new_frame = false;
-            } else if d_target >= 0.5 {
+            } else if d_target >= 0.65 {
                 sig.digital_state = DigitalState::Stutter;
-                // Hold the last frame for a random while; longer holds as the signal fades.
+                // Hold the last frame for a random while; more and longer holds as the signal fades.
                 if now < sig.hold_until {
                     sig.digital_new_frame = false;
                 } else {
-                    let k = ((d_target - 0.5) * 2.0).clamp(0.0, 1.0);
-                    if sig.rand() < 0.08 + 0.5 * k {
-                        let hold = 0.04 + sig.rand() as f64 * (0.06 + 0.35 * k as f64);
+                    let k = ((d_target - 0.65) / 0.35).clamp(0.0, 1.0);
+                    if sig.rand() < 0.03 + 0.4 * k {
+                        let hold = 0.03 + sig.rand() as f64 * (0.04 + 0.3 * k as f64);
                         sig.hold_until = now + hold;
                     }
                 }

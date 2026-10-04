@@ -11,6 +11,8 @@
 #   ./run.sh latency           stick-to-frame test: pipelining off/on x 1 or 2 frames in flight
 #                              (about 70 s), writes results/latency-*.md, then quits
 #   ./run.sh screenshots       screenshot set into results/screenshots/, then quits
+#   ./run.sh profile [--load F]  Video Signal along the paths and at named Bando spots, per
+#                              Breakup level (no window, a few seconds), into results/
 # bench, latency and screenshots also take --offscreen (no window; works with the screen locked).
 #
 # Quit with Cmd+Q or Shift+Esc. Your last tuning is also autosaved to saved/autosave.toml.
@@ -38,6 +40,10 @@ case "${1:-}" in
   screenshots)
     shift
     exec "$bin" --screenshots "$@"
+    ;;
+  profile)
+    shift
+    exec "$bin" --signal-profile "$@"
     ;;
   *)
     exec "$bin" "$@"

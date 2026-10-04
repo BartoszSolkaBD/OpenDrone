@@ -36,6 +36,7 @@ pub enum Step {
     SetVtx(f32),
     SetLensCurve(f32),
     SetAspect(bool),
+    Profile,
     Report,
     Exit,
 }
@@ -67,6 +68,7 @@ pub struct Script {
     pub rows: Vec<BenchRow>,
     pub shots: Vec<String>,
     pub started: f64,
+    pub profile_md: String,
 }
 
 /// A thread that "presses" a stick at random moments, so latency includes waiting for the frame.
@@ -159,6 +161,43 @@ pub fn start_script(mut script: ResMut<Script>, args: Res<LaunchArgs>, time: Res
         s.push_back(Step::Measure { label: "latency".into(), secs: 12.0 });
         s.push_back(Step::Synthetic(false));
         s.push_back(Step::Wait(0.5));
+        s.push_back(Step::Report);
+        s.push_back(Step::Exit);
+    } else if args.look_shots {
+        // A short set for checking the look after a change (about 20 s).
+        script.kind = "screenshots";
+        s.push_back(Step::HidePanel(true));
+        s.push_back(Step::WaitBuilt);
+        for f in [0.12f32, 0.62] {
+            s.push_back(Step::SeekPath { which: 0, frac: f });
+            for look in [Look::Analog, Look::Digital] {
+                s.push_back(Step::SetLook(look));
+                s.push_back(Step::Wait(2.5));
+                s.push_back(Step::Screenshot(format!(
+                    "r2-bando-p0-{:02}-{}",
+                    (f * 100.0) as u32,
+                    if look == Look::Analog { "analog" } else { "digital" }
+                )));
+            }
+        }
+        s.push_back(Step::SeekPath { which: 1, frac: 0.62 });
+        s.push_back(Step::SetLook(Look::Analog));
+        for (mw, tag) in [(6.0, "noisy"), (2.0, "heavy")] {
+            s.push_back(Step::SetVtx(mw));
+            s.push_back(Step::Wait(2.0));
+            s.push_back(Step::Screenshot(format!("r2-breakup-{tag}-analog")));
+        }
+        s.push_back(Step::SetVtx(25.0));
+        s.push_back(Step::Report);
+        s.push_back(Step::Exit);
+    } else if args.signal_profile {
+        script.kind = "signal-profile";
+        s.push_back(Step::HidePanel(true));
+        for map in [MapKind::Bando, MapKind::SkatePark] {
+            s.push_back(Step::SetMap(map));
+            s.push_back(Step::WaitBuilt);
+            s.push_back(Step::Profile);
+        }
         s.push_back(Step::Report);
         s.push_back(Step::Exit);
     } else if args.debug_shots {
@@ -365,6 +404,11 @@ pub fn run_script(
             }
         }
         Step::SetDebug(d) => debug.0 = d,
+        Step::Profile => {
+            let md = crate::profile::report(&map, &tuning);
+            script.profile_md.push_str(&md);
+            script.profile_md.push('\n');
+        }
         Step::SetRepeat(n) => probe.0 = n,
         Step::SetVtx(mw) => tuning.signal.vtx_mw_whoop = mw,
         Step::SetLensCurve(k) => {
@@ -471,6 +515,10 @@ fn write_report(script: &Script, latency: &[LatencySample], meas_cpu: &[f32], ar
             let _ = writeln!(md, "\nNot included: USB and radio, the Radio Link emulation (#21), the physics step, the compositor and the display's scan-out (about half to one refresh, 3-6 ms at 165 Hz).");
             let raw: Vec<String> = latency.iter().map(|l| format!("{:.2}/{}", l.to_present_ms, l.to_gpu_done_ms.map(|v| format!("{v:.2}")).unwrap_or("-".into()))).collect();
             let _ = writeln!(md, "\nRaw (present/gpu-done ms): {}", raw.join(" "));
+        }
+        "signal-profile" => {
+            let _ = writeln!(md, "Video Signal along the preset paths, simulated without rendering (no flutter), every 0.2 m at the path's speed.\n");
+            md.push_str(&script.profile_md);
         }
         "screenshots" => {
             for s in &script.shots {
