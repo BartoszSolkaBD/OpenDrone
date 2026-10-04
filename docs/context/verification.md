@@ -60,7 +60,7 @@ _Avoid_: Playtest, vibe check
 ## Rules
 
 - A Scenario is readable by a non-programmer. Every number carries its unit, sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.
-- The whole simulation is bit-exact on every platform. The same starting state and the same inputs give exactly the same flight, to the last bit, on every OS ([ADR-0001](../adr/0001-bit-exact-determinism-with-ordinary-floats.md)). Picture, camera, sound and analog noise are outside it.
+- The whole simulation is bit-exact on every platform. The same starting state and the same inputs give exactly the same flight, to the last bit, on every OS ([ADR-0001](../adr/0001-bit-exact-determinism-with-ordinary-floats.md)). Picture, camera, sound and Breakup are outside it.
 - A Scenario's starting state spells out everything, every time, with no hidden defaults ([ADR-0002](../adr/0002-scenario-starting-state-spells-out-everything.md)). That includes the active Rates, every Assist and the Packet Rate, because all are part of the simulation. State nobody can write by hand is named in one word: "settled" motors and a "fresh" Flight Controller.
 - A Scenario names its Quad and its Map but never copies their numbers. So changing a Quad definition moves every Scenario that uses it.
 - World values such as wind come from the Map. A Scenario that needs wind uses a Test Map that has wind.
