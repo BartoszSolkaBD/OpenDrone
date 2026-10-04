@@ -17,7 +17,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 |---|---|---|
 | Flying | Quad, Flight Controller, Flight Mode, Arm, Rates, Assist, Endless Battery, Preset | [docs/context/flying.md](docs/context/flying.md) |
 | Input | Input Device, Radio, Gamepad, Action | [docs/context/input.md](docs/context/input.md) |
-| World and content | Map, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
+| World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
 | Verification | Scenario | [docs/context/verification.md](docs/context/verification.md) |
 
@@ -29,6 +29,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | controller | Input Device, or Flight Controller (always say which) |
 | arcade mode, easy mode, difficulty | Assist or Preset |
 | level, track, scene | Map |
+| gate (for an opening on a Map) | Gap (a gate is a racing object) |
 | mod, plugin, DLC | Pack |
 | e2e test, replay test | Scenario |
 | camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |
