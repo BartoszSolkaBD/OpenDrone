@@ -38,7 +38,8 @@ _Avoid_: Input profile, controller config, mapping file
 
 ## Rules
 
-- Support is meant to be general. Verified devices are only the ones the maintainer can test, currently the DualSense and the Radiomaster Pocket.
+- Support is meant to be general. Verified devices are only the ones the maintainer can test, currently the DualSense over USB and the Radiomaster Pocket over USB with its RF module off. The DualSense over Bluetooth stays unverified until a later check.
+- An Input Device that goes quiet because its sticks rest isn't lost. A resting Pocket sends nothing at all.
 - The keyboard triggers Actions only. It isn't an Input Device and can't fly a Quad.
 - Every Action can be rebound.
 - Channels keep the Input Device's full resolution, after its calibration and channel mapping.

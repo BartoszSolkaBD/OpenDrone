@@ -15,7 +15,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md) and [docs/context/input.md](..
   - It has no 125 Hz cap and no window-focus requirement on Windows.
   - It also runs on iOS and Android, which keeps the mobile door open.
 - **Fallback: gilrs on our own thread.** gilrs is already very good on Linux, where it uses kernel timestamps, and on macOS, where it reacts the moment a value changes. On Windows it is capped at 125 Hz, needs window focus, and has an open DualSense Bluetooth bug. It has no mobile support.
-- **Prove it first with a short prototype.** The SDL recommendation rests on a few unverified points, listed in [what the prototype must prove](#what-the-prototype-must-prove).
+- **Proven on the dev Mac by a prototype ([#18](https://github.com/BartoszSolkaBD/OpenDrone/issues/18)).** Through SDL on its own thread, beside a Bevy window, the Pocket delivered 1 kHz at 11 bits and the DualSense 250 Hz over USB at 8 bits. macOS showed no permission prompt. The prototype also corrected how samples get their timestamps. See [prototype results](#prototype-results-issue-18).
 
 **Key facts**
 
@@ -281,8 +281,8 @@ Bevy adds a whole frame to step 3: about 22 ms at 45 fps. A dedicated input thre
 
 | OS | DualSense | Radiomaster Pocket |
 |---|---|---|
-| **Linux** | **High.** Event device from `hid-playstation`, with kernel timestamps. No root needed. 250 Hz over USB, about 800–1000 Hz over Bluetooth. | **High.** Event device from `hid-input`, with kernel timestamps, 11-bit, 1 kHz with RF off. |
-| **macOS** | **High.** IOKit HID callbacks on our own thread. Each value carries an OS timestamp: `IOHIDValueGetTimeStamp`, "OS AbsoluteTime" (`IOKit/hid/IOHIDValue.h`, macOS 26.2 SDK). Non-exclusive, works alongside Apple's GameController framework. | **High.** Same path. Apple's GameController framework ignores the Pocket, but IOKit sees it. |
+| **Linux** | **High.** Event device from `hid-playstation`. No root needed. 250 Hz over USB, about 800–1000 Hz over Bluetooth. The kernel stamps each event, but SDL stamps sticks when it reads them ([#18](#prototype-results-issue-18)). | **High.** Event device from `hid-input`, 11-bit, 1 kHz with RF off. Same timestamp note. |
+| **macOS** | **High, measured in [#18](#prototype-results-issue-18): 250 Hz over USB.** SDL's own DualSense driver reads every report, non-exclusively, alongside Apple's GameController framework. SDL stamps each report when it processes it; it doesn't use IOKit's per-value timestamp (`IOHIDValueGetTimeStamp`). | **High, measured in #18: 1 kHz.** SDL reads the Pocket's current values through IOKit each time our thread polls, and stamps them then. Apple's GameController framework ignores the Pocket, but IOKit sees it. |
 | **Windows** | **Medium.** SDL's HIDAPI reads every report, with no focus requirement. Timestamps are read times, not device times. Steam Input can inject a virtual Xbox pad, so tell pilots to disable it (Liftoff and Uncrashed both do). | **Medium.** SDL's DirectInput path, background-capable, all 8 axes. Read-time timestamps. gilrs's Windows.Gaming.Input path would cap at 125 Hz and need focus unless patched. |
 
 ## How other simulators handle Radio calibration, endpoints and channel mapping
@@ -319,7 +319,7 @@ Bevy adds a whole frame to step 3: about 22 ms at 45 fps. A dedicated input thre
 |---|---|---|
 | **All OSes** | 8-bit sticks, a hardware limit. USB runs at 250 Hz, slower than Bluetooth. | Classic mode only (EdgeTX 2.11+): fixed CH1–8 axes and CH9–32 on/off buttons. Only 1 kHz with RF modules off. Output shaped by the model's mixer and Limits. Shares its USB ID with every EdgeTX radio. |
 | **Linux** | Raw HID access needs a udev rule. The event-device path works without one. | None known. Slider and Dial arrive as `ABS_THROTTLE` and `ABS_RUDDER`. |
-| **macOS** | Whether the Input Monitoring permission prompt stays away for gamepads is **unverified**: SDL's comments imply only keyboards trigger it. A Bluetooth pad switched to the full report by another app may confuse descriptor-based readers like gilrs (inferred). | Same Input Monitoring question. Apple's GameController framework doesn't support it, so IOKit is required. |
+| **macOS** | No Input Monitoring prompt over USB (verified in [#18](#prototype-results-issue-18)). A Bluetooth pad switched to the full report by another app may confuse descriptor-based readers like gilrs (inferred). | No Input Monitoring prompt (verified in #18). Apple's GameController framework doesn't support it, so IOKit is required. |
 | **Windows** | Steam Input interference. gilrs over Bluetooth is broken (#184). SDL is fine. | No native device timestamps. gilrs/Windows.Gaming.Input means 125 Hz and focus required. |
 | **iOS** (roadmap) | Works through Apple's GameController framework (SDL). | Probably impossible with any stack (**unverified**). |
 | **Android** (roadmap) | SDL HIDAPI/InputDevice. gilrs has no support. | SDL InputDevice over USB OTG, probably (**unverified**). |
@@ -334,3 +334,48 @@ Before the recommendation is locked, a small prototype should confirm these poin
 4. Building SDL from source in CI works on all three OSes, and the added build time is acceptable.
 
 If step 1 or step 4 fails, use the fallback: gilrs on our own thread, with its default filters off and axes mapped by raw code. On Windows that means either patching its 8 ms poll interval upstream or adding a small Windows backend of our own.
+
+## Prototype results (issue #18)
+
+Measured on the dev Mac (M4, macOS 26.6.2) on 2026-10-04 with a throwaway probe, in [#18](https://github.com/BartoszSolkaBD/OpenDrone/issues/18):
+- SDL 3.4.18 through `sdl3-sys` 0.7.2, built from source and statically linked, with only the joystick and HIDAPI parts.
+- SDL ran on its own thread while a Bevy 0.19.1 window owned the main thread.
+
+The probe, its raw data and the summaries are on the branch [`prototype/sdl3-input-probe`](https://github.com/BartoszSolkaBD/OpenDrone/tree/prototype/sdl3-input-probe/prototypes/sdl3-input-probe).
+
+| | Radiomaster Pocket (USB, RF off) | DualSense (USB) |
+|---|---|---|
+| Report rate | **1 kHz**: new values about 1 ms apart, up to 980 a second | **250 Hz**: gaps of exactly 4, 8 or 12 ms, on a fixed 4 ms beat |
+| Resolution | **11 bits** | **8 bits**, sticks and triggers |
+| What SDL exposes | 8 axes (yaw on axis 3, CH5–CH8 on axes 4–7), 24 buttons | 6 axes (4 stick, 2 trigger), 13 buttons, D-pad, gyro, accelerometer |
+| While the sticks rest | no new values at all | the right stick rests about 10% right of centre and flickers by one step |
+| macOS permission prompt | none | none |
+
+**Point by point:**
+
+1. **Own thread beside Bevy: works.**
+   - SDL started on a non-main thread in 5–40 ms.
+   - It checked the devices 3,000–3,400 times a second, with steady gaps of 0.36 ms at most, while Bevy drew at 165 fps.
+   - Plugging a device in or out stalls the thread briefly: 9 ms when the DualSense connected, 4.6 ms around the Pocket's unplug.
+   - Bevy's own gamepad library (gilrs) read the same devices at the same time with no conflict.
+2. **Input Monitoring: no prompt.** The probe ran as its own app, and macOS's status for it stayed "never asked" for the whole run, with both devices.
+3. **Rates and resolution: as expected over USB.** See the table. The DualSense over Bluetooth wasn't measured; it gets checked later, if Bluetooth support needs changes.
+4. **Building SDL from source:**
+   - It adds about 30 s to a clean build on the M4 and needs CMake.
+   - On Linux, SDL must be told it is a build without a window system (`SDL_UNIX_CONSOLE_BUILD`, the `sdl-unix-console-build` feature). Otherwise its CMake stops because X11 and Wayland headers are missing.
+   - **CI built and started it on all three OSes** (GitHub Actions: macos-latest, windows-latest, ubuntu-latest; Rust 1.99.0). On each, SDL started its gamepad support on a spawned thread.
+   - A clean, uncached SDL-only build took 74 s on macOS, 55 s on Windows and 52 s on Linux. The whole probe, Bevy included, took 7–11 minutes uncached.
+   - **Watch on Windows:** the test loop, sleeping 250 µs between polls, managed only about 1,240 polls a second on the Windows runner. That's barely above the Pocket's 1 kHz. Runners are virtual machines (the macOS runner managed about 730, against 3,000+ on the M4), so this needs checking on real Windows hardware. The Windows input thread will probably need a finer wait than a plain sleep.
+   - Real devices on Windows and Linux weren't tested; only builds.
+
+**Corrections to this document:**
+
+- **Timestamps.** SDL stamps every stick and button sample with its own clock when our thread reads it, on every OS:
+  - On macOS, the Pocket's path reads the current value at each poll.
+  - The DualSense's path stamps each report when it processes it.
+  - On Linux, SDL ignores the kernel's event time for sticks.
+
+  So a sample's time is accurate to about one poll, roughly 0.3 ms at 3,000 polls a second. The input thread must poll well above the fastest device's report rate: on the Pocket's macOS path, only the latest value survives between polls. Only the DualSense's motion-sensor readings carry the controller's own clock. (gilrs on Linux does keep the kernel's timestamps.)
+- **SDL reports changes only.** A resting Pocket produced no samples at all for 5 s, so silence can't mean a lost device; unplugging shows up as the operating system removing it. At unplug, SDL also sent false centre values on two switch channels in the same instant.
+- **Window focus.** SDL only ignores background input when it owns a window. Our build has no SDL video at all, so it never does. This is checked in the source; the probe's not-focused step wasn't reached in the measured runs.
+- **Gamepad centre.** On the test DualSense, the sticks rest 3–10% off centre and flicker by one step. Gamepad calibration needs a centre and a small deadband. The Pocket's centre is off by only +0.05%.
