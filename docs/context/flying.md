@@ -17,7 +17,7 @@ How the Flight Controller reads the sticks: Acro, where the sticks command rotat
 _Avoid_: Mode (on its own), stabilisation mode
 
 **Arm**:
-To let the Flight Controller spin the motors. As in Betaflight, the pilot arms with an Action, and only with the throttle low and the Quad roughly level.
+To let the Flight Controller spin the motors. As in Betaflight, the pilot arms with a switch Channel, and only with the throttle low and the Quad roughly level.
 _Avoid_: Start, enable motors
 
 **Rates**:
