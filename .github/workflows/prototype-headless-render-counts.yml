@@ -1,0 +1,102 @@
+# PROTOTYPE for issue #29: "Can Bevy render headless on GitHub's Linux runner and report per-frame
+# render counts?" Throwaway; it lives only on branch prototype/headless-render-counts.
+#
+# Builds the harness in prototypes/headless-render-counts, renders both blockout Maps twice on
+# Mesa's software Vulkan (lavapipe), fails if the two runs' counts differ, and uploads both runs.
+name: "Prototype #29: headless render counts"
+
+on:
+  push:
+    branches: [prototype/headless-render-counts]
+  # Manual runs need this file on the default branch, so in practice the push above runs it.
+  workflow_dispatch:
+    inputs:
+      frames:
+        description: Flight frames per Map
+        default: "120"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prototype-headless-render-counts
+  cancel-in-progress: true
+
+jobs:
+  counts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      FRAMES: ${{ inputs.frames || '120' }}
+      # Mesa's software Vulkan driver is the only GPU on the runner.
+      WGPU_BACKEND: vulkan
+      CARGO_TERM_COLOR: always
+    defaults:
+      run:
+        working-directory: prototypes/headless-render-counts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mesa's software Vulkan (lavapipe)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends mesa-vulkan-drivers libvulkan1 vulkan-tools
+          vulkaninfo --summary 2>&1 | grep -E "deviceName|driverName|driverInfo|apiVersion|deviceType" || true
+          echo "CPU: $(nproc) cores, $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2)"
+
+      - name: Install Rust 1.99.0
+        run: |
+          rustup toolchain install 1.99.0 --profile minimal
+          rustup default 1.99.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: prototypes/headless-render-counts
+
+      - name: Build
+        run: |
+          start=$(date +%s)
+          ./prepare-wgpu.sh
+          cargo build --release
+          echo "BUILD_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Run 1
+        run: |
+          start=$(date +%s)
+          timeout 30m ./run.sh --frames "$FRAMES" --out results/runs/run-1
+          echo "RUN1_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Run 2
+        run: |
+          start=$(date +%s)
+          timeout 30m ./run.sh --frames "$FRAMES" --out results/runs/run-2
+          echo "RUN2_SECS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Compare the two runs
+        run: ./compare.sh results/runs/run-1 results/runs/run-2
+
+      - name: Report
+        if: always()
+        run: |
+          {
+            echo "## Headless render counts (prototype #29)"
+            echo
+            echo "- Flight frames per Map: $FRAMES"
+            echo "- Build: ${BUILD_SECS:-?} s. Run 1: ${RUN1_SECS:-?} s, run 2: ${RUN2_SECS:-?} s (both Maps each)"
+            echo
+            echo '### Same counts in both runs?'
+            echo
+            echo '```'
+            ./compare.sh results/runs/run-1 results/runs/run-2 || true
+            echo '```'
+            for f in results/runs/run-1/*/summary.md; do
+              [ -f "$f" ] && { echo; sed 's/^# /### /' "$f"; }
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: headless-render-counts
+          path: prototypes/headless-render-counts/results/runs/
+          retention-days: 30

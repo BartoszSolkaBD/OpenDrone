@@ -1,0 +1,35 @@
+# PROTOTYPE. Throwaway harness for issue #29 ("Can Bevy render headless on GitHub's Linux runner
+# and report per-frame render counts?"). Not production code; do not depend on it.
+# Bevy 0.19.1, as in the #28 camera prototype. Run it with ./run.sh.
+[package]
+name = "headless-render-counts"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+# No winit, audio or gamepads: nothing here needs a screen or a desktop session.
+bevy = { version = "=0.19.1", default-features = false, features = [
+    "default_app",
+    "3d_bevy_render",
+    "scene",
+    "std",
+    "multi_threaded",
+] }
+# The same wgpu that Bevy 0.19.1 uses, patched below. `counters` switches on wgpu's own
+# internal counters (live objects, and driver memory on Vulkan/DX12).
+wgpu = { version = "=29.0.4", default-features = false, features = ["counters"] }
+
+# wgpu 29.0.4 plus our counting (wgpu-counting.patch). ./prepare-wgpu.sh downloads the crate,
+# checks its checksum and applies the patch into vendor/wgpu (not committed).
+[patch.crates-io]
+wgpu = { path = "vendor/wgpu" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = false

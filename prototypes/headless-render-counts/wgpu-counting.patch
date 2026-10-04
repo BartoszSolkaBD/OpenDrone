@@ -1,0 +1,1042 @@
+diff -ruN a/src/api/buffer.rs b/src/api/buffer.rs
+--- a/src/api/buffer.rs	2026-10-04 17:50:50
++++ b/src/api/buffer.rs	2026-10-04 17:50:50
+@@ -223,6 +223,8 @@
+     pub(crate) map_context: Arc<Mutex<MapContext>>,
+     pub(crate) size: wgt::BufferAddress,
+     pub(crate) usage: BufferUsages,
++    /// PROTOTYPE (OpenDrone #29): releases this buffer's bytes from the live total.
++    pub(crate) od_mem: Option<Arc<crate::od_counters::MemGuard>>,
+     // Todo: missing map_state https://www.w3.org/TR/webgpu/#dom-gpubuffer-mapstate
+ }
+ #[cfg(send_sync)]
+@@ -330,6 +332,9 @@
+ 
+     /// Destroy the associated native resources as soon as possible.
+     pub fn destroy(&self) {
++        if let Some(m) = &self.od_mem {
++            m.release();
++        }
+         self.inner.destroy();
+     }
+ 
+diff -ruN a/src/api/command_buffer_actions.rs b/src/api/command_buffer_actions.rs
+--- a/src/api/command_buffer_actions.rs	2026-10-04 17:50:50
++++ b/src/api/command_buffer_actions.rs	2026-10-04 17:50:50
+@@ -20,6 +20,8 @@
+ pub(crate) struct DeferredCommandBufferActions {
+     pub buffer_mappings: Vec<DeferredBufferMapping>,
+     pub on_submitted_work_done_callbacks: Vec<dispatch::BoxSubmittedWorkDoneCallback>,
++    /// PROTOTYPE (OpenDrone #29): pipeline-statistics query slots started in this command buffer.
++    pub od_stats_slots: Vec<u32>,
+ }
+ 
+ impl DeferredCommandBufferActions {
+@@ -27,6 +29,7 @@
+         self.buffer_mappings.append(&mut other.buffer_mappings);
+         self.on_submitted_work_done_callbacks
+             .append(&mut other.on_submitted_work_done_callbacks);
++        self.od_stats_slots.append(&mut other.od_stats_slots);
+     }
+ 
+     pub fn execute(self, queue: &dispatch::DispatchQueue) {
+diff -ruN a/src/api/command_encoder.rs b/src/api/command_encoder.rs
+--- a/src/api/command_encoder.rs	2026-10-04 17:50:50
++++ b/src/api/command_encoder.rs	2026-10-04 17:50:50
+@@ -77,11 +77,16 @@
+         &'encoder mut self,
+         desc: &RenderPassDescriptor<'_>,
+     ) -> RenderPass<'encoder> {
+-        let rpass = self.inner.begin_render_pass(desc);
++        let mut rpass = self.inner.begin_render_pass(desc);
++        let mut od = crate::od_counters::begin_render_pass(desc);
++        if let Some(slot) = crate::od_counters::start_stats(&mut od, &mut rpass) {
++            self.actions.lock().od_stats_slots.push(slot);
++        }
+         RenderPass {
+             inner: rpass,
+             actions: Arc::clone(&self.actions),
+             _encoder_guard: api::PhantomDrop::default(),
++            od,
+         }
+     }
+ 
+@@ -104,6 +109,7 @@
+             inner: cpass,
+             actions: Arc::clone(&self.actions),
+             _encoder_guard: api::PhantomDrop::default(),
++            od: crate::od_counters::begin_compute_pass(desc),
+         }
+     }
+ 
+diff -ruN a/src/api/compute_pass.rs b/src/api/compute_pass.rs
+--- a/src/api/compute_pass.rs	2026-10-04 17:50:50
++++ b/src/api/compute_pass.rs	2026-10-04 17:50:50
+@@ -20,6 +20,9 @@
+     /// while the pass is alive. This needs to be PhantomDrop to prevent the lifetime
+     /// from being shortened.
+     pub(crate) _encoder_guard: crate::api::PhantomDrop<&'encoder ()>,
++
++    /// PROTOTYPE (OpenDrone #29): counting state.
++    pub(crate) od: crate::od_counters::PassState,
+ }
+ 
+ #[cfg(send_sync)]
+@@ -45,6 +48,7 @@
+             inner: self.inner,
+             actions: self.actions,
+             _encoder_guard: crate::api::PhantomDrop::default(),
++            od: self.od,
+         }
+     }
+ 
+@@ -87,6 +91,7 @@
+     ///
+     /// `x`, `y` and `z` denote the number of work groups to dispatch in each dimension.
+     pub fn dispatch_workgroups(&mut self, x: u32, y: u32, z: u32) {
++        crate::od_counters::dispatch(&self.od);
+         self.inner.dispatch_workgroups(x, y, z);
+     }
+ 
+@@ -98,6 +103,7 @@
+         indirect_buffer: &Buffer,
+         indirect_offset: BufferAddress,
+     ) {
++        crate::od_counters::dispatch(&self.od);
+         self.inner
+             .dispatch_workgroups_indirect(&indirect_buffer.inner, indirect_offset);
+     }
+diff -ruN a/src/api/device.rs b/src/api/device.rs
+--- a/src/api/device.rs	2026-10-04 17:50:50
++++ b/src/api/device.rs	2026-10-04 17:50:50
+@@ -140,6 +140,7 @@
+         let module = self
+             .inner
+             .create_shader_module(desc, wgt::ShaderRuntimeChecks::checked());
++        crate::od_counters::bump(&crate::od_counters::C.shader_modules_created, 1);
+         ShaderModule { inner: module }
+     }
+ 
+@@ -184,6 +185,8 @@
+         runtime_checks: crate::ShaderRuntimeChecks,
+     ) -> ShaderModule {
+         let module = self.inner.create_shader_module(desc, runtime_checks);
++        crate::od_counters::bump(&crate::od_counters::C.shader_modules_created, 1);
++        crate::od_counters::bump(&crate::od_counters::C.shader_modules_created, 1);
+         ShaderModule { inner: module }
+     }
+ 
+@@ -199,6 +202,7 @@
+         desc: ShaderModuleDescriptorPassthrough<'_>,
+     ) -> ShaderModule {
+         let module = unsafe { self.inner.create_shader_module_passthrough(&desc) };
++        crate::od_counters::bump(&crate::od_counters::C.shader_modules_created, 1);
+         ShaderModule { inner: module }
+     }
+ 
+@@ -231,6 +235,7 @@
+     #[must_use]
+     pub fn create_bind_group(&self, desc: &BindGroupDescriptor<'_>) -> BindGroup {
+         let group = self.inner.create_bind_group(desc);
++        crate::od_counters::bump(&crate::od_counters::C.bind_groups_created, 1);
+         BindGroup { inner: group }
+     }
+ 
+@@ -255,20 +260,23 @@
+     #[must_use]
+     pub fn create_render_pipeline(&self, desc: &RenderPipelineDescriptor<'_>) -> RenderPipeline {
+         let pipeline = self.inner.create_render_pipeline(desc);
+-        RenderPipeline { inner: pipeline }
++        crate::od_counters::bump(&crate::od_counters::C.render_pipelines_created, 1);
++        RenderPipeline { inner: pipeline, od_topology: desc.primitive.topology }
+     }
+ 
+     /// Creates a mesh shader based [`RenderPipeline`].
+     #[must_use]
+     pub fn create_mesh_pipeline(&self, desc: &MeshPipelineDescriptor<'_>) -> RenderPipeline {
+         let pipeline = self.inner.create_mesh_pipeline(desc);
+-        RenderPipeline { inner: pipeline }
++        crate::od_counters::bump(&crate::od_counters::C.render_pipelines_created, 1);
++        RenderPipeline { inner: pipeline, od_topology: desc.primitive.topology }
+     }
+ 
+     /// Creates a [`ComputePipeline`].
+     #[must_use]
+     pub fn create_compute_pipeline(&self, desc: &ComputePipelineDescriptor<'_>) -> ComputePipeline {
+         let pipeline = self.inner.create_compute_pipeline(desc);
++        crate::od_counters::bump(&crate::od_counters::C.compute_pipelines_created, 1);
+         ComputePipeline { inner: pipeline }
+     }
+ 
+@@ -284,6 +292,7 @@
+             map_context: Arc::new(Mutex::new(map_context)),
+             size: desc.size,
+             usage: desc.usage,
++            od_mem: crate::od_counters::MemGuard::new(desc.size, false),
+         }
+     }
+ 
+@@ -301,6 +310,7 @@
+                 view_formats: &[],
+                 ..desc.clone()
+             },
++            od_mem: crate::od_counters::MemGuard::new(crate::od_counters::texture_bytes(desc), true),
+         }
+     }
+ 
+@@ -340,6 +350,7 @@
+                 view_formats: &[],
+                 ..desc.clone()
+             },
++            od_mem: None,
+         }
+     }
+ 
+@@ -395,6 +406,7 @@
+             map_context: Arc::new(Mutex::new(map_context)),
+             size: desc.size,
+             usage: desc.usage,
++            od_mem: None,
+         }
+     }
+ 
+diff -ruN a/src/api/queue.rs b/src/api/queue.rs
+--- a/src/api/queue.rs	2026-10-04 17:50:50
++++ b/src/api/queue.rs	2026-10-04 17:50:50
+@@ -155,6 +155,7 @@
+     ///   be able to use [`StagingBelt`](crate::util::StagingBelt),
+     ///   or buffers you explicitly create, map, and unmap yourself.
+     pub fn write_buffer(&self, buffer: &Buffer, offset: BufferAddress, data: &[u8]) {
++        crate::od_counters::bump(&crate::od_counters::C.upload_bytes, data.len() as u64);
+         self.inner.write_buffer(&buffer.inner, offset, data);
+     }
+ 
+@@ -199,6 +200,7 @@
+         size: BufferSize,
+     ) -> Option<QueueWriteBufferView> {
+         profiling::scope!("Queue::write_buffer_with");
++        crate::od_counters::bump(&crate::od_counters::C.upload_bytes, size.get());
+         self.inner
+             .validate_write_buffer(&buffer.inner, offset, size)?;
+         let staging_buffer = self.inner.create_staging_buffer(size)?;
+@@ -238,6 +240,7 @@
+         data_layout: TexelCopyBufferLayout,
+         size: Extent3d,
+     ) {
++        crate::od_counters::bump(&crate::od_counters::C.upload_bytes, data.len() as u64);
+         self.inner.write_texture(texture, data, data_layout, size);
+     }
+ 
+@@ -266,7 +269,9 @@
+             actions.append(&mut comb.actions.lock());
+             comb.buffer
+         });
++        crate::od_counters::bump(&crate::od_counters::C.submits, 1);
+         let index = self.inner.submit(&mut command_buffers);
++        crate::od_counters::slots_submitted(core::mem::take(&mut actions.od_stats_slots));
+ 
+         // Execute all deferred actions after submit.
+         actions.execute(&self.inner);
+diff -ruN a/src/api/render_pass.rs b/src/api/render_pass.rs
+--- a/src/api/render_pass.rs	2026-10-04 17:50:50
++++ b/src/api/render_pass.rs	2026-10-04 17:50:50
+@@ -33,8 +33,21 @@
+     /// while the pass is alive. This needs to be PhantomDrop to prevent the lifetime
+     /// from being shortened.
+     pub(crate) _encoder_guard: PhantomDrop<&'encoder ()>,
++
++    /// PROTOTYPE (OpenDrone #29): counting state.
++    pub(crate) od: crate::od_counters::PassState,
+ }
+ 
++/// PROTOTYPE (OpenDrone #29): close the pass's pipeline-statistics query before the pass ends.
++impl Drop for RenderPass<'_> {
++    fn drop(&mut self) {
++        if self.od.stats_open {
++            self.od.stats_open = false;
++            self.inner.end_pipeline_statistics_query();
++        }
++    }
++}
++
+ #[cfg(send_sync)]
+ static_assertions::assert_impl_all!(RenderPass<'_>: Send, Sync);
+ 
+@@ -54,10 +67,16 @@
+     /// It's a safe operation, since [`CommandEncoder`] is in a locked state as long as the pass is active
+     /// regardless of the lifetime constraint or its absence.
+     pub fn forget_lifetime(self) -> RenderPass<'static> {
+-        RenderPass {
+-            inner: self.inner,
+-            actions: self.actions,
+-            _encoder_guard: crate::api::PhantomDrop::default(),
++        // PROTOTYPE (OpenDrone #29): RenderPass now has a Drop impl, so move the fields out by hand.
++        let this = core::mem::ManuallyDrop::new(self);
++        // SAFETY: `this` is never used or dropped again; each field is read exactly once.
++        unsafe {
++            RenderPass {
++                inner: core::ptr::read(&this.inner),
++                actions: core::ptr::read(&this.actions),
++                _encoder_guard: crate::api::PhantomDrop::default(),
++                od: core::ptr::read(&this.od),
++            }
+         }
+     }
+ 
+@@ -84,6 +103,7 @@
+     ///
+     /// Subsequent draw calls will exhibit the behavior defined by `pipeline`.
+     pub fn set_pipeline(&mut self, pipeline: &RenderPipeline) {
++        self.od.topology = pipeline.od_topology;
+         self.inner.set_pipeline(&pipeline.inner);
+     }
+ 
+@@ -199,6 +219,7 @@
+     /// This drawing command uses the current render state, as set by preceding `set_*()` methods.
+     /// It is not affected by changes to the state that are performed after it is called.
+     pub fn draw(&mut self, vertices: Range<u32>, instances: Range<u32>) {
++        crate::od_counters::direct_draw(&self.od, vertices.end.saturating_sub(vertices.start), instances.end.saturating_sub(instances.start));
+         self.inner.draw(vertices, instances);
+     }
+ 
+@@ -228,6 +249,7 @@
+     /// This drawing command uses the current render state, as set by preceding `set_*()` methods.
+     /// It is not affected by changes to the state that are performed after it is called.
+     pub fn draw_indexed(&mut self, indices: Range<u32>, base_vertex: i32, instances: Range<u32>) {
++        crate::od_counters::direct_draw(&self.od, indices.end.saturating_sub(indices.start), instances.end.saturating_sub(instances.start));
+         self.inner.draw_indexed(indices, base_vertex, instances);
+     }
+ 
+@@ -259,6 +281,7 @@
+     ///
+     /// [No Color Output mode]: https://www.w3.org/TR/webgpu/#no-color-output
+     pub fn draw_mesh_tasks(&mut self, group_count_x: u32, group_count_y: u32, group_count_z: u32) {
++        crate::od_counters::direct_draw(&self.od, 0, 0);
+         self.inner
+             .draw_mesh_tasks(group_count_x, group_count_y, group_count_z);
+     }
+@@ -270,6 +293,7 @@
+     ///
+     /// Calling this requires the device support [`DownlevelFlags::INDIRECT_EXECUTION`].
+     pub fn draw_indirect(&mut self, indirect_buffer: &Buffer, indirect_offset: BufferAddress) {
++        crate::od_counters::indirect_draw(&self.od, 1, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: false, count: None }));
+         self.inner
+             .draw_indirect(&indirect_buffer.inner, indirect_offset);
+     }
+@@ -286,6 +310,7 @@
+         indirect_buffer: &Buffer,
+         indirect_offset: BufferAddress,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, 1, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: true, count: None }));
+         self.inner
+             .draw_indexed_indirect(&indirect_buffer.inner, indirect_offset);
+     }
+@@ -305,6 +330,7 @@
+         indirect_buffer: &Buffer,
+         indirect_offset: BufferAddress,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, 1, None);
+         self.inner
+             .draw_mesh_tasks_indirect(&indirect_buffer.inner, indirect_offset);
+     }
+@@ -320,6 +346,7 @@
+         &mut self,
+         render_bundles: I,
+     ) {
++        crate::od_counters::bump(&crate::od_counters::C.bundles_executed, 1);
+         let mut render_bundles = render_bundles.into_iter().map(|rb| &rb.inner);
+ 
+         self.inner.execute_bundles(&mut render_bundles);
+@@ -343,6 +370,7 @@
+         indirect_offset: BufferAddress,
+         count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, count, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: false, count: None }));
+         self.inner
+             .multi_draw_indirect(&indirect_buffer.inner, indirect_offset, count);
+     }
+@@ -366,6 +394,7 @@
+         indirect_offset: BufferAddress,
+         count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, count, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: true, count: None }));
+         self.inner
+             .multi_draw_indexed_indirect(&indirect_buffer.inner, indirect_offset, count);
+     }
+@@ -383,6 +412,7 @@
+         indirect_offset: BufferAddress,
+         count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, count, None);
+         self.inner
+             .multi_draw_mesh_tasks_indirect(&indirect_buffer.inner, indirect_offset, count);
+     }
+@@ -426,6 +456,7 @@
+         count_offset: BufferAddress,
+         max_count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, max_count, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: false, count: Some((count_buffer, count_offset)) }));
+         self.inner.multi_draw_indirect_count(
+             &indirect_buffer.inner,
+             indirect_offset,
+@@ -467,6 +498,7 @@
+         count_offset: BufferAddress,
+         max_count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, max_count, Some(crate::od_counters::IndirectSrc { buffer: indirect_buffer, offset: indirect_offset, indexed: true, count: Some((count_buffer, count_offset)) }));
+         self.inner.multi_draw_indexed_indirect_count(
+             &indirect_buffer.inner,
+             indirect_offset,
+@@ -495,6 +527,7 @@
+         count_offset: BufferAddress,
+         max_count: u32,
+     ) {
++        crate::od_counters::indirect_draw(&self.od, max_count, None);
+         self.inner.multi_draw_mesh_tasks_indirect_count(
+             &indirect_buffer.inner,
+             indirect_offset,
+diff -ruN a/src/api/render_pipeline.rs b/src/api/render_pipeline.rs
+--- a/src/api/render_pipeline.rs	2026-10-04 17:50:50
++++ b/src/api/render_pipeline.rs	2026-10-04 17:50:50
+@@ -11,6 +11,8 @@
+ #[derive(Debug, Clone)]
+ pub struct RenderPipeline {
+     pub(crate) inner: dispatch::DispatchRenderPipeline,
++    /// PROTOTYPE (OpenDrone #29): to count triangles of direct draws.
++    pub(crate) od_topology: PrimitiveTopology,
+ }
+ #[cfg(send_sync)]
+ static_assertions::assert_impl_all!(RenderPipeline: Send, Sync);
+diff -ruN a/src/api/surface.rs b/src/api/surface.rs
+--- a/src/api/surface.rs	2026-10-04 17:50:50
++++ b/src/api/surface.rs	2026-10-04 17:50:50
+@@ -156,6 +156,7 @@
+                     texture: Texture {
+                         inner: texture,
+                         descriptor,
++                        od_mem: None,
+                     },
+                     presented: false,
+                     detail,
+diff -ruN a/src/api/texture.rs b/src/api/texture.rs
+--- a/src/api/texture.rs	2026-10-04 17:50:50
++++ b/src/api/texture.rs	2026-10-04 17:50:50
+@@ -12,6 +12,8 @@
+ pub struct Texture {
+     pub(crate) inner: dispatch::DispatchTexture,
+     pub(crate) descriptor: TextureDescriptor<'static>,
++    /// PROTOTYPE (OpenDrone #29): releases this texture's bytes from the live total.
++    pub(crate) od_mem: Option<alloc::sync::Arc<crate::od_counters::MemGuard>>,
+ }
+ #[cfg(send_sync)]
+ static_assertions::assert_impl_all!(Texture: Send, Sync);
+@@ -93,14 +95,19 @@
+     pub fn create_view(&self, desc: &TextureViewDescriptor<'_>) -> TextureView {
+         let view = self.inner.create_view(desc);
+ 
++        let mip = self.descriptor.mip_level_size(desc.base_mip_level).unwrap_or(self.descriptor.size);
+         TextureView {
+             inner: view,
+             texture: self.clone(),
++            od_size: (mip.width, mip.height),
+         }
+     }
+ 
+     /// Destroy the associated native resources as soon as possible.
+     pub fn destroy(&self) {
++        if let Some(m) = &self.od_mem {
++            m.release();
++        }
+         self.inner.destroy();
+     }
+ 
+diff -ruN a/src/api/texture_view.rs b/src/api/texture_view.rs
+--- a/src/api/texture_view.rs	2026-10-04 17:50:50
++++ b/src/api/texture_view.rs	2026-10-04 17:50:50
+@@ -16,6 +16,8 @@
+ pub struct TextureView {
+     pub(crate) inner: dispatch::DispatchTextureView,
+     pub(crate) texture: Texture,
++    /// PROTOTYPE (OpenDrone #29): width and height of the viewed mip level.
++    pub(crate) od_size: (u32, u32),
+ }
+ #[cfg(send_sync)]
+ static_assertions::assert_impl_all!(TextureView: Send, Sync);
+diff -ruN a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs	2026-10-04 17:50:50
++++ b/src/lib.rs	2026-10-04 17:50:50
+@@ -116,6 +116,8 @@
+ mod dispatch;
+ mod macros;
+ pub mod util;
++/// PROTOTYPE (OpenDrone #29): per-frame render Work Counts.
++pub mod od_counters;
+ 
+ //
+ //
+diff -ruN a/src/od_counters.rs b/src/od_counters.rs
+--- a/src/od_counters.rs	1970-01-01 01:00:00
++++ b/src/od_counters.rs	2026-10-04 17:50:50
+@@ -0,0 +1,562 @@
++//! PROTOTYPE for OpenDrone issue #29 ("Can Bevy render headless on GitHub's Linux runner and
++//! report per-frame render counts?"). NOT part of upstream wgpu. Added to wgpu 29.0.4 by
++//! `prototypes/headless-render-counts/wgpu-counting.patch`.
++//!
++//! Counts what the app asks wgpu to do, at wgpu's public API, so every caller is covered
++//! (Bevy's tracked passes, its raw full-screen passes, compute, uploads). The harness takes a
++//! snapshot once per frame with [`take_frame`].
++//!
++//! Optional GPU-side numbers: when [`install_pipeline_statistics`] was called on a device with
++//! `Features::PIPELINE_STATISTICS_QUERY` (Vulkan and DX12; not Metal), every render pass is
++//! wrapped in a pipeline-statistics query, resolved by [`resolve_pipeline_statistics`].
++
++extern crate std;
++
++use alloc::{string::String, sync::Arc, vec::Vec};
++use core::{
++    cell::Cell,
++    sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering::Relaxed},
++};
++use std::sync::Mutex;
++
++use crate::*;
++
++/// Max render passes per frame that get a pipeline-statistics query.
++pub const MAX_STATS_PASSES: u32 = 512;
++
++macro_rules! frame_counters {
++    ($($(#[$m:meta])* $name:ident),* $(,)?) => {
++        pub(crate) struct Atomics { $(pub(crate) $name: AtomicU64,)* }
++        pub(crate) static C: Atomics = Atomics { $($name: AtomicU64::new(0),)* };
++        /// Per-frame counts (reset by [`take_frame`]).
++        #[derive(Clone, Debug, Default)]
++        #[allow(missing_docs)]
++        pub struct FrameCounts {
++            $($(#[$m])* pub $name: u64,)*
++            /// Live buffer bytes, from the descriptors of buffers not yet dropped or destroyed.
++            pub buffer_bytes_live: i64,
++            /// Live texture bytes (theoretical footprint of every mip, layer and sample).
++            pub texture_bytes_live: i64,
++            pub buffers_live: i64,
++            pub textures_live: i64,
++            /// Every render and compute pass of the frame, in recording order.
++            pub passes: Vec<PassRecord>,
++        }
++        fn take_atomics(out: &mut FrameCounts) {
++            $(out.$name = C.$name.swap(0, Relaxed);)*
++        }
++    };
++}
++
++frame_counters!(
++    render_passes,
++    compute_passes,
++    /// Sum over render passes of the target area (width x height of the attachment).
++    target_pixels,
++    /// Every draw command: direct draws plus each slot of an indirect or multi-draw.
++    draws,
++    draws_direct,
++    draws_indirect,
++    /// `draw*_indirect*` calls (one call can hold many draws).
++    indirect_calls,
++    /// Draws that drew something: direct draws with vertices and instances, plus indirect
++    /// slots whose read-back arguments have both (after GPU culling).
++    draws_nonempty,
++    /// Triangles of direct draws, from the call's arguments.
++    triangles_direct,
++    /// Triangles of indirect draws, from their arguments read back after the frame.
++    triangles_indirect,
++    /// Indirect slots whose arguments couldn't be read back (buffer without `COPY_SRC`).
++    indirect_unread,
++    /// Vertices (or indices) x instances of direct draws.
++    vertices_direct,
++    dispatches,
++    bundles_executed,
++    render_pipelines_created,
++    compute_pipelines_created,
++    shader_modules_created,
++    bind_groups_created,
++    buffers_created,
++    buffer_bytes_created,
++    textures_created,
++    texture_bytes_created,
++    /// Bytes handed to `Queue::write_buffer*` and `Queue::write_texture`.
++    upload_bytes,
++    submits,
++);
++
++static BUFFER_BYTES_LIVE: AtomicI64 = AtomicI64::new(0);
++static TEXTURE_BYTES_LIVE: AtomicI64 = AtomicI64::new(0);
++static BUFFERS_LIVE: AtomicI64 = AtomicI64::new(0);
++static TEXTURES_LIVE: AtomicI64 = AtomicI64::new(0);
++
++/// One render or compute pass.
++#[derive(Clone, Debug, Default)]
++#[allow(missing_docs)]
++pub struct PassRecord {
++    pub label: String,
++    pub compute: bool,
++    pub width: u32,
++    pub height: u32,
++    pub samples: u32,
++    pub color_targets: u32,
++    pub depth: bool,
++    pub draws: u64,
++    pub draws_indirect: u64,
++    pub draws_nonempty: u64,
++    pub triangles_direct: u64,
++    pub triangles_indirect: u64,
++    pub dispatches: u64,
++    /// Slot in the pipeline-statistics query set, if this pass was wrapped in a query.
++    pub stats_slot: Option<u32>,
++    /// GPU pipeline statistics: vertex shader invocations, clipper invocations (triangles that
++    /// reached the clipper), clipper primitives out, fragment shader invocations, compute shader
++    /// invocations. Filled by [`resolve_pipeline_statistics`].
++    pub stats: Option<[u64; 5]>,
++}
++
++static PASSES: Mutex<Vec<PassRecord>> = Mutex::new(Vec::new());
++
++std::thread_local! {
++    static SUPPRESS: Cell<bool> = const { Cell::new(false) };
++}
++
++/// Runs `f` without counting (for the harness's own readback resources).
++pub fn uncounted<R>(f: impl FnOnce() -> R) -> R {
++    SUPPRESS.with(|s| s.set(true));
++    let r = f();
++    SUPPRESS.with(|s| s.set(false));
++    r
++}
++
++#[inline]
++pub(crate) fn on() -> bool {
++    !SUPPRESS.with(|s| s.get())
++}
++
++/// Adds `v` to a per-frame counter, unless counting is suppressed on this thread.
++#[inline]
++pub(crate) fn bump(c: &AtomicU64, v: u64) {
++    if on() {
++        c.fetch_add(v, Relaxed);
++    }
++}
++
++/// Snapshot and reset the per-frame counts (live memory is a running total, not reset).
++pub fn take_frame() -> FrameCounts {
++    let mut out = FrameCounts::default();
++    take_atomics(&mut out);
++    out.buffer_bytes_live = BUFFER_BYTES_LIVE.load(Relaxed);
++    out.texture_bytes_live = TEXTURE_BYTES_LIVE.load(Relaxed);
++    out.buffers_live = BUFFERS_LIVE.load(Relaxed);
++    out.textures_live = TEXTURES_LIVE.load(Relaxed);
++    out.passes = core::mem::take(&mut *PASSES.lock().unwrap());
++    out
++}
++
++// ---- memory guards -------------------------------------------------------------------------
++
++/// Lives inside every counted `Buffer`/`Texture` clone; the last clone dropping (or an explicit
++/// `destroy()`) releases its bytes once.
++#[derive(Debug)]
++pub(crate) struct MemGuard {
++    bytes: i64,
++    texture: bool,
++    released: AtomicBool,
++}
++
++impl MemGuard {
++    pub(crate) fn new(bytes: u64, texture: bool) -> Option<Arc<MemGuard>> {
++        if !on() {
++            return None;
++        }
++        let bytes = bytes as i64;
++        if texture {
++            TEXTURE_BYTES_LIVE.fetch_add(bytes, Relaxed);
++            TEXTURES_LIVE.fetch_add(1, Relaxed);
++            C.textures_created.fetch_add(1, Relaxed);
++            C.texture_bytes_created.fetch_add(bytes as u64, Relaxed);
++        } else {
++            BUFFER_BYTES_LIVE.fetch_add(bytes, Relaxed);
++            BUFFERS_LIVE.fetch_add(1, Relaxed);
++            C.buffers_created.fetch_add(1, Relaxed);
++            C.buffer_bytes_created.fetch_add(bytes as u64, Relaxed);
++        }
++        Some(Arc::new(MemGuard { bytes, texture, released: AtomicBool::new(false) }))
++    }
++
++    pub(crate) fn release(&self) {
++        if self.released.swap(true, Relaxed) {
++            return;
++        }
++        if self.texture {
++            TEXTURE_BYTES_LIVE.fetch_sub(self.bytes, Relaxed);
++            TEXTURES_LIVE.fetch_sub(1, Relaxed);
++        } else {
++            BUFFER_BYTES_LIVE.fetch_sub(self.bytes, Relaxed);
++            BUFFERS_LIVE.fetch_sub(1, Relaxed);
++        }
++    }
++}
++
++impl Drop for MemGuard {
++    fn drop(&mut self) {
++        self.release();
++    }
++}
++
++/// Theoretical bytes of a texture: every mip level, array layer and sample.
++pub(crate) fn texture_bytes(desc: &TextureDescriptor<'_>) -> u64 {
++    let (bw, bh) = desc.format.block_dimensions();
++    let mut total = 0u64;
++    for level in 0..desc.mip_level_count {
++        if let Some(size) = desc.mip_level_size(level) {
++            // Block-compressed formats round up to whole blocks.
++            let size = Extent3d {
++                width: size.width.max(1).div_ceil(bw) * bw,
++                height: size.height.max(1).div_ceil(bh) * bh,
++                depth_or_array_layers: size.depth_or_array_layers.max(1),
++            };
++            total += desc.format.theoretical_memory_footprint(size);
++        }
++    }
++    total * u64::from(desc.sample_count.max(1))
++}
++
++// ---- passes ----------------------------------------------------------------------------------
++
++/// Pass bookkeeping carried by a counted `RenderPass`/`ComputePass`.
++#[derive(Debug, Default)]
++pub(crate) struct PassState {
++    /// Index into this frame's pass list, or `usize::MAX` when not counted.
++    pub(crate) index: usize,
++    pub(crate) topology: PrimitiveTopology,
++    pub(crate) stats_open: bool,
++}
++
++pub(crate) fn begin_render_pass(desc: &RenderPassDescriptor<'_>) -> PassState {
++    if !on() {
++        return PassState { index: usize::MAX, ..Default::default() };
++    }
++    let mut rec = PassRecord { label: desc.label.unwrap_or("").into(), ..Default::default() };
++    let mut size = None;
++    for att in desc.color_attachments.iter().flatten() {
++        rec.color_targets += 1;
++        if size.is_none() {
++            size = Some((att.view.od_size, att.view.texture.descriptor.sample_count));
++        }
++    }
++    if let Some(ds) = &desc.depth_stencil_attachment {
++        rec.depth = true;
++        if size.is_none() {
++            size = Some((ds.view.od_size, ds.view.texture.descriptor.sample_count));
++        }
++    }
++    let ((w, h), samples) = size.unwrap_or(((0, 0), 1));
++    rec.width = w;
++    rec.height = h;
++    rec.samples = samples;
++    C.render_passes.fetch_add(1, Relaxed);
++    C.target_pixels.fetch_add(u64::from(w) * u64::from(h), Relaxed);
++    let mut passes = PASSES.lock().unwrap();
++    passes.push(rec);
++    PassState { index: passes.len() - 1, ..Default::default() }
++}
++
++pub(crate) fn begin_compute_pass(desc: &ComputePassDescriptor<'_>) -> PassState {
++    if !on() {
++        return PassState { index: usize::MAX, ..Default::default() };
++    }
++    C.compute_passes.fetch_add(1, Relaxed);
++    let mut passes = PASSES.lock().unwrap();
++    passes.push(PassRecord { label: desc.label.unwrap_or("").into(), compute: true, ..Default::default() });
++    PassState { index: passes.len() - 1, ..Default::default() }
++}
++
++fn with_pass(state: &PassState, f: impl FnOnce(&mut PassRecord)) {
++    if state.index == usize::MAX {
++        return;
++    }
++    if let Some(p) = PASSES.lock().unwrap().get_mut(state.index) {
++        f(p);
++    }
++}
++
++fn triangles(topology: PrimitiveTopology, n: u64) -> u64 {
++    match topology {
++        PrimitiveTopology::TriangleList => n / 3,
++        PrimitiveTopology::TriangleStrip => n.saturating_sub(2),
++        _ => 0,
++    }
++}
++
++pub(crate) fn direct_draw(state: &PassState, count: u32, instances: u32) {
++    if state.index == usize::MAX {
++        return;
++    }
++    let inst = u64::from(instances);
++    let tris = triangles(state.topology, u64::from(count)) * inst;
++    let nonempty = u64::from(count > 0 && instances > 0);
++    C.draws.fetch_add(1, Relaxed);
++    C.draws_direct.fetch_add(1, Relaxed);
++    C.draws_nonempty.fetch_add(nonempty, Relaxed);
++    C.triangles_direct.fetch_add(tris, Relaxed);
++    C.vertices_direct.fetch_add(u64::from(count) * inst, Relaxed);
++    with_pass(state, |p| {
++        p.draws += 1;
++        p.draws_nonempty += nonempty;
++        p.triangles_direct += tris;
++    });
++}
++
++/// Where an indirect draw's arguments live, so they can be read back after the frame.
++pub(crate) struct IndirectSrc<'a> {
++    pub(crate) buffer: &'a Buffer,
++    pub(crate) offset: BufferAddress,
++    pub(crate) indexed: bool,
++    /// For `*_indirect_count` draws: the buffer and offset of the actual draw count.
++    pub(crate) count: Option<(&'a Buffer, BufferAddress)>,
++}
++
++struct IndirectRec {
++    pass: usize,
++    topology: PrimitiveTopology,
++    buffer: Buffer,
++    offset: BufferAddress,
++    slots: u32,
++    indexed: bool,
++    count: Option<(Buffer, BufferAddress)>,
++}
++
++static INDIRECT: Mutex<Vec<IndirectRec>> = Mutex::new(Vec::new());
++
++pub(crate) fn indirect_draw(state: &PassState, slots: u32, src: Option<IndirectSrc<'_>>) {
++    if state.index == usize::MAX {
++        return;
++    }
++    C.draws.fetch_add(u64::from(slots), Relaxed);
++    C.draws_indirect.fetch_add(u64::from(slots), Relaxed);
++    C.indirect_calls.fetch_add(1, Relaxed);
++    with_pass(state, |p| {
++        p.draws += u64::from(slots);
++        p.draws_indirect += u64::from(slots);
++    });
++    let readable = |b: &Buffer| b.usage().contains(BufferUsages::COPY_SRC);
++    match src {
++        Some(src) if readable(src.buffer) => {
++            let count = src.count.filter(|(b, _)| readable(b)).map(|(b, o)| (b.clone(), o));
++            INDIRECT.lock().unwrap().push(IndirectRec {
++                pass: state.index,
++                topology: state.topology,
++                buffer: src.buffer.clone(),
++                offset: src.offset,
++                slots,
++                indexed: src.indexed,
++                count,
++            });
++        }
++        _ => {
++            C.indirect_unread.fetch_add(u64::from(slots), Relaxed);
++        }
++    }
++}
++
++/// Read back the arguments of this frame's indirect draws (after the GPU wrote them) and count
++/// their triangles and non-empty draws. Call once per frame, after the app's last submit and
++/// before [`take_frame`]. Blocks until the GPU is done. Needs the indirect buffers to have
++/// `COPY_SRC` (Bevy: `RenderDebugFlags::ALLOW_COPIES_FROM_INDIRECT_PARAMETERS`).
++pub fn resolve_indirect_draws(device: &Device, queue: &Queue) {
++    let recs = core::mem::take(&mut *INDIRECT.lock().unwrap());
++    if recs.is_empty() {
++        return;
++    }
++    let stride = |indexed: bool| if indexed { 20u64 } else { 16u64 };
++    // Layout in the read-back buffer: each record's arguments, then its count (4 bytes).
++    let mut offsets = Vec::with_capacity(recs.len());
++    let mut size = 0u64;
++    for r in &recs {
++        let args = u64::from(r.slots) * stride(r.indexed);
++        offsets.push(size);
++        size += args + if r.count.is_some() { 4 } else { 0 };
++    }
++    let size = size.max(4);
++    uncounted(|| {
++        let read = device.create_buffer(&BufferDescriptor {
++            label: Some("od_indirect_read"),
++            size,
++            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
++            mapped_at_creation: false,
++        });
++        let mut enc = device.create_command_encoder(&CommandEncoderDescriptor { label: Some("od_indirect_copy") });
++        for (r, &off) in recs.iter().zip(&offsets) {
++            let args = u64::from(r.slots) * stride(r.indexed);
++            if args > 0 {
++                enc.copy_buffer_to_buffer(&r.buffer, r.offset, &read, off, args);
++            }
++            if let Some((cb, co)) = &r.count {
++                enc.copy_buffer_to_buffer(cb, *co, &read, off + args, 4);
++            }
++        }
++        queue.submit([enc.finish()]);
++        let slice = read.slice(..);
++        slice.map_async(MapMode::Read, |r| r.expect("map indirect arguments"));
++        device.poll(PollType::wait_indefinitely()).expect("poll");
++        let data = slice.get_mapped_range();
++        let u32_at = |at: u64| u32::from_le_bytes(data[at as usize..at as usize + 4].try_into().unwrap());
++        let mut passes = PASSES.lock().unwrap();
++        for (r, &off) in recs.iter().zip(&offsets) {
++            let st = stride(r.indexed);
++            let args = u64::from(r.slots) * st;
++            let n = match r.count {
++                Some(_) => u32_at(off + args).min(r.slots),
++                None => r.slots,
++            };
++            let (mut tris, mut nonempty) = (0u64, 0u64);
++            for i in 0..u64::from(n) {
++                let at = off + i * st;
++                // Both layouts start with (vertex or index count, instance count).
++                let (count, instances) = (u32_at(at), u32_at(at + 4));
++                tris += triangles(r.topology, u64::from(count)) * u64::from(instances);
++                nonempty += u64::from(count > 0 && instances > 0);
++            }
++            C.triangles_indirect.fetch_add(tris, Relaxed);
++            C.draws_nonempty.fetch_add(nonempty, Relaxed);
++            if let Some(p) = passes.get_mut(r.pass) {
++                p.triangles_indirect += tris;
++                p.draws_nonempty += nonempty;
++            }
++        }
++        drop(passes);
++        drop(data);
++        read.unmap();
++    });
++}
++
++pub(crate) fn dispatch(state: &PassState) {
++    if state.index == usize::MAX {
++        return;
++    }
++    C.dispatches.fetch_add(1, Relaxed);
++    with_pass(state, |p| p.dispatches += 1);
++}
++
++// ---- GPU pipeline statistics (Vulkan / DX12) -------------------------------------------------
++
++struct Stats {
++    set: QuerySet,
++    resolve: Buffer,
++    read: Buffer,
++    next_slot: u32,
++    /// Slots whose pass reached `Queue::submit`. Only these are resolved: resolving a query
++    /// that never ran would wait forever on Vulkan.
++    submitted: Vec<u32>,
++}
++
++static STATS: Mutex<Option<Stats>> = Mutex::new(None);
++
++/// Each slot is resolved to its own 256-byte-aligned place (wgpu's resolve alignment).
++const SLOT_STRIDE: u64 = QUERY_RESOLVE_BUFFER_ALIGNMENT;
++
++/// Wrap every following render pass in a pipeline-statistics query. Returns false (and does
++/// nothing) when the device lacks `Features::PIPELINE_STATISTICS_QUERY`, as on Metal.
++pub fn install_pipeline_statistics(device: &Device) -> bool {
++    if !device.features().contains(Features::PIPELINE_STATISTICS_QUERY) {
++        return false;
++    }
++    let bytes = u64::from(MAX_STATS_PASSES) * SLOT_STRIDE;
++    let stats = uncounted(|| Stats {
++        set: device.create_query_set(&QuerySetDescriptor {
++            label: Some("od_pipeline_statistics"),
++            ty: QueryType::PipelineStatistics(PipelineStatisticsTypes::all()),
++            count: MAX_STATS_PASSES,
++        }),
++        resolve: device.create_buffer(&BufferDescriptor {
++            label: Some("od_pipeline_statistics_resolve"),
++            size: bytes,
++            usage: BufferUsages::QUERY_RESOLVE | BufferUsages::COPY_SRC,
++            mapped_at_creation: false,
++        }),
++        read: device.create_buffer(&BufferDescriptor {
++            label: Some("od_pipeline_statistics_read"),
++            size: bytes,
++            usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
++            mapped_at_creation: false,
++        }),
++        next_slot: 0,
++        submitted: Vec::new(),
++    });
++    *STATS.lock().unwrap() = Some(stats);
++    true
++}
++
++/// Called right after a counted render pass begins. Returns the query slot it started, which
++/// the encoder carries to `Queue::submit` (see [`slots_submitted`]).
++pub(crate) fn start_stats(state: &mut PassState, pass: &mut dispatch::DispatchRenderPass) -> Option<u32> {
++    if state.index == usize::MAX {
++        return None;
++    }
++    let mut guard = STATS.lock().unwrap();
++    let stats = guard.as_mut()?;
++    if stats.next_slot >= MAX_STATS_PASSES {
++        return None;
++    }
++    let slot = stats.next_slot;
++    stats.next_slot += 1;
++    pass.begin_pipeline_statistics_query(&stats.set.inner, slot);
++    state.stats_open = true;
++    drop(guard);
++    with_pass(state, |p| p.stats_slot = Some(slot));
++    Some(slot)
++}
++
++/// Called by `Queue::submit` with the query slots of the passes it submitted.
++pub(crate) fn slots_submitted(slots: Vec<u32>) {
++    if slots.is_empty() {
++        return;
++    }
++    if let Some(stats) = STATS.lock().unwrap().as_mut() {
++        stats.submitted.extend(slots);
++    }
++}
++
++/// Resolve this frame's pipeline statistics into the pass list. Call once per frame, after the
++/// app has submitted all of the frame's command buffers. Blocks until the GPU is done.
++pub fn resolve_pipeline_statistics(device: &Device, queue: &Queue) {
++    let mut guard = STATS.lock().unwrap();
++    let Some(stats) = guard.as_mut() else { return };
++    stats.next_slot = 0;
++    let mut slots = core::mem::take(&mut stats.submitted);
++    slots.sort_unstable();
++    slots.dedup();
++    if slots.is_empty() {
++        return;
++    }
++    uncounted(|| {
++        let mut enc = device.create_command_encoder(&CommandEncoderDescriptor { label: Some("od_stats_resolve") });
++        for (k, &slot) in slots.iter().enumerate() {
++            enc.resolve_query_set(&stats.set, slot..slot + 1, &stats.resolve, k as u64 * SLOT_STRIDE);
++        }
++        let used = slots.len() as u64 * SLOT_STRIDE;
++        enc.copy_buffer_to_buffer(&stats.resolve, 0, &stats.read, 0, used);
++        queue.submit([enc.finish()]);
++        let slice = stats.read.slice(0..used);
++        slice.map_async(MapMode::Read, |r| r.expect("map pipeline statistics"));
++        device.poll(PollType::wait_indefinitely()).expect("poll");
++        let mut values = alloc::collections::BTreeMap::new();
++        {
++            let data = slice.get_mapped_range();
++            for (k, &slot) in slots.iter().enumerate() {
++                let at = k * SLOT_STRIDE as usize;
++                let v = |i: usize| u64::from_le_bytes(data[at + i * 8..at + i * 8 + 8].try_into().unwrap());
++                values.insert(slot, [v(0), v(1), v(2), v(3), v(4)]);
++            }
++        }
++        stats.read.unmap();
++        let mut passes = PASSES.lock().unwrap();
++        for p in passes.iter_mut() {
++            if let Some(slot) = p.stats_slot {
++                p.stats = values.get(&slot).copied();
++            }
++        }
++    });
++}

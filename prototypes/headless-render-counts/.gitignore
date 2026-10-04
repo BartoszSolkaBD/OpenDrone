@@ -1,0 +1,5 @@
+# PROTOTYPE #29: build output, the patched wgpu (made by prepare-wgpu.sh) and scratch runs stay local.
+target/
+vendor/
+results/latest/
+results/runs/
