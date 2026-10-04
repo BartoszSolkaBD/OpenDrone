@@ -16,7 +16,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Topic | Terms | Deep dive |
 |---|---|---|
 | Flying | Quad, Quad definition, Flight Controller, Tune, Flight Mode, Arm, Failsafe, Rates, Assist, Endless Battery, Preset, Prop Wash, Prop Strike, Crash Flip, Confidence | [docs/context/flying.md](docs/context/flying.md) |
-| Input | Input Device, Radio, Gamepad, Channel, Action, Radio Link, Packet Rate, Input Device profile | [docs/context/input.md](docs/context/input.md) |
+| Input | Input Device, Radio, Gamepad, Channel, Action, Radio Link, Packet Rate, Report Rate, Input Device profile | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | FPV Camera, Camera Tilt, Lens, FOV, Video Look, Video Signal, Breakup, Dynamic Range, Auto-exposure | [docs/context/camera.md](docs/context/camera.md) |
 | Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |

@@ -11,4 +11,4 @@ Betaflight tunes RC smoothing and feedforward to how often stick frames arrive. 
 
 - A Packet Rate faster than the device reports causes duplicate frames and pulsing feedforward, for example 500 Hz with a DualSense on USB (250 Hz). The settings screen warns about it.
 - Failsafe runs on the Radio Link. Unplugging the Input Device stops its frames.
-- How the Radio Link handles the DualSense's 8-bit sticks and its 250 Hz USB clock is a follow-up decision. It waits for measured DualSense data.
+- How the Radio Link handles the DualSense's 8-bit sticks and its 250 Hz USB clock was decided in [#27](https://github.com/BartoszSolkaBD/OpenDrone/issues/27): it locks to the device's report beat ([ADR-0020](0020-radio-link-locks-to-the-device-report-beat.md)), and the 8-bit steps get no special treatment.
