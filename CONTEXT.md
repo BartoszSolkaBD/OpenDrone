@@ -20,6 +20,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | World and content | Map, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
 | Verification | Scenario | [docs/context/verification.md](docs/context/verification.md) |
+| Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning | [docs/context/screens.md](docs/context/screens.md) |
 
 ## Terms to avoid
 
@@ -33,3 +34,5 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | e2e test, replay test | Scenario |
 | camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |
 | hotkey, shortcut | Action |
+| main menu, lobby, home screen | Hub |
+| onboarding, tutorial | First Launch |
