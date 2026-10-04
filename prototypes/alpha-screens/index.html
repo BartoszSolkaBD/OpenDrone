@@ -129,6 +129,17 @@ table.chg-t td,table.chg-t th{border-bottom:1px solid var(--line);padding:.2em .
 
 /* ---------- flight view ---------- */
 .fpv{position:absolute;inset:0;overflow:hidden;background:#000}
+.fpv .frame{position:absolute;inset:0;overflow:hidden}
+.fpv .frame.f43{left:50%;right:auto;width:auto;height:100%;aspect-ratio:4/3;transform:translateX(-50%)}
+.a-tsrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1.5em;align-items:center;margin-bottom:.4em}
+.a-tsrow .row{grid-template-columns:minmax(0,1fr) auto;margin:0}
+.a-tsrow .row .rmk{display:none}
+.loading{background:#07090c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em;text-align:center}
+.loading .big{font-size:2.4em;font-weight:900}
+.loading .bar{width:22em;height:.4em;background:var(--panel2);border-radius:1em;overflow:hidden}
+.loading .bar i{display:block;height:100%;width:100%;background:var(--accent);transform-origin:0 50%;animation:load 1.4s linear forwards}
+@keyframes load{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.loading .keys{margin-top:1.2em;color:var(--muted);font-size:.9em}
 .fpv .sky{position:absolute;left:0;right:0;top:0;height:var(--hy);background:linear-gradient(#6aa0d6,#d3e5f5)}
 .fpv .ground{position:absolute;left:0;right:0;top:var(--hy);bottom:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.08) 0 .2em,transparent .2em 3em),linear-gradient(#a3aaaf,#6c7378)}
 .fpv.map-bando .sky{background:linear-gradient(#53575d,#a39f96)}
@@ -639,8 +650,8 @@ function b(id, html, act, cls, extra){
 }
 
 const QUADS = {
-  whoop: { name:'Whoop 65', sub:'65 mm whoop, modelled on the BetaFPV Meteor65 Pro', spec:'35 mm props in ducts', tilt:20, fov:135, minTilt:0, maxTilt:50, minFov:90, maxFov:160 },
-  five:  { name:'Freestyle 5″', sub:'A generic 5-inch freestyle Quad', spec:'5-inch open props', tilt:30, fov:120, minTilt:0, maxTilt:60, minFov:90, maxFov:160 },
+  whoop: { name:'Whoop 65', sub:'65 mm whoop, modelled on the BetaFPV Meteor65 Pro', spec:'35 mm props in ducts', tilt:30, fov:135, minTilt:0, maxTilt:80, minFov:90, maxFov:160 },
+  five:  { name:'Freestyle 5″', sub:'A generic 5-inch freestyle Quad', spec:'5-inch open props', tilt:30, fov:120, minTilt:0, maxTilt:80, minFov:90, maxFov:160 },
 };
 const MAPS = {
   skate: { name:'Skate Park', sub:'Open concrete with ramps, rails and bowls. Room to learn.' },
@@ -676,7 +687,10 @@ const DEFS = {
   smoothing:    { label:'Input smoothing', kind:'bool' },
   endless:      { label:'Endless Battery', kind:'bool' },
   autoArm:      { label:'Auto-arm', kind:'bool' },
-  look:         { label:'Video look', kind:'enum', options:['Analog','Digital'] },
+  look:         { label:'Video Look', kind:'enum', options:['Analog','Digital'] },
+  imageShape:   { label:'Image shape', kind:'enum', options:['4:3','16:9'] },
+  linkRate:     { label:'Radio Link rate', kind:'enum', options:['50','100','150','250','333','500','1000'], fmt:v => v + ' Hz' },
+  blackbox:     { label:'Record Blackbox logs (.bbl)', kind:'bool' },
   noise:        { label:'Analog noise strength', kind:'enum', options:['Light','Medium','Realistic'] },
   tier:         { label:'Quality tier', kind:'enum', options:['Low','Medium','High'] },
   resolution:   { label:'Resolution', kind:'enum', options:['2560 × 1440 (native)','1920 × 1080','3840 × 2160'] },
@@ -706,7 +720,7 @@ function presetValues(name){
   return v;
 }
 const PRESET_KEYS = Object.keys(presetValues('Beginner'));
-const OTHER_DEFAULTS = { look:'Analog', tier:'High', resolution:'2560 × 1440 (native)', windowMode:'Fullscreen', resScale:100, frameCap:'Off', vsync:false, textSize:'100%', reduceMotion:false };
+const OTHER_DEFAULTS = { look:'Analog', imageShape:'4:3', linkRate:'250', blackbox:false, tier:'High', resolution:'2560 × 1440 (native)', windowMode:'Fullscreen', resScale:100, frameCap:'Off', vsync:false, textSize:'100%', reduceMotion:false };
 const ACTIONS = ['Reset','Camera Tilt up','Camera Tilt down','FOV wider','FOV narrower','Pause','Arm','Flight Mode switch'];
 const BIND_CYCLE = { key:['R','↑','↓','→','←','Esc','T','G','—'], radio:['—','SA','SB','SC','SD','SE'], pad:['—','✕','○','△','□','L1','R1','Options','D-pad ↑','D-pad ↓','D-pad →','D-pad ←'] };
 function defaultBinds(){
@@ -737,7 +751,8 @@ function step(k, dir){
   if (d.kind === 'bool') v = !v;
   else if (d.kind === 'enum'){ const o = d.options, i = o.indexOf(v); v = o[(i + dir + o.length) % o.length]; }
   else v = clamp(v + dir * d.step, d.min, d.max);
-  S.v[k] = v; applyA11y();
+  const old = S.v[k]; S.v[k] = v; applyA11y();
+  if ((k === 'resolution' || k === 'windowMode') && !S.modal && old !== v) openDisplayConfirm(k, old);
 }
 function changes(){
   const pv = presetValues(S.base);
@@ -815,14 +830,28 @@ function presetFacts(name){
     <li>Other Assists: <b>${other}</b></li>
     <li>Camera Tilt: <b>${p.tilt ? `each Quad’s default ${p.tilt}°` : 'each Quad’s default'}</b>; analog noise <b>${p.noise.toLowerCase()}</b></li></ul>`;
 }
+/* Input Devices the emulator can "connect" (rates from the input research, #3) */
+const DEVICES = { radio:{ name:'Radiomaster Pocket', kind:'Radio', hz:1000, how:'USB with RF off' }, pad:{ name:'DualSense', kind:'Gamepad', hz:250, how:'USB' } };
+const curDev = () => DEVICES[S.device] || null;
+function devList(){
+  return `<div class="devs">${Object.entries(DEVICES).map(([k, d]) => `<div class="dev"><b>${S.device === k ? '✓' : '○'} ${d.name}</b><span${S.device === k ? '' : ' class="muted"'}>${d.kind} · ${S.device === k ? 'connected' : 'not connected'}</span></div>`).join('')}</div>`;
+}
+function linkWarning(){
+  const d = curDev(), r = +S.v.linkRate;
+  return d && r > d.hz ? `${r} Hz is faster than your ${d.name} delivers (about ${d.hz} Hz over ${d.how}).` : '';
+}
+function preflightWarnings(){
+  const d = curDev(), w = [];
+  if (!d) return ['No Input Device connected. Connect a Radio or Gamepad to fly.'];
+  if (!S.v.autoArm && S.binds.Arm[S.device] === '—') w.push(`Arm isn’t bound on your ${d.name}. Bind it in Input Devices, or turn on Auto-arm.`);
+  const lw = linkWarning(); if (lw) w.push('Radio Link rate: ' + lw);
+  return w;
+}
 function deviceBody(){
   return `<h1>Your Input Device</h1>
   <p class="muted">You fly with a Radio or a Gamepad. The keyboard only triggers Actions, like Reset and Pause.</p>
-  <div class="devs">
-    <div class="dev"><b>✓ Radiomaster Pocket</b><span>Radio · found</span></div>
-    <div class="dev"><b>○ DualSense</b><span class="muted">Gamepad · not connected</span></div>
-  </div>
-  <div class="placeholder"><b>Placeholder.</b> Binding and calibration go here: sticks, the Arm switch, a Flight Mode switch and setup tips (RF off, EdgeTX 2.11 or later). Decided in #19, “How does a pilot bind and calibrate Input Devices?”</div>
+  ${devList()}
+  <div class="placeholder"><b>Placeholder.</b> Binding and calibration go here: sticks, the Arm switch, a Flight Mode switch, an offer to put Pause and Reset on spare switches, and setup tips (RF off, EdgeTX 2.11 or later). Decided in #19, “How does a pilot bind and calibrate Input Devices?”</div>
   <div class="btnrow">${b('dev-go', 'Continue ▸', 'devdone', 'primary', 'data-autofocus')}${b('dev-later', 'Set up later', 'devdone')}</div>`;
 }
 function quadArt(k){ return `<span class="quadart ${k}"><i class="arm"></i><i class="arm a2"></i><i class="pp p1"></i><i class="pp p2"></i><i class="pp p3"></i><i class="pp p4"></i><i class="bod"></i></span>`; }
@@ -876,7 +905,7 @@ function flyingTab(){
   return `<section><h3>Preset</h3>
     <div class="presetrow">${PRESET_NAMES.map(p => b('pre-' + p, `<b>${p}</b>${S.base === p ? `<small>${ch.length ? 'you started here' : '✓ current'}</small>` : '<small>&nbsp;</small>'}`, 'pick:preset:' + p, 'preset' + (S.base === p ? ' on' : ''))).join('')}
       <div class="plabel">Now: <b>${esc(presetLabel())}</b>${ch.length ? `<small>${ch.length} setting${ch.length > 1 ? 's' : ''} changed (marked ◆)</small>` : ''}</div></div>
-    <p class="note">A Preset sets Flying and camera settings only. Graphics, Accessibility and the video look never change with it.</p></section>
+    <p class="note">A Preset sets Flight Mode, Rates, Assists, each Quad’s Camera Tilt and FOV, and analog noise strength. It never touches Blackbox, the Radio Link rate, the Video Look, Image shape, Graphics or Accessibility.</p></section>
   <section><h3>Flight Mode</h3>${row('flightMode', { hint: fmBound ? 'A Flight Mode switch is bound, so the switch decides in flight. This is used when it isn’t.' : 'Angle and Horizon level the Quad for you. They are Assists.' })}</section>
   <section><h3>Rates ${b('paste', 'Paste from Betaflight CLI…', 'paste')}</h3>
     ${row('ratesType', { hint:'Actual is Betaflight’s default since 4.3.' })}
@@ -885,20 +914,23 @@ function flyingTab(){
     ${S.v.ratesType === 'QUICK' ? row('quickExpo') : ''}
     ${row('thrMid')}${row('thrExpo')}${row('thrLimitType')}${row('thrLimitPct', { disabled:S.v.thrLimitType === 'Off' })}</section>
   <section><h3>Assists</h3>
-    ${row('smoothing')}${row('endless', { hint:'Voltage still sags under load, but the pack never runs flat.' })}${row('autoArm', { hint:'Arms the first time you raise the throttle from low. Only the sim has this.' })}</section>`;
+    ${row('smoothing')}${row('endless', { hint:'Voltage still sags under load, but the pack never runs flat.' })}${row('autoArm', { hint:'Arms the first time you raise the throttle from low. Only the sim has this. With no Arm switch bound, only Reset disarms.' })}</section>
+  <section><h3>Blackbox <span class="muted" style="text-transform:none;letter-spacing:0">(not set by Presets)</span></h3>
+    ${row('blackbox', { hint:'Writes Betaflight-style .bbl logs of every flight, for Blackbox Explorer. Off by default.' })}
+    ${b('bb-folder', 'Open the log folder', 'note:bb')}</section>`;
 }
 function quadCamBlock(q, withPicker){
   const Q = QUADS[q];
-  return `<section><h3>Camera on each Quad</h3>
+  return `<section><h3>FPV Camera on each Quad</h3>
     ${withPicker ? `<div class="seg">${Object.keys(QUADS).map(k => b('cq-' + k, QUADS[k].name + (k === q ? ' ✓' : ''), 'camq:' + k, 'segb' + (k === q ? ' on' : ''))).join('')}</div>` : ''}
-    ${row(`cam_${q}_tilt`, { label:'Camera Tilt', hint:`${Q.name} default ${Q.tilt}° (placeholder until #14)` })}
+    ${row(`cam_${q}_tilt`, { label:'Camera Tilt', hint:`${Q.name} default ${Q.tilt}°, range ${Q.minTilt}–${Q.maxTilt}°` })}
     ${row(`cam_${q}_fov`, { label:'FOV', hint:`${Q.name} default ${Q.fov}° (placeholder until #14)` })}
     ${b('camdef-' + q, 'Back to Preset values', 'camdef:' + q)}
     <p class="note">Each Quad keeps its own Camera Tilt and FOV. In flight, ↑ / ↓ change Camera Tilt and ← / → change FOV, 1° per press, saved to that Quad.</p></section>`;
 }
 function videoBlock(){
   const dig = S.v.look === 'Digital';
-  return `<section><h3>Video</h3>${row('look', { hint:'Your choice. No Preset changes it.' })}${row('noise', { disabled:dig, hint: dig ? 'Only used with the analog look.' : 'The Preset sets this: light, medium or realistic.' })}</section>`;
+  return `<section><h3>Video</h3>${row('look', { hint:'Analog, or one generic Digital look. No Preset changes it.' })}${row('noise', { disabled:dig, hint: dig ? 'Only used with the Analog look.' : 'The Preset sets this: light, medium or realistic.' })}${row('imageShape', { hint:'4:3 by default. Never stretched: the image keeps its shape and the rest of the screen stays black. No Preset changes it.' })}</section>`;
 }
 function cameraTab(){ return quadCamBlock(S.camQuad || S.quad, true) + videoBlock(); }
 function graphicsTab(){
@@ -920,10 +952,14 @@ function navLegend(dev){
 }
 function inputTab(){
   const rows = ACTIONS.map(a => `<tr><th>${a}</th>${['key','radio','pad'].map(col => `<td>${b(`bind-${a}-${col}`, esc(S.binds[a][col]), `bind:${a}:${col}`, 'bindb')}</td>`).join('')}</tr>`).join('');
+  const lw = linkWarning();
   return `<section><h3>Input Devices</h3>
-    <div class="devs"><div class="dev"><b>✓ Radiomaster Pocket</b><span>Radio · connected</span></div><div class="dev"><b>○ DualSense</b><span class="muted">Gamepad · not connected</span></div></div>
+    ${devList()}
     <div class="placeholder"><b>Placeholder.</b> Stick mapping, calibration (centre, endpoints, deadzone) and setup tips for the Pocket. Decided in #19.</div></section>
-  <section><h3>Actions</h3><p class="note">The keyboard only triggers Actions; it can’t fly. Prototype: pressing a binding just cycles sample values. Arm on SA is assumed to come from setup.</p>
+  <section><h3>Radio Link <span class="muted" style="text-transform:none;letter-spacing:0">(not set by Presets)</span></h3>
+    ${row('linkRate', { hint:'How often the simulated radio link carries your sticks to the Flight Controller, like an ELRS packet rate. Default 250 Hz.' })}
+    ${lw ? `<p class="warn">⚠ ${esc(lw)}</p>` : `<p class="note">${curDev() ? `Your ${curDev().name} delivers about ${curDev().hz} Hz (${curDev().how}).` : 'No Input Device connected.'}</p>`}</section>
+  <section><h3>Actions</h3><p class="note">The keyboard only triggers Actions; it can’t fly. With Auto-arm on and no Arm switch bound, only Reset disarms. Prototype: pressing a binding just cycles sample values. Arm on SA is assumed to come from setup.</p>
     <table class="binds"><tr><th>Action</th><th>Keyboard</th><th>Radio</th><th>Gamepad</th></tr>${rows}</table></section>
   <section><h3>Moving around the menus</h3>${navLegend('radio')}${navLegend('pad')}<p class="note">Mouse and keyboard always work too.</p></section>`;
 }
@@ -973,12 +1009,13 @@ function flightView(){
   const vfov = fov * 0.5625, pitch = f.airborne ? tilt * 0.85 : 0, hy = clamp(50 + ((tilt - pitch) / vfov) * 100, 5, 97);
   const frozen = S.paused || S.countdown > 0 || (S.variant === 'D' && S.nav.first);
   return `<div class="fpv map-${S.map}${f.airborne ? ' air' : ''}${frozen ? ' frozen' : ''}" style="--hy:${hy.toFixed(1)}%;--zoom:${(120 / fov).toFixed(3)}">
-    <div class="sky"></div><div class="ground"></div><div class="scene">${S.map === 'skate' ? SKATE_PROPS : BANDO_PROPS}</div>
-    ${S.v.look === 'Analog' ? `<div class="noise n-${S.v.noise}"></div>` : ''}
-    <div class="ptag">PROTOTYPE · Free Flight · ${MAPS[S.map].name} · ${QUADS[q].name} · ${S.v.look} look</div>
-    <div class="fmsg">${esc(f.msg)}</div>
-    <div class="osdph">OSD goes here · not yet specified (map fog)</div>
-    ${S.readout ? `<div class="readout">${esc(S.readout)}</div>` : ''}</div>`;
+    <div class="frame${S.v.imageShape === '4:3' ? ' f43' : ''}">
+      <div class="sky"></div><div class="ground"></div><div class="scene">${S.map === 'skate' ? SKATE_PROPS : BANDO_PROPS}</div>
+      ${S.v.look === 'Analog' ? `<div class="noise n-${S.v.noise}"></div>` : ''}
+      <div class="osdph">OSD goes here · not yet specified (map fog)</div>
+      ${S.readout ? `<div class="readout">${esc(S.readout)}</div>` : ''}</div>
+    <div class="ptag">PROTOTYPE · Free Flight · ${MAPS[S.map].name} · ${QUADS[q].name} · ${S.v.look} · ${S.v.imageShape}</div>
+    <div class="fmsg">${esc(f.msg)}</div></div>`;
 }
 
 /* =====================================================================
@@ -988,8 +1025,8 @@ const V = {};
 
 /* ---------- A: Quick Fly hub ---------- */
 V.A = {
-  name:'Quick Fly hub', pauseName:'Pause menu',
-  flow:'One home screen. First launch: the question, then Input Device, then the hub. The hub shows Map, Quad and Preset as chips next to a big FLY button. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a small pause menu that can also swap the Map or Quad.',
+  name:'Quick Fly hub (agreed in round 1)', pauseName:'Pause menu',
+  flow:'The agreed shape. One home screen. First launch: the question (with Text size on the same screen), then Input Device, then the hub with FLY focused. The hub shows Map, Quad and Preset as chips next to a big FLY button, plus pre-flight warnings when something would stop you flying. FLY shows a short loading screen. Settings opens as a drawer, from the hub or the pause menu. Esc in flight opens a pause menu that can also swap the Map or Quad.',
   best:'Returning pilot: 1 press (FLY). First launch: 3 (answer, Continue, FLY). New Map: 3 (Map chip, pick, FLY). From the air, new Map: 3 (Esc, Map, pick).',
   start(){ S.nav = { screen:S.firstDone ? 'hub' : 'welcome', picker:null, drawer:false, pp:null }; },
   where(){ const n = S.nav; if (n.screen === 'welcome') return 'First launch › Have you flown FPV before?'; if (n.screen === 'device') return 'First launch › Input Device';
@@ -999,14 +1036,14 @@ V.A = {
   afterDevice(){ S.nav.screen = 'hub'; },
   render(){
     const n = S.nav;
-    if (n.screen === 'welcome') return `<div class="layer scr a-center"><div class="a-qcard"><div class="logo">OpenDrone</div>${questionBody()}</div></div>`;
+    if (n.screen === 'welcome') return `<div class="layer scr a-center"><div class="a-qcard"><div class="a-tsrow"><div class="logo">OpenDrone</div>${row('textSize', { hint:'Bigger text before you read on.' })}</div>${questionBody()}</div></div>`;
     if (n.screen === 'device') return `<div class="layer scr a-center"><div class="a-qcard">${deviceBody()}</div></div>`;
     const chips = ['map','quad','preset'].map(k => b('chip-' + k, `<span class="k">${PK[k]}</span><span class="val">${esc(k === 'map' ? MAPS[S.map].name : k === 'quad' ? QUADS[S.quad].name : presetLabel())}</span><span class="go">change ▸</span>`, 'v:chip:' + k, 'chip')).join('');
     let h = `<div class="layer scr a-hub">
       <div class="a-top"><span class="logo">OpenDrone</span><span class="muted">Free Flight</span></div>
       <div class="a-body">
         <div class="a-hero mapbg-${S.map}"><div class="big">${MAPS[S.map].name}</div><div>${QUADS[S.quad].name} · ${esc(presetLabel())}</div>${b('fly', 'FLY ▸', 'fly', 'a-fly', 'data-autofocus')}</div>
-        <div class="a-side">${n.picker ? pickerList(n.picker) : chips}</div>
+        <div class="a-side">${n.picker ? pickerList(n.picker) : chips + preflightWarnings().map(w => `<p class="warn">⚠ ${esc(w)}</p>`).join('') + (preflightWarnings().length ? b('warn-fix', 'Open Input Devices ▸', 'v:fixwarn') : '')}</div>
       </div>
       <div class="a-foot">${b('settings', '⚙ Settings', 'v:drawer')}${b('quit', 'Quit', 'quit')}<span class="muted hint">FLY uses the last Map, Quad and Preset. Change one first if you like.</span></div></div>`;
     if (n.drawer) h += this.drawer();
@@ -1018,7 +1055,7 @@ V.A = {
     let h = `<div class="layer a-pause"><div class="a-pcard"><h2>Paused</h2>
       ${b('resume', 'Resume', 'resume', '', 'data-autofocus')}${b('reset', 'Reset (back to the Launch Spot)', 'reset')}
       ${b('pmap', `Map: <b>${MAPS[S.map].name}</b> ▸`, 'v:pp:map')}${b('pquad', `Quad: <b>${QUADS[S.quad].name}</b> ▸`, 'v:pp:quad')}
-      ${b('psettings', '⚙ Settings', 'v:drawer')}${b('phub', 'Back to the hub', 'v:hub')}</div>
+      ${b('psettings', '⚙ Settings', 'v:drawer')}${b('phub', 'Back to the hub', 'v:hub')}${b('pquit', 'Quit OpenDrone', 'quit')}</div>
       ${n.pp ? `<div class="a-pcard">${pickerList(n.pp)}</div>` : ''}</div>`;
     if (n.drawer) h += this.drawer();
     return h;
@@ -1027,6 +1064,7 @@ V.A = {
     const n = S.nav;
     if (name === 'chip'){ n.picker = a; S.focus = `pk-${a}-${a === 'map' ? S.map : a === 'quad' ? S.quad : S.base}`; }
     if (name === 'drawer') n.drawer = true;
+    if (name === 'fixwarn'){ n.drawer = true; S.tab = 'input'; S.focus = 'tab-input'; }
     if (name === 'pp'){ n.pp = n.pp === a ? null : a; if (n.pp) S.focus = `pk-${a}-${a === 'map' ? S.map : S.quad}`; }
     if (name === 'hub'){ S.inFlight = false; S.paused = false; n.screen = 'hub'; n.pp = null; n.drawer = false; }
   },
@@ -1178,20 +1216,46 @@ V.D = {
 /* =====================================================================
    Flow engine: actions, flight, counting
    ===================================================================== */
-function menuActive(){ return !S.inFlight || S.paused || !!S.modal || (S.variant === 'D' && !!S.nav.first); }
+function menuActive(){ return !S.inFlight || S.paused || !!S.modal || !!S.loading || (S.variant === 'D' && !!S.nav.first); }
 function logRun(label){
   if (!S.counting) return;
   S.log.unshift({ v:S.variant, from:S.countFrom, to:label, p:S.steps, m:S.moves }); S.log = S.log.slice(0, 8); S.counting = false;
 }
 function enterFlight(label){
   S.inFlight = true; S.paused = false; S.flight = freshFlight(); S.countdown = 0; S.edit = null;
+  if (!curDev()) failsafe();
   logRun(label || `on the Launch Spot (${MAPS[S.map].name}, ${QUADS[S.quad].name})`);
+  if (S.variant === 'A'){ S.loading = true; clearTimeout(loadTimer); loadTimer = setTimeout(() => { S.loading = false; render(); }, 1500); }
 }
+let loadTimer = null;
+/* Failsafe copies Betaflight (#21): a lost Input Device drops the Quad. Nothing pauses. */
+function failsafe(){ const f = S.flight; if (!f) return; f.armed = false; f.airborne = false; f.armSw = false; f.msg = 'Failsafe: no Input Device. As in Betaflight, the Quad disarms and drops. Nothing pauses.'; }
+function armName(){ const d = curDev(); if (!d) return 'no Input Device'; const bnd = S.binds.Arm[S.device]; return bnd === '—' ? '⚠ not bound' : `${d.kind} ${bnd}`; }
+function loadingHtml(){
+  const rb = curDev() ? S.binds.Reset[S.device] : '—';
+  return `<div class="layer loading"><div class="muted">Free Flight</div><div class="big">${MAPS[S.map].name}</div><div>${QUADS[S.quad].name} · ${esc(presetLabel())}</div>
+    <div class="bar"><i></i></div><div class="note">Loading the Map and warming up shaders, so nothing stutters the first time you see it.</div>
+    <div class="keys">Arm: ${S.v.autoArm ? 'Auto-arm (just raise the throttle)' : esc(armName())} · Reset: R${rb !== '—' ? ' or ' + rb : ''} · Pause: Esc · Camera Tilt ↑ ↓ · FOV ← →</div></div>`;
+}
+let dispTimer = null;
+function openDisplayConfirm(k, old){
+  S.modal = { type:'display', k, old, left:15, ret:'row-' + k }; clearInterval(dispTimer);
+  dispTimer = setInterval(() => { if (!S.modal || S.modal.type !== 'display'){ clearInterval(dispTimer); return; } S.modal.left--; if (S.modal.left <= 0) revertDisplay(); render(); }, 1000);
+}
+function revertDisplay(){ const m = S.modal; S.v[m.k] = m.old; S.focus = m.ret; S.modal = null; clearInterval(dispTimer); toast('Display setting put back'); }
+function displayModal(){
+  const m = S.modal;
+  return `<div class="layer modal-bg"><div class="modal"><h2>Keep this display setting?</h2><p>${esc(lab(m.k))}: ${esc(fmt(m.k, m.old))} → <b>${esc(fmtv(m.k))}</b></p>
+    <p class="warn">⚠ Going back to the old setting in <b>${m.left} s</b> unless you keep it.</p>
+    <div class="btnrow">${b('disp-revert', 'Go back', 'dispRevert', '', 'data-autofocus')}${b('disp-keep', 'Keep', 'dispKeep', 'primary')}</div></div></div>`;
+}
+const NOTES = { bb:'Prototype: this would open the folder holding your .bbl logs.' };
 function clearPauseNav(){ const n = S.nav; ['pp','pit','panel'].forEach(k => { if (k in n) n[k] = null; }); if ('drawer' in n) n.drawer = false; if ('pset' in n) n.pset = false; }
 function pause(){ camKeyUp(); S.paused = true; S.counting = true; S.steps = 1; S.moves = 0; S.countFrom = 'Esc in flight'; S.camQuad = null; render(); }
 let cdTimer = null;
 function resume(){
   S.paused = false; clearPauseNav(); logRun('flying again');
+  if (!curDev()){ failsafe(); return; }
   if (S.countdownOn && S.flight && S.flight.airborne){ S.countdown = 3; clearInterval(cdTimer); cdTimer = setInterval(() => { S.countdown--; if (S.countdown <= 0){ S.countdown = 0; clearInterval(cdTimer); } render(); }, 650); }
 }
 function doReset(){
@@ -1229,11 +1293,18 @@ function act(s){
     case 'answer': applyPreset(a1 === 'skip' ? 'Beginner' : a1); S.firstPick = a1; v.afterAnswer(); break;
     case 'devdone': S.firstDone = true; v.afterDevice(); break;
     case 'pick':
-      if (a1 === 'preset') S.modal = { type:'preset', target:a2, ret:opener };
+      if (a1 === 'preset'){
+        const tv = presetValues(a2);
+        if (PRESET_KEYS.some(k => S.v[k] !== tv[k])) S.modal = { type:'preset', target:a2, ret:opener };
+        else { toast(`Already on ${a2}. Nothing to change.`); if (v.onPreset) v.onPreset(); }
+      }
       else { if (a1 === 'map') S.map = a2; else S.quad = a2; v.onPick(a1, a2); }
       break;
     case 'presetYes': { const t = S.modal.target; S.focus = S.modal.ret; S.modal = null; applyPreset(t); if (v.onPreset) v.onPreset(); toast(`Preset: ${t}`); break; }
     case 'modalNo': S.focus = S.modal.ret; S.modal = null; break;
+    case 'dispKeep': S.focus = S.modal.ret; S.modal = null; clearInterval(dispTimer); break;
+    case 'dispRevert': revertDisplay(); break;
+    case 'note': toast(NOTES[a1]); break;
     case 'paste': S.modal = { type:'paste', text:'', result:null, ret:opener }; S.focus = 'pastebox'; break;
     case 'pasteSample': S.modal.text = SAMPLES[a1](); S.modal.result = parseBF(S.modal.text); break;
     case 'pasteRead': S.modal.result = parseBF(S.modal.text); break;
@@ -1252,7 +1323,8 @@ function act(s){
 function back(){
   if (S.counting) S.steps++;
   const v = V[S.variant];
-  if (S.modal){ S.focus = S.modal.ret; S.modal = null; }
+  if (S.modal && S.modal.type === 'display') revertDisplay();
+  else if (S.modal){ S.focus = S.modal.ret; S.modal = null; }
   else if (S.edit){ S.focus = 'cell-' + S.edit; S.edit = null; }
   else if (S.inFlight && S.paused) v.pauseBack();
   else if (S.inFlight){ if (v.flightOverlayBack) v.flightOverlayBack(); }
@@ -1325,7 +1397,8 @@ function render(){
   let h;
   if (S.inFlight){ h = `<div class="layer flight">${flightView()}</div>`; if (v.flightOverlay) h += v.flightOverlay(); if (S.paused) h += v.renderPause(); }
   else h = v.render();
-  if (S.modal) h += S.modal.type === 'preset' ? presetModal(S.modal.target) : pasteModal();
+  if (S.inFlight && S.loading) h += loadingHtml();
+  if (S.modal) h += S.modal.type === 'preset' ? presetModal(S.modal.target) : S.modal.type === 'display' ? displayModal() : pasteModal();
   if (S.countdown > 0) h += `<div class="countdown"><span>${S.countdown}</span><small>Resuming. Put your sticks where you want them.</small></div>`;
   if (S.toast) h += `<div class="toast">${esc(S.toast)}</div>`;
   const scrollers = [...ui.querySelectorAll('.layer, .a-drawer-in, .d-pane, .a-side')].map(el => el.scrollTop);
@@ -1367,8 +1440,8 @@ function renderSide(){
     ${S.log.length ? `<ol>${S.log.map(l => `<li>[${l.v}] ${esc(l.from)} → ${esc(l.to)}: <b>${l.p}</b> press${l.p === 1 ? '' : 'es'}, ${l.m} move${l.m === 1 ? '' : 's'}</li>`).join('')}</ol>` : ''}
     <p><button data-side="relaunch">↻ Relaunch (returning pilot)</button><button data-side="fresh">✦ Fresh install (first launch)</button></p>
     <h4>Input Device emulator</h4>
-    <p><button data-pad="radio" class="${radio ? 'on' : ''}">Radio (Pocket)</button><button data-pad="pad" class="${radio ? '' : 'on'}">Gamepad (DualSense)</button></p>
-    ${menus ? padMenus : padFlight}
+    <p><button data-pad="radio" class="${S.device === 'radio' ? 'on' : ''}">Radio (Pocket)</button><button data-pad="pad" class="${S.device === 'pad' ? 'on' : ''}">Gamepad (DualSense)</button><button data-pad="none" class="${S.device === 'none' ? 'on' : ''}">Unplugged</button></p>
+    ${S.device === 'none' ? `<p class="dim">No Input Device. Menus still work with keyboard and mouse. In flight this means Betaflight failsafe: the Quad drops and nothing pauses.</p>` : menus ? padMenus : padFlight}
     <h4>State</h4>
     <table>
       <tr><th>Where</th><td>${esc(whereNow())}</td></tr>
@@ -1378,13 +1451,17 @@ function renderSide(){
       <tr><th>Quad</th><td>${QUADS[S.quad].name}</td></tr>
       <tr><th>Flight Mode</th><td>${S.v.flightMode}${fms.radio !== '—' || fms.pad !== '—' ? ' (a switch is bound and decides in flight)' : ''}</td></tr>
       <tr><th>Assists on</th><td>${assistsOn()}</td></tr>
+      <tr><th>Input Device</th><td>${curDev() ? curDev().name + ' (about ' + curDev().hz + ' Hz)' : 'none'}</td></tr>
+      <tr><th>Radio Link</th><td>${S.v.linkRate} Hz${linkWarning() ? ' ⚠ above the device' : ''}</td></tr>
+      <tr><th>Blackbox</th><td>${S.v.blackbox ? 'recording .bbl' : 'off'}</td></tr>
+      <tr><th>Warnings</th><td>${preflightWarnings().length ? preflightWarnings().map(esc).join('<br>') : 'none'}</td></tr>
     </table>
     <h4>Changed from ${S.base} (${ch.length})</h4>
     ${ch.length ? `<ul>${ch.map(c => `<li>${esc(c.label)}: ${esc(c.preset)} → <b>${esc(c.now)}</b></li>`).join('')}</ul>` : '<p class="dim">Nothing. The pilot is exactly on the Preset.</p>'}
     <h4>Camera on each Quad</h4>
     <ul>${Object.entries(QUADS).map(([q, Q]) => `<li>${Q.name}: Camera Tilt ${S.v[`cam_${q}_tilt`]}° · FOV ${S.v[`cam_${q}_fov`]}°</li>`).join('')}</ul>
     <h4>Not touched by Presets</h4>
-    <p>Video look ${S.v.look}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
+    <p>Video Look ${S.v.look}, image ${S.v.imageShape}. Radio Link ${S.v.linkRate} Hz. Blackbox ${S.v.blackbox ? 'on' : 'off'}. Graphics ${S.v.tier}, ${esc(S.v.resolution)}, scale ${S.v.resScale}%, frame cap ${fmt('frameCap', S.v.frameCap)}, VSync ${S.v.vsync ? 'on' : 'off'}. Text size ${S.v.textSize}, reduce motion ${S.v.reduceMotion ? 'on' : 'off'}.</p>
     <h4>Prototype toggles</h4>
     <p><button data-side="cd">Resume countdown after pause: ${S.countdownOn ? 'on' : 'off'}</button></p>
     <h4>Keys</h4>
@@ -1395,7 +1472,7 @@ function renderSide(){
    Wiring
    ===================================================================== */
 function relaunch(){
-  S.inFlight = false; S.paused = false; S.modal = null; S.edit = null; S.countdown = 0; clearInterval(cdTimer); S.readout = null; S.flight = null;
+  S.inFlight = false; S.paused = false; S.modal = null; S.edit = null; S.countdown = 0; S.loading = false; clearInterval(dispTimer); clearInterval(cdTimer); S.readout = null; S.flight = null;
   S.steps = 0; S.moves = 0; S.counting = true; S.countFrom = S.firstDone ? 'App launch (returning pilot)' : 'App launch (first launch)'; S.camQuad = null;
   lastKey = ''; if (document.activeElement && ui.contains(document.activeElement)) document.activeElement.blur();
   V[S.variant].start(); render();
@@ -1422,7 +1499,13 @@ side.addEventListener('click', e => {
     if (x === 'cd'){ S.countdownOn = !S.countdownOn; renderSide(); } }
 });
 function pad(x){
-  if (x === 'radio' || x === 'pad'){ S.device = x; renderSide(); return; }
+  if (x === 'radio' || x === 'pad' || x === 'none'){
+    const was = S.device; if (x === was) return; S.device = x;
+    const flyingNow = S.inFlight && !S.paused && !S.loading && !(S.variant === 'D' && S.nav.first);
+    if (x === 'none' && flyingNow) failsafe();
+    else if (!S.inFlight || S.paused) toast(x === 'none' ? `${DEVICES[was].name} disconnected` : `${DEVICES[x].name} connected`);
+    render(); return;
+  }
   const menus = menuActive();
   if (['up','down','left','right'].includes(x)){ if (menus) navKey(x); return; }
   if (x === 'ok'){ if (!menus) return; if (S.variant === 'B' && !S.inFlight && V.B.cur() === 'press') act('v:press'); else select(); return; }
