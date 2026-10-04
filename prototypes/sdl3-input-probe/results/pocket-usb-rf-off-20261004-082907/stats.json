@@ -36,6 +36,8 @@
       "jitter_std_ms": 0.003742435972216348,
       "rate_from_median_hz": 3448.2758620689656,
       "rate_from_mean_hz": 3443.616776828571,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -104,6 +106,8 @@
       "jitter_std_ms": 0.003742435972216348,
       "rate_from_median_hz": 3448.2758620689656,
       "rate_from_mean_hz": 3443.616776828571,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -163,7 +167,7 @@
   "main_thread_frames": {
     "connect": {
       "frames": 1634,
-      "seconds": 10.040895542000001,
+      "seconds": 10.040895542,
       "max_frame_ms": 135.586041,
       "focused_frames": 1634
     }

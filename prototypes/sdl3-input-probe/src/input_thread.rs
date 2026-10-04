@@ -2,7 +2,7 @@
 //! plain `std::thread` (never the main thread), polls as fast as it is told to, and records every
 //! raw change SDL reports, with SDL's own timestamp. No deadzone, no smoothing, no filtering.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::{CStr, c_char};
 use std::mem::MaybeUninit;
@@ -55,7 +55,7 @@ pub struct Rec {
 }
 
 /// Everything SDL tells us about one Input Device when it is opened.
-#[derive(Clone, Debug, Serialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct DeviceInfo {
     pub instance_id: u32,
     pub name: String,
@@ -93,7 +93,7 @@ impl DeviceInfo {
 }
 
 /// Facts about the thread SDL ran on.
-#[derive(Clone, Debug, Serialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct InitInfo {
     pub sdl_version: String,
     pub sdl_revision: String,

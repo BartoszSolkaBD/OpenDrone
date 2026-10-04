@@ -18,7 +18,7 @@
     "qos_requested": true,
     "qos_result": 0,
     "sdl_init_ok": true,
-    "sdl_init_ms": 39.519999999999996,
+    "sdl_init_ms": 39.52,
     "sdl_error": "",
     "poll_sleep_us": 250
   },
@@ -36,6 +36,8 @@
       "jitter_std_ms": 0.012718924891785426,
       "rate_from_median_hz": 2777.777777777778,
       "rate_from_mean_hz": 2779.880418328131,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -104,6 +106,8 @@
       "jitter_std_ms": 0.04459746197874959,
       "rate_from_median_hz": 2890.1734104046245,
       "rate_from_mean_hz": 2783.936606258292,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -172,6 +176,8 @@
       "jitter_std_ms": 0.04318557120253153,
       "rate_from_median_hz": 2840.909090909091,
       "rate_from_mean_hz": 2940.6803941254084,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -240,6 +246,8 @@
       "jitter_std_ms": 0.04820876644678511,
       "rate_from_median_hz": 2857.1428571428573,
       "rate_from_mean_hz": 2915.568961525323,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -308,6 +316,8 @@
       "jitter_std_ms": 0.051767913060317035,
       "rate_from_median_hz": 2695.4177897574123,
       "rate_from_mean_hz": 2513.7364399766893,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -376,6 +386,8 @@
       "jitter_std_ms": 0.004328584360615748,
       "rate_from_median_hz": 3344.481605351171,
       "rate_from_mean_hz": 3342.2045139603065,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -444,6 +456,8 @@
       "jitter_std_ms": 0.004215615241994779,
       "rate_from_median_hz": 3344.481605351171,
       "rate_from_mean_hz": 3343.3805425491105,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -512,6 +526,8 @@
       "jitter_std_ms": 0.04266925837824072,
       "rate_from_median_hz": 2923.9766081871344,
       "rate_from_mean_hz": 2992.50372149765,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -571,15 +587,17 @@
       "samples": 16613,
       "intervals": 16612,
       "pauses_excluded": 0,
-      "mean_ms": 0.36085077052732323,
+      "mean_ms": 0.3608507705273232,
       "min_ms": 0.308,
       "p05_ms": 0.347,
       "median_ms": 0.36,
       "p95_ms": 0.382,
       "max_ms": 0.482,
-      "jitter_std_ms": 0.012076071835005229,
+      "jitter_std_ms": 0.012076071835005227,
       "rate_from_median_hz": 2777.777777777778,
-      "rate_from_mean_hz": 2771.2286675698842,
+      "rate_from_mean_hz": 2771.228667569884,
+      "peak_100ms_hz": 0.0,
+      "on_grid_share": [],
       "histogram": [
         [
           "0.00-0.25 ms",
@@ -639,7 +657,7 @@
   "main_thread_frames": {
     "circles": {
       "frames": 1977,
-      "seconds": 12.000077249999979,
+      "seconds": 12.00007724999998,
       "max_frame_ms": 13.001125,
       "focused_frames": 1977
     },
@@ -651,8 +669,8 @@
     },
     "extremes": {
       "frames": 1981,
-      "seconds": 11.999284541999991,
-      "max_frame_ms": 7.2660420000000006,
+      "seconds": 11.999284541999993,
+      "max_frame_ms": 7.266042,
       "focused_frames": 1981
     },
     "get-ready": {
@@ -664,18 +682,18 @@
     "rest": {
       "frames": 534,
       "seconds": 5.0233205839999995,
-      "max_frame_ms": 23.937666999999998,
+      "max_frame_ms": 23.937667,
       "focused_frames": 368
     },
     "switches": {
       "frames": 901,
-      "seconds": 14.986262625000005,
+      "seconds": 14.986262625000004,
       "max_frame_ms": 19.169583,
       "focused_frames": 0
     },
     "unfocused": {
       "frames": 601,
-      "seconds": 10.017439708000007,
+      "seconds": 10.017439708000008,
       "max_frame_ms": 19.262291,
       "focused_frames": 0
     },
@@ -725,6 +743,89 @@
       },
       "device_kind": "Radio (EdgeTX USB joystick, e.g. Radiomaster Pocket)",
       "update_rate": {
+        "all steps": {
+          "samples": 2381,
+          "intervals": 2349,
+          "pauses_excluded": 31,
+          "mean_ms": 2.0955570630055336,
+          "min_ms": 0.684792,
+          "p05_ms": 0.710833,
+          "median_ms": 1.768125,
+          "p95_ms": 4.094375,
+          "max_ms": 49.19075,
+          "jitter_std_ms": 2.8416868190746496,
+          "rate_from_median_hz": 565.5708731000353,
+          "rate_from_mean_hz": 477.2000809015237,
+          "peak_100ms_hz": 980.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.3665389527458493
+            ],
+            [
+              4.0,
+              0.04299702000851426
+            ]
+          ],
+          "histogram": [
+            [
+              "0.00-0.25 ms",
+              0
+            ],
+            [
+              "0.25-0.50 ms",
+              0
+            ],
+            [
+              "0.50-0.75 ms",
+              241
+            ],
+            [
+              "0.75-1.25 ms",
+              877
+            ],
+            [
+              "1.25-1.75 ms",
+              6
+            ],
+            [
+              "1.75-2.50 ms",
+              733
+            ],
+            [
+              "2.50-3.50 ms",
+              303
+            ],
+            [
+              "3.50-4.50 ms",
+              88
+            ],
+            [
+              "4.50-6.00 ms",
+              40
+            ],
+            [
+              "6.00-8.00 ms",
+              24
+            ],
+            [
+              "8.00-12.00 ms",
+              16
+            ],
+            [
+              "12.00-20.00 ms",
+              11
+            ],
+            [
+              "20.00-50.00 ms",
+              10
+            ]
+          ]
+        },
         "circles": {
           "samples": 1643,
           "intervals": 1624,
@@ -738,6 +839,21 @@
           "jitter_std_ms": 2.6902072328949957,
           "rate_from_median_hz": 900.2253263991978,
           "rate_from_mean_hz": 526.8748411433012,
+          "peak_100ms_hz": 980.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.33004926108374383
+            ],
+            [
+              4.0,
+              0.02832512315270936
+            ]
+          ],
           "histogram": [
             [
               "0.00-0.25 ms",
@@ -808,6 +924,21 @@
           "jitter_std_ms": 1.5574040759088525,
           "rate_from_median_hz": 904.1247981541388,
           "rate_from_mean_hz": 563.7456795461574,
+          "peak_100ms_hz": 940.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.3611650485436893
+            ],
+            [
+              4.0,
+              0.036893203883495145
+            ]
+          ],
           "histogram": [
             [
               "0.00-0.25 ms",
@@ -876,6 +1007,21 @@
           "jitter_std_ms": 2.042197348335238,
           "rate_from_median_hz": 548.4461697342175,
           "rate_from_mean_hz": 479.9362704833864,
+          "peak_100ms_hz": 790.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.3780487804878049
+            ],
+            [
+              4.0,
+              0.041811846689895474
+            ]
+          ],
           "histogram": [
             [
               "0.00-0.25 ms",
@@ -944,6 +1090,21 @@
           "jitter_std_ms": 7.5770100957130655,
           "rate_from_median_hz": 472.19926809113446,
           "rate_from_mean_hz": 206.01053786404398,
+          "peak_100ms_hz": 300.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.42105263157894735
+            ],
+            [
+              4.0,
+              0.08421052631578947
+            ]
+          ],
           "histogram": [
             [
               "0.00-0.25 ms",
@@ -1012,6 +1173,21 @@
           "jitter_std_ms": 0.860424300461641,
           "rate_from_median_hz": 925.1763617439574,
           "rate_from_mean_hz": 673.9963772694717,
+          "peak_100ms_hz": 970.0,
+          "on_grid_share": [
+            [
+              1.0,
+              1.0
+            ],
+            [
+              2.0,
+              0.28714859437751006
+            ],
+            [
+              4.0,
+              0.008032128514056224
+            ]
+          ],
           "histogram": [
             [
               "0.00-0.25 ms",
@@ -1243,12 +1419,16 @@
       ],
       "rest_axis_changes": {},
       "checks": [
-        "Update rate while moving: expected about 1000 Hz with RF off; measured 527 Hz (mean interval 1.898 ms; 90% of single intervals between 0.71 and 3.91 ms). DIFFERS",
+        "Report rate: expected about 1000 Hz with RF off. Busiest 100 ms: 980 updates per second. Gaps between updates on a 1 ms grid: 100.0%, 2 ms: 36.7%, 4 ms: 4.3%. Average while moving: 477 per second (lower whenever a stick moves too slowly to change value on every report). MATCHES",
+        "Stick axes at start: centred [0, 1, 3], at the bottom [2]. EdgeTX's AETR order expects roll 0, pitch 1, throttle 2 (rests at the bottom), yaw 3.",
         "Axes: expected 8 (CH1-CH8); SDL reports 8; 8 of them moved during the run (axes [0, 1, 2, 3, 4, 5, 6, 7]). MATCHES",
         "Buttons: expected 24 (CH9-CH32); SDL reports 24; pressed during the run: [0, 1].",
         "Resolution: expected about 11 bits (0-2048); measured about 11.0 bits on the busiest axes. MATCHES",
-        "Yaw: during the yaw-only step the most active axis was Some(6) (EdgeTX AETR puts yaw/rudder on CH4, which is axis 3).",
-        "Channels 5-8 (axes 4-7): moved = [4, 5, 6, 7]. They only move if the radio model mixes switches or the pot onto CH5-CH8."
+        "Yaw-only step: the sticks were not moved in this step, so it can't single out the yaw axis.",
+        "Channels 5-8 (axes 4-7): moved = [4, 5, 6, 7]. They only move if the radio model mixes switches or the pot onto CH5-CH8.",
+        "Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.",
+        "Hands-off step: 0 axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device.",
+        "Disconnected: SDL reported the removal 45.41 s into the run (the probe can't see when the cable was actually pulled). In the same poll it also delivered last-moment value changes that the pilot didn't make: axis 5 -> 15, axis 6 -> 15."
       ]
     }
   ]

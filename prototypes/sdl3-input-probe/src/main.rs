@@ -142,6 +142,7 @@ fn parse_args() -> Args {
             "--no-gilrs" => a.gilrs = false,
             "--no-qos" => a.qos = false,
             "--selftest" => a.selftest = true,
+            "--reanalyse" => reanalyse(&PathBuf::from(it.next().expect("--reanalyse needs a results folder"))),
             "--poll-us" => a.poll_us = it.next().and_then(|v| v.parse().ok()).expect("--poll-us needs a number"),
             "--out" => a.out_root = PathBuf::from(it.next().expect("--out needs a path")),
             "-h" | "--help" => {
@@ -256,6 +257,82 @@ struct Frames(BTreeMap<String, report::FramePhase>);
 
 #[derive(Component)]
 struct Hud;
+
+/// Rebuild `summary.md` and `stats.json` in a results folder from its `events.csv` (or
+/// `events.csv.gz`) with the current analysis code. Poll-loop and frame tables come from the
+/// folder's existing `stats.json`, because their raw data isn't saved.
+fn reanalyse(dir: &std::path::Path) -> ! {
+    use input_thread::{DeviceInfo, InitInfo, Kind, Rec};
+    #[derive(serde::Deserialize)]
+    struct OldDev {
+        info: DeviceInfo,
+    }
+    #[derive(serde::Deserialize)]
+    struct Old {
+        meta: report::RunMeta,
+        init: InitInfo,
+        poll_loop: BTreeMap<String, report::IntervalStats>,
+        main_thread_frames: BTreeMap<String, report::FramePhase>,
+        devices: Vec<OldDev>,
+    }
+    let old: Old = serde_json::from_str(&std::fs::read_to_string(dir.join("stats.json")).expect("stats.json"))
+        .expect("parse stats.json");
+    let csv = match std::fs::read_to_string(dir.join("events.csv")) {
+        Ok(s) => s,
+        Err(_) => {
+            let out = std::process::Command::new("gzip")
+                .arg("-dc")
+                .arg(dir.join("events.csv.gz"))
+                .output()
+                .expect("events.csv or events.csv.gz");
+            String::from_utf8(out.stdout).expect("utf8")
+        }
+    };
+    let mut recs = Vec::new();
+    for line in csv.lines().skip(1) {
+        let f: Vec<&str> = line.split(',').collect();
+        if f.len() < 8 {
+            continue;
+        }
+        let kind = match f[4] {
+            "axis" => Kind::Axis,
+            "button" => Kind::Button,
+            "hat" => Kind::Hat,
+            "gyro" => Kind::Gyro,
+            "accel" => Kind::Accel,
+            "added" => Kind::Added,
+            "removed" => Kind::Removed,
+            _ => continue,
+        };
+        recs.push(Rec {
+            t_sdl: f[0].parse().unwrap(),
+            t_rx: f[1].parse().unwrap(),
+            phase: Phase::ALL.into_iter().find(|p| p.key() == f[2]).unwrap_or(Phase::GetReady) as u8,
+            dev: f[3].parse().unwrap(),
+            kind,
+            idx: f[5].parse().unwrap(),
+            value: f[6].parse().unwrap(),
+            sensor_ts: f[7].parse().unwrap(),
+        });
+    }
+    let infos: Vec<DeviceInfo> = old.devices.into_iter().map(|d| d.info).collect();
+    let note = format!(
+        "Re-analysed on {} UTC from this folder's raw events with the updated estimator (busiest 100 ms and grid test). \
+The poll-loop and frame tables are copied from the original run. The original output is in git history.",
+        utc_now().0
+    );
+    match report::write_reports(dir, &old.meta, &old.init, &infos, &recs, &old.poll_loop, &old.main_thread_frames, Some(&note)) {
+        Ok(short) => {
+            println!("{short}");
+            println!("Rewrote {} and stats.json", dir.join("summary.md").display());
+            std::process::exit(0);
+        }
+        Err(e) => {
+            eprintln!("reanalyse failed: {e}");
+            std::process::exit(1);
+        }
+    }
+}
 
 fn main() {
     let args = parse_args();

@@ -3,7 +3,7 @@
 
 use crate::Phase;
 use crate::input_thread::{DeviceInfo, InitInfo, Kind, Rec, ThreadResult};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::io::Write as _;
@@ -14,7 +14,7 @@ const PAUSE_NS: u64 = 50_000_000;
 /// Histogram bucket edges in milliseconds.
 const EDGES_MS: [f64; 14] = [0.0, 0.25, 0.5, 0.75, 1.25, 1.75, 2.5, 3.5, 4.5, 6.0, 8.0, 12.0, 20.0, 50.0];
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct IntervalStats {
     pub samples: usize,
     pub intervals: usize,
@@ -28,10 +28,27 @@ pub struct IntervalStats {
     pub jitter_std_ms: f64,
     pub rate_from_median_hz: f64,
     pub rate_from_mean_hz: f64,
+    /// Most updates seen in any 100 ms window, per second. A slow-moving stick doesn't change
+    /// value on every report, so averages understate the report rate; the busiest window doesn't.
+    #[serde(default)]
+    pub peak_100ms_hz: f64,
+    /// Share of gaps that land within one poll period of a whole multiple of 1, 2 and 4 ms.
+    /// A device reporting every N ms only ever produces gaps that are multiples of N.
+    #[serde(default)]
+    pub on_grid_share: Vec<(f64, f64)>,
     pub histogram: Vec<(String, usize)>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+const GRIDS_MS: [f64; 3] = [1.0, 2.0, 4.0];
+const GRID_TOLERANCE_MS: f64 = 0.4;
+
+impl IntervalStats {
+    pub fn grid(&self, g: f64) -> f64 {
+        self.on_grid_share.iter().find(|(x, _)| *x == g).map(|(_, s)| *s).unwrap_or(f64::NAN)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AxisResolution {
     pub axis: u8,
     pub min: i32,
@@ -43,7 +60,7 @@ pub struct AxisResolution {
     pub bits: Option<f64>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PhaseActivity {
     pub phase: String,
     pub axis_changes: BTreeMap<u8, usize>,
@@ -52,7 +69,7 @@ pub struct PhaseActivity {
     pub most_active_axis: Option<u8>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct DeviceReport {
     pub info: DeviceInfo,
     pub device_kind: String,
@@ -72,7 +89,7 @@ pub struct DeviceReport {
     pub checks: Vec<String>,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct FramePhase {
     pub frames: u64,
     pub seconds: f64,
@@ -80,7 +97,7 @@ pub struct FramePhase {
     pub focused_frames: u64,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RunMeta {
     pub label: String,
     pub started_utc: String,
@@ -148,7 +165,24 @@ pub fn interval_stats(ts: &[u64], pause_ns: u64) -> Option<IntervalStats> {
     let mut sorted = ms.clone();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let median = percentile(&sorted, 0.5);
+    let mut peak = 0usize;
+    let mut j = 0usize;
+    for i in 0..uniq.len() {
+        while uniq[i] - uniq[j] >= 100_000_000 {
+            j += 1;
+        }
+        peak = peak.max(i - j + 1);
+    }
+    let on_grid_share = GRIDS_MS
+        .iter()
+        .map(|&g| {
+            let on = ms.iter().filter(|&&x| (x / g).round() >= 1.0 && (x - (x / g).round() * g).abs() <= GRID_TOLERANCE_MS).count();
+            (g, on as f64 / ms.len() as f64)
+        })
+        .collect();
     Some(IntervalStats {
+        peak_100ms_hz: peak as f64 * 10.0,
+        on_grid_share,
         samples: uniq.len(),
         intervals: ms.len(),
         pauses_excluded: pauses,
@@ -204,6 +238,10 @@ fn analyse_device(info: &DeviceInfo, all: &[Rec]) -> DeviceReport {
     let kind = device_kind(info);
 
     let mut update_rate = BTreeMap::new();
+    let all_ts: Vec<u64> = recs.iter().filter(|r| r.kind == Kind::Axis).map(|r| r.t_sdl).collect();
+    if let Some(s) = interval_stats(&all_ts, PAUSE_NS) {
+        update_rate.insert(ALL_STEPS.to_string(), s);
+    }
     for ph in [Phase::Circles, Phase::Unfocused, Phase::Sensors, Phase::Extremes] {
         let ts: Vec<u64> =
             recs.iter().filter(|r| r.kind == Kind::Axis && r.phase == ph as u8).map(|r| r.t_sdl).collect();
@@ -282,11 +320,57 @@ fn analyse_device(info: &DeviceInfo, all: &[Rec]) -> DeviceReport {
         checks: Vec::new(),
     };
     rep.checks = checks(&rep);
+    rep.checks.extend(rest_and_disconnect(&rep, &recs));
     rep
 }
 
 fn verdict(ok: bool) -> &'static str {
     if ok { "MATCHES" } else { "DIFFERS" }
+}
+
+const ALL_STEPS: &str = "all steps";
+
+/// One sentence on the report rate, built from the busiest 100 ms and the 1/2/4 ms grid test.
+fn rate_line(what: &str, s: &IntervalStats, expect: &str, lo: f64, hi: f64, grid_ms: f64) -> String {
+    let ok = (lo..hi).contains(&s.peak_100ms_hz) && s.grid(grid_ms) >= 0.9;
+    format!(
+        "{what}: expected {expect}. Busiest 100 ms: {:.0} updates per second. Gaps between updates on a 1 ms grid: {:.1}%, 2 ms: {:.1}%, 4 ms: {:.1}%. \
+Average while moving: {:.0} per second (lower whenever a stick moves too slowly to change value on every report). {}",
+        s.peak_100ms_hz,
+        100.0 * s.grid(1.0),
+        100.0 * s.grid(2.0),
+        100.0 * s.grid(4.0),
+        s.rate_from_mean_hz,
+        verdict(ok)
+    )
+}
+
+/// Extra lines every device gets: what happens at rest, and at disconnect.
+fn rest_and_disconnect(rep: &DeviceReport, recs: &[&Rec]) -> Vec<String> {
+    let mut out = Vec::new();
+    if let Some(a) = rep.activity.iter().find(|a| a.phase == Phase::Rest.key()) {
+        let n: usize = a.axis_changes.values().sum();
+        out.push(format!(
+            "Hands-off step: {n} axis changes. SDL only reports changes, so a still stick sends nothing; silence alone can't tell a resting stick from a stalled device."
+        ));
+    }
+    if let Some(rm) = recs.iter().find(|r| r.kind == Kind::Removed) {
+        let same: Vec<String> = recs
+            .iter()
+            .filter(|r| r.kind == Kind::Axis && r.t_rx == rm.t_rx)
+            .map(|r| format!("axis {} -> {}", r.idx, r.value))
+            .collect();
+        out.push(format!(
+            "Disconnected: SDL reported the removal {:.2} s into the run (the probe can't see when the cable was actually pulled).{}",
+            rm.t_rx as f64 / 1e9,
+            if same.is_empty() {
+                String::new()
+            } else {
+                format!(" In the same poll it also delivered last-moment value changes that the pilot didn't make: {}.", same.join(", "))
+            }
+        ));
+    }
+    out
 }
 
 /// Plain-language comparison with the research's expectations (docs/research/input-devices.md).
@@ -300,19 +384,20 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
         .filter(|r| r.distinct_values > 50)
         .filter_map(|r| r.bits)
         .fold(f64::NAN, f64::max);
+    let _ = circles;
     if v == 0x1209 && p == 0x4F54 {
-        if let Some(c) = circles {
-            out.push(format!(
-                "Update rate while moving: expected about 1000 Hz with RF off; measured {:.0} Hz (mean interval {:.3} ms; 90% of single intervals between {:.2} and {:.2} ms). {}",
-                c.rate_from_mean_hz,
-                c.mean_ms,
-                c.p05_ms,
-                c.p95_ms,
-                verdict((800.0..1250.0).contains(&c.rate_from_mean_hz))
-            ));
-        } else {
-            out.push("Update rate: no movement recorded in the circles step.".into());
+        match rep.update_rate.get(ALL_STEPS) {
+            Some(s) => out.push(rate_line("Report rate", s, "about 1000 Hz with RF off", 800.0, 1100.0, 1.0)),
+            None => out.push("Report rate: no stick movement recorded.".into()),
         }
+        let centred: Vec<usize> =
+            rep.info.initial_axis_state.iter().enumerate().filter(|(_, v)| v.is_some_and(|v| (v as i32).abs() < 1000)).map(|(i, _)| i).collect();
+        let bottom: Vec<usize> = rep.info.initial_axis_state.iter().take(4).enumerate().filter(|(_, v)| v.is_some_and(|v| v < -30000)).map(|(i, _)| i).collect();
+        out.push(format!(
+            "Stick axes at start: centred {:?}, at the bottom {:?}. EdgeTX's AETR order expects roll 0, pitch 1, throttle 2 (rests at the bottom), yaw 3.",
+            centred.into_iter().filter(|i| *i < 4).collect::<Vec<_>>(),
+            bottom
+        ));
         out.push(format!(
             "Axes: expected 8 (CH1-CH8); SDL reports {}; {} of them moved during the run (axes {:?}). {}",
             rep.info.num_axes,
@@ -330,10 +415,15 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
             verdict((10.5..11.6).contains(&bits))
         ));
         if let Some(y) = rep.activity.iter().find(|a| a.phase == Phase::Yaw.key()) {
-            out.push(format!(
-                "Yaw: during the yaw-only step the most active axis was {:?} (EdgeTX AETR puts yaw/rudder on CH4, which is axis 3).",
-                y.most_active_axis
-            ));
+            let stick_changes: usize = y.axis_changes.iter().filter(|(a, _)| **a < 4).map(|(_, c)| c).sum();
+            out.push(if stick_changes < 50 {
+                "Yaw-only step: the sticks were not moved in this step, so it can't single out the yaw axis.".to_string()
+            } else {
+                format!(
+                    "Yaw-only step: the most active axis was {:?} (EdgeTX AETR puts yaw/rudder on CH4, which is axis 3).",
+                    y.most_active_axis
+                )
+            });
         }
         let ch58: Vec<u8> = rep.axes_that_moved.iter().copied().filter(|a| (4..8).contains(a)).collect();
         out.push(format!(
@@ -342,17 +432,14 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
         ));
     } else if v == 0x054C {
         let bt = rep.info.connection == "wireless" || rep.info.bus == "Bluetooth";
-        let (lo, hi, expect) = if bt { (700.0, 1100.0, "about 800-1000 Hz over Bluetooth") } else { (200.0, 300.0, "250 Hz over USB") };
-        for key in [Phase::Circles.key(), Phase::Sensors.key()] {
+        let (lo, hi, expect, grid) =
+            if bt { (700.0, 1100.0, "about 800-1000 Hz over Bluetooth", 1.0) } else { (200.0, 300.0, "250 Hz over USB", 4.0) };
+        for (key, what) in [
+            (Phase::Circles.key(), "Stick report rate, sensors off (circles step)"),
+            (Phase::Sensors.key(), "Stick report rate, sensors on (sensors step)"),
+        ] {
             if let Some(c) = rep.update_rate.get(key) {
-                out.push(format!(
-                    "Stick update rate ({key} step): expected {expect}; measured {:.0} Hz (mean interval {:.3} ms; 90% of single intervals between {:.2} and {:.2} ms). {}",
-                    c.rate_from_mean_hz,
-                    c.mean_ms,
-                    c.p05_ms,
-                    c.p95_ms,
-                    verdict((lo..hi).contains(&c.rate_from_mean_hz))
-                ));
+                out.push(rate_line(what, c, expect, lo, hi, grid));
             }
         }
         if let Some(s) = &rep.sensor_device_clock {
@@ -371,11 +458,12 @@ fn checks(rep: &DeviceReport) -> Vec<String> {
             verdict((7.5..8.6).contains(&bits))
         ));
     }
-    if let Some(u) = rep.update_rate.get(Phase::Unfocused.key()) {
-        out.push(format!(
-            "With the probe window NOT focused: {:.0} Hz (mean {:.3} ms). Input keeps flowing without focus if this is close to the circles rate.",
-            u.rate_from_mean_hz, u.mean_ms
-        ));
+    match rep.update_rate.get(Phase::Unfocused.key()) {
+        Some(u) => out.push(format!(
+            "With the probe window NOT focused: busiest 100 ms {:.0} updates per second, average {:.0}. Input keeps flowing without focus if this is close to the focused steps.",
+            u.peak_100ms_hz, u.rate_from_mean_hz
+        )),
+        None => out.push("Window-not-focused step: no stick movement recorded, so focus independence is untested in this run.".into()),
     }
     out
 }
@@ -399,12 +487,24 @@ fn in_step_order<V>(m: &BTreeMap<String, V>) -> Vec<(&String, &V)> {
 
 fn fmt_stats_row(name: &str, s: &IntervalStats) -> String {
     format!(
-        "| {name} | {} | {:.0} Hz | {:.3} | {:.3} | {:.3} | {:.3} | {:.3} | {:.3} | {} |\n",
-        s.samples, s.rate_from_mean_hz, s.mean_ms, s.min_ms, s.median_ms, s.p95_ms, s.max_ms, s.jitter_std_ms, s.pauses_excluded
+        "| {name} | {} | {:.0} /s | {:.0} /s | {:.0}% / {:.0}% / {:.0}% | {:.3} | {:.3} | {:.3} | {:.3} | {:.3} | {:.3} | {} |\n",
+        s.samples,
+        s.peak_100ms_hz,
+        s.rate_from_mean_hz,
+        100.0 * s.grid(1.0),
+        100.0 * s.grid(2.0),
+        100.0 * s.grid(4.0),
+        s.mean_ms,
+        s.min_ms,
+        s.median_ms,
+        s.p95_ms,
+        s.max_ms,
+        s.jitter_std_ms,
+        s.pauses_excluded
     )
 }
 
-const STATS_HEADER: &str = "| What | Samples | Rate (1 / mean) | Mean ms | Min ms | Median ms | p95 ms | Max ms | Jitter (std) ms | Pauses >50 ms skipped |\n|---|---|---|---|---|---|---|---|---|---|\n";
+const STATS_HEADER: &str = "| What | Samples | Busiest 100 ms | Average (1 / mean) | On 1 / 2 / 4 ms grid | Mean ms | Min ms | Median ms | p95 ms | Max ms | Jitter (std) ms | Pauses >50 ms skipped |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n";
 
 fn histogram_md(s: &IntervalStats) -> String {
     let total: usize = s.histogram.iter().map(|(_, c)| c).sum();
@@ -472,20 +572,40 @@ pub fn write_all(
         }
     }
 
-    let devices: Vec<DeviceReport> = result.devices.iter().map(|d| analyse_device(d, &result.records)).collect();
+    write_reports(dir, meta, &result.init, &result.devices, &result.records, &poll_loop, frames, None)
+}
 
-    let stats = Stats { meta, init: &result.init, poll_loop: poll_loop.clone(), main_thread_frames: frames.clone(), devices: devices.clone() };
+/// Writes `stats.json` and `summary.md` from the raw records. Used at the end of a run, and by
+/// `--reanalyse` to rebuild them from a results folder's `events.csv` and `stats.json`.
+#[allow(clippy::too_many_arguments)]
+pub fn write_reports(
+    dir: &Path,
+    meta: &RunMeta,
+    init: &InitInfo,
+    devices_info: &[DeviceInfo],
+    records: &[Rec],
+    poll_loop: &BTreeMap<String, IntervalStats>,
+    frames: &BTreeMap<String, FramePhase>,
+    reanalysed_note: Option<&str>,
+) -> std::io::Result<String> {
+    let poll_loop = poll_loop.clone();
+    let devices: Vec<DeviceReport> = devices_info.iter().map(|d| analyse_device(d, records)).collect();
+
+    let stats = Stats { meta, init, poll_loop: poll_loop.clone(), main_thread_frames: frames.clone(), devices: devices.clone() };
     std::fs::write(dir.join("stats.json"), serde_json::to_string_pretty(&stats).unwrap())?;
 
     // Human summary.
     let mut md = String::new();
     let _ = writeln!(md, "# SDL3 input probe: {}\n", meta.label);
+    if let Some(note) = reanalysed_note {
+        let _ = writeln!(md, "> {note}\n");
+    }
     let _ = writeln!(
         md,
         "PROTOTYPE output for [issue #18](https://github.com/BartoszSolkaBD/OpenDrone/issues/18). Raw data: `events.csv` (every change SDL reported) and `stats.json`.\n"
     );
     let _ = writeln!(md, "- Started: {} (UTC), lasted {:.1} s, {}", meta.started_utc, meta.duration_s, meta.os);
-    let _ = writeln!(md, "- SDL {} ({}), built from source, statically linked, joystick + HIDAPI only", result.init.sdl_version, result.init.sdl_revision);
+    let _ = writeln!(md, "- SDL {} ({}), built from source, statically linked, joystick + HIDAPI only", init.sdl_version, init.sdl_revision);
     let _ = writeln!(md, "- Bevy 0.19.1 window open on the main thread; Bevy's own gamepad plugin (gilrs) {}", if meta.bevy_gilrs_enabled { "ON (reading the same devices at the same time)" } else { "OFF" });
     let _ = writeln!(md, "- Launched as {}", if meta.launched_as_app_bundle { "its own .app bundle (macOS treats it as a separate app for permissions)" } else { "a plain binary from a terminal (macOS attributes permissions to the terminal app)" });
     if meta.quick {
@@ -493,7 +613,7 @@ pub fn write_all(
     }
 
     let _ = writeln!(md, "\n## 1. Does SDL run on its own thread while Bevy/winit owns the main thread?\n");
-    let i = &result.init;
+    let i = init;
     let _ = writeln!(
         md,
         "- SDL_Init(GAMEPAD) on thread `{}`: {} in {:.1} ms{}",
@@ -577,10 +697,19 @@ pub fn write_all(
             let _ = writeln!(md, "| {k} | {} |", v.replace('|', "/"));
         }
 
-        let _ = writeln!(md, "\n**Update rate** (instants when any axis changed; a new value can only appear when the device sends a report, so while the sticks move fast this tracks the report rate). SDL stamps a change when the input thread polls (about every {:.2} ms here), so single intervals snap to whole poll periods; the mean gives the true rate.\n", poll_loop.get("whole run").map(|s| s.mean_ms).unwrap_or(f64::NAN));
+        let _ = writeln!(
+            md,
+            "\n**Update rate.** Counts the moments when any axis changed. A new value can only appear when the device sends a report, but a slow stick doesn't change on every report, so averages understate the report rate. Two measures don't depend on stick speed: the **busiest 100 ms**, and the **grid test** (a device reporting every N ms only produces gaps that are whole multiples of N). SDL stamps a change when the input thread polls (about every {:.2} ms here), so single gaps wobble by up to one poll period.\n",
+            poll_loop.get("whole run").map(|s| s.mean_ms).unwrap_or(f64::NAN)
+        );
         md.push_str(STATS_HEADER);
-        for (k, s) in &d.update_rate {
-            md.push_str(&fmt_stats_row(&format!("any axis, {k}"), s));
+        if let Some(s) = d.update_rate.get(ALL_STEPS) {
+            md.push_str(&fmt_stats_row(&format!("any axis, {ALL_STEPS}"), s));
+        }
+        for (k, s) in in_step_order(&d.update_rate) {
+            if k != ALL_STEPS {
+                md.push_str(&fmt_stats_row(&format!("any axis, {k}"), s));
+            }
         }
         if let Some(s) = &d.sensor_device_clock {
             md.push_str(&fmt_stats_row("gyro, controller clock (= report rate)", s));
@@ -591,8 +720,8 @@ pub fn write_all(
         for (a, s) in &d.per_axis_circles {
             md.push_str(&fmt_stats_row(&format!("axis {a}, circles"), s));
         }
-        if let Some(c) = d.update_rate.get(Phase::Circles.key()) {
-            let _ = writeln!(md, "\nInterval histogram, any axis, circles step:\n");
+        if let Some(c) = d.update_rate.get(ALL_STEPS) {
+            let _ = writeln!(md, "\nGaps between updates, any axis, all steps:\n");
             md.push_str(&histogram_md(c));
         }
         if let Some(s) = &d.sensor_device_clock {
