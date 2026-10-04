@@ -1,6 +1,6 @@
 # Input
 
-The physical devices pilots fly with. Back to the [map](../../CONTEXT.md).
+The physical devices pilots fly with, and the Actions they trigger. Back to the [map](../../CONTEXT.md).
 
 ## Language
 
@@ -16,6 +16,12 @@ _Avoid_: Transmitter, TX, drone controller
 A console-style controller, such as a DualSense or an Xbox controller.
 _Avoid_: Joypad, controller
 
+**Action**:
+A command that isn't flying, such as Reset, Camera Tilt up or Pause, bound to a keyboard key, a Gamepad button or a Radio switch.
+_Avoid_: Hotkey, shortcut, command
+
 ## Rules
 
 - Support is meant to be general. Verified devices are only the ones the maintainer can test, currently the DualSense and the Radiomaster Pocket.
+- The keyboard triggers Actions only. It isn't an Input Device and can't fly a Quad.
+- Every Action can be rebound.
