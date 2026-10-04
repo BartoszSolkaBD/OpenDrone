@@ -30,5 +30,5 @@ A Work Count more than 2% above main fails the gate, unless the PR names the cha
   - `cargo xtask bench` times the physics there, and agents paste the figures beside any slowdown they explain.
   - The Frame Check measures the 45 fps promise: an average, with the slowest 1% reported but not promised. The maintainer runs it before each release, and no release is tagged below the promise.
 - **Small steps can't add up unseen.** The Review Report shows each Work Count's total change since the last release.
-- **The render counts aren't proven yet.** Whether Bevy renders on GitHub's Linux machine with a software GPU, and which counts it can report, is a task ticket. The physics counts don't depend on it.
+- **The render counts aren't proven yet.** Whether Bevy renders on GitHub's Linux machine with a software GPU, and which counts it can report, is a task ticket. The physics counts don't depend on it. _Update: proven in [#29](https://github.com/BartoszSolkaBD/OpenDrone/issues/29); see [ADR-0016](0016-render-work-counts-from-a-counting-wgpu-on-one-lavapipe-thread.md)._
 - **Faster results need nothing.** Main's numbers simply move.
