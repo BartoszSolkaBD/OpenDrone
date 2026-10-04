@@ -52,6 +52,7 @@ pub struct LaunchArgs {
     pub signal_profile: bool,
     pub look_shots: bool,
     pub bench_quick: bool,
+    pub exposure_shots: bool,
     /// Render the final picture into an offscreen image instead of the window (works with the screen locked).
     pub offscreen: bool,
     /// Frames allowed on the GPU at once (1-3; Bevy's default is 2). Fewer = less latency.
@@ -140,6 +141,7 @@ fn parse_args() -> LaunchArgs {
         signal_profile: false,
         look_shots: false,
         bench_quick: false,
+        exposure_shots: false,
         offscreen: false,
         frames_in_flight: 2,
         load: None,
@@ -154,6 +156,7 @@ fn parse_args() -> LaunchArgs {
             "--windowed" => a.windowed = true,
             "--bench" => a.bench = true,
             "--bench-quick" => a.bench_quick = true,
+            "--exposure-shots" => a.exposure_shots = true,
             "--latency" => a.latency_test = true,
             "--screenshots" => a.screenshots = true,
             "--debug-shots" => a.debug_shots = true,
@@ -172,7 +175,7 @@ fn parse_args() -> LaunchArgs {
         }
         i += 1;
     }
-    if a.screenshots || a.debug_shots || a.signal_profile || a.look_shots {
+    if a.screenshots || a.debug_shots || a.signal_profile || a.look_shots || a.exposure_shots {
         a.offscreen = true;
     }
     a
@@ -404,7 +407,7 @@ fn apply_tuning(
     mut manual: ResMut<ManualTextureViews>,
     mut cams: Query<(Entity, &mut Projection, &mut Msaa, Option<&mut AutoExposure>, &mut RenderTarget, &mut Tonemapping), With<FpvCam3d>>,
     mut display: Query<&mut Camera, (With<FpvDisplay>, Without<FpvCam3d>)>,
-    mut suns: Query<&mut DirectionalLight, With<map::Sun>>,
+    mut suns: Query<(&mut DirectionalLight, Option<&map::SkyFill>), Or<(With<map::Sun>, With<map::SkyFill>)>>,
     mut ambient: ResMut<GlobalAmbientLight>,
     mut mask: ResMut<MeterMask>,
     mut comp: Local<CompCurve>,
@@ -533,9 +536,10 @@ fn apply_tuning(
             cam.is_active = want;
         }
     }
-    for mut sun in &mut suns {
-        if sun.illuminance != tuning.scene.sun_lux {
-            sun.illuminance = tuning.scene.sun_lux;
+    for (mut sun, fill) in &mut suns {
+        let want = if fill.is_some() { tuning.scene.sky_fill_lux } else { tuning.scene.sun_lux };
+        if sun.illuminance != want {
+            sun.illuminance = want;
         }
         if sun.shadow_maps_enabled != tuning.scene.shadows {
             sun.shadow_maps_enabled = tuning.scene.shadows;

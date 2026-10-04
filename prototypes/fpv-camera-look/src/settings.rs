@@ -182,9 +182,9 @@ impl Default for AnalogTuning {
             // slowly); darkening is limited to 1.5 stops so sunny scenes stay bright.
             exposure: ExposureTuning {
                 enabled: true,
-                speed_brighten: 1.5,
-                speed_darken: 2.5,
-                max_brighten_ev: 3.0,
+                speed_brighten: 3.0,
+                speed_darken: 4.0,
+                max_brighten_ev: 5.0,
                 max_darken_ev: 1.5,
                 tone: ToneCurve::Punchy,
                 target_ev: -2.0,
@@ -227,10 +227,10 @@ impl Default for DigitalTuning {
             relock_s: 1.0,
             exposure: ExposureTuning {
                 enabled: true,
-                speed_brighten: 3.0,
-                speed_darken: 4.0,
-                max_brighten_ev: 3.5,
-                max_darken_ev: 1.5,
+                speed_brighten: 4.0,
+                speed_darken: 6.0,
+                max_brighten_ev: 6.0,
+                max_darken_ev: 2.0,
                 tone: ToneCurve::Punchy,
                 target_ev: -2.0,
             },
@@ -306,6 +306,10 @@ impl Default for SignalTuning {
 #[serde(default)]
 pub struct SceneTuning {
     pub sun_lux: f32,
+    /// Round 3: a shadowed "sky" light from high up, opposite the sun. Floors and roofs block it,
+    /// so interiors get only the (low) ambient light and end up 5-6 stops below sun, as in a
+    /// real concrete shell. A stand-in for the baked light.
+    pub sky_fill_lux: f32,
     pub ambient_nits: f32,
     pub shadows: bool,
     pub msaa: bool,
@@ -314,9 +318,9 @@ pub struct SceneTuning {
 
 impl Default for SceneTuning {
     fn default() -> Self {
-        // Round 2: shade 3 stops below sun (skylight is about 1/8 of direct sun); round 1's
-        // 1500 nits made it 4.4 stops, which only looked fine because auto-exposure hid it.
-        Self { sun_lux: 100_000.0, ambient_nits: 4000.0, shadows: true, msaa: true, detail_texture: true }
+        // Round 3: open shade lit by the sky fill (about 2-3 stops below sun); interiors under the
+        // slabs only by the ambient light (about 5.7 stops below sun).
+        Self { sun_lux: 100_000.0, sky_fill_lux: 20_000.0, ambient_nits: 600.0, shadows: true, msaa: true, detail_texture: true }
     }
 }
 
@@ -349,16 +353,18 @@ pub struct QuadCameras {
 }
 
 impl QuadCameras {
+    /// Whoop 65: BetaFPV C03 (1/3" CMOS, NTSC only, S/N >50 dB). Digital: a generic 1080p system.
     pub fn whoop() -> Self {
         Self {
-            analog: CameraSpec { dynamic_range_ev: 8.0, lines: 480.0, horizontal: 400.0 },
-            digital: CameraSpec { dynamic_range_ev: 11.0, lines: 1080.0, horizontal: 1440.0 },
+            analog: CameraSpec { dynamic_range_ev: 7.0, lines: 480.0, horizontal: 300.0 },
+            digital: CameraSpec { dynamic_range_ev: 10.0, lines: 1080.0, horizontal: 1440.0 },
         }
     }
+    /// Freestyle 5": a typical analog camera (Caddx Ratel 2 / RunCam Phoenix 2 class).
     pub fn five() -> Self {
         Self {
-            analog: CameraSpec { dynamic_range_ev: 9.0, lines: 480.0, horizontal: 500.0 },
-            digital: CameraSpec { dynamic_range_ev: 11.0, lines: 1080.0, horizontal: 1440.0 },
+            analog: CameraSpec { dynamic_range_ev: 8.5, lines: 480.0, horizontal: 400.0 },
+            digital: CameraSpec { dynamic_range_ev: 10.0, lines: 1080.0, horizontal: 1440.0 },
         }
     }
 }

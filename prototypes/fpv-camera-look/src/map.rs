@@ -414,4 +414,18 @@ pub fn spawn_sun(commands: &mut Commands, tuning: &Tuning) {
             .build(),
         Sun,
     ));
+    // Sky fill: from high up, opposite the sun, with shadows (see SceneTuning::sky_fill_lux).
+    let el = 60f32.to_radians();
+    let az = (157.5f32 + 180.0).to_radians();
+    let to_sky = b(az.sin() * el.cos(), az.cos() * el.cos(), el.sin());
+    commands.spawn((
+        DirectionalLight { illuminance: tuning.scene.sky_fill_lux, shadow_maps_enabled: tuning.scene.shadows, ..default() },
+        Transform::from_translation(to_sky * 100.0).looking_at(Vec3::ZERO, Vec3::Y),
+        CascadeShadowConfigBuilder { num_cascades: 2, first_cascade_far_bound: 12.0, maximum_distance: 80.0, ..default() }
+            .build(),
+        SkyFill,
+    ));
 }
+
+#[derive(Component)]
+pub struct SkyFill;

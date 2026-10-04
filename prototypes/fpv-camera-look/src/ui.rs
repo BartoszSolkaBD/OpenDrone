@@ -489,7 +489,8 @@ pub fn panel(
             egui::CollapsingHeader::new("Stand-in lighting (not part of the look)").default_open(false).show(ui, |ui| {
                 let sc = &mut tuning.scene;
                 slider(ui, &mut sc.sun_lux, 10_000.0..=150_000.0, "sun (lux)");
-                slider(ui, &mut sc.ambient_nits, 0.0..=8000.0, "sky/ambient (nits) — stands in for baked light");
+                slider(ui, &mut sc.sky_fill_lux, 0.0..=60_000.0, "sky fill (lux, blocked by floors)");
+                slider(ui, &mut sc.ambient_nits, 0.0..=8000.0, "ambient everywhere (nits) — interiors get only this");
                 ui.checkbox(&mut sc.shadows, "sun shadows");
                 ui.checkbox(&mut sc.msaa, "MSAA 4× on the Map render");
             });

@@ -168,6 +168,33 @@ pub fn start_script(mut script: ResMut<Script>, args: Res<LaunchArgs>, time: Res
         s.push_back(Step::Wait(0.5));
         s.push_back(Step::Report);
         s.push_back(Step::Exit);
+    } else if args.exposure_shots {
+        // The exposure transient: settle outside in the yard, jump inside the dark rooms, and
+        // photograph the camera adapting; then jump back out and photograph the blow-out.
+        script.kind = "screenshots";
+        s.push_back(Step::HidePanel(true));
+        s.push_back(Step::WaitBuilt);
+        for look in [Look::Analog, Look::Digital] {
+            let tag = if look == Look::Analog { "analog" } else { "digital" };
+            s.push_back(Step::SetLook(look));
+            s.push_back(Step::SeekPath { which: 1, frac: 0.06 });
+            s.push_back(Step::Wait(3.5));
+            s.push_back(Step::Screenshot(format!("exp-{tag}-0-outside")));
+            s.push_back(Step::SeekPath { which: 1, frac: 0.40 });
+            let mut t = 0.0f32;
+            for at in [0.1f32, 0.5, 1.0, 2.0, 4.0] {
+                s.push_back(Step::Wait(at - t));
+                t = at;
+                s.push_back(Step::Screenshot(format!("exp-{tag}-1-inside-{:.1}s", at)));
+            }
+            s.push_back(Step::SeekPath { which: 1, frac: 0.06 });
+            s.push_back(Step::Wait(0.1));
+            s.push_back(Step::Screenshot(format!("exp-{tag}-2-back-out-0.1s")));
+            s.push_back(Step::Wait(1.4));
+            s.push_back(Step::Screenshot(format!("exp-{tag}-2-back-out-1.5s")));
+        }
+        s.push_back(Step::Report);
+        s.push_back(Step::Exit);
     } else if args.look_shots {
         // A short set for checking the look after a change (about 20 s).
         script.kind = "screenshots";

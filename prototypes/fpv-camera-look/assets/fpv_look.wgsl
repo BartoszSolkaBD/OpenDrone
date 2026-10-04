@@ -176,7 +176,7 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
 
     // Luma: a soft picture of `lines` lines, four taps spread over the analog pixel.
     let fx = gx * (apx * soft);
-    let fy = gy * (apy * soft * 0.85);
+    let fy = gy * (apy * soft / 0.7);  // Kell factor: interlaced video resolves ~70% of its lines
     let g0 = fx * 0.75;
     let g1 = fy * 0.75;
     // (The camera curve runs once on each blurred result, not per tap: it costs ~0.3 ms per tap set.)
