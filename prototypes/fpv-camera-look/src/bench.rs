@@ -113,10 +113,12 @@ impl SyntheticSteps {
 pub fn start_script(mut script: ResMut<Script>, args: Res<LaunchArgs>, time: Res<Time<Real>>) {
     script.started = time.elapsed_secs_f64();
     let mut s = VecDeque::new();
-    if args.bench {
+    if args.bench || args.bench_quick {
         script.kind = "bench";
         s.push_back(Step::HidePanel(true));
-        for map in [MapKind::Bando, MapKind::SkatePark] {
+        // Quick: Bando only, the runs that give the camera's cost (about 45 s).
+        let maps: &[MapKind] = if args.bench_quick { &[MapKind::Bando] } else { &[MapKind::Bando, MapKind::SkatePark] };
+        for &map in maps {
             s.push_back(Step::SetMap(map));
             s.push_back(Step::WaitBuilt);
             s.push_back(Step::SetBreakup(BreakupLevel::Realistic));
@@ -134,6 +136,9 @@ pub fn start_script(mut script: ResMut<Script>, args: Res<LaunchArgs>, time: Res
                 ("H. Digital, Map drawn at 2.0x", false, Look::Digital, 2.0, 1, true),
             ];
             for (label, bypass, look, scale, reps, ae) in configs {
+                if args.bench_quick && (label.starts_with("C.") || label.starts_with("G.") || label.starts_with("H.")) {
+                    continue;
+                }
                 s.push_back(Step::SetBypass(bypass));
                 s.push_back(Step::SetLook(look));
                 s.push_back(Step::SetScale(scale));
@@ -480,6 +485,19 @@ fn write_report(script: &Script, latency: &[LatencySample], meas_cpu: &[f32], ar
             let mut derived = String::new();
             for map in [MapKind::Bando, MapKind::SkatePark] {
                 let get = |p: &str| script.rows.iter().find(|r| r.map == map && r.label.starts_with(p)).map(|r| r.mean_ms);
+                if let (Some(a), Some(b), None, Some(d), Some(e), Some(f)) =
+                    (get("A."), get("B."), get("C."), get("D."), get("E."), get("F."))
+                {
+                    let _ = writeln!(
+                        derived,
+                        "- {}: Analog adds {:.2} ms over a plain camera, Digital {:.2} ms; one Analog merged pass {:.2} ms, one Digital merged pass {:.2} ms.",
+                        map.label(),
+                        b - a,
+                        e - a,
+                        (d - b) / 4.0,
+                        (f - e) / 4.0
+                    );
+                }
                 if let (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g), Some(h)) =
                     (get("A."), get("B."), get("C."), get("D."), get("E."), get("F."), get("G."), get("H."))
                 {

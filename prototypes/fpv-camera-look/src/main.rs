@@ -51,6 +51,7 @@ pub struct LaunchArgs {
     pub debug_shots: bool,
     pub signal_profile: bool,
     pub look_shots: bool,
+    pub bench_quick: bool,
     /// Render the final picture into an offscreen image instead of the window (works with the screen locked).
     pub offscreen: bool,
     /// Frames allowed on the GPU at once (1-3; Bevy's default is 2). Fewer = less latency.
@@ -138,6 +139,7 @@ fn parse_args() -> LaunchArgs {
         debug_shots: false,
         signal_profile: false,
         look_shots: false,
+        bench_quick: false,
         offscreen: false,
         frames_in_flight: 2,
         load: None,
@@ -151,6 +153,7 @@ fn parse_args() -> LaunchArgs {
             "--pipelined" => a.pipelined = true,
             "--windowed" => a.windowed = true,
             "--bench" => a.bench = true,
+            "--bench-quick" => a.bench_quick = true,
             "--latency" => a.latency_test = true,
             "--screenshots" => a.screenshots = true,
             "--debug-shots" => a.debug_shots = true,
@@ -292,7 +295,8 @@ fn setup(
             Camera { order: 0, ..default() },
             RenderTarget::TextureView(render::SOURCE_VIEW),
             Projection::Perspective(PerspectiveProjection { fov: 1.5, near: 0.004, far: 3000.0, ..default() }),
-            Tonemapping::TonyMcMapface,
+            Tonemapping::Reinhard,
+            DebandDither::Disabled,
             Exposure { ev100: 15.0 },
             Msaa::Sample4,
             FpvCam3d,
@@ -460,11 +464,9 @@ fn apply_tuning(
             *msaa = want_msaa;
         }
         let ex = tuning.exposure();
-        let want_tone = match ex.tone {
-            settings::ToneCurve::Soft => Tonemapping::TonyMcMapface,
-            settings::ToneCurve::Punchy => Tonemapping::AcesFitted,
-            settings::ToneCurve::HardClip => Tonemapping::None,
-        };
+        // Round 3: Bevy always compresses with Reinhard (it applies the auto-exposure; `None` would
+        // skip it); the merged pass undoes it and applies the camera's dynamic range and tone curve.
+        let want_tone = Tonemapping::Reinhard;
         if *tonemap != want_tone {
             *tonemap = want_tone;
         }
@@ -606,7 +608,18 @@ fn update_frame(
     let reduce = tuning.reduce_motion;
     let a = &tuning.analog;
     let d = &tuning.digital;
-    let apx = pic.z / (a.lines.max(100.0) * 4.0 / 3.0);
+    // The camera on this Quad (round 3): lines top to bottom and sharpness across, both relative
+    // to the 4:3 frame (a 16:9 picture is a crop of it, so it shows fewer lines).
+    let cam = tuning.camera();
+    let frame_h = pic.z * 0.75;
+    let apy = frame_h / cam.lines.max(60.0);
+    let apx = frame_h / cam.horizontal.max(60.0);
+    let dig_px = frame_h / cam.lines.max(60.0);
+    let tone = match tuning.exposure().tone {
+        settings::ToneCurve::Punchy => 0.0,
+        settings::ToneCurve::Soft => 1.0,
+        settings::ToneCurve::HardClip => 2.0,
+    };
     let ab = sig.analog_shown;
     let db = sig.digital_shown;
     let smooth = |e0: f32, e1: f32, x: f32| {
@@ -629,6 +642,7 @@ fn update_frame(
         breakup_d: Vec4::new(smooth(0.0, 0.6, db) * 0.6, smooth(0.25, 0.85, db) * 0.7, 0.0, 0.0),
         digital: Vec4::new(d.sharpen, d.contrast, d.saturation, d.brightness),
         misc: Vec4::new(debug.0, 0.0, 0.0, 0.0),
+        cam: Vec4::new(8.6 / cam.dynamic_range_ev.clamp(3.0, 20.0), tone, apy, dig_px),
     };
     frame.source = src.views.clone();
     frame.mips_enabled = std::env::var("FPV_NO_MIPS").is_err();

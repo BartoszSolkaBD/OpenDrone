@@ -79,8 +79,11 @@ pub struct FpvParams {
     pub breakup_d: Vec4,
     /// Digital: sharpen, contrast, saturation, brightness.
     pub digital: Vec4,
-    /// spare.
+    /// debug view, spare...
     pub misc: Vec4,
+    /// Camera: dynamic-range factor (8.6 / stops), tone curve (0 ACES, 1 soft, 2 hard clip),
+    /// output px per analog line (vertical), output px per transmitted Digital pixel.
+    pub cam: Vec4,
 }
 
 #[derive(Clone)]

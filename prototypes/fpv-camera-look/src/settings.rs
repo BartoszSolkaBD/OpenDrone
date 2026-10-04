@@ -152,9 +152,7 @@ impl Default for ExposureTuning {
 pub struct AnalogTuning {
     /// How big the Map is drawn underneath the fisheye, relative to the picture's pixels on screen.
     pub source_scale: f32,
-    /// The analog picture's height in lines (720 = "about 960x720").
-    pub lines: f32,
-    /// Blur, in analog pixels.
+    /// Extra blur on top of the camera's resolution, in analog pixels (1 = just the camera).
     pub softness: f32,
     pub grain: f32,
     /// Sideways colour smear, in analog pixels.
@@ -171,7 +169,6 @@ impl Default for AnalogTuning {
     fn default() -> Self {
         Self {
             source_scale: 1.0,
-            lines: 720.0,
             softness: 1.0,
             // Round 2: the maintainer prefers grain near 0.1.
             grain: 0.1,
@@ -323,10 +320,55 @@ impl Default for SceneTuning {
     }
 }
 
+/// One camera's real limits in the pilot's live picture (round 3). These become `[camera]` keys
+/// in each Quad definition.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct CameraSpec {
+    /// Stops of scene light between black and white clipping in the live picture.
+    pub dynamic_range_ev: f32,
+    /// Lines from top to bottom of the live picture (NTSC analog shows 480; 1080p digital 1080).
+    pub lines: f32,
+    /// Analog: effective sharpness across, in TV lines per picture height.
+    /// Digital: transmitted pixels across the 4:3 picture.
+    pub horizontal: f32,
+}
+
+impl Default for CameraSpec {
+    fn default() -> Self {
+        Self { dynamic_range_ev: 9.0, lines: 480.0, horizontal: 450.0 }
+    }
+}
+
+/// The FPV Camera on one Quad: what it shows as Analog and as Digital.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct QuadCameras {
+    pub analog: CameraSpec,
+    pub digital: CameraSpec,
+}
+
+impl QuadCameras {
+    pub fn whoop() -> Self {
+        Self {
+            analog: CameraSpec { dynamic_range_ev: 8.0, lines: 480.0, horizontal: 400.0 },
+            digital: CameraSpec { dynamic_range_ev: 11.0, lines: 1080.0, horizontal: 1440.0 },
+        }
+    }
+    pub fn five() -> Self {
+        Self {
+            analog: CameraSpec { dynamic_range_ev: 9.0, lines: 480.0, horizontal: 500.0 },
+            digital: CameraSpec { dynamic_range_ev: 11.0, lines: 1080.0, horizontal: 1440.0 },
+        }
+    }
+}
+
 #[derive(Resource, Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Tuning {
     pub quad: QuadKind,
+    pub camera_whoop: QuadCameras,
+    pub camera_five: QuadCameras,
     /// Corner to corner of the 4:3 picture.
     pub fov_deg: f32,
     pub tilt_deg: f32,
@@ -345,6 +387,8 @@ impl Default for Tuning {
     fn default() -> Self {
         Self {
             quad: QuadKind::Whoop65,
+            camera_whoop: QuadCameras::whoop(),
+            camera_five: QuadCameras::five(),
             fov_deg: 160.0,
             tilt_deg: 30.0,
             aspect: Aspect::FourThree,
@@ -361,6 +405,23 @@ impl Default for Tuning {
 }
 
 impl Tuning {
+    /// The camera on the selected Quad, for the selected Video Look.
+    pub fn camera(&self) -> &CameraSpec {
+        let q = match self.quad {
+            QuadKind::Whoop65 => &self.camera_whoop,
+            QuadKind::Freestyle5 => &self.camera_five,
+        };
+        match self.look {
+            Look::Analog => &q.analog,
+            Look::Digital => &q.digital,
+        }
+    }
+    pub fn camera_mut(&mut self) -> &mut QuadCameras {
+        match self.quad {
+            QuadKind::Whoop65 => &mut self.camera_whoop,
+            QuadKind::Freestyle5 => &mut self.camera_five,
+        }
+    }
     pub fn exposure(&self) -> &ExposureTuning {
         match self.look {
             Look::Analog => &self.analog.exposure,

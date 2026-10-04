@@ -410,10 +410,25 @@ pub fn panel(
                 }
             });
 
+            let quad_label = tuning.quad.label();
+            egui::CollapsingHeader::new(format!("Camera on the {quad_label} (Quad values)")).default_open(true).show(ui, |ui| {
+                let c = tuning.camera_mut();
+                ui.label("Analog camera");
+                ui.push_id("cam_a", |ui| {
+                    slider(ui, &mut c.analog.dynamic_range_ev, 4.0..=16.0, "dynamic range (stops)");
+                    slider(ui, &mut c.analog.lines, 240.0..=1080.0, "lines top to bottom (NTSC = 480)");
+                    slider(ui, &mut c.analog.horizontal, 150.0..=1200.0, "sharpness across (TV lines)");
+                });
+                ui.label("Digital camera");
+                ui.push_id("cam_d", |ui| {
+                    slider(ui, &mut c.digital.dynamic_range_ev, 4.0..=16.0, "dynamic range (stops)");
+                    slider(ui, &mut c.digital.lines, 360.0..=1440.0, "lines top to bottom (1080p = 1080)");
+                });
+            });
+
             egui::CollapsingHeader::new("Analog look").default_open(tuning.look == Look::Analog).show(ui, |ui| {
                 let a = &mut tuning.analog;
-                slider(ui, &mut a.lines, 360.0..=1080.0, "picture lines (720 ≈ 960×720)");
-                slider(ui, &mut a.softness, 0.0..=3.0, "softness (analog px)");
+                slider(ui, &mut a.softness, 0.0..=3.0, "extra softness (1 = the camera alone)");
                 slider(ui, &mut a.grain, 0.0..=0.2, "grain");
                 slider(ui, &mut a.colour_bleed, 0.0..=10.0, "colour bleed (analog px)");
                 slider(ui, &mut a.contrast, 0.6..=1.8, "contrast");

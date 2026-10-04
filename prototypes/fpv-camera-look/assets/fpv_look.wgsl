@@ -16,6 +16,7 @@ struct FpvParams {
     breakup_d: vec4<f32>, // smear, blocks, -, black
     digital: vec4<f32>,   // sharpen, contrast, saturation, brightness
     misc: vec4<f32>,
+    cam: vec4<f32>,       // dynamic-range factor, tone curve, px per analog line, px per digital pixel
 };
 
 @group(0) @binding(0) var src_tex: texture_2d<f32>;
@@ -73,6 +74,46 @@ fn warp(pix: vec2<f32>) -> vec2<f32> {
     return vec2<f32>(s.x / P.source.x, s.y / P.source.y) * 0.5 + 0.5;
 }
 
+// The camera's response (round 3). The Map render stores Reinhard-compressed light
+// (y = x / (1 + x), after auto-exposure), so we undo that, squeeze or stretch the stops around
+// the exposure's middle grey to this camera's dynamic range, and apply the tone curve.
+const PIVOT: f32 = 0.263;  // scene light that ACES shows as 18% grey
+
+fn rrt_odt(v: vec3<f32>) -> vec3<f32> {
+    let a = v * (v + 0.0245786) - 0.000090537;
+    let b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return a / b;
+}
+
+fn aces(color: vec3<f32>) -> vec3<f32> {
+    let rgb_to_rrt = mat3x3<f32>(
+        vec3<f32>(0.59719, 0.35458, 0.04823),
+        vec3<f32>(0.07600, 0.90834, 0.01566),
+        vec3<f32>(0.02840, 0.13383, 0.83777),
+    );
+    let odt_to_rgb = mat3x3<f32>(
+        vec3<f32>(1.60475, -0.53108, -0.07367),
+        vec3<f32>(-0.10208, 1.10813, -0.00605),
+        vec3<f32>(-0.00327, -0.07276, 1.07602),
+    );
+    var c = color * rgb_to_rrt;
+    c = rrt_odt(c);
+    c = c * odt_to_rgb;
+    return clamp(c, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn cam_curve(y_in: vec3<f32>) -> vec3<f32> {
+    let y = clamp(y_in, vec3<f32>(0.0), vec3<f32>(0.992));
+    let x = max(y / (vec3<f32>(1.0) - y), vec3<f32>(1e-6));
+    let xs = PIVOT * exp2(log2(x / PIVOT) * P.cam.x);
+    if (P.cam.y < 0.5) {
+        return aces(xs);
+    } else if (P.cam.y < 1.5) {
+        return xs / (xs + vec3<f32>(1.198));
+    }
+    return clamp(xs * (0.18 / PIVOT), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
 fn to_gamma(c: vec3<f32>) -> vec3<f32> {
     return pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
 }
@@ -108,7 +149,8 @@ fn samp(uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec3<f32> {
 fn analog(pix_in: vec2<f32>) -> vec3<f32> {
     let time = P.mode.y;
     let frame = u32(P.mode.z);
-    let apx = P.analog.x;
+    let apx = P.analog.x;     // output px per analog pixel across (from the camera's TVL)
+    let apy = P.cam.z;        // output px per analog line (from the camera's lines)
     let soft = P.analog.y;
     let grain = P.analog.z;
     let bleed = P.analog.w;
@@ -122,7 +164,7 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
     var rel = pix_in - P.picture.xy;
     rel.y = rel.y + roll * P.picture.w * fract(time * 0.37);
     rel.y = rel.y - P.picture.w * floor(rel.y / P.picture.w);
-    let line = floor(rel.y / apx);
+    let line = floor(rel.y / apy);
     let tear_wave = (noise1(line * 0.045 + time * 2.3, 11u) - 0.5) * 2.0;
     let jitter = (hash3(i32(line), 3, frame * flicker_u(flicker)) - 0.5) * 2.0;
     rel.x = rel.x + tear * (tear_wave * 0.05 * P.picture.z + jitter * 2.0 * apx);
@@ -134,22 +176,24 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
 
     // Luma: a soft picture of `lines` lines, four taps spread over the analog pixel.
     let fx = gx * (apx * soft);
-    let fy = gy * (apx * soft * 0.85);
+    let fy = gy * (apy * soft * 0.85);
     let g0 = fx * 0.75;
     let g1 = fy * 0.75;
-    let t0 = to_gamma(sampb(uv + 0.30 * fx + 0.10 * fy, g0, g1));
-    let t1 = to_gamma(sampb(uv - 0.30 * fx - 0.10 * fy, g0, g1));
-    let t2 = to_gamma(sampb(uv + 0.10 * fx - 0.30 * fy, g0, g1));
-    let t3 = to_gamma(sampb(uv - 0.10 * fx + 0.30 * fy, g0, g1));
-    let lum = rgb2yiq((t0 + t1 + t2 + t3) * 0.25).x;
+    // (The camera curve runs once on each blurred result, not per tap: it costs ~0.3 ms per tap set.)
+    let t0 = sampb(uv + 0.30 * fx + 0.10 * fy, g0, g1);
+    let t1 = sampb(uv - 0.30 * fx - 0.10 * fy, g0, g1);
+    let t2 = sampb(uv + 0.10 * fx - 0.30 * fy, g0, g1);
+    let t3 = sampb(uv - 0.10 * fx + 0.30 * fy, g0, g1);
+    let lum = rgb2yiq(to_gamma(cam_curve((t0 + t1 + t2 + t3) * 0.25))).x;
 
     // Chroma: much less bandwidth, and it trails to the right (colour bleed).
     let bx = gx * (apx * max(bleed, 0.01));
     let cg = bx * 0.5;
-    let c0 = rgb2yiq(to_gamma(sampb(uv - bx * 0.15, cg, fy))).yz;
-    let c1 = rgb2yiq(to_gamma(sampb(uv - bx * 0.50, cg, fy))).yz;
-    let c2 = rgb2yiq(to_gamma(sampb(uv - bx * 0.85, cg, fy))).yz;
-    var yiq = vec3<f32>(lum, (c0 + c1 + c2) / 3.0);
+    let c0 = sampb(uv - bx * 0.15, cg, fy);
+    let c1 = sampb(uv - bx * 0.50, cg, fy);
+    let c2 = sampb(uv - bx * 0.85, cg, fy);
+    let chroma = rgb2yiq(to_gamma(cam_curve((c0 + c1 + c2) / 3.0))).yz;
+    var yiq = vec3<f32>(lum, chroma);
 
     // Grade: contrast and saturation in gamma space; colour fades out as the signal weakens.
     yiq.x = (yiq.x - 0.5) * P.analog2.x + 0.5;
@@ -157,7 +201,7 @@ fn analog(pix_in: vec2<f32>) -> vec3<f32> {
     yiq = vec3<f32>(yiq.x, yiq.yz * sat);
 
     // Faint grain on the analog grid, new every frame.
-    let a = rel / apx;
+    let a = rel / vec2<f32>(apx, apy);
     let gn = vnoise(a * vec2<f32>(1.0, 1.0), frame * 3u + 1u) - 0.5;
     // The noise floor rises as the signal weakens: the first sign, before any sparkles.
     yiq.x = yiq.x + gn * (grain * 2.0 + stat * 0.45);
@@ -199,10 +243,11 @@ fn digital(pix: vec2<f32>) -> vec3<f32> {
     let uv = warp(pix);
     let gx = warp(pix + vec2<f32>(1.0, 0.0)) - uv;
     let gy = warp(pix + vec2<f32>(0.0, 1.0)) - uv;
-    let blur = 1.0 + smear * 10.0;
-    var c = samp(uv, gx * blur, gy * blur);
+    // The transmitted picture's resolution (1080 lines = a little softer than this screen).
+    let blur = max(P.cam.w, 1.0) * (1.0 + smear * 10.0);
+    var c = cam_curve(samp(uv, gx * blur, gy * blur));
     if (P.digital.x > 0.0) {
-        let b = samp(uv, gx * 2.5 * blur, gy * 2.5 * blur);
+        let b = cam_curve(samp(uv, gx * 2.5 * blur, gy * 2.5 * blur));
         c = max(c + (c - b) * P.digital.x, vec3<f32>(0.0));
     }
     if (blocks > 0.0) {
@@ -214,7 +259,7 @@ fn digital(pix: vec2<f32>) -> vec3<f32> {
         let h = hash3(i32(cell.x), i32(cell.y), tslot);
         if (h < blocks) {
             let cuv = warp(P.picture.xy + (cell + 0.5) * bs);
-            let bc = samp(cuv, gx * bs, gy * bs);
+            let bc = cam_curve(samp(cuv, gx * bs, gy * bs));
             c = mix(c, bc, 0.85);
         }
     }
