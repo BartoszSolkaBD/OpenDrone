@@ -19,7 +19,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Input | Input Device, Radio, Gamepad, Action | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
-| Verification | Scenario | [docs/context/verification.md](docs/context/verification.md) |
+| Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Test Pilot, Test Map | [docs/context/verification.md](docs/context/verification.md) |
 
 ## Terms to avoid
 
@@ -31,5 +31,6 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | level, track, scene | Map |
 | mod, plugin, DLC | Pack |
 | e2e test, replay test | Scenario |
+| assertion | Expectation |
 | camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |
 | hotkey, shortcut | Action |
