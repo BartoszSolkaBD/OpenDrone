@@ -21,6 +21,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
 | Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |
 | Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Test Pilot, Test Map, Test Quad, Feel Test | [docs/context/verification.md](docs/context/verification.md) |
+| Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning | [docs/context/screens.md](docs/context/screens.md) |
 
 ## Terms to avoid
 
@@ -40,3 +41,5 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | front door, sim input | Flight Input |
 | RC link, link rate | Radio Link, Packet Rate |
 | PID profile, FC settings | Tune |
+| main menu, lobby, home screen | Hub |
+| onboarding, tutorial | First Launch |
