@@ -202,6 +202,8 @@ pub struct DigitalTuning {
     pub contrast: f32,
     pub saturation: f32,
     pub brightness: f32,
+    /// The generic Digital camera's limits (one set for every Quad).
+    pub camera: CameraSpec,
     /// Digital always shows the picture this much later than Analog.
     pub delay_ms: f32,
     /// Extra delay added near the edge of range.
@@ -222,6 +224,7 @@ impl Default for DigitalTuning {
             contrast: 1.0,
             saturation: 1.0,
             brightness: 1.0,
+            camera: digital_camera_default(),
             delay_ms: 15.0,
             edge_extra_delay_ms: 20.0,
             relock_s: 1.0,
@@ -344,12 +347,16 @@ impl Default for CameraSpec {
     }
 }
 
-/// The FPV Camera on one Quad: what it shows as Analog and as Digital.
+/// The FPV Camera on one Quad, as Analog (round 3: Digital is one generic set, on the Video Look).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct QuadCameras {
     pub analog: CameraSpec,
-    pub digital: CameraSpec,
+}
+
+/// The generic Digital camera (DJI O3/O4 and Walksnail class, no brand): 10 stops, 1080 lines.
+pub fn digital_camera_default() -> CameraSpec {
+    CameraSpec { dynamic_range_ev: 10.0, lines: 1080.0, horizontal: 1440.0 }
 }
 
 impl QuadCameras {
@@ -357,14 +364,12 @@ impl QuadCameras {
     pub fn whoop() -> Self {
         Self {
             analog: CameraSpec { dynamic_range_ev: 7.0, lines: 480.0, horizontal: 300.0 },
-            digital: CameraSpec { dynamic_range_ev: 10.0, lines: 1080.0, horizontal: 1440.0 },
         }
     }
     /// Freestyle 5": a typical analog camera (Caddx Ratel 2 / RunCam Phoenix 2 class).
     pub fn five() -> Self {
         Self {
             analog: CameraSpec { dynamic_range_ev: 8.5, lines: 480.0, horizontal: 400.0 },
-            digital: CameraSpec { dynamic_range_ev: 10.0, lines: 1080.0, horizontal: 1440.0 },
         }
     }
 }
@@ -419,7 +424,7 @@ impl Tuning {
         };
         match self.look {
             Look::Analog => &q.analog,
-            Look::Digital => &q.digital,
+            Look::Digital => &self.digital.camera,
         }
     }
     pub fn camera_mut(&mut self) -> &mut QuadCameras {

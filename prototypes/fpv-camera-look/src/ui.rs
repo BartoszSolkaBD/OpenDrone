@@ -411,18 +411,12 @@ pub fn panel(
             });
 
             let quad_label = tuning.quad.label();
-            egui::CollapsingHeader::new(format!("Camera on the {quad_label} (Quad values)")).default_open(true).show(ui, |ui| {
+            egui::CollapsingHeader::new(format!("Analog camera on the {quad_label} (Quad values)")).default_open(true).show(ui, |ui| {
                 let c = tuning.camera_mut();
-                ui.label("Analog camera");
                 ui.push_id("cam_a", |ui| {
                     slider(ui, &mut c.analog.dynamic_range_ev, 4.0..=16.0, "dynamic range (stops)");
                     slider(ui, &mut c.analog.lines, 240.0..=1080.0, "lines top to bottom (NTSC = 480)");
                     slider(ui, &mut c.analog.horizontal, 150.0..=1200.0, "sharpness across (TV lines)");
-                });
-                ui.label("Digital camera");
-                ui.push_id("cam_d", |ui| {
-                    slider(ui, &mut c.digital.dynamic_range_ev, 4.0..=16.0, "dynamic range (stops)");
-                    slider(ui, &mut c.digital.lines, 360.0..=1440.0, "lines top to bottom (1080p = 1080)");
                 });
             });
 
@@ -441,6 +435,10 @@ pub fn panel(
 
             egui::CollapsingHeader::new("Digital look").default_open(tuning.look == Look::Digital).show(ui, |ui| {
                 let d = &mut tuning.digital;
+                ui.push_id("cam_d", |ui| {
+                    slider(ui, &mut d.camera.dynamic_range_ev, 4.0..=16.0, "camera dynamic range (stops)");
+                    slider(ui, &mut d.camera.lines, 360.0..=1440.0, "picture lines (1080p = 1080)");
+                });
                 slider(ui, &mut d.source_scale, 0.5..=2.5, "Map drawn at × picture pixels (centre sharpness)");
                 slider(ui, &mut d.lens_curve, 0.0..=0.8, "lens curve (0 = stock fisheye, up = gentler)");
                 slider(ui, &mut d.sharpen, 0.0..=1.5, "sharpen");

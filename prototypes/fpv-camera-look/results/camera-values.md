@@ -5,7 +5,7 @@ resolution exists for any of these FPV cameras, so every DR value is an Estimate
 manufacturer's signal-to-noise (S/N) figure (stops = dB / 6.02; S/N is an upper limit, not DR).
 TVL is measured per picture height: lines across a 4:3 picture = TVL × 4/3.
 
-## Values the prototype uses (future `[camera]` keys)
+## Values the prototype uses (Analog: future `[camera]` keys per Quad; Digital: one generic set on the Video Look)
 
 | Quad | Key | Value | Confidence | Range | Source |
 |---|---|---|---|---|---|
@@ -15,8 +15,8 @@ TVL is measured per picture height: lines across a 4:3 picture = TVL × 4/3.
 | Freestyle 5" (Ratel 2 / Phoenix 2 class) | analog_dynamic_range | 8.5 stops | Estimate | 7–10 stops | ratel-pro (S/N >60 dB), phoenix2 (S/N >50 dB) |
 | Freestyle 5" | analog_lines | 480 lines | Manufacturer | — | ntsc (NTSC default; PAL 576 possible) |
 | Freestyle 5" | analog_sharpness | 400 TVL | Estimate | 330–480 TVL | ntsc, rec601 (hard limit 540 TVL) |
-| Both (generic Digital) | digital_dynamic_range | 10 stops | Estimate | 9–12 stops | o4, walksnail (no figure published; live view uses normal colour, not Log) |
-| Both | digital_lines | 1080 lines | Manufacturer | — | o4 (1080p at up to 100 fps), walksnail (1080p60) |
+| Generic Digital look (not per Quad) | dynamic_range | 10 stops | Estimate | 9–12 stops | o4, walksnail (no figure published; live view uses normal colour, not Log) |
+| Generic Digital look | lines | 1080 lines | Manufacturer | — | o4 (1080p at up to 100 fps), walksnail (1080p60) |
 
 Interlaced analog resolves about 70% of its lines (Kell factor, Derived): the prototype blurs
 vertically by 1/0.7 of a line.
