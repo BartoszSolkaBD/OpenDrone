@@ -27,3 +27,7 @@ _Avoid_: Mod, plugin, DLC
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
+
+## Rules
+
+- A Map sets the world's physical values: gravity, air density and, later, wind. Pilot settings never change them.
