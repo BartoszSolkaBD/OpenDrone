@@ -65,8 +65,8 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 | `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts |
 | `sim` → its caller, when asked | the flight log stream: setpoint, gyro, P, I, D and F terms, motor commands and battery voltage at the loop rate. It's off by default and costs nothing while off |
 | `sim` → the game (read only) | "which Map surfaces does this line pass through, and where?", for the FPV camera's signal model. It never changes state |
-| `sim` ↔ `flight-controller` | in: sensor readings, Channels and the time step. Out: 4 motor commands and a debug record |
-| `sim` ↔ `physics` | in: motor commands and the time step. Out: the new Quad state and sensor readings |
+| `sim` ↔ `flight-controller` | in: sensor readings, Channels and the time step. Out: 4 motor commands, each with its spin direction, and a debug record |
+| `sim` ↔ `physics` | in: motor commands, each with its spin direction for Crash Flip ([ADR-0012](0012-crashes-behave-like-a-real-quad.md)), and the time step. Out: the new Quad state and sensor readings |
 
 ## Rules at the front door
 

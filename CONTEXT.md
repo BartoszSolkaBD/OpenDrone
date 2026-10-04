@@ -15,7 +15,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 
 | Topic | Terms | Deep dive |
 |---|---|---|
-| Flying | Quad, Flight Controller, Tune, Flight Mode, Arm, Failsafe, Rates, Assist, Endless Battery, Preset, Prop Wash, Confidence | [docs/context/flying.md](docs/context/flying.md) |
+| Flying | Quad, Flight Controller, Tune, Flight Mode, Arm, Failsafe, Rates, Assist, Endless Battery, Preset, Prop Wash, Prop Strike, Crash Flip, Confidence | [docs/context/flying.md](docs/context/flying.md) |
 | Input | Input Device, Radio, Gamepad, Channel, Action, Radio Link, Packet Rate | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | FPV Camera, Camera Tilt, Lens, FOV, Video Look, Video Signal, Breakup | [docs/context/camera.md](docs/context/camera.md) |
@@ -43,5 +43,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | front door, sim input | Flight Input |
 | RC link, link rate | Radio Link, Packet Rate |
 | PID profile, FC settings | Tune |
+| turtle mode | Crash Flip |
+| prop hit, prop clip | Prop Strike |
 | main menu, lobby, home screen | Hub |
 | onboarding, tutorial | First Launch |
