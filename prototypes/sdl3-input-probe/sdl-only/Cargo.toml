@@ -1,0 +1,17 @@
+# PROTOTYPE (issue #18). Smallest possible "does SDL 3.4 build from source and initialise its
+# gamepad subsystem on a non-main thread" check, without Bevy. Used for the Linux container
+# build and the 3-OS CI job.
+[package]
+name = "sdl-only"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sdl3-sys = { version = "=0.7.2", default-features = false, features = [
+    "build-from-source",
+    "link-static",
+    "no-default-subsystems",
+    "sdl-joystick",
+    "sdl-hidapi",
+] }

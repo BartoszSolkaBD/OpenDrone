@@ -1,0 +1,41 @@
+# PROTOTYPE (issue #18). Lives only on the throwaway branch prototype/sdl3-input-probe.
+# Answers "does SDL 3.4 build from source, statically, on all three desktop OSes, and how long
+# does it add?" by building the SDL-only check and the full probe on GitHub's runners.
+name: prototype-sdl3-input-probe
+
+on:
+  push:
+    branches: [prototype/sdl3-input-probe]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux packages for Bevy (window, gamepad) and CMake
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake libudev-dev libwayland-dev libxkbcommon-dev pkg-config
+      - name: Tool versions
+        run: rustc --version && cmake --version | head -1
+      - name: SDL only (build from source, static) and initialise on a thread
+        working-directory: prototypes/sdl3-input-probe/sdl-only
+        run: |
+          start=$(date +%s)
+          cargo build --release
+          echo "SDL-only build seconds: $(( $(date +%s) - start ))" | tee -a "$GITHUB_STEP_SUMMARY"
+          ./target/release/sdl-only | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Full probe (Bevy + SDL)
+        working-directory: prototypes/sdl3-input-probe
+        run: |
+          start=$(date +%s)
+          cargo build --release
+          echo "Full probe build seconds: $(( $(date +%s) - start ))" | tee -a "$GITHUB_STEP_SUMMARY"

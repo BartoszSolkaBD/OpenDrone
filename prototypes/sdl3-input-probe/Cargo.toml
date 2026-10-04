@@ -1,0 +1,37 @@
+# PROTOTYPE. Throwaway probe for issue #18. Not production code; do not depend on it.
+[package]
+name = "sdl3-input-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# Build SDL 3.4 from source (needs CMake + a C compiler), statically linked, with only the
+# joystick and HIDAPI subsystems. Turn it off (`--no-default-features`) to type-check the
+# Rust side for other targets without compiling SDL's C code.
+default = ["sdl-from-source"]
+sdl-from-source = [
+    "sdl3-sys/build-from-source",
+    "sdl3-sys/link-static",
+    "sdl3-sys/no-default-subsystems",
+    "sdl3-sys/sdl-joystick",
+    "sdl3-sys/sdl-hidapi",
+]
+
+[dependencies]
+# A minimal-but-real Bevy app: winit owns the main thread, a window renders UI text every frame.
+bevy = { version = "=0.19.1", default-features = false, features = ["ui", "keyboard"] }
+sdl3-sys = { version = "=0.7.2", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+# Only so `cargo check --target x86_64-pc-windows-msvc` works from a Mac (no MSVC assembler here):
+# Bevy pulls in blake3, whose build script otherwise compiles x86 assembly.
+[target.'cfg(windows)'.dependencies]
+blake3 = { version = "1", features = ["pure"] }
+
+[profile.release]
+debug = false

@@ -1,0 +1,7 @@
+target/
+sdl-only/target/
+Cargo.lock.bak
+results/last-app-run.log
+results/selftest-*/
+# Raw logs are committed gzipped (events.csv.gz), not as plain CSV.
+results/**/events.csv
