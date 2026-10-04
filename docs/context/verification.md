@@ -49,6 +49,14 @@ _Avoid_: autopilot, altitude hold
 A simple Map built into the code for Scenarios only, such as empty air, a flat floor or a wall.
 _Avoid_: test level
 
+**Test Quad**:
+A Quad definition made only for Scenarios, such as one with a single effect's numbers set to zero so that effect can be tested alone. Pilots never fly one.
+_Avoid_: Mock Quad, debug switch
+
+**Feel Test**:
+A session in which a pilot who flies the real Quad flies the simulated one against their memory of it, following a written checklist of manoeuvres. Whatever the pilot signs off is pinned in Scenarios.
+_Avoid_: Playtest, vibe check
+
 ## Rules
 
 - A Scenario is readable by a non-programmer. Every number carries its unit, sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.
@@ -60,3 +68,4 @@ _Avoid_: test level
 - A change to simulation behaviour shows up in the Results, which show every measured value that moved, even inside its tolerance. The change is reviewed by reading which values moved and which didn't.
 - The Test Pilot moves only the sticks, as a human would, and never touches the physics. Pilots never get it.
 - Rust and maths-library updates count as behaviour changes, and each one gets its own PR.
+- To test one effect alone, a Scenario uses a Test Quad. The physics has no hidden switches that turn effects off.

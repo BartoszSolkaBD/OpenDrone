@@ -44,6 +44,14 @@ _Avoid_: Infinite battery, battery off
 A named starting point, Beginner, Intermediate or Pro, that sets the pilot's Flying and camera settings. Changing any of those afterwards makes the selection Custom.
 _Avoid_: Difficulty, profile
 
+**Prop Wash**:
+The shaking a Quad suffers when it descends into its own disturbed air, for example after a chop-and-dive. It comes from the physics and the Flight Controller's real delays, never from an artificial effect or a setting.
+_Avoid_: Propwash effect, prop wash strength (as a setting)
+
+**Confidence**:
+How well a number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every number carries one.
+_Avoid_: Accuracy, certainty
+
 ## Rules
 
 - There is no arcade mode. Every Preset runs the same physics and differs only in settings and Assists.
@@ -52,3 +60,6 @@ _Avoid_: Difficulty, profile
 - A Quad should feel like its real-world counterpart to a pilot who flies one. Feel is judged against real quads running Betaflight.
 - The Flight Controller copies Betaflight 2026.6. A Tune from an older Betaflight is translated into 2026.6 settings, never emulated.
 - Reset, loading a Map and switching Quad all power the Flight Controller up fresh, as a new battery does.
+- No pilot setting changes a physics effect, Prop Wash strength included. How strong each effect is comes from the Quad's definition.
+- Only Estimate numbers move in a Feel Test. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong.
+- Whoop numbers come from whoop data, never from scaled-down 5" numbers.

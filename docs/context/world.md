@@ -52,3 +52,4 @@ _Avoid_: Sandbox, practice mode
 - A Launch Spot is on open, flat ground, with at least 3 m clear all round and open sky above, facing the Map's main feature.
 - A Map looks realistic: real-world materials such as concrete, brick, rust and plywood. No real graffiti or brand logos.
 - Each Map has one fixed time of day. The alpha's Skate Park and Bando are both in sunny early afternoon.
+- A Map sets the world's physical values: gravity, air density and, later, wind. Pilot settings never change them.
