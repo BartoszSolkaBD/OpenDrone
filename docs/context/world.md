@@ -37,7 +37,7 @@ A Map in which simulated cars drift around a circuit and the pilot follows them 
 _Avoid_: Drifting contest
 
 **Pack**:
-A bundle of content, such as Quads, Maps or Input Device profiles, defined as data and assets. A Pack can be added to the repository or dropped in by a user at runtime.
+A bundle of content made only of data and assets, never code: Quad definitions, Maps and Input Device profiles. The game's own content is a Pack too. A Pack can be added to the repository or dropped in by a pilot at runtime.
 _Avoid_: Mod, plugin, DLC
 
 **Free Flight**:
@@ -53,3 +53,7 @@ _Avoid_: Sandbox, practice mode
 - A Map looks realistic: real-world materials such as concrete, brick, rust and plywood. No real graffiti or brand logos.
 - Each Map has one fixed time of day. The alpha's Skate Park and Bando are both in sunny early afternoon.
 - A Map sets the world's physical values: gravity, air density and, later, wind. Pilot settings never change them.
+- Every part of a Map states whether it is solid. Nothing is solid, or passable, by accident.
+- Every Quad, Map and Input Device profile has a fixed id made of its Pack's id and its own, such as `opendrone/skate-park`. Scenarios and settings use the id. The on-screen name is separate and may change.
+- A Pack never runs code, changes physics rules, touches a pilot's settings or replaces another Pack's items ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)).
+- A broken item in a dropped Pack is skipped and reported in plain words. The rest of the Pack still loads.

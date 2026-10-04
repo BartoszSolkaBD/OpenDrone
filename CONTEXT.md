@@ -15,8 +15,8 @@ This file is the **map**: read it first, then open only the deep dive for the to
 
 | Topic | Terms | Deep dive |
 |---|---|---|
-| Flying | Quad, Flight Controller, Tune, Flight Mode, Arm, Failsafe, Rates, Assist, Endless Battery, Preset, Prop Wash, Confidence | [docs/context/flying.md](docs/context/flying.md) |
-| Input | Input Device, Radio, Gamepad, Channel, Action, Radio Link, Packet Rate | [docs/context/input.md](docs/context/input.md) |
+| Flying | Quad, Quad definition, Flight Controller, Tune, Flight Mode, Arm, Failsafe, Rates, Assist, Endless Battery, Preset, Prop Wash, Confidence | [docs/context/flying.md](docs/context/flying.md) |
+| Input | Input Device, Radio, Gamepad, Channel, Action, Radio Link, Packet Rate, Input Device profile | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | FPV Camera, Camera Tilt, Lens, FOV, Video Look, Video Signal, Breakup | [docs/context/camera.md](docs/context/camera.md) |
 | Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |
@@ -33,6 +33,8 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | level, track, scene | Map |
 | gate (for an opening on a Map) | Gap (a gate is a racing object) |
 | mod, plugin, DLC | Pack |
+| quad config, quad profile | Quad definition |
+| input profile, controller config | Input Device profile |
 | e2e test, replay test | Scenario |
 | assertion | Expectation |
 | camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |

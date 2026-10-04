@@ -8,6 +8,10 @@ What gets simulated in the air, and how pilots tune the experience. Back to the 
 The simulated aircraft: its frame, motors, props, battery and the physics that govern it. A Quad is defined as data, so a new Quad is a new definition, not new physics code.
 _Avoid_: Drone (in code and specs), aircraft, model
 
+**Quad definition**:
+The data that defines one Quad in a Pack: its physics numbers, each with a Confidence, its Tune, its camera defaults and its on-screen name. It is named by a fixed id, such as `opendrone/whoop-65`, which never changes even if the on-screen name does.
+_Avoid_: Quad config, quad profile, airframe file
+
 **Flight Controller**:
 The simulated on-board firmware that turns stick input into motor commands through Rates, a stabilisation loop and a Flight Mode. Its reference is Betaflight 2026.6.
 _Avoid_: Controller (ambiguous), FC firmware
@@ -49,7 +53,7 @@ The shaking a Quad suffers when it descends into its own disturbed air, for exam
 _Avoid_: Propwash effect, prop wash strength (as a setting)
 
 **Confidence**:
-How well a number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every number carries one.
+How well a physics number in a Quad definition is known: Measured, Manufacturer, Derived (arithmetic on Measured or Manufacturer numbers) or Estimate. Every physics number carries one, with its source. Counts and choices, such as blade count or prop direction, don't, and neither do the Tune or the camera defaults. An Estimate also carries the range it may move within.
 _Avoid_: Accuracy, certainty
 
 ## Rules
@@ -61,5 +65,7 @@ _Avoid_: Accuracy, certainty
 - The Flight Controller copies Betaflight 2026.6. A Tune from an older Betaflight is translated into 2026.6 settings, never emulated.
 - Reset, loading a Map and switching Quad all power the Flight Controller up fresh, as a new battery does.
 - No pilot setting changes a physics effect, Prop Wash strength included. How strong each effect is comes from the Quad's definition.
-- Only Estimate numbers move in a Feel Test. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong.
+- Only Estimate numbers move in a Feel Test, and only inside their range. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong. A locked number changes only with a new source.
+- A Tune spells out every setting the Flight Controller reads, each marked with where its value came from: the real quad, its Betaflight version's default, or a translation rule ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)).
+- Which switch arms the Quad or picks the Flight Mode belongs to the pilot's Input Device profile, never to the Tune. It's the same on every Quad.
 - Whoop numbers come from whoop data, never from scaled-down 5" numbers.
