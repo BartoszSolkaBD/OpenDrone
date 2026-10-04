@@ -11,7 +11,7 @@ The code is one Cargo workspace of eleven unpublished crates that share one vers
 | `opendrone-flight-controller` | core | Our Betaflight-style Flight Controller, plus the Betaflight CLI translator (Rates paste, `diff all` import), which takes text in and opens no files |
 | `opendrone-sim` | core | The Simulation: Flight Inputs, Radio Link, Assists, Flight Controller, physics and session state |
 | `opendrone-test-pilot` | core | The Test Pilot: reads the state and moves only the sticks, from outside the front door |
-| `opendrone-input` | edge | Input Devices on their own thread, on SDL 3.4 |
+| `opendrone-input` | edge | Input Devices on their own thread, on SDL 3.4 ([ADR-0018](0018-input-through-sdl3-on-its-own-thread.md)) |
 | `opendrone-pack` | edge | Reads and checks Pack files, and pulls colliders and the Launch Spot out of each Map's `.glb` |
 | `opendrone-scenario` | edge | The Scenario runner: headless, used in CI |
 | `opendrone-blackbox` | edge | Writes `.bbl` files from the flight log stream |
