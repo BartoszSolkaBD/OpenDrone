@@ -379,3 +379,26 @@ The probe, its raw data and the summaries are on the branch [`prototype/sdl3-inp
 - **SDL reports changes only.** A resting Pocket produced no samples at all for 5 s, so silence can't mean a lost device; unplugging shows up as the operating system removing it. At unplug, SDL also sent false centre values on two switch channels in the same instant.
 - **Window focus.** SDL only ignores background input when it owns a window. Our build has no SDL video at all, so it never does. This is checked in the source; the probe's not-focused step wasn't reached in the measured runs.
 - **Gamepad centre.** On the test DualSense, the sticks rest 3–10% off centre and flicker by one step. Gamepad calibration needs a centre and a small deadband. The Pocket's centre is off by only +0.05%.
+
+## Follow-up runs (issue #27)
+
+[#27](https://github.com/BartoszSolkaBD/OpenDrone/issues/27) re-analysed #18's runs and added one DualSense run, `dualsense-usb-sensors-20261004-165521`. It was made with the same probe on the dev Mac and lasted 101.5 s. It includes fast circles, 76 s with motion sensors on, a 6 s hands-off with the controller on the desk, and slow edge tracing. Its raw data sits next to #18's runs on the `prototype/sdl3-input-probe` branch.
+
+**A resting DualSense keeps reporting** when its motion sensors are on:
+- **At rest:** 250.0 gyro readings a second, with the longest gap 4.4 ms.
+- **Over the 76 s with sensors on:** 19,011 readings, and none went missing (by the controller's own clock). 19,000 of the 19,010 gaps were 3.5–4.5 ms. The longest, 9.4 ms, came from one report that arrived 5.8 ms late while buttons were being pressed.
+- **Why it works:** SDL 3.4.18 sends a sensor reading for every report, changed or not (`SDL_SendJoystickSensor`, `SDL_hidapi_ps5.c`).
+- **Why we need our own check:** over USB, SDL never treats silence as a disconnect. Only wireless dongles are dropped, after 500 ms of silence.
+- **Permission:** macOS's Input Monitoring status stayed "never asked" again.
+
+**The report beat against the Mac's clock:**
+- **DualSense:** 250.0011 Hz, 4.5 ppm slow, measured on every report through the gyro readings. #18's run gave 6 ppm.
+  - Reports reach the input thread a median 0.23 ms after they're due; 99.9% arrive within 0.48 ms.
+  - During moves, the sticks change on nearly every report, so each 4 ms report carries a fresh sample.
+- **Pocket:** 1000.004 Hz, 4 ppm slow, with arrivals 0–0.66 ms after they're due.
+  - But during fast moves its values don't move every 1 ms. They jump unevenly every 1–4 ms (about 2 ms on average): jumps of 15–20 steps with single-step changes in between, on one axis at a time. The cause is unknown and has its own follow-up.
+
+**What it means for the Radio Link** (a model of Betaflight 2026.6's feedforward, fed these traces):
+- A free-running 250 Hz Radio Link whose tick lands 0.1–0.5 ms after the DualSense's beat makes feedforward ripple about 7–10× larger. Locking the Radio Link to the device's beat avoids it ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md)).
+- With the lock, 8-bit steps add 0.3% average and 2% peak of motor range on real fast circles on the 5" (1.1% and 6% on the whoop).
+- The Pocket's uneven jumps give about 1.1% average and 12% peak on fast flicks (3.7% and 45% on the whoop), and locking doesn't change that.
