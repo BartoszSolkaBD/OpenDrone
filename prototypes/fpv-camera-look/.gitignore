@@ -1,0 +1,5 @@
+# PROTOTYPE #28: build output and personal files stay local.
+target/
+saved/
+screenshots/
+results/screenshots/

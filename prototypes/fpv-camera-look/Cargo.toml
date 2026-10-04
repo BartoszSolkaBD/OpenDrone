@@ -1,0 +1,43 @@
+# PROTOTYPE. Throwaway app for issue #28 ("Does the FPV camera look right and fit 2 ms on the M4?").
+# Not production code; do not depend on it. Built on Bevy 0.19.1 (the current stable release;
+# 0.20 is still a release candidate).
+[package]
+name = "fpv-camera-look"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# SDL 3.4 built from source (needs CMake), statically linked, joystick + HIDAPI only, like the
+# #18 probe. It reads the Radiomaster Pocket and the DualSense on their own thread.
+default = ["sdl"]
+sdl = [
+    "dep:sdl3-sys",
+    "sdl3-sys/build-from-source",
+    "sdl3-sys/link-static",
+    "sdl3-sys/no-default-subsystems",
+    "sdl3-sys/sdl-joystick",
+    "sdl3-sys/sdl-hidapi",
+]
+
+[dependencies]
+bevy = { version = "=0.19.1" }
+bevy_egui = { version = "=0.42.0" }
+# Same wgpu as Bevy 0.19.1 uses; only for timestamp query sets, which Bevy does not re-export.
+wgpu = { version = "29", default-features = false }
+sdl3-sys = { version = "=0.7.2", default-features = false, optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = false
