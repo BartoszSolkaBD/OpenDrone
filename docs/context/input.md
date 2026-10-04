@@ -16,6 +16,10 @@ _Avoid_: Transmitter, TX, drone controller
 A console-style controller, such as a DualSense or an Xbox controller.
 _Avoid_: Joypad, controller
 
+**Channel**:
+One stick or switch value, as a receiver hands it to the Flight Controller, such as roll, throttle or the arm switch. A Gamepad button can drive a virtual switch Channel.
+_Avoid_: Axis (that's the raw device side), RC input
+
 **Action**:
 A command that isn't flying, such as Reset, Camera Tilt up or Pause, bound to a keyboard key, a Gamepad button or a Radio switch.
 _Avoid_: Hotkey, shortcut, command
@@ -25,3 +29,5 @@ _Avoid_: Hotkey, shortcut, command
 - Support is meant to be general. Verified devices are only the ones the maintainer can test, currently the DualSense and the Radiomaster Pocket.
 - The keyboard triggers Actions only. It isn't an Input Device and can't fly a Quad.
 - Every Action can be rebound.
+- Channels keep the Input Device's full resolution, after its calibration and channel mapping.
+- Arm and the Flight Mode switch reach the Flight Controller as switch Channels, whatever they're bound to, as in Betaflight's Modes tab.

@@ -16,9 +16,10 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Topic | Terms | Deep dive |
 |---|---|---|
 | Flying | Quad, Flight Controller, Flight Mode, Arm, Rates, Assist, Endless Battery, Preset | [docs/context/flying.md](docs/context/flying.md) |
-| Input | Input Device, Radio, Gamepad, Action | [docs/context/input.md](docs/context/input.md) |
+| Input | Input Device, Radio, Gamepad, Channel, Action | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
+| Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |
 | Verification | Scenario | [docs/context/verification.md](docs/context/verification.md) |
 
 ## Terms to avoid
@@ -33,3 +34,5 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | e2e test, replay test | Scenario |
 | camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |
 | hotkey, shortcut | Action |
+| game loop, game time | Simulation, Simulation Time |
+| front door, sim input | Flight Input |
