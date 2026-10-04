@@ -6,6 +6,7 @@ Research for [#5](https://github.com/BartoszSolkaBD/OpenDrone/issues/5), part of
 - **Vocabulary:** see [`CONTEXT.md`](../../CONTEXT.md) and [`docs/context/flying.md`](../context/flying.md). "Flight Controller" means our simulated firmware. A **Quad** is the simulated aircraft.
 - **Licensing sections are not legal advice.** They summarise what the licence text and the Free Software Foundation (FSF) say. Get a lawyer's view before you ship anything that bundles or links Betaflight.
 - **Code is not copied here.** Betaflight is GPL-3.0. This note describes its behaviour in maths and plain words, not in its C source (see [§8.4](#84-reimplementing-betaflight-behaviour-in-rust)).
+- **Corrected 2026-10-04.** [#21](https://github.com/BartoszSolkaBD/OpenDrone/issues/21) checked the source again at 4.3.0, 4.4.0, 2025.12.1 and 2026.6.2, and fixed §3, §3.1, §4 and §6.3. The fixes cover version scoping, the I-term hold, the throttle-curve date, low TPA, the failsafe timeline and Dynamic D. The decisions that rest on this note are in [ADR 0007](../adr/0007-emulated-radio-link.md) and [ADR 0008](../adr/0008-copy-betaflight-2026-6-translate-older-tunes.md).
 
 ## Answer in brief
 
@@ -100,7 +101,8 @@ In rate mode ("acro"), one loop tick does the following per axis ([pid.c L1048�
 3. **P.** `P = 0.032029 · P_gain · error`. TPA scales it only if TPA mode is "PD". On yaw, P passes through a 100 Hz low-pass.
 4. **I.** Each tick, `I += (0.244381 · I_gain + anti-gravity boost) · dT · error'`.
    - `error'` is the error after I-term relax.
-   - I is clamped to `iterm_windup % × PID-sum limit`. That is ±400 on roll and pitch and ±320 on yaw by default ([pid_init.c L423](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L423)).
+   - I is clamped to `iterm_windup % × PID-sum limit`. That is ±400 on roll and pitch and ±320 on yaw by default ([pid_init.c L423](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L423)). *This is 2025.12 and later. In 4.3–4.5, `iterm_limit` (400) was the clamp, and `iterm_windup` (85) instead slowed I growth once the mixer range passed 85 %: on yaw only in 4.3, on all axes from 4.4.*
+   - On yaw, the I gain is multiplied by 2.5 internally, unless `use_integrated_yaw` is on ([pid_init.c L378–L383](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L378-L383)).
    - Yaw gets no anti-gravity boost.
 5. **D.** `D = 0.000529 · D_gain · (−rate of change of the D-filtered gyro)`.
    - Dynamic D then multiplies it by between 1 and D_max ÷ D, and TPA scales it.
@@ -121,7 +123,7 @@ The scaling constants are in [pid.h L46–L52](https://github.com/betaflight/bet
 - **Anti-gravity** ([pid.c L465–L485](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid.c#L465-L485)): it takes the throttle's rate of change, weights it towards low throttle, and smooths it with a 5 Hz PT2 filter. That value boosts I by ×0.34 per unit of gain, and P by a smaller amount.
 - **TPA** ([pid.c L407–L422](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid.c#L407-L422), [pid_init.c L534–L540](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L534-L540)):
   - The factor falls linearly from 1 at the breakpoint (1350 µs, or 35 % throttle) to `1 − rate` at full throttle.
-  - Low TPA is separate. It cuts D by up to 20 % below 1050 µs, until throttle first passes that point.
+  - Low TPA is separate. It cuts D by up to 20 % below 1050 µs, until throttle first passes that point after power-up. The latch resets only at power-up, not when re-arming. Low TPA arrived in 4.5.
   - 2026.x also adds a "hyperbolic" TPA curve and speed-based TPA, mainly for wings. Both are off for Quads.
 - **Dynamic D** ([pid.c L1347–L1371](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid.c#L1347-L1371)): D is multiplied by up to `D_max/D`. The boost is driven by the larger of two signals: gyro acceleration (scaled by `d_max_gain`) or stick speed (scaled by `d_max_advance`).
 - **Naming changed in 2025.12** ([Dynamic-D doc](https://www.betaflight.com/docs/wiki/guides/current/Dynamic-D)):
@@ -132,6 +134,8 @@ The scaling constants are in [pid.h L46–L52](https://github.com/betaflight/bet
 ### 3.1 Radio link rate: how RC smoothing and feedforward adapt
 
 Real Betaflight measures how often radio frames arrive. It then tunes RC smoothing and feedforward to that rate. This is part of the Flight Controller, not an Assist, so we replicate it exactly.
+
+*Version scope: this section describes 2025.12 and later. In 4.3 and 4.4 the link rate was "trained" once: Betaflight waited about 6 s after boot, averaged 50 frame gaps, and applied no RC smoothing before training finished. Feedforward was also a different algorithm in those versions, with smoothing default 25, averaging off and a quadratic jitter formula. See [ADR 0008](../adr/0008-copy-betaflight-2026-6-translate-older-tunes.md) and [#21](https://github.com/BartoszSolkaBD/OpenDrone/issues/21).*
 
 The input research ([#3](https://github.com/BartoszSolkaBD/OpenDrone/issues/3)) found that our Input Devices deliver timestamped stick samples at very different rates:
 
@@ -144,22 +148,22 @@ So how Betaflight behaves at each rate decides how each Input Device feels.
 **How Betaflight measures the rate** ([rc.c L286–L327](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L286-L327), [L564–L619](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L564-L619)):
 
 - **Gap between frames.** It uses the receiver's own frame timestamp where the protocol provides one, otherwise the arrival time.
-- **Valid range.** The gap is clamped to 0.8–65.5 ms, which is about 15–1250 Hz. A gap outside that range is used clamped, but marked "not valid" for rate tracking.
+- **Valid range.** The gap is clamped to 0.8–65.5 ms, which is about 15–1250 Hz. A gap outside that range is used clamped, but marked "not valid" for rate tracking. (The 0.8 ms floor is 2025.12 and later; 4.3–4.5 used 0.95 ms.)
 - **A slowly smoothed estimate** starts at 100 Hz:
   - Each valid frame within ±20 % of the estimate moves it 10 % of the way.
   - Three outliers in a row in the same direction snap the estimate to the new rate, because the link rate changed.
   - Outliers that alternate direction are ignored as jitter, which is common at 1 kHz.
 - **Retuning.** The filters are retuned after every 3 valid frames.
-- **Signal loss.** With no frames for 150 ms the link counts as lost and failsafe starts ([rx.c L136–L137](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/rx/rx.c#L136-L137)). The rate estimate is frozen while the signal is lost.
+- **Signal loss.** With no frames for 150 ms the link counts as lost: RXLOSS is flagged and arming is blocked ([rx.c L136–L137](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/rx/rx.c#L136-L137)). The sticks keep their last values until about 0.3 s, when the stage-1 values apply: roll, pitch and yaw centred, throttle low, AUX held. Stage 2 (by default DROP, which disarms) starts at `failsafe_delay`, 1.5 s ([failsafe.c L224–L233](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/failsafe.c#L224-L233)). The rate estimate is frozen while the signal is lost. 4.4 flagged the loss at 100 ms.
 
 **What tunes itself to that rate:**
 
 | Part | Behaviour | At 250 Hz | At 1 kHz |
 |---|---|---|---|
 | **RC smoothing** of setpoint and throttle ([rc.c L346–L425](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L346-L425)) | A 3rd-order (PT3) low-pass that runs every PID loop. It turns the steps between frames into a smooth curve. Cutoff = `max(15 Hz, rate × 1.5 / (1 + factor/10))`. With the default factor 30 that is `rate × 0.375`. | about 94 Hz | about 375 Hz |
-| **Feedforward smoothing** ([pid_init.c L509–L524](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L509-L524), [rc.c L386–L395](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L386-L395)) | Two PT1 stages on stick speed and stick acceleration. The time constant is normalised to a 250 Hz link, about 7.4 ms with smooth factor 65, and the filters are retuned per frame interval, so the delay stays about the same at any rate. | 7.4 ms | 7.4 ms |
+| **Feedforward smoothing** ([pid_init.c L509–L524](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L509-L524), [rc.c L386–L395](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L386-L395)) | Two PT1 stages on stick speed and stick acceleration. The time constant is normalised to a 250 Hz link, about 7.4 ms with smooth factor 65. The filters are retuned to the tracked link rate every 3 valid frames, not to each frame's own gap, so the delay stays about the same at any rate. The final feedforward also passes through the setpoint PT3. | 7.4 ms | 7.4 ms |
 | **Stick speed** ([rc.c L432–L561](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L432-L561)) | Computed once per *new* frame as the change in setpoint × the measured frame rate. Between frames feedforward is held, and RC smoothing interpolates. | per frame | per frame |
-| **Duplicate frames** | Interpolation is on for every receiver type except CRSF ([pid_init.c L524](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L524)). If one axis repeats its last value, the first repeat is extrapolated from the previous speed. Later repeats force speed to zero, so feedforward decays instead of stepping. | | |
+| **Duplicate frames** | Interpolation is on for every receiver type except CRSF ([pid_init.c L524](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/pid_init.c#L524)). The check reads `serialrx_provider` whatever the receiver is, so a built-in SPI ELRS receiver left at the default provider (CRSF) also runs with interpolation off. If one axis repeats its last value, the first repeat is extrapolated from the previous speed. Later repeats force speed to zero, so feedforward decays instead of stepping. With interpolation off, a repeat simply gives zero speed. | | |
 | **Jitter attenuation** | Feedforward is scaled by `min(1, (average abs(Δstick) over the last 2 frames + 1) / (1 + jitter_factor))`, with Δ in µs. At the default jitter factor 7, full feedforward needs about 7 µs of stick change per frame. | | |
 | **Averaging and boost** | 2-point moving average. Boost adds stick acceleration × rate × 0.015. | | |
 
@@ -188,7 +192,7 @@ The mixer runs in this order ([mixer.c L676–L845](https://github.com/betafligh
 6. **Airmode logic** (`mixer_type`, Legacy by default; [mixer.c L655–L674](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/mixer.c#L655-L674)):
    - If the mix spans more than the full range, all motors are scaled down to fit.
    - Throttle is then shifted up or down so that no motor clips. This is why a Quad can still flip at zero throttle.
-   - Without Airmode, authority below half throttle is faded to between 50 % and 100 %.
+   - Without Airmode, authority below half throttle is faded to between 50 % and 100 %. This fade exists only from 4.4 onwards.
    - Linear and Dynamic mixer types also exist ([Mixer doc](https://www.betaflight.com/docs/wiki/guides/current/Mixer)).
 7. **Output.** `motor = idle + (1 − idle) × (mix + throttle)` ([mixer.c L455–L506](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/flight/mixer.c#L455-L506)).
    - With DShot, idle is `48 + idle% × 1999` on a 48–2047 scale ([dshot.c L62–L70](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/drivers/dshot.c#L62-L70)).
@@ -197,11 +201,11 @@ The mixer runs in this order ([mixer.c L676–L845](https://github.com/betafligh
 **Airmode is on by default.** The feature is in the default feature set ([feature.c L34](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/config/feature.c#L34)).
 
 - After arming, it engages once throttle first passes 25 % ([core.c L841–L866](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L841-L866), [rx.c L105](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/pg/rx.c#L105)).
-- Until then, I-term is held at zero. That gives a "soft" feel on the ground before takeoff, which a Scenario can check.
+- Until then, I-term is held at zero, but only while the throttle stick is below `min_check` (1050). Between `min_check` and 25 % throttle, I-term already runs. This gives a "soft" feel on the ground before takeoff, which a Scenario can check. The same is true in 4.3 and 4.4.
 
-**The throttle curve changed in 2026.x** ([rc.c L829–L873](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L829-L873)):
+**The throttle curve changed in 2025.12** ([2025.12.1 rc.c L775–L830](https://github.com/betaflight/betaflight/blob/2025.12.1/src/main/fc/rc.c#L775-L830), [2026.6.2 rc.c L829–L873](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L829-L873)):
 
-- It is now two quadratic Bézier segments through a "hover point" (`thr_mid`, `thr_hover`), bent by `thr_expo`.
+- It is now two quadratic Bézier segments through a "hover point" (`thr_mid`, `thr_hover`), bent by `thr_expo`. `thr_mid` now means "the stick position where the curve reaches `thr_hover`".
 - The defaults (50/50/0) give a straight line.
 - Older versions (4.3–4.5) used a different curve. The defaults are linear in both, so this only matters for imported tunes with non-zero expo.
 
@@ -302,6 +306,8 @@ The three sources give three different Dynamic D defaults:
 | [2026.6 release notes](https://www.betaflight.com/docs/wiki/release/Betaflight-2026-6-Release-Notes) | (not stated) | "now defaults to 0" |
 
 Treat the source as the truth for 2026.6.2. Don't copy defaults from the docs.
+
+The guide's 37/20 matches the source of 4.3, 4.4 and 2025.12; the guide is simply older than 2026.6. Also, `d_max_advance` changed meaning in 2025.12. Before that, the stick-driven boost was `d_max_gain × d_max_advance / 100` (7.4 at the defaults). Since then, `d_max_advance` is used on its own.
 
 ## 7. SITL Betaflight: builds, interface and timing
 
