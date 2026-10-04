@@ -11,3 +11,4 @@ Findings from the research tickets on [Map: OpenDrone alpha spec](https://github
 | [reference-flight-data.md](reference-flight-data.md) | Where can we get public reference flight data? | [#6](https://github.com/BartoszSolkaBD/OpenDrone/issues/6) |
 | [determinism.md](determinism.md) | Can the simulation be deterministic across platforms? | [#7](https://github.com/BartoszSolkaBD/OpenDrone/issues/7) |
 | [asset-pipeline.md](asset-pipeline.md) | What's the best agent-driven asset pipeline? | [#8](https://github.com/BartoszSolkaBD/OpenDrone/issues/8) |
+| [quad-settings/](quad-settings/README.md) | What settings do the maintainer's real quads (Meteor65 Pro, Cetus X) run? | [#20](https://github.com/BartoszSolkaBD/OpenDrone/issues/20) |
