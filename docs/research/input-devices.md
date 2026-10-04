@@ -33,7 +33,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md) and [docs/context/input.md](..
 
 ### Firmware and mode
 
-- **EdgeTX version.** The latest stable release is **v2.12.4** (2026-09-02). The Pocket has been supported since 2.10.0.
+- **EdgeTX version.** The latest stable release is **v2.12.4** (2026-09-02). The Pocket has been supported since 2.10.0, and Radiomaster ships it with **2.10.5** (its factory SD packages dated 2025-03-04). 2.10 works too: see [Binding and calibration facts](#binding-and-calibration-facts-issue-19).
 - **The Pocket only has the "Classic" joystick mode on EdgeTX 2.11.0 and later.**
   - The Pocket's MCU is an STM32F407xE with 512 KB of flash ([CMakeLists.txt#L347](https://github.com/EdgeTX/edgetx/blob/def35ad324896b45d6607d4778536b1bc5360d20/radio/src/targets/taranis/CMakeLists.txt#L347)).
   - For that chip, the build turns "Advanced" joystick mode off with `set(USBJ_EX OFF)` ([#L544-L549](https://github.com/EdgeTX/edgetx/blob/def35ad324896b45d6607d4778536b1bc5360d20/radio/src/targets/taranis/CMakeLists.txt#L544-L549)).
@@ -283,7 +283,7 @@ Bevy adds a whole frame to step 3: about 22 ms at 45 fps. A dedicated input thre
 |---|---|---|
 | **Linux** | **High.** Event device from `hid-playstation`. No root needed. 250 Hz over USB, about 800–1000 Hz over Bluetooth. The kernel stamps each event, but SDL stamps sticks when it reads them ([#18](#prototype-results-issue-18)). | **High.** Event device from `hid-input`, 11-bit, 1 kHz with RF off. Same timestamp note. |
 | **macOS** | **High, measured in [#18](#prototype-results-issue-18): 250 Hz over USB.** SDL's own DualSense driver reads every report, non-exclusively, alongside Apple's GameController framework. SDL stamps each report when it processes it; it doesn't use IOKit's per-value timestamp (`IOHIDValueGetTimeStamp`). | **High, measured in #18: 1 kHz.** SDL reads the Pocket's current values through IOKit each time our thread polls, and stamps them then. Apple's GameController framework ignores the Pocket, but IOKit sees it. |
-| **Windows** | **Medium.** SDL's HIDAPI reads every report, with no focus requirement. Timestamps are read times, not device times. Steam Input can inject a virtual Xbox pad, so tell pilots to disable it (Liftoff and Uncrashed both do). | **Medium.** SDL's DirectInput path, background-capable, all 8 axes. Read-time timestamps. gilrs's Windows.Gaming.Input path would cap at 125 Hz and need focus unless patched. |
+| **Windows** | **Medium.** SDL's HIDAPI reads every report, with no focus requirement. Timestamps are read times, not device times. Steam Input can inject a virtual Xbox pad. Liftoff and DRL tell pilots to turn it off; Uncrashed's developer tells wireless PS5 users to turn it on ([#19](#binding-and-calibration-facts-issue-19)). | **Medium.** SDL's DirectInput path, background-capable, all 8 axes. Read-time timestamps. gilrs's Windows.Gaming.Input path would cap at 125 Hz and need focus unless patched. |
 
 ## How other simulators handle Radio calibration, endpoints and channel mapping
 
@@ -292,10 +292,9 @@ Bevy adds a whole frame to step 3: about 22 ms at 45 fps. A dedicated input thre
 - It tells players to disable Steam Input.
 - On PS4 there is no calibration menu, so the Radio must output a fixed channel order.
 
-**DRL, TRYP FPV, Uncrashed and VelociDrone.** What we know comes only from developer posts on the Steam forums and from manuals we couldn't extract. Treat it as **unverified** detail:
-- DRL auto-calibrates: move both sticks in circles, then each axis. It also has a manual per-axis min/centre/max dropdown.
-- TRYP FPV has a "throttle 0 at middle" toggle that separates Gamepads from Radios.
-- Uncrashed has an axis assignment screen.
+**DRL, TRYP FPV, Uncrashed, VelociDrone and FPV SkyDive:** checked against first-party sources in [#19](#binding-and-calibration-facts-issue-19). Two earlier claims here were wrong:
+- DRL's automatic calibration moves each stick through its full range for at least 3 s, then recentres. Rotating both sticks in circles is FPV SkyDive's method.
+- Uncrashed doesn't tell pilots to disable Steam Input. Its developer tells wireless PS5 users to turn it on.
 
 **Betaflight as the reference model** (firmware 2026.6.2):
 - Channel map `AETR1234` by default ([rx.c#L119-L124](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/pg/rx.c#L119-L124)).
@@ -317,7 +316,7 @@ Bevy adds a whole frame to step 3: about 22 ms at 45 fps. A dedicated input thre
 
 | | DualSense | Radiomaster Pocket |
 |---|---|---|
-| **All OSes** | 8-bit sticks, a hardware limit. USB runs at 250 Hz, slower than Bluetooth. | Classic mode only (EdgeTX 2.11+): fixed CH1–8 axes and CH9–32 on/off buttons. Only 1 kHz with RF modules off. Output shaped by the model's mixer and Limits. Shares its USB ID with every EdgeTX radio. |
+| **All OSes** | 8-bit sticks, a hardware limit. USB runs at 250 Hz, slower than Bluetooth. | Classic mode only on EdgeTX 2.11+ (2.10 also has Advanced mode, Classic by default): fixed CH1–8 axes and CH9–32 on/off buttons. Only 1 kHz with RF modules off. Output shaped by the model's mixer and Limits. Shares its USB ID with every EdgeTX radio. |
 | **Linux** | Raw HID access needs a udev rule. The event-device path works without one. | None known. Slider and Dial arrive as `ABS_THROTTLE` and `ABS_RUDDER`. |
 | **macOS** | No Input Monitoring prompt over USB (verified in [#18](#prototype-results-issue-18)). A Bluetooth pad switched to the full report by another app may confuse descriptor-based readers like gilrs (inferred). | No Input Monitoring prompt (verified in #18). Apple's GameController framework doesn't support it, so IOKit is required. |
 | **Windows** | Steam Input interference. gilrs over Bluetooth is broken (#184). SDL is fine. | No native device timestamps. gilrs/Windows.Gaming.Input means 125 Hz and focus required. |
@@ -402,3 +401,132 @@ The probe, its raw data and the summaries are on the branch [`prototype/sdl3-inp
 - A free-running 250 Hz Radio Link whose tick lands 0.1–0.5 ms after the DualSense's beat makes feedforward ripple about 7–10× larger. Locking the Radio Link to the device's beat avoids it ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md)).
 - With the lock, 8-bit steps add 0.3% average and 2% peak of motor range on real fast circles on the 5" (1.1% and 6% on the whoop).
 - The Pocket's uneven jumps give about 1.1% average and 12% peak on fast flicks (3.7% and 45% on the whoop), and locking doesn't change that.
+
+## Binding and calibration facts (issue #19)
+
+Checked on 2026-10-04 for [#19](https://github.com/BartoszSolkaBD/OpenDrone/issues/19). Sources:
+- EdgeTX source at v2.10.0, v2.10.7, v2.11.0 and v2.12.4, plus `main`
+- Radiomaster's Pocket manual A1.8 and its factory SD packages
+- SDL 3.4.18 source
+- Betaflight 2026.6.2 source
+- the ExpressLRS docs
+- first-party notes from other simulators
+
+**What #19 decided** is in the [Input deep dive](../context/input.md) and [ADR-0017](../adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md).
+
+### EdgeTX on the Pocket
+
+- **Versions.**
+  - **2.10.x** has two USB joystick modes on the Pocket, Classic and Advanced. Classic is every model's default and sends the same 19-byte report as 2.11, with axes 0–2047 instead of 0–2048. Advanced left at its defaults sends no axes at all, only button bits ([v2.10.0 `radio/src/CMakeLists.txt#L60-L64`](https://github.com/EdgeTX/edgetx/blob/v2.10.0/radio/src/CMakeLists.txt#L60-L64), [`usb_joystick.cpp#L80-L110`](https://github.com/EdgeTX/edgetx/blob/v2.10.0/radio/src/usb_joystick.cpp#L80-L110)).
+  - **2.11.0** removed Advanced mode on 512 KB radios such as the Pocket ([PR #5443](https://github.com/EdgeTX/edgetx/pull/5443)), and widened the axes to 0–2048 ([PR #4883](https://github.com/EdgeTX/edgetx/pull/4883)).
+  - **The extra-byte bug** ([#6320](https://github.com/EdgeTX/edgetx/issues/6320), fixed in 2.12.3 by [PR #7532](https://github.com/EdgeTX/edgetx/pull/7532)) only hit the Advanced-mode path, never the Pocket.
+  - **Factory Pockets ship 2.10.5.** So the floor is **EdgeTX 2.10, in Classic mode**.
+- **USB strings** ([v2.12.4 `usbd_desc.c#L71-L91`](https://github.com/EdgeTX/edgetx/blob/v2.12.4/radio/src/targets/common/arm/stm32/usbd_desc.c#L71-L91)):
+  - Manufacturer: "OpenTX", in every version checked.
+  - Product: "Radiomaster Pocket Joystick".
+  - Serial: always "00000000001B".
+  - bcdDevice: 0x0200 on 2.10.x, then major.minor in BCD (0x0211, 0x0212).
+  - After 2.12.4, `main` renames the product "RadioMaster Pocket Joystick" ([PR #7786](https://github.com/EdgeTX/edgetx/pull/7786)).
+  - **The name SDL showed in #18, "EdgeTX Radiomaster Pocket Joystick", isn't explained by any of these strings.** Recheck it on hardware.
+- **USB mode.** Radio Setup › "USB mode" offers Ask, Joyst or SDCard, and the factory default is Ask. With Ask, plugging in shows "Select mode": pick "USB Joystick (HID)".
+- **RF off.** MDL › SETUP › "Internal RF" › Mode OFF, and the same for "External RF".
+  - A new model starts with both off, but Radiomaster's factory models have the internal module on.
+  - EdgeTX never turns RF off by itself.
+  - The mixer runs at 1 kHz only when neither module sets its own period ([`mixer_scheduler.cpp#L69-L87`](https://github.com/EdgeTX/edgetx/blob/v2.12.4/radio/src/mixer_scheduler.cpp#L69-L87)).
+- **Controls.**
+  - SA: 2-position. SB and SC: 3-position. SD: 2-position.
+  - **SE is momentary:** 2-position hardware set up as a Toggle, and called "Momentary Switch" in Radiomaster's manual.
+  - S1 is a pot. There's no SF or higher.
+- **What a model sends on CH5 and up.**
+  - **A new EdgeTX model:** only the four sticks, in "Def chan order". CH5–CH8 then sit at centre, which is 1500 µs and the middle of a 3-position range.
+  - **EdgeTX's model wizard** (Multirotor) adds CH5 Arm, CH6 Beeper and CH7 Mode.
+  - **Radiomaster's factory models:**
+    - "POCKET", selected out of the box: CH5 SA, CH6 SD, CH7 SB, CH8 SC, CH9 SE, CH10 S1.
+    - "FPV DRONE": CH5 SA, CH6 SB, CH7 SC, CH8 SD, CH9 SE, CH10 S1.
+  - The maintainer's Pocket in #18 matched "FPV DRONE": 2 positions on CH5 and CH8, 3 on CH6 and CH7.
+- **Stick mode and channel order.**
+  - Mode 1–4 only changes which physical stick feeds each input. The channel order comes from the model's mixes.
+  - "Def chan order" is AETR on Radiomaster's builds. Official EdgeTX builds on fresh settings default to Mode 1 and RETA.
+- **Switch values.**
+  - On an axis (CH5–CH8): a 2-position switch gives 0 or 2048, a 3-position one 0, 1024 or 2048 (2047 on 2.10).
+  - Outputs beyond ±100% saturate in the joystick report.
+  - A button (CH9 and up) counts as pressed only when its channel is above 0, so a 3-position switch in the middle isn't pressed.
+- **Remapping.** 2.11+ has no joystick-specific invert or remap. Only the model's mixes and its output Direction change the layout.
+
+### ExpressLRS and Betaflight
+
+- **ExpressLRS wants Arm on AUX1 (CH5)**, low for disarmed and high for armed. AUX1 is the one switch sent in every packet ([switch modes](https://www.expresslrs.org/software/switch-config/)).
+- **±100% in EdgeTX** is CRSF 172 and 1811, which Betaflight turns into 988 and 2012 µs. Centre is 992, or 1500 µs: µs = 0.62477 × value + 881 ([`rx/crsf.h`](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/rx/crsf.h)).
+- **Betaflight's `aux` lines** read `aux <slot> <mode> <aux index> <start> <end> <logic> <linked>` ([`cli/cli.c#L1268-L1380`](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/cli/cli.c#L1268-L1380)).
+  - Mode ids: ARM 0, ANGLE 1, HORIZON 2, FLIP OVER AFTER CRASH 35.
+  - Ranges run from 900 to 2100 µs in 25 µs steps. A mode is active when start ≤ value < end ([`fc/rc_modes.c#L80-L89`](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc_modes.c#L80-L89)).
+  - Aux index 0 reads CH5.
+  - Angle wins over Horizon ([`fc/core.c#L1042-L1060`](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/core.c#L1042-L1060)), and Acro is simply no mode.
+- **Deadband.** `deadband` and `yaw_deadband` default to 0.
+  - They act on roll, pitch and yaw only, never throttle.
+  - The deadband is subtracted and the rest rescaled, so full stick stays full ([`fc/rc.c#L666-L735`](https://github.com/betaflight/betaflight/blob/2026.6.2/src/main/fc/rc.c#L666-L735)).
+- **Defaults:** `min_check` 1050, `max_check` 1900, `rxrange` 1000–2000 (a pass-through), `map` AETR1234.
+- **Arming blocks tied to the switch:** NOT_DISARMED (the arm switch was on when the link appeared or came back, boot included), ARM_SWITCH (toggle it after any other block) and FLIP_SWITCH (Crash Flip turned off while armed).
+
+### SDL 3.4.18
+
+- **Radio or Gamepad.**
+  - SDL's built-in database has no mapping for 1209:4F54, and macOS and Windows open the Pocket as a plain joystick.
+  - **Linux builds a gamepad mapping for it automatically,** as for any event device with gamepad buttons ([`linux/SDL_sysjoystick.c#L2350`](https://github.com/libsdl-org/SDL/blob/release-3.4.18/src/joystick/linux/SDL_sysjoystick.c#L2350)).
+  - So SDL's "is it a gamepad" can't tell a Radio from a Gamepad on every OS.
+- **Names and ids.**
+  - A device's name is "manufacturer product" on every backend ([`SDL_utils.c#L483-L620`](https://github.com/libsdl-org/SDL/blob/release-3.4.18/src/SDL_utils.c#L483-L620)).
+  - The USB vendor and product ids are available everywhere.
+  - bcdDevice is 0 on DirectInput.
+  - A serial number only comes through SDL's HIDAPI driver or udev.
+- **The DualSense through SDL's gamepad API.**
+  - Buttons are named by position:
+    - south ✕, east ○, west □, north △
+    - back = Create, start = Options
+    - shoulders, stick clicks and the D-pad
+    - touchpad, and misc1 = microphone
+  - Triggers run 0–32767, and the gamepad type is PS5.
+  - `SDL_GetGamepadButtonLabel` gives Cross, Circle, Square and Triangle. Nintendo-style layouts are converted to positions.
+- **No deadzone anywhere** in SDL's gamepad layer.
+- **The jitter gate** ([`SDL_joystick.c#L2505-L2567`](https://github.com/libsdl-org/SDL/blob/release-3.4.18/src/joystick/SDL_joystick.c#L2505-L2567)):
+  - Until an axis first moves more than 1.25% (409 SDL units), SDL drops its changes and keeps reporting its first value.
+  - The DualSense's sticks start at 0, so a hands-off reading straight after plugging in can say 0 instead of the real rest position.
+  - On unplug, SDL sets each axis back to its first value. That's the false centre seen in #18.
+- **Hints worth setting** (from [#28](https://github.com/BartoszSolkaBD/OpenDrone/issues/28)):
+  - `SDL_HINT_NO_SIGNAL_HANDLERS` = "1", so SDL doesn't take Ctrl+C and the kill signal away from Bevy.
+  - `SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS` = "1" keeps sticks working when the window isn't focused. SDL only filters when it owns a window, so this is a safeguard.
+
+### The #18 traces at rest
+
+- **DualSense, as a share of half travel:**
+  - Right stick sideways: rests at +9.0 to +10.6% after every release.
+  - Left stick sideways: 0.4–3.5%, depending on which way it was let go.
+  - Right stick up and down: −3.5 to −5.1%.
+  - Left stick up and down: +0.4%.
+
+  One 8-bit step is 0.8%.
+- **Pocket:**
+  - Stick values sit on SDL's 32-unit grid, offset by +15, so centre is exactly the radio's centre step. Nothing flickers at rest.
+  - The throttle rests at the bottom.
+
+### How other simulators bind and calibrate
+
+Sources: Steam announcements, manuals, knowledge bases and developer forum posts, read 2026-10-04.
+
+| Sim | Calibration | Deadzone | Gamepad throttle | Arming |
+|---|---|---|---|---|
+| **Liftoff** | Automatic, with a 3 s "centre stick" timer; manual calibration with live values; presets for known controllers; saved per controller | Adjustable after calibrating | A "throttle zero point" setting | "Throttle down" by default; arm, disarm and turtle can be bound |
+| **VelociDrone** | Follow the on-screen sticks, centre, then move each stick quickly | Per axis, set by the wizard | "Use Gamepad mode": throttle from mid-stick up; the trigger is suggested | Auto-arm in races by default. Manual arming needs Arm and Flip After Crash switches, and turtle takes 7 steps |
+| **Uncrashed** | Assign the axes, then move both sticks in all four directions | A setting since 2021 | Throttle expo and mid-point | Lower the throttle to arm after a reset; arm and disarm can be bound |
+| **DRL** | Automatic (each stick's full range for at least 3 s, then recentre), manual, and trims | Adjustable for gamepads | A zero throttle point; triggers can be the throttle | Not found |
+| **TRYP FPV** | A guided first flight, Mode 2 by default | A setting | "Use throttle at 0" | Betaflight-style arm and mode switches since June 2026 |
+| **FPV SkyDive** | Rotate both sticks for 7 s, then pick the throttle mode: Manual, or Auto (sprung) | Not found | Auto mode | Auto-arm at 0% throttle, which can be switched off |
+
+- **Steam Input.** Liftoff and DRL tell pilots to turn it off. Uncrashed's developer tells wireless PS5 users to turn it on.
+- **Main links:**
+  - [Liftoff support](https://www.liftoff-game.com/support)
+  - [VelociDrone desktop manual](https://www.velocidrone.com/desktop_manual)
+  - [Uncrashed developer FAQ](https://steamcommunity.com/app/1682970/discussions/0/6643422659556525796/)
+  - [DRL 2.6 notes](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/2403127338434427667)
+  - [TRYP switch management](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1833968530900390)
+  - [FPV SkyDive 2.1.1](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5138087875098098925)

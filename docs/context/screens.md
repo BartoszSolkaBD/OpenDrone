@@ -9,7 +9,7 @@ The home screen. It shows the last Map, Quad and Preset next to a FLY button, so
 _Avoid_: Main menu, lobby, home screen
 
 **First Launch**:
-The single pass a new install makes before the Hub: a flashing-images notice with Text size and Reduce motion, the question "Have you flown FPV before?", which picks the starting Preset, and the Input Device check.
+The single pass a new install makes before the Hub: a flashing-images notice with Text size and Reduce motion, the question "Have you flown FPV before?", which picks the starting Preset, and the Input Device setup, where Calibration and switch setup run unless the pilot chooses Set up later.
 _Avoid_: Onboarding, tutorial, setup wizard
 
 **Pause Menu**:
@@ -17,12 +17,12 @@ The menu the Pause Action opens during Free Flight. From it the pilot can Resume
 _Avoid_: Esc menu, pit stop, in-game menu
 
 **Pre-flight Warning**:
-A notice on the Hub that something would stop the pilot flying, such as no Input Device or no way to Arm. It never blocks flying.
+A notice on the Hub that something would stop the pilot flying, or flying well, such as no Input Device, no way to Arm, an Input Device that isn't calibrated, or a Radio still transmitting. It never blocks flying.
 _Avoid_: Error, blocker
 
 ## Rules
 
-- A returning pilot reaches the Launch Spot in one press from the Hub. A new install takes three: answer the question, confirm the Input Device, press FLY.
+- A returning pilot reaches the Launch Spot in one press from the Hub. A new install takes three when the pilot skips the Input Device setup: answer the question, Set up later, FLY. Setting up there is the selected choice and adds about half a minute of guided steps.
 - In single-player, the Pause Menu freezes the simulation. In multiplayer it will have to open over a world that keeps running.
 - Losing the Input Device never opens the Pause Menu. The Failsafe handles it, as in Betaflight.
 - Settings take effect as soon as they change. Only resolution and window mode ask to be kept, and they change back after 15 seconds.
