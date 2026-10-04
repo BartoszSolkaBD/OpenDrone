@@ -15,9 +15,10 @@ This file is the **map**: read it first, then open only the deep dive for the to
 
 | Topic | Terms | Deep dive |
 |---|---|---|
-| Flying | Quad, Flight Controller, Assist, Preset | [docs/context/flying.md](docs/context/flying.md) |
-| Input | Input Device, Radio, Gamepad | [docs/context/input.md](docs/context/input.md) |
-| World and content | Map, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
+| Flying | Quad, Flight Controller, Flight Mode, Arm, Rates, Assist, Endless Battery, Preset | [docs/context/flying.md](docs/context/flying.md) |
+| Input | Input Device, Radio, Gamepad, Action | [docs/context/input.md](docs/context/input.md) |
+| World and content | Map, Launch Spot, Reset, Drift Event, Pack, Free Flight | [docs/context/world.md](docs/context/world.md) |
+| Camera and video | Camera Tilt | [docs/context/camera.md](docs/context/camera.md) |
 | Verification | Scenario | [docs/context/verification.md](docs/context/verification.md) |
 
 ## Terms to avoid
@@ -26,7 +27,9 @@ This file is the **map**: read it first, then open only the deep dive for the to
 |---|---|
 | drone (in code or specs) | Quad |
 | controller | Input Device, or Flight Controller (always say which) |
-| arcade mode, easy mode | Assist or Preset |
+| arcade mode, easy mode, difficulty | Assist or Preset |
 | level, track, scene | Map |
 | mod, plugin, DLC | Pack |
 | e2e test, replay test | Scenario |
+| camera angle, uptilt | Camera Tilt (Angle is a Flight Mode) |
+| hotkey, shortcut | Action |
