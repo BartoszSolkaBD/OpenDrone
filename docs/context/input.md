@@ -45,7 +45,7 @@ How many times a second the Radio Link delivers a fresh set of Channels, as in E
 _Avoid_: Link rate, refresh rate, polling rate
 
 **Report Rate**:
-How many times a second an Input Device sends its values to the computer, on a beat of its own: 250 Hz for the DualSense over USB, 1000 Hz for the Radiomaster Pocket with its RF module off.
+How many times a second an Input Device sends its values to the computer, on a beat of its own: 250 Hz for the DualSense over USB, 1000 Hz for the Radiomaster Pocket with its RF module off. With its RF module on, a Pocket reports once per ELRS packet instead.
 _Avoid_: Polling rate, refresh rate, sample rate
 
 **Input Device profile**:
@@ -55,7 +55,7 @@ _Avoid_: Input profile, controller config, mapping file
 ## Rules
 
 - Support is meant to be general. Verified devices are only the ones the maintainer can test, currently the DualSense over USB and the Radiomaster Pocket over USB with its RF module off. The DualSense over Bluetooth stays unverified until a later check.
-- An Input Device that goes quiet because its sticks rest isn't lost. A resting Pocket sends nothing at all.
+- An Input Device that goes quiet because its sticks rest isn't lost. A resting Pocket can send nothing at all.
 - A device that keeps reporting at rest counts as lost after 1 s of silence, exactly as if it were unplugged. The DualSense over USB keeps its motion sensors on as that heartbeat. Devices that report only changes, like the Pocket, are lost only when unplugged.
 - The keyboard can't fly a Quad. Its keys trigger Actions and can drive Virtual Switches, which travel in the Flying Input Device's Radio Link frames.
 - Every Action can be rebound. An Action fires once, when its key, button or switch moves into the bound position, and it works from every connected device.
@@ -70,7 +70,10 @@ _Avoid_: Input profile, controller config, mapping file
 - When the Packet Rate divides the Input Device's Report Rate evenly, the Radio Link locks to the device's report beat: each frame leaves a fixed margin after a report is due and carries exactly one fresh report ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md)). At other Packet Rates it runs on its own clock.
 - The Packet Rate setting warns when the rate is faster than the device's Report Rate, and adds a gentler note when the rate doesn't divide it evenly (150 and 100 Hz on a DualSense, 150 Hz on a Pocket).
 - A Gamepad's 8-bit stick steps get no special treatment on the way to the Radio Link. Calibration removes the flicker at rest, and Input smoothing is there for pilots who want it smoother.
+- A Radio's values get no special treatment on the way to the Radio Link either: no low-pass, and nothing copied from the radio's firmware. Through the Radio Link, a Radio should feel like an ideal radio on a real ELRS link ([#30](https://github.com/BartoszSolkaBD/OpenDrone/issues/30)).
 - Losing the Input Device, whether unplugged or silent, loses the Radio Link, and the Flight Controller runs Failsafe.
 - A device is matched to a profile by its USB ids plus its product name, ignoring case, and never by firmware version. Every EdgeTX and OpenTX radio (USB 1209:4F54) is a Radio. Devices without a profile of their own fall back to "Any Radio" or "Any Gamepad".
 - EdgeTX 2.10 and later are supported, in EdgeTX's Classic USB joystick mode.
+- The Pocket's setup asks for RF off and for the sim model's ADC filter set to Off. EdgeTX's ADC filter is on by default, and with it on the values creep and then jump by about 10 counts instead of following the stick.
+- A Radio counts as still transmitting when, while its sticks move, no two of its value changes come closer than about 3 ms. With RF off, many come exactly 1 ms apart. Counting changes isn't enough, because the ADC filter skips many reports.
 - A Pack's Input Device profile is only a starting point. The pilot's calibrated copy is never written back into a Pack, and no Pack can change it. The device's facts (its name, match and Report Rate) always come from the current Pack.

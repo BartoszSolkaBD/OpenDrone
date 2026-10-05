@@ -25,6 +25,7 @@ Vocabulary follows [CONTEXT.md](../../CONTEXT.md) and [docs/context/input.md](..
 | Axes | 8 (CH1–CH8) | 4 stick axes, plus 2 triggers (8-bit) |
 | Buttons | 24 (CH9–CH32, pressed when above 0) | 15 or more, plus a hat, touchpad and motion sensors |
 | Report rate | **1000 Hz, but only with its RF modules off.** Otherwise it runs at the RF module's rate. | **USB 250 Hz**; Bluetooth about 800–1000 Hz |
+| Value updates while moving | Uneven while EdgeTX's ADC filter is on, which is the default: creeps of 1–2 counts, then jumps of 10 counts or more. Smooth with it off ([#30](#the-pockets-uneven-value-updates-issue-30)). | A fresh value on nearly every report |
 | Seen by Apple's GameController framework | No | Yes (macOS 11.3+) |
 | Seen as an Xbox-style Gamepad on Windows | No (generic HID joystick) | No (generic HID game controller) |
 | Linux kernel driver | `hid-generic` / `hid-input` | `hid-playstation` (kernel 5.12+) |
@@ -395,12 +396,14 @@ The probe, its raw data and the summaries are on the branch [`prototype/sdl3-inp
   - Reports reach the input thread a median 0.23 ms after they're due; 99.9% arrive within 0.48 ms.
   - During moves, the sticks change on nearly every report, so each 4 ms report carries a fresh sample.
 - **Pocket:** 1000.004 Hz, 4 ppm slow, with arrivals 0–0.66 ms after they're due.
-  - But during fast moves its values don't move every 1 ms. They jump unevenly every 1–4 ms (about 2 ms on average): jumps of 15–20 steps with single-step changes in between, on one axis at a time. The cause is unknown and has its own follow-up.
+  - But during fast moves its values don't move every 1 ms. They jump unevenly every 1–4 ms (about 2 ms on average): jumps of 15–20 steps with single-step changes in between. [#30](#the-pockets-uneven-value-updates-issue-30) found the cause: EdgeTX's ADC filter. "On one axis at a time", as first reported, came from the move itself (flicks), not from the device.
 
 **What it means for the Radio Link** (a model of Betaflight 2026.6's feedforward, fed these traces):
 - A free-running 250 Hz Radio Link whose tick lands 0.1–0.5 ms after the DualSense's beat makes feedforward ripple about 7–10× larger. Locking the Radio Link to the device's beat avoids it ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md)).
 - With the lock, 8-bit steps add 0.3% average and 2% peak of motor range on real fast circles on the 5" (1.1% and 6% on the whoop).
 - The Pocket's uneven jumps give about 1.1% average and 12% peak on fast flicks (3.7% and 45% on the whoop), and locking doesn't change that.
+  - **Corrected in [#30](#the-pockets-uneven-value-updates-issue-30):** these figures came mostly from their reference. The "true move" was a 30 Hz-smoothed copy of the Pocket's own output, which strips out the flicks' real speed. That reference alone is 0.8–1.7% / 9–21% away from the move rebuilt from the exact values at each jump.
+  - Against the rebuilt move, the Pocket's fast flicks give 0.27–0.36% / 2.3–2.9% on the 5" and 0.85–1.0% / 7–9% on the whoop. That's about the size of the locked DualSense's 8-bit ripple.
 
 ## Binding and calibration facts (issue #19)
 
@@ -530,3 +533,135 @@ Sources: Steam announcements, manuals, knowledge bases and developer forum posts
   - [DRL 2.6 notes](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/2403127338434427667)
   - [TRYP switch management](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1833968530900390)
   - [FPV SkyDive 2.1.1](https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/5138087875098098925)
+
+## The Pocket's uneven value updates (issue #30)
+
+Checked on 2026-10-04 for [#30](https://github.com/BartoszSolkaBD/OpenDrone/issues/30). Sources:
+- EdgeTX source at v2.10.0, v2.10.7 and v2.12.4, and at commit `1fdb58ba` (the maintainer's Radiomaster factory build)
+- ExpressLRS 3.6.4 source and the EdgeTX manual
+- the maintainer's radio settings, copied from the radio's SD card (kept out of the repo)
+- #18's Pocket run and two new runs, played through #21's model of Betaflight 2026.6
+
+**What #30 decided** is in the [Input deep dive](../context/input.md), with pointers in [ADR-0007](../adr/0007-emulated-radio-link.md) and [ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md).
+
+### The cause: EdgeTX's ADC filter
+
+- **What it does.** EdgeTX calls it the "ADC filter", and its source calls it the jitter filter. It runs on every stick once per mixer cycle ([v2.10.7 `hal/adc_driver.cpp#L326-L389`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/hal/adc_driver.cpp#L326-L389), called from [`tasks/mixer_task.cpp#L245`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/tasks/mixer_task.cpp#L245)). It's the same in v2.10.0 and v2.12.4.
+  - If the stick has moved less than about 10 USB counts since the output last caught up, the output only creeps toward it. The creep's time constant is 16 mixer cycles, and the output moves at most 0.6 counts per cycle.
+  - Once the gap reaches 10 counts, the output snaps straight to the stick.
+  - So a moving stick shows 1–2 count creeps and jumps of 10 counts or more, and almost nothing in between.
+- **It's on by default.**
+  - The radio-wide setting is SYS › HARDWARE › "ADC filter", and Radiomaster's factory settings leave it on.
+  - Each model can override it in MDL › SETUP › "ADC filter": Global, Off or On ([`gui/128x64/model_setup.cpp#L1140`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/gui/128x64/model_setup.cpp#L1140)).
+  - EdgeTX's manual says it "should be disabled for models with flight controllers" ([Setup](https://manual.edgetx.org/bw-radios/model-select/setup), [Hardware](https://manual.edgetx.org/bw-radios/radio-settings/hardware)).
+- **Its threshold is per mixer cycle, so it acts differently at different rates.**
+  - **RF off** (mixer every 1 ms): only moves faster than about 10,000 counts a second pass straight through, and the creep's time constant is 16 ms.
+  - **RF on at ELRS 250** (mixer every 4 ms): the bar is 2,500 counts a second, and the creep's time constant is 64 ms.
+  - Either way the output never lags the stick by more than about 10 counts, which is 1% of half travel.
+- **Ruled out:**
+  - **The mixer timing.** It runs every 1 ms with RF off ([`mixer_scheduler.cpp#L80`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/mixer_scheduler.cpp#L80)).
+  - **The ADC.** Its 4× oversampling happens within a single read ([`stm32_adc.cpp#L30`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/targets/common/arm/stm32/stm32_adc.cpp#L30)).
+  - **SDL.**
+
+### The maintainer's radio
+
+- **Firmware.** The Version page reads "RM Factory (1fdb58ba)". That's EdgeTX commit `1fdb58ba` (2023-07-26, "Merge branch 'main' into 3djc/RM-Pocket"): a pre-release Radiomaster build that writes `semver: 2.10.0` into its settings files.
+- **It filters before it calibrates.**
+  - It filters the raw stick reading ([`hal/adc_driver.cpp#L337-L394`](https://github.com/EdgeTX/edgetx/blob/1fdb58ba738cfe5da611e402ed2554f254c115df/radio/src/hal/adc_driver.cpp#L337-L394)) and calibrates afterwards ([`mixer.cpp#L518-L519`](https://github.com/EdgeTX/edgetx/blob/1fdb58ba738cfe5da611e402ed2554f254c115df/radio/src/mixer.cpp#L518-L519)). Release 2.10.0 and later calibrate first.
+  - So this build's steps come out 1024 ÷ (that side's calibration span) times larger: 1.17–1.29 with this radio's calibration. The trace matches this for each side of each stick.
+  - Its jumps therefore start at about 12 counts instead of 10, and its creeps are 1 or 2 counts.
+- **Its "FPV Sim" model:**
+  - RF off, AETR mixes at 100% and outputs at ±100%
+  - the ADC filter left at Global, so on
+  - an output curve "CNT" on CH1, CH2 and CH4 that makes a ±1% centre deadband, which explains the trace's snaps to exactly centre
+- **Its flying models,** METEOR and POCKET, have Internal RF on (CRSF).
+
+### #18's trace, report by report
+
+| Axis | Changes | 1–2 counts | 3–9 counts | 10+ counts | Median jump |
+|---|---|---|---|---|---|
+| Roll | 523 | 214 | 16 | 293 | 19 |
+| Pitch | 580 | 304 | 8 | 268 | 15 |
+| Yaw | 502 | 135 | 15 | 352 | 20 |
+
+The few 3–9 count changes sit at centre, where the CNT deadband trims jumps that cross it.
+
+- **Every change lands on the 1 kHz beat** (98–99%). The beat runs at 1000.004 Hz, and changes arrive 0.21 ms after they're due on median, 0.51 ms at most.
+- **No slower period hides underneath.** Jumps land on all four report phases, and back-to-back jumps are common (120 of 292 on roll). A 250 Hz Radio Link locked to any of the four phases gets the same ripple, so there's no "value beat" to lock to.
+- **The axes are independent.** Roll and pitch changed in the same report 29 times, against 33 expected for independent axes.
+
+### Runs with the filter on and off
+
+Two runs on the FPV Sim model with RF off, each with hands-off, flicks, fast circles, slow circles, small slow nudges and slow edge tracing:
+- `pocket-sim-filter-on-20261004-194253`, ADC filter at Global (on)
+- `pocket-sim-filter-off-20261004-194512`, ADC filter Off
+
+They're committed locally on `prototype/sdl3-input-probe`, pending a push decision.
+
+| Roll, by step | Filter on: 1–2 / 3–9 / 10+ counts | Filter off: 1–2 / 3–9 / 10+ counts | Changes exactly 1 report apart, on / off |
+|---|---|---|---|
+| Fast circles | 30 / 1 / 69% | 12 / 57 / 31% | 60% / 96% |
+| Slow circles | 50 / 1 / 49% | 26 / 73 / 1% | 38% / 93% |
+| Small slow nudges | 81 / 1 / 17% | 76 / 24 / 0% | 17% / 72% |
+| Slow edge tracing | 66 / 0 / 34% | 54 / 44 / 2% | 28% / 81% |
+
+- **With the filter on,** 3–9 count changes stay at 2.5% or less on every stick and step. With it off they make up 10–74%.
+- **Changes per moving second** on the sticks: 194–766 with the filter on, 612–960 with it off.
+- **Running EdgeTX's filter on the filter-off trace reproduces the filter-on run**, step by step. On roll, slow circles come out 53 / 0 / 47% simulated against 50 / 1 / 49% measured, and edge tracing 67 / 0 / 33% against 66 / 0 / 34%.
+
+### What it does to Betaflight's feedforward
+
+Ripple is the feedforward's departure from an ideal 11-bit radio doing the same move on perfect 250 Hz frames, in % of motor range (average / peak). The Radio Link runs at 250 Hz, locked. "Real ELRS 250" means EdgeTX's filter running every 4 ms, which is exactly what a real Pocket on ELRS sends.
+
+**The runs' real moves** (the filter-off trace taken as the move, this radio's build):
+
+| Move | Filter on, RF off | Filter off | Real ELRS 250 |
+|---|---|---|---|
+| Fast circles, 5" | 0.45 / 3.4 | 0.17 / 1.6 | 0.25 / 2.8 |
+| Fast circles, whoop | 1.51 / 12.9 | 0.78 / 11.5 | 1.02 / 12.2 |
+| Slow circles, 5" | 0.40 / 3.7 | 0.12 / 1.1 | 0.26 / 2.7 |
+| Slow circles, whoop | 1.11 / 8.1 | 0.37 / 4.1 | 0.75 / 7.5 |
+| Slow edge tracing, 5" | 0.32 / 3.9 | 0.15 / 2.6 | 0.25 / 3.3 |
+| Slow edge tracing, whoop | 0.90 / 14.2 | 0.51 / 11.8 | 0.77 / 13.1 |
+| Small slow nudges, 5" | 0.04 / 0.4 | 0.01 / 0.2 | 0.04 / 0.4 |
+| Small slow nudges, whoop | 0.09 / 1.1 | 0.03 / 0.3 | 0.09 / 1.0 |
+
+- **Filter Off cuts the average ripple** by 2–3× on the 5" and 1.8–3× on the whoop, and ends up closer to an ideal radio than the real Pocket on ELRS is.
+- **The whoop's peaks are partly the reference's own error:** even filter Off shows 11–12% there.
+- **The fast flicks** couldn't be scored this way, because the reference (a 50 Hz low-pass of the trace) swamps all three variants.
+
+**Fast flicks** (#18's flicks, rebuilt from the exact values at each jump; a default model):
+
+| Path | 5" | Whoop |
+|---|---|---|
+| Filter on, RF off | 0.23 / 2.8 | 0.73 / 8.4 |
+| Plus a 60 Hz Radio-only low-pass | 0.27 / 3.3, 2 ms later | 0.93 / 12.6 |
+| Plus a 30 Hz Radio-only low-pass | 0.46 / 6.0, 4 ms later | 1.56 / 21.0 |
+| Filter off | 0.14 / 2.1 | 0.48 / 6.7 |
+| Real ELRS 250 | 0.19 / 2.5 | 0.55 / 6.8 |
+| Filter off, with the Radio Link copying EdgeTX's filter | 0.18 / 2.5 | 0.53 / 6.8 |
+
+- **This radio's build scales everything by about 1.22.** Filter on then gives 0.33 / 3.8 on the 5" and 1.07 / 11.6 on the whoop, and filter off 0.20 / 2.9 and 0.69 / 8.1.
+- **The low-pass helps only slow moves,** where the ripple is already small, and it hurts fast ones.
+
+### Not measured
+
+- **Stick noise at rest with the filter off.**
+  - SDL hides an axis's changes until it first moves more than 1.25% (its initial-value gate, `SDL_SendJoystickAxis` in SDL 3.4.18), and the hands-off step came first in the run.
+  - The CNT deadband also hides the centred sticks.
+  - The held throttle, thumb tremor included, gives an upper bound: 1–3 count steps, spread over 4 counts or less.
+  - In the model, noise up to 1.5 counts costs 0.1% of motor range or less at rest.
+- **The Pocket with RF on.** That EdgeTX then runs its mixer, and sends one USB report, once per ELRS packet comes from the source only:
+  - the module's period sets the mixer's: [`mixer_scheduler.cpp#L70`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/mixer_scheduler.cpp#L70) and [`pulses/crossfire.cpp#L144`](https://github.com/EdgeTX/edgetx/blob/v2.10.7/radio/src/pulses/crossfire.cpp#L144)
+  - ExpressLRS asks for its packet interval: [`tx_main.cpp#L443`](https://github.com/ExpressLRS/ExpressLRS/blob/3.6.4/src/src/tx_main.cpp#L443)
+
+  The ExpressLRS tool can't open while the selected model has Internal RF off, so these runs stayed RF off.
+
+### Probe changes
+
+The probe on `prototype/sdl3-input-probe` gained:
+- `--steps pocket`: hands-off, flicks, fast circles, slow circles, small slow nudges and edge tracing
+- `--steps pocket-short`
+- `--expect-hz N`, for a Radio with RF on
+- a per-step "How the values move" table of change sizes and gaps
+- a stick-noise line for the hands-off step
