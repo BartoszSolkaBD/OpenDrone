@@ -123,7 +123,7 @@ This is the ticket's deliverable.
 | # | Effect | What the pilot feels | Importance | Compute | Parameter source | Tier |
 |---|---|---|---|---|---|---|
 | 29 | Collisions with the world: contact, friction, restitution, continuous collision detection (CCD) [S38] | Crashes, bounces, skids. Without CCD, passing through thin rails at speed | Critical | **Highest of all**, though still small against the frame | Restitution and friction tuned by feel. AirSim defaults are 0.55 and 0.5 [S35] | Core |
-| 30 | Prop strikes and damage | Losing a motor after clipping something | Medium | Low | The map lists "Crashes" as not yet specified | Later |
+| 30 | Prop strikes and damage | Losing a motor after clipping something | Medium | Low | Prop grip: estimate, tuned by feel. ESC restart: Bluejay source | Strikes: Core, without damage. Damage: Later ([#26](https://github.com/BartoszSolkaBD/OpenDrone/issues/26), [ADR-0012](../adr/0012-crashes-behave-like-a-real-quad.md)) |
 | 31 | Frame vibration and gyro noise fed to the Flight Controller | Shapes the Flight Controller's filter delay, which is part of how prop wash feels | Medium | Negligible | 5": noise spectrum from public logs (TII, CC BY 4.0). Whoop: estimate | Recommended (ties to [#5](https://github.com/BartoszSolkaBD/OpenDrone/issues/5)) |
 | 32 | Air density (altitude, temperature) | Less thrust at altitude | Low | Negligible | Standard atmosphere | A constant in the alpha |
 
@@ -454,8 +454,11 @@ Chen and Rincon-Mora's two-RC model is the general reference [S27]. **No whoop-p
   - Flightmare only clamps to a world box [S31].
   - gym-pybullet-drones' `DYN` mode has no collision response at all [S32].
   - QuadSwarm uses hand-made heuristics: velocity decay plus noise [S57].
-- **Prop strikes.** No open-source simulator models them. Velocidrone added prop damage on collision in January 2026 [S43]. Uncrashed has a propeller-damage toggle [S44].
-- **Crash behaviour is a gap.** It is already listed under "Not yet specified" on the map.
+- **Prop strikes.** No open-source simulator models them.
+  - VelociDrone's manual lists prop damage only in its Single Class mode [S43]. Its 20 January 2026 patch only adds a second of immunity to prop damage after a reset. An earlier version of this note said VelociDrone added prop damage in January 2026; that was wrong.
+  - Uncrashed has had a propeller-damage toggle since May 2025, on by default [S44].
+  - Liftoff and TRYP FPV also damage props; see [#26](https://github.com/BartoszSolkaBD/OpenDrone/issues/26).
+- **Crash behaviour** was settled in [#26](https://github.com/BartoszSolkaBD/OpenDrone/issues/26) ([ADR-0012](../adr/0012-crashes-behave-like-a-real-quad.md)).
 
 ## 7. How existing simulators approach it
 
@@ -467,7 +470,7 @@ No vendor publishes its equations, tick rate or validation data. Everything belo
 |---|---|---|---|---|---|---|
 | **Liftoff** | Unity | Own flight model; the Physics 5.0 update's new Flight Controller "relies a lot less on Unity's physics system". Thrust from part data; drag from projected area sampled at 42 angles | Area drag; battery with amp draw, C-rating overheating, fast and slow sag (Apr 2024). **Prop wash is artificial**, default 42% | Part-based builder | Own Flight Controller with "A.I. PID tune"; manual tuning possible | [S42] |
 | **Liftoff: Micro Drones** | Unity | Whoop-focused spin-off, full release Aug 2025 | Nothing published on ducts | Drone editor | Unverified | [S42] |
-| **Velocidrone** | Unverified | "Proprietary physics and aerodynamics system"; NACA prop profiles; full drivetrain. "Very high and ultra high" physics settings, multithreaded prop and drag physics (Dec 2024) | Battery voltage and current; ESC "real ESC code for throttle ramping, braking"; motor Kv, coil resistance, torque; prop flex under load; induced and parasitic drag; prop damage (Jan 2026) | Editor with weight, drag per axis, prop size and power, **prop wash strength** (Community) | Legacy in-house, or **Betaflight 4.2 simulation** with rates, PIDs, throttle curve, TPA | [S43] |
+| **Velocidrone** | Unverified | "Proprietary physics and aerodynamics system"; NACA prop profiles; full drivetrain. "Very high and ultra high" physics settings, multithreaded prop and drag physics (Dec 2024) | Battery voltage and current; ESC "real ESC code for throttle ramping, braking"; motor Kv, coil resistance, torque; prop flex under load; induced and parasitic drag; prop damage in Single Class mode only | Editor with weight, drag per axis, prop size and power, **prop wash strength** (Community) | Legacy in-house, or **Betaflight 4.2 simulation** with rates, PIDs, throttle curve, TPA | [S43] |
 | **Uncrashed** | Unverified (likely Unreal) | Parametric, "settings based on real values"; users can tune gravity, air friction, throttle-dependent prop efficiency | Propeller damage toggle | Prop size and pitch, Kv, cells, weight, air friction, "air grip" (Community) | Not documented | [S44] |
 | **DRL Simulator** | Unity | "Advanced aerodynamic modeling"; partner claims "unsteady drag model (from Georgia Tech)", ground effect, battery dynamics, 5,000+ bench tests | Ground effect, battery sag | Thousands of real parts | Unverified | [S45] |
 | **Tiny Whoop GO** | Unverified | Launched ~Jan 2021; **no physics information published** | — | — | — | [S46] |
@@ -738,7 +741,7 @@ Code paths were read from the default branch on 2026-10-03.
 - [S43] Velocidrone:
   - features: https://velocidrone.com/features
   - news: https://www.velocidrone.com/news
-  - manual: https://velocidrone.com/downloads/VelociDroneManual.pdf
+  - manual: https://velocidrone.com/downloads/VelociDroneManual.pdf; desktop manual (arming, prop damage, resets): https://www.velocidrone.com/desktop_manual
 - [S44] Uncrashed: https://store.steampowered.com/app/1682970/; developer post on prop damage: https://steamcommunity.com/app/1682970/discussions/0/599650671167331642
 - [S45] DRL Simulator: https://store.steampowered.com/app/641780; MultiGP announcement: https://dev.multigp.com/the-drl-sim-is-now-the-official-fpv-sim-of-multigp/
 - [S46] Tiny Whoop GO: https://www.tinywhoopgo.com/

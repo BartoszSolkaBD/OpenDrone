@@ -12,3 +12,6 @@ Findings from the research tickets on [Map: OpenDrone alpha spec](https://github
 | [determinism.md](determinism.md) | Can the simulation be deterministic across platforms? | [#7](https://github.com/BartoszSolkaBD/OpenDrone/issues/7) |
 | [asset-pipeline.md](asset-pipeline.md) | What's the best agent-driven asset pipeline? | [#8](https://github.com/BartoszSolkaBD/OpenDrone/issues/8) |
 | [quad-settings/](quad-settings/README.md) | What settings do the maintainer's real quads (Meteor65 Pro, Cetus X) run? | [#20](https://github.com/BartoszSolkaBD/OpenDrone/issues/20) |
+| [fpv-camera-dynamic-range-and-resolution.md](fpv-camera-dynamic-range-and-resolution.md) | How many stops and how much sharpness do the alpha's FPV cameras really have? | [#28](https://github.com/BartoszSolkaBD/OpenDrone/issues/28) |
+| [goggles-osd.md](goggles-osd.md) | What does Betaflight's OSD show, how do analog and digital systems draw it, which fonts can we ship, and what do other sims show? | [#31](https://github.com/BartoszSolkaBD/OpenDrone/issues/31) |
+| [bevy-0.20.md](bevy-0.20.md) | What does Bevy 0.20 change for us, and what does sharing glam with parry3d cost? | [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33) |
