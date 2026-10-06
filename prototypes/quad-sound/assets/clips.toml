@@ -1,0 +1,462 @@
+# Sound clips for the #34 quad-sound prototype.
+# Every clip is CC0 1.0, verified on its source page (see licence_evidence).
+# Files live in clips/ (gitignored); run ./fetch-clips.sh to download and verify them.
+# sha256 is of the final file on disk; for zip members, of the extracted member.
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-generic-light.ogg"
+title = "Impact Sounds: impactGeneric_light_000"
+original_name = "impactGeneric_light_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactGeneric_light_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "f0e982611e97512fee5f777986b67e8b435434b601f94992ec044f7e89fb5acb"
+duration_s = 0.139
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Light generic knock, 0.14 s. Candidate for a plastic frame tapping something (5\" or whoop). Judged from the file name; not listened to."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-plate-light.ogg"
+title = "Impact Sounds: impactPlate_light_000"
+original_name = "impactPlate_light_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactPlate_light_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "6e797cf8a5bfc52d7ed5eb47c227974c1cf2a674954fec5b539cea7d62c7282c"
+duration_s = 0.542
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Light 'plate' impact with a short ring, 0.54 s. Candidate for a hard-plastic/carbon plate hit. Material of Kenney's 'plate' is not stated; judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-soft-medium.ogg"
+title = "Impact Sounds: impactSoft_medium_000"
+original_name = "impactSoft_medium_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactSoft_medium_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "7d3ba0bb5e60a11b5d3e558c141303dcf494256675fbf753c0d252d2cf0481e3"
+duration_s = 0.118
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Short soft bump, 0.12 s. Candidate for a 30 g whoop bumping into something. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-soft-heavy.ogg"
+title = "Impact Sounds: impactSoft_heavy_000"
+original_name = "impactSoft_heavy_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactSoft_heavy_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "49e7ca88743fca974bb8676ea138b751cfd8f9033b5e7af8736c2a215d6edbc1"
+duration_s = 0.505
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Heavier soft thud, 0.5 s. Candidate for a 5\" quad thudding into a wall. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-metal-light.ogg"
+title = "Impact Sounds: impactMetal_light_000"
+original_name = "impactMetal_light_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactMetal_light_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "33b5e6e37c6e9d54e07bf5a89b12c76e879f40c1ea83cdd82714df1d6f9fec6d"
+duration_s = 0.351
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Light metal clink, 0.35 s. Candidate for a 5\" quad clipping a rail. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-metal-medium.ogg"
+title = "Impact Sounds: impactMetal_medium_000"
+original_name = "impactMetal_medium_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactMetal_medium_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "a96f879fec0864a8938e0c745b6996a6c5679c16a234ce31a01cc995e8401003"
+duration_s = 0.272
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Medium metal hit, 0.27 s. Candidate for a harder rail/pipe strike. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-tin-medium.ogg"
+title = "Impact Sounds: impactTin_medium_000"
+original_name = "impactTin_medium_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactTin_medium_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "f4bbee66ca191ec744b84fc07ac9ed2a6fda955d51cfed8360f12b62815d3cbd"
+duration_s = 0.159
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Thin tin/sheet-metal hit, 0.16 s. Candidate for sheet metal or a thin pole. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-concrete-step.ogg"
+title = "Impact Sounds: footstep_concrete_000"
+original_name = "footstep_concrete_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/footstep_concrete_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "d7267e183067757c92c169de2a379abea592cfca6b39bb2e8feea15221ad79fe"
+duration_s = 0.106
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Very short concrete scuff (a footstep), 0.11 s. Candidate for a skid/tap on concrete. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/kenney-stone-mining.ogg"
+title = "Impact Sounds: impactMining_000"
+original_name = "impactMining_000.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/impact-sounds"
+download_url = "https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip"
+zip_member = "Audio/impactMining_000.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/impact-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "36b4ea107222d073c67ca64dde26944975609202d5090b2f2021213c1a7e35cd"
+duration_s = 0.937
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Hard hit on stone (a pickaxe in the pack's theme), 0.94 s. Candidate for a hard concrete/stone wall hit; may be too heavy. Judged from the file name."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/fs-quad-wall-collision.ogg"
+title = "Quadcopter Drone Collision Hitting Wall and Falling"
+original_name = "Quadcopter Drone Collision Hitting Wall and Falling"
+author = "qubodup (Freesound)"
+source_page = "https://freesound.org/people/qubodup/sounds/854351/"
+download_url = "https://cdn.freesound.org/previews/854/854351_71257-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "54502c2bfd70429afdd822ef05007017ea9d4c1a986b6798c65c68dcbf9b5539"
+duration_s = 8.249
+channels = 1
+sample_rate = 48000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 48 kHz, 16-bit, mono, 0:08.248). What you hear (from the uploader's description/tags, not listened to): an FPV quad's props touch the side wall of a window opening, then a hasty landing. Extracted from the US Marine Corps video '24th MEU: FPV Drones' (DVIDS, 2026-05-04, timecode ~7:02). Motor sound is present. The page also shows the uploader's signature 'See profile for CC BY attribution requirements'; the profile section is headed 'CC BY Attribution Requirements' (asks for 'qubodup' in a Sounds credits section), while this sound's own licence box says CC0, so credit is optional but cheap. Upstream source is a DVIDS (US government) video."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/fs-ardrone-prop-strike.ogg"
+title = "Parrot AR drone 2.0 take off, flight and landing"
+original_name = "Parrot AR drone 2.0 take off, flight and landing"
+author = "timsc (Freesound)"
+source_page = "https://freesound.org/people/timsc/sounds/332036/"
+download_url = "https://cdn.freesound.org/previews/332/332036_266678-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "a99a5b043bdf522d0d3db99830ac0c1d80c66856606722b50fcd904dc0269ba8"
+duration_s = 100.504
+channels = 2
+sample_rate = 48000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: FLAC, 48 kHz, 16-bit, stereo, 1:40.504). What you hear (from the uploader's description/tags, not listened to): a Parrot AR.Drone 2.0 flown indoors, phone recording; about 20 s in a piece of card is ingested into the rotor blades and it crashes. Mostly motor noise; the prop strike would need trimming out."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/fs-rc-car-metal-rail.ogg"
+title = "Impact on metal"
+original_name = "Impact on metal"
+author = "JoMungus (Freesound)"
+source_page = "https://freesound.org/people/JoMungus/sounds/726486/"
+download_url = "https://cdn.freesound.org/previews/726/726486_11865776-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "af48d2804f5417aa3083b0e3b337ea2e9c957c0a440efa1b3f50ff90a13b8925"
+duration_s = 2.159
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: MP3, 44.1 kHz, 132 kbps, stereo, 0:02.158). What you hear (from the uploader's description/tags, not listened to): an RC car running into a metal rail at a skate park. The original upload is itself an MP3, so this Ogg is a lossy transcode of a lossy file."
+
+[[clip]]
+group = "hits"
+file = "clips/hits/fs-small-plastic-breaks.ogg"
+title = "Small Plastic Break Sounds SFX.wav"
+original_name = "Small Plastic Break Sounds SFX.wav"
+author = "knoptop (Freesound)"
+source_page = "https://freesound.org/people/knoptop/sounds/504585/"
+download_url = "https://cdn.freesound.org/previews/504/504585_1035118-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "01440e44f8284bc55bf1cf71ca847df01f0577a5cf60785486896326dea1e1fd"
+duration_s = 47.648
+channels = 2
+sample_rate = 48000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 48 kHz, 24-bit, stereo, 0:47.647). What you hear (from the uploader's description/tags, not listened to): a small plastic part crashing into miscellaneous objects around a workshop and breaking; many separate takes (tags include tiny-whoop, drone, plastic, hits). Needs cutting into single hits."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-click.ogg"
+title = "Interface Sounds: click_001"
+original_name = "click_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/click_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9"
+duration_s = 0.1
+channels = 1
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Menu click (cursor move / button press). Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-select.ogg"
+title = "Interface Sounds: select_001"
+original_name = "select_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/select_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "aec0c31ea934a35936ae0d2ab8fac8123c93aa5647f935853a58dbaf90278b7a"
+duration_s = 0.043
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Menu select. Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-back.ogg"
+title = "Interface Sounds: back_001"
+original_name = "back_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/back_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "07db973f79f6ae0f2edc34561e7592e24d0577455919fb602cb8ecc0da991dcf"
+duration_s = 0.064
+channels = 1
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Menu back. Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-close.ogg"
+title = "Interface Sounds: close_001"
+original_name = "close_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/close_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "44af8249b933e0fd35ec957a638bb1a0b01f85b53fbe9674bf77bd3ca3168ef4"
+duration_s = 0.148
+channels = 1
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Menu close / dismiss. Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-toggle.ogg"
+title = "Interface Sounds: toggle_001"
+original_name = "toggle_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/toggle_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "ca1d2dde5f0b286abac4f070e23edab8f30927c8a533665cdf2ac6492a415e49"
+duration_s = 0.139
+channels = 1
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Toggle on/off. Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-confirm.ogg"
+title = "Interface Sounds: confirmation_001"
+original_name = "confirmation_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/confirmation_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a"
+duration_s = 0.29
+channels = 1
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Confirm. Judged from the file name."
+
+[[clip]]
+group = "menus"
+file = "clips/menus/kenney-error.ogg"
+title = "Interface Sounds: error_001"
+original_name = "error_001.ogg"
+author = "Kenney (www.kenney.nl)"
+source_page = "https://kenney.nl/assets/interface-sounds"
+download_url = "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip"
+zip_member = "Audio/error_001.ogg"
+licence = "CC0 1.0"
+licence_evidence = "License.txt inside the zip: \"License: (Creative Commons Zero, CC0) http://creativecommons.org/publicdomain/zero/1.0/ ... This content is free to use in personal, educational and commercial projects.\" Asset page https://kenney.nl/assets/interface-sounds lists \"License: Creative Commons CC0\" linking https://creativecommons.org/publicdomain/zero/1.0/ (both checked 2026-10-06)."
+sha256 = "46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433"
+duration_s = 0.165
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "Error / not allowed. Judged from the file name."
+
+[[clip]]
+group = "background-skate-park"
+file = "clips/background-skate-park/fs-city-birds-distant-vehicles.ogg"
+title = "Small_City_Birds_Distant_Vehicles_Ambient.wav"
+original_name = "Small_City_Birds_Distant_Vehicles_Ambient.wav"
+author = "gokalp_gonen (Freesound)"
+source_page = "https://freesound.org/people/gokalp_gonen/sounds/640600/"
+download_url = "https://cdn.freesound.org/previews/640/640600_4897512-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "579da316aef144f1fca7ef536b67c56ae7bd6eaf850ce440137ffe165675f069"
+duration_s = 108.376
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 44.1 kHz, 16-bit, stereo, 1:48.376). What you hear (from the uploader's description/tags, not listened to): small-city birds with distant vehicles; stereo XY (two AKG CK93 on a Zoom H6). Tags: birds, city, park, distant, traffic, passing, road, street, urban. No voices mentioned."
+
+[[clip]]
+group = "background-skate-park"
+file = "clips/background-skate-park/fs-urban-sunny-day.ogg"
+title = "urban_ambience_outside_apartment__sunny_day.wav"
+original_name = "urban_ambience_outside_apartment__sunny_day.wav"
+author = "njlyczko (Freesound)"
+source_page = "https://freesound.org/people/njlyczko/sounds/580646/"
+download_url = "https://cdn.freesound.org/previews/580/580646_12662124-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "4ccb3831c30a0e305d9a663c33b66a288fac6254193e9b4faa2bf905c0bdb541"
+duration_s = 139.5
+channels = 2
+sample_rate = 48000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 48 kHz, 24-bit, stereo, 2:19.500). What you hear (from the uploader's description/tags, not listened to): urban ambience outside an apartment building on a sunny, dry day: birds singing, distant traffic hum, one car horn and a plane passing overhead (Zoom H2n). No voices mentioned; the horn and plane may need cutting for a clean loop."
+
+[[clip]]
+group = "background-skate-park"
+file = "clips/background-skate-park/fs-skate-park-street.ogg"
+title = "Skate Board Park"
+original_name = "Skate Board Park"
+author = "Rashpil (Freesound)"
+source_page = "https://freesound.org/people/Rashpil/sounds/711196/"
+download_url = "https://cdn.freesound.org/previews/711/711196_14958854-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "0551d5006f6ce645c64f8edf65d98d2002d41b2ce02a52fcce157bd4c8201f9e"
+duration_s = 107.0
+channels = 2
+sample_rate = 96000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 96 kHz, 24-bit, stereo, 1:47.000). What you hear (from the uploader's description/tags, not listened to): a real skate park next to a street, traffic audible (Moscow, 2023). Tags include children, people, city, street: VOICES ARE LIKELY, intelligibility unknown; must be checked by ear before use."
+
+[[clip]]
+group = "background-bando"
+file = "clips/background-bando/fs-construction-site-wind-crane.ogg"
+title = "wind construction site 2.wav"
+original_name = "wind construction site 2.wav"
+author = "gecop (Freesound)"
+source_page = "https://freesound.org/people/gecop/sounds/545035/"
+download_url = "https://cdn.freesound.org/previews/545/545035_3562198-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "5c657af9e8d3a524054552ba8835a3386ee224ed34c0509230afbd042ef5b54b"
+duration_s = 64.723
+channels = 2
+sample_rate = 48000
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 48 kHz, 32-bit, stereo, 1:04.722). What you hear (from the uploader's description/tags, not listened to): mild howling wind at a construction site, plastic (sheeting) waving and a squeaky yard crane. Tags: wind, howling, crane, squeaky, iron, construction, site, city. No machinery engines mentioned. A sister take (freesound 545038, 0:46.772, same description) exists if more length is needed."
+
+[[clip]]
+group = "background-bando"
+file = "clips/background-bando/fs-teufelsberg-wind-fabric.ogg"
+title = "Teufelsberg ambient sounds 2 - including fabric flapping.wav"
+original_name = "Teufelsberg ambient sounds 2 - including fabric flapping.wav"
+author = "dbspin (Freesound)"
+source_page = "https://freesound.org/people/dbspin/sounds/396674/"
+download_url = "https://cdn.freesound.org/previews/396/396674_255403-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "b844777b128cc1723d09dce9a696d562c30132c58a01256eb8fb1116eb034d72"
+duration_s = 258.741
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 44.1 kHz, 16-bit, stereo, 4:18.740). What you hear (from the uploader's description/tags, not listened to): ambience at Teufelsberg, an abandoned military base outside Berlin, including fabric flapping (tags: abandoned, building, wind). Longer than the 1-3 min ideal; trim to taste."
+
+[[clip]]
+group = "background-bando"
+file = "clips/background-bando/fs-city-from-high-building.ogg"
+title = "Street ambient, Berlin summer afternoon"
+original_name = "Street ambient, Berlin summer afternoon"
+author = "EloiMarin (Freesound)"
+source_page = "https://freesound.org/people/EloiMarin/sounds/640167/"
+download_url = "https://cdn.freesound.org/previews/640/640167_5471575-hq.ogg"
+licence = "CC0 1.0"
+licence_evidence = "Freesound sound page licence box: \"Creative Commons 0\" linking http://creativecommons.org/publicdomain/zero/1.0/, with the text \"You can copy, modify, distribute and perform the sound, even for commercial purposes, all without the need of asking permission to the author.\" (checked 2026-10-06)"
+sha256 = "0e7298320fbe0b19a04236be8889634645e352816f6c6a794fc37f25b81a52cb"
+duration_s = 139.994
+channels = 2
+sample_rate = 44100
+format = "Ogg Vorbis"
+notes = "HQ preview, not the original (original upload: Wave, 44.1 kHz, 24-bit, stereo, 2:19.993). What you hear (from the uploader's description/tags, not listened to): a summer afternoon in Berlin Lichtenberg recorded from a very high building: mostly distant city noise, with occasional subtle birds, children, dogs and sirens; unfiltered, dominated by low frequencies. The uploader warns 'the web preview seems to have some high frequency artifacts. Download the WAV file to get it on full quality' - this HQ preview may carry those artifacts; fetch the original (login) if it matters."

@@ -1,0 +1,50 @@
+# PROTOTYPE. Throwaway app for issue #34 ("Does the live Quad sound feel right, on board and from
+# where you stand?"). Not production code; do not depend on it.
+# The sound is Firewheel used directly. Nothing here uses Bevy (ADR-0023); Firewheel itself only
+# pulls in the small `bevy_platform` crate, as ADR-0023 notes.
+[package]
+name = "quad-sound"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+# SDL 3.4 built from source (needs CMake), statically linked, joystick + HIDAPI only, as in the
+# #18 probe and the #28 camera prototype. Reads the Radiomaster Pocket and the DualSense.
+default = ["sdl"]
+sdl = [
+    "dep:sdl3-sys",
+    "sdl3-sys/build-from-source",
+    "sdl3-sys/link-static",
+    "sdl3-sys/no-default-subsystems",
+    "sdl3-sys/sdl-joystick",
+    "sdl3-sys/sdl-hidapi",
+]
+
+[dependencies]
+# Pinned, as ADR-0023 says the game will pin it.
+firewheel = { version = "=0.14.0", features = ["node_profiling"] }
+audioadapter-buffers = "5.2"
+# The same symphonium Firewheel uses; its default features add Ogg Vorbis, WAV and resampling.
+symphonium = "0.13"
+triple_buffer = "9"
+eframe = "0.36"
+gltf = "1.4"
+glam = "0.32"
+hound = "3.5"
+png = "0.18"
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+sdl3-sys = { version = "=0.7.2", default-features = false, optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = false
