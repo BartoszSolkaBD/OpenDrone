@@ -71,7 +71,10 @@ _Avoid_: Accuracy, certainty
 - The battery is always simulated. No setting turns it off.
 - A Quad should feel like its real-world counterpart to a pilot who flies one. Feel is judged against real quads running Betaflight.
 - The Flight Controller copies Betaflight 2026.6. A Tune from an older Betaflight is translated into 2026.6 settings, never emulated.
-- Reset, loading a Map and switching Quad all power the Flight Controller up fresh, as a new battery does.
+- Reset, loading a Map and switching Quad all power the Quad up fresh, as a new battery does.
+  - The Flight Controller is ready at once, skipping Betaflight's own power-up waits.
+  - The ESCs play their start-up tones first, as Bluejay does. The motors answer only after the ready beep, about 1.7 s later.
+  - Until that beep, arming is blocked, and the OSD shows Betaflight's `BOOTGRACE` reason. An Arm switch that was already on must be flipped off and on again, and Auto-arm arms on the first throttle raise after the beep ([#32](https://github.com/BartoszSolkaBD/OpenDrone/issues/32)).
 - No pilot setting changes a physics effect, Prop Wash strength included. How strong each effect is comes from the Quad's definition.
 - Only Estimate numbers move in a Feel Test, and only inside their range. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong. A locked number changes only with a new source.
 - A Tune spells out every setting the Flight Controller reads, each marked with where its value came from: the real quad, its Betaflight version's default, or a translation rule ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)).
