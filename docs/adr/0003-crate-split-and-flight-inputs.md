@@ -1,6 +1,6 @@
 # Crate split: a deterministic core, entered only through Flight Inputs
 
-The code is one Cargo workspace of eleven unpublished crates that share one version number. Five core crates make up the Simulation. They follow the same-results house rules ([ADR-0001](0001-bit-exact-determinism-with-ordinary-floats.md), bit-exact determinism with ordinary floats), use no Bevy, and never read a clock or open a file. Everything that can change a flight enters through one front door, as Flight Inputs stamped with Simulation Time. We chose this so that the game, the Scenario runner and, later, multiplayer all drive exactly the same Simulation. It also means the build tools enforce the walls, so a maintainer who doesn't read Rust doesn't have to police them in review. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
+The code is one Cargo workspace of twelve unpublished crates (eleven until [#32](https://github.com/BartoszSolkaBD/OpenDrone/issues/32) added `opendrone-sound`) that share one version number. Five core crates make up the Simulation. They follow the same-results house rules ([ADR-0001](0001-bit-exact-determinism-with-ordinary-floats.md), bit-exact determinism with ordinary floats), use no Bevy, and never read a clock or open a file. Everything that can change a flight enters through one front door, as Flight Inputs stamped with Simulation Time. We chose this so that the game, the Scenario runner and, later, multiplayer all drive exactly the same Simulation. It also means the build tools enforce the walls, so a maintainer who doesn't read Rust doesn't have to police them in review. Settled in [#12](https://github.com/BartoszSolkaBD/OpenDrone/issues/12).
 
 ## The crates
 
@@ -15,6 +15,7 @@ The code is one Cargo workspace of eleven unpublished crates that share one vers
 | `opendrone-pack` | edge | Reads and checks Pack files, and pulls colliders and the Launch Spot out of each Map's `.glb` |
 | `opendrone-scenario` | edge | The Scenario runner: headless, used in CI |
 | `opendrone-blackbox` | edge | Writes `.bbl` files from the flight log stream |
+| `opendrone-sound` | edge | Makes and plays the Quad's sound, Background Sound and menu sounds on Firewheel, on the sound's own thread ([ADR-0023](0023-quad-sound-made-live-on-firewheel.md)) |
 | `opendrone` | shell | The game, and the only crate that uses Bevy |
 | `xtask` | dev | Asset generators, texture fetch, Scenario format migration, an input monitor. Never shipped |
 
@@ -52,6 +53,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 - `sim` is the only place the two meet. It runs the 8 kHz steps, with one Flight Controller loop per step.
 - `test-pilot` uses `sim` from the outside, through Flight Inputs.
 - `scenario` uses `sim`, `flight-controller`, `test-pilot`, `pack` and `blackbox`.
+- `sound` uses no other OpenDrone crate. The game hands it each frame's state.
 - The game uses everything except `xtask`.
 
 ## What crosses each wall
@@ -62,11 +64,12 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 | `input` → the game | Channels at the device's full resolution, with every button's state, and lost / back; all stamped with the computer's clock |
 | the game, `scenario` or `test-pilot` → `sim` | Flight Inputs: Channels (Arm, Flight Mode and Crash Flip are switch Channels with fixed meanings, [ADR-0017](0017-switches-reach-the-flight-controller-with-fixed-meanings.md)), an Input Device lost or back, and Reset; each stamped with Simulation Time |
 | `pack` → `sim` (set-up) | Quad definitions with their Tune, Map collision shapes, the Launch Spot, world values; plus the pilot's settings and a random seed from the caller |
-| `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts, plus the Flight Controller's readings for the OSD ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
+| `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, each ESC's state (starting up, ready, running, or stopped after failed restarts), battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts, including how hard each prop rubs, plus the Flight Controller's readings for the OSD ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
 | `sim` → its caller, when asked | the flight log stream: setpoint, gyro, P, I, D and F terms, motor commands and battery voltage at the loop rate. It's off by default and costs nothing while off |
 | `sim` → the game (read only) | "which Map surfaces does this line pass through, and where?", for the FPV camera's signal model. It never changes state |
 | `sim` ↔ `flight-controller` | in: sensor readings, Channels and the time step. Out: 4 motor commands, each with its spin direction, a debug record, and what Betaflight's OSD reads: why arming is blocked, the Failsafe phase, the battery state, Crash Flip state and the beeper |
 | the game or `scenario` → the OSD, beside `sim` | in: each tick's Flight Controller readings and the pilot's OSD layout. Out: the OSD screen, 12 times a second in Simulation Time. Nothing flows back into `sim` ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
+| the game → `sound` | each frame's Quad states and the Flight Controller's beeper, the Map's Background Sound, the Listening Position and the volumes. Out: sound to the device. Nothing flows back into `sim` ([ADR-0023](0023-quad-sound-made-live-on-firewheel.md)) |
 | `sim` ↔ `physics` | in: motor commands, each with its spin direction for Crash Flip ([ADR-0012](0012-crashes-behave-like-a-real-quad.md)), and the time step. Out: the new Quad state and sensor readings |
 
 ## Rules at the front door
@@ -90,7 +93,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
   - Game modes live in the game.
   - They act only through Flight Inputs, settings, Assists and the choice of Map.
   - World values come only from the Map.
-- **Mobile:** only `input` and the game touch the operating system, and SDL runs on iOS and Android.
+- **Mobile:** only `input`, `sound` and the game touch the operating system. SDL runs on iOS and Android, and Firewheel has backends for both.
 - **SITL Betaflight:**
   - The Flight Controller seam is in `sim`. What plugs into it: our Flight Controller, a scripted-motors stand-in, and later a SITL bridge in its own crate.
   - The shipped game never depends on the SITL bridge.
@@ -104,7 +107,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 - **Flight Controller alone:** straight into `flight-controller`.
 - **Sticks in Scenario files:** `scenario` converts the sticks-in-percent values into whole-number Channels.
 - **Mid-air starts:** `sim` can build one with the motors "settled" and the Flight Controller "fresh".
-- **Fresh after Reset:** Reset, a new Map or a new Quad also starts a fresh Flight Controller.
+- **Fresh after Reset:** Reset, a new Map or a new Quad also starts a fresh Flight Controller, and powers the ESCs up, so the motors answer only after their ready beep, about 1.7 s later ([#32](https://github.com/BartoszSolkaBD/OpenDrone/issues/32)). A mid-air start's "settled" motors have their ESCs already running.
 
 ## Files and settings
 
@@ -117,7 +120,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 - **Where settings live:**
   - `flight-controller`: Rates and Flight Mode
   - `sim`: input smoothing, Endless Battery, Auto-arm and Packet Rate
-  - the game: camera, graphics and accessibility settings, plus the settings file itself
+  - the game: camera, graphics, accessibility and sound settings, plus the settings file itself
   - `input`: bindings and calibration, in Input Device profiles
 
 ## Checks in CI
@@ -125,6 +128,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 - Nothing in the core may depend on Bevy or the operating system.
 - The house-rule lints run on the core crates only. Clippy reads its settings for each crate separately.
 - One reference Scenario must give the same fingerprint in the game build as in the headless runner.
+- The game starts and runs with no sound device. GitHub's machines have none.
 
 ## Considered options
 
