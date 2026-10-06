@@ -35,7 +35,7 @@ Proven in [#29](https://github.com/BartoszSolkaBD/OpenDrone/issues/29) with a th
 
 ## Consequences
 
-- **Upgrades.** The patch fits one wgpu version, 29.0.4 for Bevy 0.19.1. Any Bevy upgrade that moves wgpu needs the patch ported, and main's numbers may move. Bevy 0.20 uses wgpu 30.
+- **Upgrades.** The patch fits one wgpu version, 29.0.4 for Bevy 0.19.1. Any Bevy upgrade that moves wgpu needs the patch ported, and main's numbers may move. Bevy 0.20 uses wgpu 30. _Update: tried in [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33). The patch applies to wgpu 30.0.1 with two one-line fixes, but on Bevy 0.20 it reads 0 triangles for the shadow passes, which are now culled on the GPU, so that read-back needs work. Each upgrade must prove the port complete on the Linux runner; see [ADR-0021](0021-alpha-starts-on-bevy-0-20.md)._
 - **Shipping.** The game ships with plain wgpu. Only the counting build uses the patched copy, made from wgpu's published source and a patch file in the repo.
 - **Where counts are compared.** Only on the same kind of machine. The M4 (Metal) matches the runner on:
   - passes and their area

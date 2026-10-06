@@ -27,7 +27,7 @@ We write the contact response ourselves: bounce and slide, plus Prop Strikes, in
   - Bevy 0.19.1 uses glam 0.32, so the two don't touch today. Bevy 0.20.0-rc.2 uses glam 0.33.
   - Cargo merges the features of a shared library, so parry3d's determinism mode switches Bevy's own maths to glam's `scalar-math` (no parallel maths instructions) and `libm`.
   - `cargo check` of Bevy 0.20.0-rc.2 with default features, `serialize` and parry3d 0.31.1 `enhanced-determinism` succeeded, so the build failure noted in bevy_rapier's changelog doesn't occur with these versions. A running window wasn't tested.
-- **The frame-time cost is unmeasured.** The 1440p frame test should run with parry3d's determinism mode on.
+- **The frame-time cost is unmeasured.** The 1440p frame test should run with parry3d's determinism mode on. _Update: measured in [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33): no visible cost at 1440p, and at most about 0.07 ms of CPU per frame on the M4. The alpha starts on Bevy 0.20 and accepts the shared glam; see [ADR-0021](0021-alpha-starts-on-bevy-0-20.md)._
 - **A guard in CI.** Bevy's side could change glam's settings and so change collision results in the game build only. CI checks that one reference Scenario gives the same fingerprint in the game build as in the headless runner.
 - **Our own number types.** Our types in `opendrone-maths` don't use glam. The conversion to and from parry3d's types happens inside `opendrone-physics`.
 - **Ray questions for the FPV camera.** The read-only ray question the game asks for the FPV camera's signal model uses the same Map collision.
