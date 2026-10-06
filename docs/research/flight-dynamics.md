@@ -611,6 +611,25 @@ The parameters a Quad definition needs, with how each is normally sourced:
 | Pack effective resistance | ≈ 35–39 mΩ (LAVA 300) | Derived |
 | Duct ram drag | ≈ 1.2 s⁻¹ mass-normalised | Derived/Estimate |
 
+> **Correction from [#34](https://github.com/BartoszSolkaBD/OpenDrone/issues/34): `k_f` above is the 40 mm prop's figure.** This is a physics question for a Feel Test. It changes no physics decision.
+>
+> - **Where the table's `k_f` comes from.** It is the BetaFPV 0802 (2026) on 40 mm props (§3.1), not scaled down to the Meteor65 Pro's 35 mm props.
+> - **The 35 mm figure.** With the same `C_T` ≈ 0.29, `k_f = C_T·ρ·D⁴/4π²` ≈ 1.35 × 10⁻⁸ N/(rad/s)². Keeping 2.0–2.3 × 10⁻⁸ would need `C_T` ≈ 0.46.
+> - **What that predicts.**
+>
+>   | | Speed | Blade-pass (3 blades) |
+>   |---|---|---|
+>   | Hover | ≈ 22,700 RPM | ≈ 1,140 Hz |
+>   | Full thrust (30.6 g) | ≈ 45,000 RPM | |
+>
+> - **It agrees with the other data:**
+>   - Hover current comes out at ≈ 1.0 A, matching BetaFPV's 8.8 g at 1.0 A.
+>   - Hover duty comes out at ≈ 41%, inside #10's 40–50%.
+>   - The lumped resistance comes out at ≈ 0.50 Ω.
+> - **What settles it.** Real RPM, or the blade-pass line in the maintainer's phone recording of a hover.
+>
+> See [quad-sound.md](quad-sound.md).
+
 **Generic 5".**
 
 | Parameter | Value | Confidence |

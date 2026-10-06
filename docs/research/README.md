@@ -15,3 +15,4 @@ Findings from the research tickets on [Map: OpenDrone alpha spec](https://github
 | [fpv-camera-dynamic-range-and-resolution.md](fpv-camera-dynamic-range-and-resolution.md) | How many stops and how much sharpness do the alpha's FPV cameras really have? | [#28](https://github.com/BartoszSolkaBD/OpenDrone/issues/28) |
 | [goggles-osd.md](goggles-osd.md) | What does Betaflight's OSD show, how do analog and digital systems draw it, which fonts can we ship, and what do other sims show? | [#31](https://github.com/BartoszSolkaBD/OpenDrone/issues/31) |
 | [bevy-0.20.md](bevy-0.20.md) | What does Bevy 0.20 change for us, and what does sharing glam with parry3d cost? | [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33) |
+| [quad-sound.md](quad-sound.md) | What does a real quad sound like? This covers the whoop's pitch from the physics, what the sound prototype measured on the M4, and Firewheel notes. | [#34](https://github.com/BartoszSolkaBD/OpenDrone/issues/34) |
