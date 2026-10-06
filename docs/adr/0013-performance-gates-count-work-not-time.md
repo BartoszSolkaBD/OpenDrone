@@ -29,6 +29,7 @@ A Work Count more than 2% above main fails the gate, unless the PR names the cha
 - **Real time stays on the M4.**
   - `cargo xtask bench` times the physics there, and agents paste the figures beside any slowdown they explain.
   - The Frame Check measures the 45 fps promise: an average, with the slowest 1% reported but not promised. The maintainer runs it before each release, and no release is tagged below the promise.
+  - _Update: one exception, decided in [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33). A PR that moves Bevy to a new 0.N version waits for the maintainer, who runs the Frame Check and looks at both Maps in both Video Looks before it merges, because counts can't see Bevy changes. Patch releases don't trigger it; see [ADR-0021](0021-alpha-starts-on-bevy-0-20.md)._
 - **Small steps can't add up unseen.** The Review Report shows each Work Count's total change since the last release.
 - **The render counts aren't proven yet.** Whether Bevy renders on GitHub's Linux machine with a software GPU, and which counts it can report, is a task ticket. The physics counts don't depend on it. _Update: proven in [#29](https://github.com/BartoszSolkaBD/OpenDrone/issues/29); see [ADR-0016](0016-render-work-counts-from-a-counting-wgpu-on-one-lavapipe-thread.md)._
 - **Faster results need nothing.** Main's numbers simply move.

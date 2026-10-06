@@ -30,5 +30,6 @@ Phase 2 starts when the repo accepts outside contributions, or at the 0.1.0 alph
 - **Strangers can't use the automatic path.**
   - Agents act only on text written by the maintainer's account.
   - The Review check fails for any PR not opened by the maintainer's account or by Dependabot from a branch in this repo.
+  - _Update: one narrow exception, decided in [#33](https://github.com/BartoszSolkaBD/OpenDrone/issues/33). An "Upgrade to Bevy 0.N" issue opened by this repo's own scheduled workflow from its fixed template counts as the maintainer's words; see [ADR-0021](0021-alpha-starts-on-bevy-0-20.md)._
 - **Phase 1 keeps the door to Phase 2 open.** CODEOWNERS is written by Area, and branch protection is on, with required checks, squash merges and auto-merge, but no required approvals.
 - **Everything is visible from day one:** spec tickets, half-built code and the maintainer's commit email in the existing history. New commits use GitHub's noreply address.
