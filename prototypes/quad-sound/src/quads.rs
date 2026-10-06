@@ -61,8 +61,13 @@ pub struct QuadDef {
     pub drag_quad: f32,
     pub max_rate_dps: f32,
     pub center_rate_dps: f32,
-    /// Static per-motor speed spread from the frame and parts (model detail, not tuned by ear).
+    /// Static per-motor duty spread from the frame and parts (model detail, not tuned by ear).
     pub motor_spread: [f32; 4],
+    /// Thrust noise the FC fights in a steady hover (air, the props' own wake), fraction.
+    pub turbulence: f32,
+    /// Centre of gravity off the thrust centre (x forward, y left), m. The FC holds it with
+    /// steady motor differences, as on a real quad with its pack a little off-centre.
+    pub cg_offset: [f32; 2],
     /// Path speeds for the Where-you-stand flights, m/s.
     pub cruise_speed: f32,
 }
@@ -80,11 +85,15 @@ impl QuadDef {
                 poles: 12,                // motor_poles = 12 (diff all)
                 prop_d: 0.035,
                 kv_rpm: 19500.0,          // 0802SE 19500KV
-                r_motor: 0.64,            // Derived: 30.6 g @ 3.4 A, 4 V with k_f below
+                r_motor: 0.50,            // Derived: 30.6 g @ 3.4 A, 4 V with k_f below
                 i0: 0.2,                  // Estimate
-                k_f: 2.15e-8,             // Derived 2.0-2.3e-8 (§9.1)
-                k_m: 1.12e-10,            // Derived: k_m/k_f ≈ 0.0052 m (§9.1 says ≈ 0.005)
-                rotor_j: 2.4e-8,          // Derived: gives ~30 ms at hover (§9.1: 20-50 ms)
+                // #34 round 2: the only published whoop RPM point is the 0802 (2026) on 40 mm
+                // props, 55 g at 46,481 RPM (§8.1) -> C_T ≈ 0.29. The same C_T on the Pro's 35 mm
+                // props gives k_f = C_T·ρ·D⁴/4π² ≈ 1.35e-8. Round 1 used §9.1's 2.15e-8, which is
+                // the 40 mm figure unscaled (it would need C_T ≈ 0.46).
+                k_f: 1.35e-8,             // Derived
+                k_m: 7.05e-11,            // Derived: torque at 3.4 A over ω²; k_m/k_f ≈ 0.0052 m
+                rotor_j: 2.45e-8,         // Derived: gives ~30 ms at hover (§9.1: 20-50 ms)
                 cells: 1,
                 v_oc: 4.05,               // LiHV mid-pack
                 r_batt: 0.037,            // Derived 35-39 mOhm (§9.1)
@@ -96,7 +105,12 @@ impl QuadDef {
                 drag_quad: 0.0028,        // Estimate: ~15 m/s top speed
                 max_rate_dps: 670.0,      // Betaflight 4.3 defaults (quad-settings)
                 center_rate_dps: 70.0,
-                motor_spread: [0.012, -0.006, 0.004, -0.010],
+                // Round 2: real whoop hovers spread the four motors widely (the Tiny Hawk 2
+                // recording's blade-pass line covers ±10 %), so the rough model spreads and
+                // buffets them more.
+                motor_spread: [0.03, -0.02, 0.015, -0.025],
+                turbulence: 0.05,
+                cg_offset: [0.0015, -0.001],      // Estimate: 1.5 mm and 1 mm
                 cruise_speed: 9.0,
             },
             // docs/research/flight-dynamics.md §8.2 and §9.1 (generic 5").
@@ -125,7 +139,9 @@ impl QuadDef {
                 drag_quad: 0.042,         // Estimate: ~35 m/s top speed
                 max_rate_dps: 650.0,      // like the Cetus X tune's 650
                 center_rate_dps: 70.0,
-                motor_spread: [0.008, -0.004, 0.003, -0.007],
+                motor_spread: [0.015, -0.01, 0.008, -0.012],
+                turbulence: 0.03,
+                cg_offset: [0.004, -0.002],       // Estimate: 4 mm and 2 mm
                 cruise_speed: 22.0,
             },
         }
@@ -211,6 +227,12 @@ pub struct SoundBlock {
     pub load_loudness: f32,
     /// Random speed jitter (turbulence, commutation), fraction of speed.
     pub jitter: f32,
+    /// Slow random flutter in each tone's strength (unsteady air on the blades). Less sounds
+    /// more synthetic.
+    pub tone_roughness: f32,
+    /// High hiss above `hiss_hz` (blade tips and trailing edges), grows steeply with speed.
+    pub hiss_level: f32,
+    pub hiss_hz: f32,
     /// Body/duct resonance (peaking EQ on the motors).
     pub body_peak_hz: f32,
     pub body_peak_db: f32,
@@ -252,24 +274,29 @@ impl SoundBlock {
     pub fn for_quad(kind: QuadKind) -> Self {
         match kind {
             QuadKind::Whoop65 => SoundBlock {
+                // Round 2 ("a bit synthetic"): darker overtones, more growl between them, more
+                // and lower whoosh, a little flutter, a softer duct peak.
                 bpf_level: 1.0,
-                bpf_harmonics: 10.0,
-                harmonic_rolloff: 0.9,
-                blade_mismatch: 0.22,
-                shaft_level: 0.08,
+                bpf_harmonics: 8.0,
+                harmonic_rolloff: 1.5,
+                blade_mismatch: 0.2,
+                shaft_level: 0.02,
                 level_exponent: 2.0,
-                broadband_level: 0.35,
-                broadband_center: 3.0,
-                broadband_q: 0.8,
-                broadband_swish: 0.4,
-                motor_whine: 0.08,
+                broadband_level: 0.9,
+                broadband_center: 2.0,
+                broadband_q: 0.5,
+                broadband_swish: 0.5,
+                motor_whine: 0.05,
                 load_brightness: 0.5,
                 load_loudness: 0.4,
-                jitter: 0.004,
-                body_peak_hz: 3500.0,
-                body_peak_db: 4.0,
-                body_peak_q: 1.5,
-                hum_level: 0.12,
+                jitter: 0.015,
+                tone_roughness: 0.6,
+                hiss_level: 1.7,
+                hiss_hz: 2000.0,
+                body_peak_hz: 2500.0,
+                body_peak_db: 1.5,
+                body_peak_q: 1.0,
+                hum_level: 0.03,
                 hum_mode1_hz: 900.0,
                 hum_mode1_q: 6.0,
                 hum_mode2_hz: 1600.0,
@@ -289,27 +316,30 @@ impl SoundBlock {
             QuadKind::Freestyle5 => SoundBlock {
                 bpf_level: 1.0,
                 bpf_harmonics: 12.0,
-                harmonic_rolloff: 1.1,
-                blade_mismatch: 0.35,
-                shaft_level: 0.2,
+                harmonic_rolloff: 1.3,
+                blade_mismatch: 0.25,
+                shaft_level: 0.08,
                 level_exponent: 2.0,
-                broadband_level: 0.5,
+                broadband_level: 1.0,
                 broadband_center: 4.0,
                 broadband_q: 0.7,
                 broadband_swish: 0.5,
                 motor_whine: 0.06,
                 load_brightness: 0.6,
                 load_loudness: 0.5,
-                jitter: 0.003,
+                jitter: 0.012,
+                tone_roughness: 0.5,
+                hiss_level: 1.2,
+                hiss_hz: 1500.0,
                 body_peak_hz: 2500.0,
                 body_peak_db: 2.0,
                 body_peak_q: 1.2,
-                hum_level: 0.3,
+                hum_level: 0.2,
                 hum_mode1_hz: 180.0,
                 hum_mode1_q: 4.0,
                 hum_mode2_hz: 420.0,
                 hum_mode2_q: 6.0,
-                hum_follow: 0.5,
+                hum_follow: 0.3,
                 esc_beep_level: 0.3,
                 esc_beep_brightness: 0.6,
                 esc_ring_hz: 2500.0,
@@ -334,6 +364,7 @@ pub struct ListenerParams {
     pub where_you_stand: bool,
     // On the Quad: the camera mic
     pub mic_lowcut_hz: f32,
+    pub mic_highcut_hz: f32,
     pub wind_level: f32,
     /// Airspeed at which the wind reaches wind_level, m/s.
     pub wind_ref_speed: f32,
@@ -349,9 +380,6 @@ pub struct ListenerParams {
     pub comp_attack_ms: f32,
     pub comp_release_ms: f32,
     pub comp_makeup_db: f32,
-    pub clip_on: bool,
-    pub clip_drive_db: f32,
-    pub clip_hardness: f32,
     pub onquad_level_db: f32,
     // Where you stand
     /// Inside this distance the Quad is at full level, m.
@@ -361,8 +389,12 @@ pub struct ListenerParams {
     pub air_cutoff_100m_hz: f32,
     pub delay_on: bool,
     pub wall_muffle_on: bool,
+    /// Corner of the wall shelf: above it, sound is cut by wall_highs_db.
     pub wall_muffle_hz: f32,
+    /// Level cut behind the first wall (all frequencies).
     pub wall_loss_db: f32,
+    /// Extra cut above the corner behind the first wall.
+    pub wall_highs_db: f32,
 }
 
 impl Default for ListenerParams {
@@ -370,6 +402,7 @@ impl Default for ListenerParams {
         ListenerParams {
             where_you_stand: false,
             mic_lowcut_hz: 90.0,
+            mic_highcut_hz: 11000.0,
             wind_level: 0.5,
             wind_ref_speed: 20.0,
             wind_exponent: 2.0,
@@ -379,20 +412,18 @@ impl Default for ListenerParams {
             comp_on: true,
             comp_threshold_db: -26.0,
             comp_ratio: 4.0,
-            comp_attack_ms: 12.0,
+            comp_attack_ms: 20.0,
             comp_release_ms: 250.0,
             comp_makeup_db: 10.0,
-            clip_on: false,
-            clip_drive_db: 6.0,
-            clip_hardness: 0.6,
             onquad_level_db: 0.0,
             stand_ref_m: 3.0,
             stand_level_db: 10.0,
             air_cutoff_100m_hz: 8000.0,
             delay_on: true,
             wall_muffle_on: true,
-            wall_muffle_hz: 700.0,
-            wall_loss_db: 10.0,
+            wall_muffle_hz: 800.0,
+            wall_loss_db: 6.0,
+            wall_highs_db: 10.0,
         }
     }
 }
@@ -427,9 +458,10 @@ pub struct ClipChoice {
     pub menu_back: String,
     pub skate_park_background: String,
     pub bando_background: String,
-    /// Each Map's Background Sound level (the Map's own level, before the Background volume).
-    pub skate_park_level: f32,
-    pub bando_level: f32,
+    /// Each Map's Background Sound level, dB (the Map's own value, before the Background volume).
+    /// The files stay as recorded (#34 reaction 14).
+    pub skate_park_level_db: f32,
+    pub bando_level_db: f32,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
@@ -457,8 +489,10 @@ impl Default for Tuning {
                 menu_back: "clips/menus/kenney-back.ogg".into(),
                 skate_park_background: "clips/background-skate-park/fs-city-birds-distant-vehicles.ogg".into(),
                 bando_background: "clips/background-bando/fs-construction-site-wind-crane.ogg".into(),
-                skate_park_level: 1.0,
-                bando_level: 1.0,
+                // Starting values that put both at about -30 dBFS RMS: #640600 is -20.3 dBFS as
+                // recorded, #545035 is -39.2 dBFS.
+                skate_park_level_db: -10.0,
+                bando_level_db: 9.0,
             },
         }
     }
@@ -509,7 +543,10 @@ impl SoundBlock {
             ("Motors and props", "Motor whine", &mut self.motor_whine, 0.0, 0.5, "pole pairs x rotation rate, with current"),
             ("Motors and props", "Load brightness", &mut self.load_brightness, 0.0, 1.5, "harder-working props sound brighter"),
             ("Motors and props", "Load loudness", &mut self.load_loudness, 0.0, 1.0, "windmilling props sound quieter"),
-            ("Motors and props", "Speed jitter", &mut self.jitter, 0.0, 0.03, "turbulence, commutation"),
+            ("Motors and props", "Speed jitter", &mut self.jitter, 0.0, 0.05, "fast speed wobble (fraction): widens each tone"),
+            ("Motors and props", "Tone roughness", &mut self.tone_roughness, 0.0, 1.0, "flutter in each tone; less = more synthetic"),
+            ("Motors and props", "High hiss", &mut self.hiss_level, 0.0, 3.0, "air noise of the blade tips"),
+            ("Motors and props", "Hiss from Hz", &mut self.hiss_hz, 500.0, 8000.0, ""),
             ("Motors and props", "Body/duct peak Hz", &mut self.body_peak_hz, 200.0, 10000.0, ""),
             ("Motors and props", "Body/duct peak dB", &mut self.body_peak_db, -12.0, 12.0, ""),
             ("Motors and props", "Body/duct peak Q", &mut self.body_peak_q, 0.3, 6.0, ""),
@@ -537,6 +574,7 @@ impl ListenerParams {
     pub fn knobs_onquad(&mut self) -> Vec<Knob<'_>> {
         vec![
             ("On the Quad: mic", "Mic low cut Hz", &mut self.mic_lowcut_hz, 20.0, 400.0, ""),
+            ("On the Quad: mic", "Mic high cut Hz", &mut self.mic_highcut_hz, 3000.0, 20000.0, "action-camera audio rolls off the top"),
             ("On the Quad: mic", "Level dB", &mut self.onquad_level_db, -20.0, 10.0, ""),
             ("On the Quad: wind", "Wind level", &mut self.wind_level, 0.0, 2.0, "at the reference speed"),
             ("On the Quad: wind", "Wind ref speed m/s", &mut self.wind_ref_speed, 5.0, 50.0, ""),
@@ -549,8 +587,6 @@ impl ListenerParams {
             ("On the Quad: compressor", "Attack ms", &mut self.comp_attack_ms, 0.5, 80.0, "slower lets the swell's first instant through"),
             ("On the Quad: compressor", "Release ms", &mut self.comp_release_ms, 20.0, 1500.0, ""),
             ("On the Quad: compressor", "Makeup dB", &mut self.comp_makeup_db, 0.0, 24.0, ""),
-            ("On the Quad: clipping", "Drive dB", &mut self.clip_drive_db, 0.0, 24.0, ""),
-            ("On the Quad: clipping", "Hardness", &mut self.clip_hardness, 0.0, 1.0, "soft (tanh) to hard"),
         ]
     }
     pub fn knobs_stand(&mut self) -> Vec<Knob<'_>> {
@@ -558,8 +594,9 @@ impl ListenerParams {
             ("Where you stand", "Full level within m", &mut self.stand_ref_m, 0.5, 10.0, "then fades as 1/distance"),
             ("Where you stand", "Level dB", &mut self.stand_level_db, -20.0, 20.0, ""),
             ("Where you stand", "Air cutoff at 100 m Hz", &mut self.air_cutoff_100m_hz, 1000.0, 20000.0, "air absorbs highs"),
-            ("Where you stand", "Wall muffle cutoff Hz", &mut self.wall_muffle_hz, 150.0, 4000.0, ""),
-            ("Where you stand", "Wall loss dB (first wall)", &mut self.wall_loss_db, 0.0, 30.0, "each further wall adds 40% of this, up to two more"),
+            ("Where you stand", "Wall muffle corner Hz", &mut self.wall_muffle_hz, 150.0, 4000.0, "above this, walls cut the highs"),
+            ("Where you stand", "Wall loss dB", &mut self.wall_loss_db, 0.0, 20.0, "all frequencies, first wall; more walls add a quarter each, at most 1.5x"),
+            ("Where you stand", "Wall highs cut dB", &mut self.wall_highs_db, 0.0, 24.0, "extra cut above the corner, first wall"),
         ]
     }
 }

@@ -118,6 +118,7 @@ pub struct Sim {
     walls_next: f64,
     // Disturbances
     noise: [f32; 4],
+    iterm: Vec3,
     rng: crate::dsp::Rng,
     pub wash: f32,
     // Paths
@@ -186,6 +187,7 @@ impl Sim {
             walls: 0.0,
             walls_next: 0.0,
             noise: [0.0; 4],
+            iterm: Vec3::ZERO,
             rng: crate::dsp::Rng::new(1234),
             wash: 0.0,
             path: None,
@@ -548,7 +550,7 @@ impl Sim {
 
         // --- Line to the pilot: walls (every 20 ms) ---
         if t >= self.walls_next {
-            self.walls = self.map.walls_crossed(self.pos, self.listener) as f32;
+            self.walls = self.map.walls_averaged(self.pos, self.listener, 1.0);
             self.walls_next = t + 0.02;
         }
 
@@ -577,7 +579,14 @@ impl Sim {
             target.y = 7.0 * e.y;
         }
         let kp = 30.0;
-        let mut alpha = (target - self.rates) * kp;
+        let err = target - self.rates;
+        // A small I-term holds the off-centre CG with steady motor differences.
+        if self.on_ground {
+            self.iterm = Vec3::ZERO;
+        } else {
+            self.iterm = (self.iterm + err * DT * 300.0).clamp(Vec3::splat(-400.0), Vec3::splat(400.0));
+        }
+        let mut alpha = err * kp + self.iterm;
         // Prop wash and air: thrust noise the FC fights (so the motors warble).
         let i = Vec3::from(def.inertia);
         alpha.z *= 0.5;
@@ -647,7 +656,7 @@ impl Sim {
         let vh = (self.def.mass * G / (2.0 * 1.225 * 4.0 * self.def.disk_area())).sqrt();
         let sink = -self.vel.dot(up);
         self.wash = ((sink - 0.3 * vh) / vh).clamp(0.0, 1.0);
-        let base = 0.01;
+        let base = self.def.turbulence;
         for k in 0..4 {
             thrust[k] *= 1.0 + (base + 0.15 * self.wash) * self.noise[k];
         }
@@ -667,6 +676,12 @@ impl Sim {
             torque.y += -x * a * thrust[k];
             torque.z += -spin * km_kf * thrust[k];
             total += thrust[k];
+        }
+        // Weight acting at the off-centre CG (body frame, while flying).
+        if !self.on_ground {
+            let w = def.mass * G;
+            torque.x += -w * def.cg_offset[1];
+            torque.y += w * def.cg_offset[0];
         }
         let i = Vec3::from(def.inertia);
         self.rates += torque / i * DT;

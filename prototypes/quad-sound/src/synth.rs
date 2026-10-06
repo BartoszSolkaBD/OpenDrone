@@ -134,6 +134,10 @@ struct Motor {
     /// Partial amplitudes at the start of the block and their per-sample step.
     amp: [f32; MAX_PARTIALS],
     damp: [f32; MAX_PARTIALS],
+    /// Fixed per-prop differences in each partial's strength (-1..1, scaled by blade mismatch).
+    var: [f32; MAX_PARTIALS],
+    /// Slow random flutter of the tones (turbulence), three independent bands.
+    rough_lp: [OnePole; 3],
 }
 
 impl Motor {
@@ -143,6 +147,10 @@ impl Motor {
         for p in phase.iter_mut() {
             let a = rng.uniform() * TAU;
             *p = (a.cos(), a.sin());
+        }
+        let mut var = [0.0; MAX_PARTIALS];
+        for v in var.iter_mut() {
+            *v = rng.white();
         }
         Motor {
             theta: rng.uniform() * TAU,
@@ -159,6 +167,8 @@ impl Motor {
             phase,
             amp: [0.0; MAX_PARTIALS],
             damp: [0.0; MAX_PARTIALS],
+            var,
+            rough_lp: [OnePole::default(); 3],
         }
     }
 }
@@ -176,6 +186,9 @@ struct VoiceProc {
     buzz_env: f32,
     pause_gain: f32,
     sr: f32,
+    hiss_rng: Rng,
+    hiss_hp: [OnePole; 2],
+    hiss_lp: OnePole,
 }
 
 impl AudioNode for QuadVoiceNode {
@@ -206,6 +219,9 @@ impl AudioNode for QuadVoiceNode {
             buzz_env: 0.0,
             pause_gain: 1.0,
             sr,
+            hiss_rng: Rng::new(777),
+            hiss_hp: [OnePole::default(); 2],
+            hiss_lp: OnePole::default(),
         })
     }
 }
@@ -297,9 +313,25 @@ impl AudioNodeProcessor for VoiceProc {
             mo.tick.set(b.tick_hz, 2.5, sr);
             mo.esc_ring1.set(b.esc_ring_hz, 4.0, sr);
             mo.esc_ring2.set(b.esc_ring_hz * 2.3, 5.0, sr);
-            mo.jitter_lp.set(25.0, sr);
+            mo.jitter_lp.set(30.0, sr);
+            mo.rough_lp[0].set(12.0, sr);
+            mo.rough_lp[1].set(25.0, sr);
+            mo.rough_lp[2].set(45.0, sr);
         }
         let tick_decay = (-1.0 / (b.tick_decay_ms.max(0.1) * 1e-3 * sr)).exp();
+        // Scale one-pole-filtered white noise (uniform, sd 0.577) back to about unit size.
+        let rough_scale = |fc: f32| {
+            let a = 1.0 - (-TAU * fc / sr).exp();
+            1.0 / (0.577 * (a / (2.0 - a)).sqrt())
+        };
+        let rs = [rough_scale(12.0), rough_scale(25.0), rough_scale(45.0)];
+        let rs_jit = rough_scale(30.0);
+        for h in self.hiss_hp.iter_mut() {
+            h.set(b.hiss_hz, sr);
+        }
+        self.hiss_lp.set(14000.0, sr);
+        let hiss_exp = b.level_exponent + 0.5;
+        let var_depth = 0.6 * b.blade_mismatch;
         let env_a = 1.0 - (-1.0 / (0.002 * sr)).exp();
         let pause_target = if f.paused { 0.0 } else { 1.0 };
         let pause_a = 1.0 - (-1.0 / (0.025 * sr)).exp();
@@ -314,13 +346,15 @@ impl AudioNodeProcessor for VoiceProc {
             let mut ticks = 0.0f32;
             let mut shaft_exc = 0.0f32;
             let mut esc_sum = 0.0f32;
+            let mut hiss_pow = 0.0f32;
             for i in 0..4 {
                 let w = prev.omega[i] + (f.omega[i] - prev.omega[i]) * x;
                 let wn = (w / f.omega_max.max(1.0)).clamp(0.0, 1.3);
                 let load = ((prev.current[i] + (f.current[i] - prev.current[i]) * x) / f.i_max.max(0.1)).clamp(0.0, 1.0);
                 let rub = prev.rub[i] + (f.rub[i] - prev.rub[i]) * x;
                 let mo = &mut self.motors[i];
-                let jit = mo.jitter_lp.lp(mo.rng.white()) * 4.0 * b.jitter;
+                // Speed jitter: band-limited (≈30 Hz) noise, sd = `jitter` as a fraction of speed.
+                let jit = (mo.jitter_lp.lp(mo.rng.white()) * rs_jit).clamp(-3.0, 3.0) * b.jitter;
                 let dtheta = w * (1.0 + jit) / sr;
                 mo.theta += dtheta;
                 if mo.theta > TAU {
@@ -339,8 +373,13 @@ impl AudioNodeProcessor for VoiceProc {
                 let mut tone = 0.0f32;
                 let mut cos_bpf = 0.0f32;
                 let bl = f.blades.max(1) as usize;
+                let mut rough = [0.0f32; 3];
+                for (j, r) in rough.iter_mut().enumerate() {
+                    let w = mo.rng.white();
+                    *r = (mo.rough_lp[j].lp(w) * rs[j]).clamp(-2.5, 2.5) * b.tone_roughness * 0.35;
+                }
                 for k in 0..m_counts[i] {
-                    let a = mo.amp[k];
+                    let a = mo.amp[k] * (1.0 + var_depth * mo.var[k]) * (1.0 + rough[k % 3]).max(0.0);
                     mo.amp[k] += mo.damp[k];
                     let (pc, ps) = mo.phase[k];
                     tone += a * (im * pc + re * ps);
@@ -352,13 +391,14 @@ impl AudioNodeProcessor for VoiceProc {
                     re = nre;
                 }
                 // Broadband whoosh, pulsing at the blade rate.
-                let bb_amp = b.broadband_level * wn.powf(b.level_exponent + 0.5) * (0.6 + 0.4 * load) * 0.08;
+                let bb_amp = b.broadband_level * wn.powf(b.level_exponent) * (0.6 + 0.4 * load) * 0.08;
                 let nz = mo.rng.white();
                 let bb = mo.bb.bp_norm(nz) * bb_amp * (1.0 + b.broadband_swish * cos_bpf);
                 // Motor whine at the electrical frequency.
                 let fe = w / TAU * pole_pairs;
                 let whine = if fe < 0.9 * nyq { (mo.theta * pole_pairs).sin() * b.motor_whine * load * wn * 0.1 } else { 0.0 };
                 motors_sum += tone + bb + whine;
+                hiss_pow += wn.powf(2.0 * hiss_exp);
                 shaft_exc += zs * wn * wn;
                 // Prop Strike ticks.
                 if mo.tick_env > 1e-4 {
@@ -396,7 +436,13 @@ impl AudioNodeProcessor for VoiceProc {
                     esc_sum += e * mo.esc_env;
                 }
             }
-            let motors = self.body.process(motors_sum);
+            // High hiss (trailing-edge and tip noise): one shared band above `hiss_hz`, as loud
+            // as the four motors together.
+            let hn = self.hiss_rng.white();
+            let h1 = self.hiss_hp[0].hp(hn);
+            let h2 = self.hiss_hp[1].hp(h1);
+            let hiss = self.hiss_lp.lp(h2) * b.hiss_level * hiss_pow.sqrt() * 0.16;
+            let motors = self.body.process(motors_sum + hiss);
             let hum_res = self.hum1.bp_norm(shaft_exc * 0.5 + motors * 0.3) + 0.7 * self.hum2.bp_norm(shaft_exc * 0.5 + motors * 0.3);
             let hum = b.hum_level * (b.hum_follow * shaft_exc * 0.15 + (1.0 - b.hum_follow) * hum_res * 0.3);
             // Betaflight's buzzer (an active buzzer: one fixed pitch, switched on and off).
@@ -452,6 +498,7 @@ struct ListenerProc {
     delay: [DelayLine; 2],
     air: [[OnePole; 2]; 2],
     wall: [[OnePole; 2]; 2],
+    mic_lp: [[OnePole; 2]; 2],
     walls_s: f32,
     last_delay: f32,
     // Switching
@@ -494,6 +541,7 @@ impl AudioNode for ListenerNode {
             delay: [DelayLine::new(len), DelayLine::new(len)],
             air: [[OnePole::default(); 2]; 2],
             wall: [[OnePole::default(); 2]; 2],
+            mic_lp: [[OnePole::default(); 2]; 2],
             walls_s: 0.0,
             last_delay: 0.0,
             mode_stand: self.p.where_you_stand,
@@ -560,7 +608,6 @@ impl AudioNodeProcessor for ListenerProc {
         let lim_att = 1.0 - (-1.0 / (0.0005 * sr)).exp();
         let lim_rel = 1.0 - (-1.0 / (0.15 * sr)).exp();
         let onquad_gain = db_to_lin(p.onquad_level_db);
-        let drive = db_to_lin(p.clip_drive_db);
 
         // Where you stand: distance at both ends of the block.
         let r0 = dist(prev.quad_pos, prev.listener_pos).max(0.3);
@@ -572,19 +619,28 @@ impl AudioNodeProcessor for ListenerProc {
                 a.set(air_fc, sr);
             }
         }
+        for ch in self.mic_lp.iter_mut() {
+            for a in ch.iter_mut() {
+                a.set(p.mic_highcut_hz, sr);
+            }
+        }
         let walls_a = 1.0 - (-(n as f32) / (0.08 * sr)).exp();
         let walls_target = if p.wall_muffle_on { f.walls.min(3.0) } else { 0.0 };
         self.walls_s += walls_a * (walls_target - self.walls_s);
         let w = self.walls_s;
-        let wall_fc = 20000.0 * (p.wall_muffle_hz / 20000.0).powf(w.min(1.0)) * (1.0 / (1.0 + 0.5 * (w - 1.0).max(0.0)));
+        // Walls muffle, never silence: sound bends round a building. `amount` is 1 for the first
+        // wall and grows by a quarter for each further one, capped at 1.5. It cuts the highs above
+        // the muffle corner (a shelf, so the lows always get through) and the level a little.
+        // Round 1 used a low-pass whose corner fell to 350 Hz with more walls; the Quad has almost
+        // nothing that low, so it went silent behind the Bando tower (#34 reactions 5 and 6).
         for ch in self.wall.iter_mut() {
             for a in ch.iter_mut() {
-                a.set(wall_fc.max(80.0), sr);
+                a.set(p.wall_muffle_hz.max(80.0), sr);
             }
         }
-        // The first wall costs the full loss; each further one (up to two more) 40% of it, since
-        // sound also bends round a building rather than only going through it.
-        let wall_gain = db_to_lin(-p.wall_loss_db * (w.min(1.0) + 0.4 * (w - 1.0).clamp(0.0, 2.0)));
+        let amount = w.min(1.0) + 0.25 * (w - 1.0).clamp(0.0, 2.0);
+        let wall_highs = db_to_lin(-p.wall_highs_db * amount);
+        let wall_gain = db_to_lin(-p.wall_loss_db * amount);
         let stand_gain = db_to_lin(p.stand_level_db) * wall_gain;
         let ref_m = p.stand_ref_m.max(0.1);
 
@@ -641,12 +697,9 @@ impl AudioNodeProcessor for ListenerProc {
                 } else {
                     self.gr_db = 0.0;
                 }
-                let mut yq = (qh + wh) * g * onquad_gain;
-                let mut yc = ch * g * onquad_gain;
-                if p.clip_on {
-                    yq = clip(yq * drive, p.clip_hardness) / drive;
-                    yc = clip(yc * drive, p.clip_hardness) / drive;
-                }
+                // The camera's own top end: action-camera audio rolls off the highest highs.
+                let yq = two_lp(&mut self.mic_lp[0], (qh + wh) * g * onquad_gain);
+                let yc = two_lp(&mut self.mic_lp[1], ch * g * onquad_gain);
                 (yq, yc)
             } else {
                 // Where you stand: travel time (Doppler follows), distance, air, walls.
@@ -658,8 +711,10 @@ impl AudioNodeProcessor for ListenerProc {
                 let g = stand_gain * (ref_m / r.max(ref_m));
                 yq = two_lp(&mut self.air[0], yq);
                 yc = two_lp(&mut self.air[1], yc);
-                yq = two_lp(&mut self.wall[0], yq);
-                yc = two_lp(&mut self.wall[1], yc);
+                let lq = two_lp(&mut self.wall[0], yq);
+                let lc = two_lp(&mut self.wall[1], yc);
+                yq = lq + wall_highs * (yq - lq);
+                yc = lc + wall_highs * (yc - lc);
                 let (yq, yc) = (yq * g, yc * g);
                 // A safety limiter (not a character compressor): only a punch-out right next to
                 // you reaches it, so the loudest moment doesn't hard-clip.

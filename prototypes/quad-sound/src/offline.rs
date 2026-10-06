@@ -37,6 +37,7 @@ pub fn scenes() -> Vec<Scene> {
     let mut v = vec![
         s("01-whoop-powerup-onquad", Whoop65, MapKind::Bando, false, S::PowerUp, 7.0, "Reset: Bluejay start-up melody and ready beeps, arm, idle, disarm"),
         s("02-whoop-hover-onquad", Whoop65, MapKind::Bando, false, S::Hover, 10.0, "take off, hover with small corrections, land"),
+        s("02s-whoop-hover-standing", Whoop65, MapKind::Bando, true, S::Hover, 10.0, "the same hover heard from 1.5 m, like the Tiny Hawk 2 reference recording"),
         s("03-whoop-punchout-onquad", Whoop65, MapKind::Bando, false, S::PunchOut, 9.0, "hover, full throttle 1.6 s, chop, catch"),
         s("04-whoop-punchout-standing", Whoop65, MapKind::Bando, true, S::PunchOut, 9.0, "the same flight heard from the Launch Spot"),
         s("05-five-powerup-onquad", Freestyle5, MapKind::SkatePark, false, S::PowerUp, 7.0, "Reset with the 5\": ESC melody plus Betaflight's buzzer, arm and disarm beeps"),
@@ -59,7 +60,6 @@ pub fn scenes() -> Vec<Scene> {
         s("24-five-pausemenu-onquad", Freestyle5, MapKind::SkatePark, false, S::PauseMenu, 7.0, "Pause Menu at 2.5 s: Quad silent, background dips, menu click; Resume at 5 s"),
         s("22-whoop-flyby-standing", Whoop65, MapKind::SkatePark, true, S::Path(PathKind::FlyBy), 10.0, "whoop fly-by at 11 m/s, 8 m in front"),
     ];
-    v.push(Scene { clip: true, ..s("09-five-punchout-onquad-clipping", Freestyle5, MapKind::SkatePark, false, S::PunchOut, 9.0, "as 07, with clipping on") });
     v.sort_by_key(|s| s.name);
     v
 }
@@ -177,9 +177,9 @@ impl Offline {
 fn run_scene(scene: &Scene, tuning: &Tuning, maps: &HashMap<MapKind, Arc<MapGeom>>, sr: u32) -> (Vec<f32>, Duration, f32) {
     let mut tuning = tuning.clone();
     tuning.listener.where_you_stand = scene.stand;
-    tuning.listener.clip_on = scene.clip || tuning.listener.clip_on && !scene.name.contains("onquad") || (scene.clip);
-    if !scene.clip && scene.name.contains("onquad") {
-        tuning.listener.clip_on = false;
+    if std::env::var("T34_NOBG").is_ok() {
+        // Diagnostics: the Quad alone, so the trace's rms is the Quad's.
+        tuning.volumes.background = 0.0;
     }
     let block = 256;
     let t_setup = Instant::now();
@@ -289,7 +289,7 @@ pub fn render(names: &[String], tuning: &Tuning, out_dir: &Path) {
             "| `{}.wav` | {} | {} | {} | {:.2} |\n",
             scene.name,
             scene.quad.label(),
-            if scene.stand { "Where you stand" } else if scene.clip { "On the Quad + clipping" } else { "On the Quad" },
+            if scene.stand { "Where you stand" } else { "On the Quad" },
             scene.what,
             peak
         ));

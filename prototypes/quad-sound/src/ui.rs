@@ -322,7 +322,7 @@ fn clip_combo(ui: &mut egui::Ui, label: &str, value: &mut String, manifest: &[Cl
     let before = value.clone();
     let short = |f: &str| f.rsplit('/').next().unwrap_or(f).trim_end_matches(".ogg").to_string();
     egui::ComboBox::from_label(label).selected_text(short(value)).width(240.0).show_ui(ui, |ui| {
-        for c in manifest.iter().filter(|c| c.group == group) {
+        for c in manifest.iter().filter(|c| c.group == group && !c.notes.starts_with("REJECTED")) {
             ui.selectable_value(value, c.file.clone(), short(&c.file)).on_hover_text(format!(
                 "{}\n{} — {}\n{}\n{}",
                 c.title, c.author, c.licence, c.source_page, c.notes
@@ -724,10 +724,7 @@ impl App {
         });
         egui::CollapsingHeader::new("On the Quad (camera mic)").default_open(true).show(ui, |ui| {
             let l = &mut self.tuning.listener;
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut l.comp_on, "compressor");
-                ui.checkbox(&mut l.clip_on, "clipping (try it)");
-            });
+            ui.checkbox(&mut l.comp_on, "compressor");
             knob_ui(ui, l.knobs_onquad());
         });
         egui::CollapsingHeader::new("Where you stand").default_open(true).show(ui, |ui| {
@@ -767,9 +764,9 @@ impl App {
                 }
             });
             clip_combo(ui, "Skate Park background", &mut c.skate_park_background, &m, "background-skate-park");
-            ui.add(egui::Slider::new(&mut c.skate_park_level, 0.0..=2.0).text("Skate Park level"));
+            ui.add(egui::Slider::new(&mut c.skate_park_level_db, -30.0..=20.0).text("Skate Park level dB"));
             clip_combo(ui, "Bando background", &mut c.bando_background, &m, "background-bando");
-            ui.add(egui::Slider::new(&mut c.bando_level, 0.0..=2.0).text("Bando level"));
+            ui.add(egui::Slider::new(&mut c.bando_level_db, -30.0..=20.0).text("Bando level dB"));
             if let Some((f, hit)) = preview {
                 if hit {
                     let g = self.tuning.block(self.quad).hit_level;

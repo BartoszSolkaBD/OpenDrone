@@ -142,6 +142,18 @@ impl MapGeom {
         n
     }
 
+    /// Walls on the line, averaged over five parallel lines spread `spread` metres sideways and
+    /// up/down (as the Video Signal averages over the wave's width, ADR-0019). A column or a rail
+    /// then blocks only part of the sound; a building blocks all of it.
+    pub fn walls_averaged(&self, a: Vec3, b: Vec3, spread: f32) -> f32 {
+        let d = (b - a).normalize_or_zero();
+        let side = d.cross(Vec3::Z).normalize_or(Vec3::X);
+        let up = side.cross(d).normalize_or(Vec3::Z);
+        let offs = [Vec3::ZERO, side * spread, -side * spread, up * spread, -up * spread];
+        let total: u32 = offs.iter().map(|o| self.walls_crossed(a + *o, b + *o)).sum();
+        total as f32 / offs.len() as f32
+    }
+
     /// The largest part by footprint (the Bando tower, the Skate Park's bowl), for the
     /// "around/through the building" paths.
     pub fn main_feature(&self) -> Option<&Obj> {

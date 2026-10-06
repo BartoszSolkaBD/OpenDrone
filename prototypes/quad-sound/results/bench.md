@@ -6,10 +6,10 @@ Machine: Apple M4
 
 | Quad | Listening Position | % of one core |
 |---|---|---|
-| Whoop 65 (Meteor65 Pro) | On the Quad | 1.12% |
-| Whoop 65 (Meteor65 Pro) | Where you stand | 1.14% |
-| Freestyle 5" | On the Quad | 1.30% |
-| Freestyle 5" | Where you stand | 1.32% |
+| Whoop 65 (Meteor65 Pro) | On the Quad | 1.23% |
+| Whoop 65 (Meteor65 Pro) | Where you stand | 1.12% |
+| Freestyle 5" | On the Quad | 1.46% |
+| Freestyle 5" | Where you stand | 1.48% |
 
 ## Live stream on the default output device (master volume 0, so nothing is heard)
 
@@ -17,9 +17,9 @@ Output delay is what CoreAudio reports through cpal: the device buffer plus the 
 
 | Requested block | Block in use | Sample rate | Output delay (callback to speaker) | Worst case tick to speaker (+ one block wait) | Tick age at read | Peak CPU in a block | Device |
 |---|---|---|---|---|---|---|---|
-| 64 | 64 frames (1.3 ms) | 48000 Hz | 3.5 ms | 4.9 ms | 0.67 ms | 9.9% | External Headphones |
-| 128 | 128 frames (2.7 ms) | 48000 Hz | 4.9 ms | 7.5 ms | 0.67 ms | 6.7% | External Headphones |
-| 256 | 256 frames (5.3 ms) | 48000 Hz | 7.5 ms | 12.9 ms | 0.65 ms | 4.9% | External Headphones |
-| 512 | 512 frames (10.7 ms) | 48000 Hz | 12.9 ms | 23.5 ms | 0.62 ms | 10.6% | External Headphones |
-| 1024 | 1024 frames (21.3 ms) | 48000 Hz | 23.5 ms | 44.9 ms | 0.60 ms | 9.9% | External Headphones |
-| device default | 1024 frames (21.3 ms) | 48000 Hz | 23.5 ms | 44.9 ms | 0.60 ms | 9.9% | External Headphones |
+| 64 | 64 frames (1.3 ms) | 48000 Hz | 3.5 ms | 4.9 ms | 0.66 ms | 10.7% | External Headphones |
+| 128 | 128 frames (2.7 ms) | 48000 Hz | 4.9 ms | 7.5 ms | 0.68 ms | 7.3% | External Headphones |
+| 256 | 256 frames (5.3 ms) | 48000 Hz | 7.5 ms | 12.9 ms | 0.68 ms | 5.4% | External Headphones |
+| 512 | 512 frames (10.7 ms) | 48000 Hz | 12.9 ms | 23.5 ms | 0.62 ms | 11.9% | External Headphones |
+| 1024 | 1024 frames (21.3 ms) | 48000 Hz | 23.5 ms | 44.9 ms | 0.49 ms | 11.4% | External Headphones |
+| device default | 1024 frames (21.3 ms) | 48000 Hz | 23.5 ms | 44.9 ms | 0.54 ms | 11.6% | External Headphones |

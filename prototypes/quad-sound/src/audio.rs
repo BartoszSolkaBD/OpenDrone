@@ -95,26 +95,8 @@ pub fn decode_clip(file: &str, sr: u32, trim_hit: bool) -> Option<Vec<Vec<f32>>>
             }
         }
     }
-    // The candidates were recorded at very different levels (-64 to -18 dBFS RMS), so for a fair
-    // comparison: backgrounds are matched to -30 dBFS RMS and hits to a -1 dBFS peak. The Map's
-    // own level and the group volumes then apply on top.
-    let gain = if file.contains("background") {
-        let ch0 = &data[0];
-        let rms = (ch0.iter().map(|x| x * x).sum::<f32>() / ch0.len().max(1) as f32).sqrt();
-        10f32.powf(-30.0 / 20.0) / rms.max(1e-6)
-    } else if trim_hit {
-        let peak = data.iter().flat_map(|c| c.iter()).fold(0.0f32, |a, &b| a.max(b.abs()));
-        10f32.powf(-1.0 / 20.0) / peak.max(1e-6)
-    } else {
-        1.0
-    };
-    if gain != 1.0 {
-        for ch in data.iter_mut() {
-            for s in ch.iter_mut() {
-                *s *= gain;
-            }
-        }
-    }
+    // Files play as recorded (#34 reaction 14): the Map's level and the sound block's hit level
+    // set the loudness.
     Some(data)
 }
 
@@ -255,11 +237,12 @@ impl Engine {
     }
 
     fn set_volumes(&mut self, v: &Volumes, tuning: &Tuning) {
-        let bg_level = if self.bg_file == tuning.clips.bando_background {
-            tuning.clips.bando_level
+        let bg_db = if self.bg_file == tuning.clips.bando_background {
+            tuning.clips.bando_level_db
         } else {
-            tuning.clips.skate_park_level
+            tuning.clips.skate_park_level_db
         };
+        let bg_level = 10f32.powf(bg_db / 20.0);
         let pause = if self.paused { v.pause_background } else { 1.0 };
         // Sliders use Firewheel's Volume::Linear (amplitude = value²). The Map's level and the
         // pause dip are amplitudes, so they go in under the square root.

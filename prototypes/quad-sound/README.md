@@ -13,6 +13,7 @@ Throwaway. It answers one question: **does the live Quad sound feel right, On th
 ./run.sh bench              # CPU cost + live block size and output delay (silent), into results/bench.md
 ./run.sh --no-device        # the app as if there were no sound device
 ./run.sh nodevice           # the same path, headless
+./run.sh analyze FILE 3 7   # spectrum of FILE (wav or ogg) between 3 and 7 s
 ./run.sh --load NAME.toml   # start from a saved tuning (tuning/NAME.toml)
 ```
 
@@ -52,42 +53,44 @@ The top bar shows the live sample rate, block size, output delay, how old the ne
 
 ## What makes the sound (all in `src/synth.rs`)
 
-- **Each motor's voice** comes from its simulated speed and current:
-  - the blade-pass tone (blades × rotation rate) with its overtones
-  - the tones between them, from blades that aren't quite alike (growl)
-  - the 1× shaft tone
-  - broadband whoosh that pulses at the blade rate
-  - the motor's electrical whine (pole pairs × rotation rate)
+Round 2 rebuilt the voice against real recordings; see `results/reference-spectra.md`.
 
-  Load (current) makes it louder and brighter. Four voices at slightly different speeds beat against each other.
+- **Each motor's voice** comes from its simulated speed and current:
+  - **The blade-pass tone** (blades × rotation rate) dominates. Its overtones fall off steeply.
+  - **Weaker shaft-rate tones** sit between them.
+  - **Broadband whoosh**, pulsing at the blade rate, and a high **hiss** carry about half the energy, as in the Tiny Hawk 2 recording.
+  - **The tones aren't steady.** Each motor's speed wobbles a little, each tone's strength flutters, and each prop's overtones differ slightly.
+  - **Load (current)** makes it louder and brighter.
+  - **The motor's electrical whine** stays weak, as measured.
 - **The rest of the Quad:**
-  - Frame hum, partly following the motors and partly a fixed frame ring.
-  - Bluejay's ESC tones as its two current pulses per period (≈199 µs apart) ringing the motor bell.
-  - Betaflight's active buzzer, gated by the real beeper patterns.
-  - Prop Strike ticks, one per blade passing while it rubs.
-- **On the Quad:**
-  - the camera mic's low cut
+  - **Frame hum.**
+  - **Bluejay's ESC tones**, made as its two current pulses per period ringing the motor bell.
+  - **Betaflight's active buzzer**, gated by the real beeper patterns.
+  - **Prop Strike ticks**, one for each blade passing while it rubs.
+- **On the Quad:** the camera mic, with:
+  - a low cut and a high cut
   - wind on the mic from airspeed and the props' downwash
-  - a camera-style compressor whose attack lets the first instant of a punch-out through
-  - optional clipping
+  - a camera-style compressor with a 20 ms attack, so the first instant of a punch-out gets through
+
+  Clipping was tried in round 1 and dropped.
 - **Where you stand:**
-  - travel time at 343 m/s through a variable delay, so Doppler comes from the physics and isn't added on top
-  - 1/distance beyond a "full level" radius
-  - air absorption
-  - wall muffling from a "which Map parts does this line cross" check on the #17 blockouts
-  - a safety limiter for a punch-out right next to you
-  - no wind, and no echo yet
+  - **Travel time** at 343 m/s through a variable delay. Doppler comes from that delay, not from a separate effect.
+  - **Distance:** the sound falls off as 1/distance beyond a "full level" radius, plus air absorption.
+  - **Walls muffle, never silence.** They cut the highs and the level, at most about 15 dB for the highs plus 9 dB overall. The prototype counts walls along five parallel lines 1 m apart, so a column or a rail blocks only part of the sound.
+  - **A safety limiter** stops a punch-out right next to you from clipping.
+  - **No wind on the mic, and no echo yet.**
 
 ## Where the numbers come from
 
 - **Motor model** (`src/quads.rs`, *not* tunable here, because a sound is never fixed by moving a physics number): `docs/research/flight-dynamics.md` §8–9 and the `diff all` exports.
-  - **Whoop:** 0802SE 19500KV, 35 mm 3-blade, 1S, 12 poles, DShot300, idle 6%. It hovers at ≈18,000 RPM (blade-pass ≈900 Hz) and tops out at ≈36,000 RPM.
+  - **Whoop:** 0802SE 19500KV, 35 mm 3-blade, 1S, 12 poles, DShot300, idle 6%. It hovers at ≈22,700 RPM (blade-pass ≈1,140 Hz) and tops out at ≈45,000 RPM. Round 2 corrected the thrust coefficient for 35 mm props; see `results/reference-spectra.md` §1.
   - **5″:** 1750KV, 5.1″ 3-blade, 6S, 14 poles, idle 5.5%. It hovers at ≈9,400 RPM (≈470 Hz) and tops out at ≈29,600 RPM.
 - **Beeps** (`src/beeps.rs`): Bluejay v0.21.0 and Betaflight 2026.6.2 source. Every figure is traced, with file and line, in `results/beeps-facts.md`.
 - **Clips** (`assets/clips.toml`): all CC0 1.0, each checked on its source page, with SHA-256. `assets/fetch-clips.sh` downloads and verifies them; the files themselves aren't committed.
 
 ## Results
 
+- `results/reference-spectra.md`: the physics pitch check, and real recordings against the synth.
 - `results/bench.md`: CPU cost and live delay on the M4.
 - `renders/README.md`: what each rendered file is.
 - `results/ui-screenshot.png`: the window.

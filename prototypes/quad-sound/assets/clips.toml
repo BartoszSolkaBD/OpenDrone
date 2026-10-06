@@ -391,7 +391,7 @@ duration_s = 139.5
 channels = 2
 sample_rate = 48000
 format = "Ogg Vorbis"
-notes = "HQ preview, not the original (original upload: Wave, 48 kHz, 24-bit, stereo, 2:19.500). What you hear (from the uploader's description/tags, not listened to): urban ambience outside an apartment building on a sunny, dry day: birds singing, distant traffic hum, one car horn and a plane passing overhead (Zoom H2n). No voices mentioned; the horn and plane may need cutting for a clean loop."
+notes = "REJECTED by the maintainer (#34, round 1). HQ preview, not the original (original upload: Wave, 48 kHz, 24-bit, stereo, 2:19.500). What you hear (from the uploader's description/tags, not listened to): urban ambience outside an apartment building on a sunny, dry day: birds singing, distant traffic hum, one car horn and a plane passing overhead (Zoom H2n). No voices mentioned; the horn and plane may need cutting for a clean loop."
 
 [[clip]]
 group = "background-skate-park"
@@ -408,7 +408,7 @@ duration_s = 107.0
 channels = 2
 sample_rate = 96000
 format = "Ogg Vorbis"
-notes = "HQ preview, not the original (original upload: Wave, 96 kHz, 24-bit, stereo, 1:47.000). What you hear (from the uploader's description/tags, not listened to): a real skate park next to a street, traffic audible (Moscow, 2023). Tags include children, people, city, street: VOICES ARE LIKELY, intelligibility unknown; must be checked by ear before use."
+notes = "REJECTED by the maintainer (#34, round 1). HQ preview, not the original (original upload: Wave, 96 kHz, 24-bit, stereo, 1:47.000). What you hear (from the uploader's description/tags, not listened to): a real skate park next to a street, traffic audible (Moscow, 2023). Tags include children, people, city, street: VOICES ARE LIKELY, intelligibility unknown; must be checked by ear before use."
 
 [[clip]]
 group = "background-bando"
