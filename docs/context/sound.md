@@ -20,19 +20,33 @@ _Avoid_: Ambience, ambient sound, environment sound
 - Each motor has its own voice. You hear Prop Wash and the Flight Controller's corrections as the motors warble, never as a sound of their own. Nothing is heard that the Simulation didn't do.
 - A sound is never fixed by moving a physics number. If the pitch in a hover sounds wrong while the sound block is right, that's raised as a possible physics problem for a Feel Test.
 - The sound block carries no Confidence, because it isn't physics.
+- **The sound block describes only its Quad**:
+  - the motor and prop voice
+  - frame hum
+  - beep levels
+  - Prop Strike ticks
+  - hit level
+  - how loud the Quad is Where you stand
+
+  Everything about the listener is the game's, the same for every Quad: the camera mic, wind on the mic, the compressor, and distance, air and walls. A Pack's Quad never carries listener settings.
+- **A small sound-side wobble in each motor's speed** widens each motor's tone. It stands in for turbulence faster than the Simulation's tick, which the Simulation doesn't model. It's checked again once the real physics exists. It changes nothing in a flight.
+- **The voice isn't final.** It's reworked and tuned by ear during the build. The starting point is the [#34 prototype](https://github.com/BartoszSolkaBD/OpenDrone/issues/34)'s second round ([research](../research/quad-sound.md)), and the maintainer's own recording of their Meteor65 Pro is the reference.
 
 ### Listening Positions
 
 - **On the Quad**, the default, sounds like a camera recording made on board:
   - the motors and props, close and loud
   - wind on the microphone, growing steeply with airspeed and with the props' downwash
-  - a camera-style compressor, so a punch-out swells and everything else ducks, with the first instant of the swell slipping through
+  - a camera-style compressor, so a punch-out swells and everything else ducks, with the first instant of the swell slipping through. Its attack is about 20 ms.
   - a frame hum that follows the motors
+  - no clipping: it was tried, and dropped
 - **Where you stand**, at the Launch Spot:
   - The sound fades with distance.
   - It arrives late, at the speed of sound: about 0.15 s at 50 m.
   - Its pitch shifts as the Quad flies past.
   - The Map's walls muffle it, along the line from the Quad to the pilot.
+    - **Walls muffle and never silence.** They cut the highs and lower the level a little, and the total cut is capped, because sound bends round a building.
+    - **Walls are counted along five parallel lines 1 m apart**, not one, in the spirit of the Video Signal's averaging over the wave's width ([ADR-0019](../adr/0019-video-signal-averages-walls-over-the-wave-width.md)). So a column or a rail blocks only part of the sound, and the muffling builds up gradually as the Quad goes behind a wall.
   - There's no wind on a microphone, and beeps and crashes fade with distance like the motors.
   - Echo off the Map comes later.
 
@@ -59,7 +73,7 @@ _Avoid_: Ambience, ambient sound, environment sound
 
 - Prop Strikes are made live: one tick for each blade that hits, as fast as the slowing prop and as hard as the rub.
 - Hits and menu sounds are CC0 recordings.
-- Each Map carries its Background Sound in its Pack, as a CC0 loop with its own level.
+- Each Map carries its Background Sound in its Pack, as a CC0 loop with its own level in dB. The file stays as recorded, and the Map's level sets how loud it plays.
 - Every outside sound file is CC0 and is listed in `CREDITS.md` with its source and checksum.
 - There's no music. Pilots who want music play their own.
 
@@ -81,6 +95,7 @@ _Avoid_: Ambience, ambient sound, environment sound
   - Menus click.
   - Resume brings the Quad back along with the Simulation.
 - **The Hub and the loading screen** play menu sounds only.
+- **The sound device:** the game asks for a 256-frame block, about 5 ms at 48 kHz. If the device can't do that, it takes the device's default. Firewheel's own default is 1024 frames, about 23 ms, which is too slow.
 - **No sound device at start:** the game runs silent and says so once on the Hub.
 - **Sound device lost in flight:** the sound moves to the new default device, and nothing pauses.
 - **Window in the background:** sound keeps playing.
