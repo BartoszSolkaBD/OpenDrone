@@ -1,6 +1,6 @@
 # Camera and video
 
-What the pilot sees through the Quad's FPV Camera, and how its video reaches them. Back to the [map](../../CONTEXT.md).
+What the pilot sees through the Quad's FPV Camera, how its video reaches them, and the OSD laid over it. Back to the [map](../../CONTEXT.md).
 
 ## Language
 
@@ -40,6 +40,14 @@ _Avoid_: WDR, HDR (those are camera makers' claims, not what reaches the goggles
 The FPV Camera brightening or darkening its picture as the light changes, within limits and over about a second, as a real camera does. Flying into a dark room starts near black with the windows blown out; flying back out blows out before the picture recovers.
 _Avoid_: Eye adaptation, auto-brightness
 
+**OSD**:
+The text and symbols the Flight Controller lays over the FPV picture, copied from Betaflight: battery voltage, timers, Flight Mode, warnings and the like, each an element on a grid of 30 × 13 characters. In Analog it rides the video; in Digital the goggles draw it. The sim's own notices aren't part of it.
+_Avoid_: HUD, overlay
+
+**OSD layout**:
+Which OSD elements show and where, plus the OSD's own options: the timers, which warnings and statistics are on, and the alarms. It belongs to the pilot and is the same on every Quad.
+_Avoid_: OSD config, HUD layout
+
 ## Rules
 
 - Camera settings never touch the physics, so they can change mid-flight.
@@ -54,7 +62,17 @@ _Avoid_: Eye adaptation, auto-brightness
 - Digital always shows the picture a little later than Analog, as real digital systems do. The delay is in the picture only, never in the sticks.
 - On Light the picture is never lost completely. With Reduce motion on, Breakup flashes at most 3 times a second.
 - In Analog, Betaflight's OSD rides the video, so Breakup hits it too. In Digital the OSD stays clean. The sim's own notices always sit clean on top of the video.
+- The OSD is Betaflight 2026.6's, copied: its element texts, its warnings in their order with their 2 Hz blink, `ARMED` at arming and the statistics page after disarming. It shows only what the real quad could know. Elements with no source in the sim, such as GPS speed, temperatures, RSSI or a current reading on a Quad with no current sensor, stay blank.
+- The OSD layout is the pilot's, one for every Quad. It never lives in a Tune or a Quad definition, and no Preset changes it. Pilots change it by pasting `osd_*` lines from the Betaflight CLI or by switching elements on and off.
+- Both Video Looks use one OSD layout on Betaflight's NTSC grid of 30 × 13 characters. In 16:9 the grid keeps its 4:3 shape, centred at full height.
+- In Analog the OSD joins the picture after the camera: it gets no Lens bend, Auto-exposure or colour, then passes through the analog link with the picture, with the same softness, grain, static, tearing and roll.
+- In Digital the OSD is drawn crisp, in a cleaner font, and travels with the picture: it's as late as the picture, stays live while the picture stutters and freezes on its last values while the picture is frozen.
+- The OSD fonts are our own, CC0, drawn on Betaflight's character map. Betaflight's own fonts are GPL ([ADR-0014](../adr/0014-licences-for-libraries-and-assets.md)).
+- Text size never scales the OSD, which is part of the picture. It scales the sim's notices and the menus.
+- The sim's notices in flight (the Camera Tilt, FOV and Flight Mode readouts and the device notice) sit at the top centre of the picture, one line at a time.
+- In Digital only, the goggles also show Video Signal bars, which the pilot can switch off. Analog shows none, as analog goggles don't.
+- The OSD is worked out beside the Simulation, from the Flight Controller's state, 12 times a second in Simulation Time. It never changes a flight ([ADR-0022](../adr/0022-osd-worked-out-beside-the-simulation.md)).
 - Graphics quality tiers may change how sharp the picture is, never the Lens, FOV, Breakup or Digital's delay. Every machine shows the same signal.
 - All camera and video effects together fit in 2 ms of a High-tier frame on the dev machine, and the Map is drawn once per frame ([ADR-0009](../adr/0009-fisheye-from-one-warped-render.md)).
-- Only the camera's own steps count against those 2 ms: the merged pass and what feeds it. Drawing the Map wider than the picture, for the fisheye, counts as drawing the Map, under the 45 fps promise.
+- Only the camera's own steps count against those 2 ms: the merged pass and what feeds it. The OSD is drawn inside the merged pass, so it counts too. Drawing the Map wider than the picture, for the fisheye, counts as drawing the Map, under the 45 fps promise.
 - Shade sits about 2–3 stops below sun and the inside of a building about 5–6 stops below. Auto-exposure needs those ratios to look right, so a Map's lighting must keep them.

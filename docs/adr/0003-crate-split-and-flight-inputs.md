@@ -8,7 +8,7 @@ The code is one Cargo workspace of eleven unpublished crates that share one vers
 |---|---|---|
 | `opendrone-maths` | core | Shared 64-bit number types and the house-rule maths ([ADR-0004](0004-parry3d-geometry-only-f64.md)) |
 | `opendrone-physics` | core | Quad physics and Map collisions, including a "held on a thrust stand" set-up |
-| `opendrone-flight-controller` | core | Our Betaflight-style Flight Controller, plus the Betaflight CLI translator (Rates paste, `diff all` import), which takes text in and opens no files |
+| `opendrone-flight-controller` | core | Our Betaflight-style Flight Controller, plus the Betaflight CLI translator (Rates paste, `diff all` import), which takes text in and opens no files, and Betaflight's OSD logic, which runs beside the Simulation ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
 | `opendrone-sim` | core | The Simulation: Flight Inputs, Radio Link, Assists, Flight Controller, physics and session state |
 | `opendrone-test-pilot` | core | The Test Pilot: reads the state and moves only the sticks, from outside the front door |
 | `opendrone-input` | edge | Input Devices on their own thread, on SDL 3.4 ([ADR-0018](0018-input-through-sdl3-on-its-own-thread.md)) |
@@ -62,10 +62,11 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 | `input` → the game | Channels at the device's full resolution, with every button's state, and lost / back; all stamped with the computer's clock |
 | the game, `scenario` or `test-pilot` → `sim` | Flight Inputs: Channels (Arm, Flight Mode and Crash Flip are switch Channels with fixed meanings, [ADR-0017](0017-switches-reach-the-flight-controller-with-fixed-meanings.md)), an Input Device lost or back, and Reset; each stamped with Simulation Time |
 | `pack` → `sim` (set-up) | Quad definitions with their Tune, Map collision shapes, the Launch Spot, world values; plus the pilot's settings and a random seed from the caller |
-| `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts |
+| `sim` → its caller | after each tick, every Quad's state: position, attitude, speeds, each motor's speed, thrust, torque and current, battery voltage and charge, armed state, Flight Mode, Failsafe state and contacts, plus the Flight Controller's readings for the OSD ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
 | `sim` → its caller, when asked | the flight log stream: setpoint, gyro, P, I, D and F terms, motor commands and battery voltage at the loop rate. It's off by default and costs nothing while off |
 | `sim` → the game (read only) | "which Map surfaces does this line pass through, and where?", for the FPV camera's signal model. It never changes state |
-| `sim` ↔ `flight-controller` | in: sensor readings, Channels and the time step. Out: 4 motor commands, each with its spin direction, and a debug record |
+| `sim` ↔ `flight-controller` | in: sensor readings, Channels and the time step. Out: 4 motor commands, each with its spin direction, a debug record, and what Betaflight's OSD reads: why arming is blocked, the Failsafe phase, the battery state, Crash Flip state and the beeper |
+| the game or `scenario` → the OSD, beside `sim` | in: each tick's Flight Controller readings and the pilot's OSD layout. Out: the OSD screen, 12 times a second in Simulation Time. Nothing flows back into `sim` ([ADR-0022](0022-osd-worked-out-beside-the-simulation.md)) |
 | `sim` ↔ `physics` | in: motor commands, each with its spin direction for Crash Flip ([ADR-0012](0012-crashes-behave-like-a-real-quad.md)), and the time step. Out: the new Quad state and sensor readings |
 
 ## Rules at the front door

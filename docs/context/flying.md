@@ -76,6 +76,7 @@ _Avoid_: Accuracy, certainty
 - Only Estimate numbers move in a Feel Test, and only inside their range. Measured, Manufacturer and Derived numbers are locked: if only a locked number would fix a feel, an effect is missing or wrong. A locked number changes only with a new source.
 - A Tune spells out every setting the Flight Controller reads, each marked with where its value came from: the real quad, its Betaflight version's default, or a translation rule ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)).
 - Which switch arms the Quad or picks the Flight Mode belongs to the pilot's Input Device profile, never to the Tune. It's the same on every Quad.
+- Whether a Quad measures its current is its Tune's `current_meter` setting, as in Betaflight. `ADC` or `ESC` means the Flight Controller reads the battery current from the physics, so the OSD can show current and mAh. Any other value reads blank. The Whoop 65 has `ADC`, its board's default; the Freestyle 5″ has `ADC` set by hand, because a typical 5″ stack measures current.
 - Whoop numbers come from whoop data, never from scaled-down 5" numbers.
 - A crash never disarms or resets the Quad on its own. As in Betaflight, the pilot disarms, Failsafe drops the Quad, or the pilot presses Reset.
 - Nothing on a Quad breaks or wears out in the alpha. A Prop Strike only brakes the motor, and the ESC restarts it as Bluejay does.
