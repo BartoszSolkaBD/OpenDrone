@@ -204,9 +204,12 @@ pub fn check_feel_test_rules(
             "the Feel Test log rules can't be checked until this file passes the Pack checker (`cargo xtask packs`)".into(),
         );
     };
-    let Ok(before_quad) = quad::read_quad_file(quad_file, before_text) else {
+    // The version before may come from an older checker that read less, so
+    // every setting of it that still reads is compared.
+    let Ok((before_quad, _)) = quad::read_quad_file_as_far_as_it_goes(quad_file, before_text)
+    else {
         return one(
-            "the version before this change can't be read, so the Feel Test log rules can't compare it".into(),
+            "the version before this change isn't readable TOML, so the Feel Test log rules can't compare it".into(),
         );
     };
     let read_log = |text: Option<&str>| match text {

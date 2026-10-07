@@ -44,6 +44,20 @@ fn a_pull_request_that_renames_a_scenario_to_markdown_runs_the_rust_checks() {
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_only_changes_a_quads_feel_test_log_runs_the_rust_checks() {
+    // The Pack checker reads each Quad's feel-tests.md, so a change to one is
+    // checked even though it's Markdown.
+    let repo = Repo::new("feel-test-log");
+    repo.write(
+        "packs/opendrone/quads/whoop-65/feel-tests.md",
+        "# Feel Test log: Whoop 65\n\n| Date | Number | Old → new | Why |\n|---|---|---|---|\n| 2026-11-09 | [props] grip | 0.5 → 0.6 | wall bumps stuck too hard |\n",
+    );
+    let outputs = repo.commit_and_check("pull_request");
+    assert_eq!(outputs["rust"], "true", "{outputs:?}");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
 fn a_pull_request_that_changes_a_text_file_under_docs_runs_the_rust_checks() {
     let repo = Repo::new("docs-text-file");
     repo.write(

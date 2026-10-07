@@ -14,12 +14,17 @@
 //! - `check-links`: the book's link check alone, on a book that's built.
 //! - `scenario-catalogue`: prints the catalogue of every Scenario, the page the
 //!   book shows ([`scenario_catalogue`]).
+//! - `packs`: the Pack checker, over every Pack in `packs/` and every Test
+//!   Quad in `scenarios/test-quads/`.
+//! - `feel-tests --base <revision>`: the Feel Test log rules, comparing every
+//!   Quad definition with the one at `<revision>`.
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
 use std::process::ExitCode;
 
 mod book;
+mod packs;
 mod scenario_catalogue;
 mod walls;
 
@@ -41,7 +46,16 @@ Commands:
       Check every link in a book that's already built.
   scenario-catalogue [<folder>]
       Print the catalogue of every Scenario in a folder (default scenarios),
-      as the book shows it.";
+      as the book shows it.
+  packs
+      Check every Pack in packs/ and every Test Quad in scenarios/test-quads/
+      with the Pack checker, listing every problem with its file and line.
+  feel-tests --base <git revision>
+      Compare every Quad definition with the one at <git revision> (in CI,
+      HEAD^1, the pull request's base): an Estimate that moved needs a new
+      row in its feel-tests.md and must stay inside its range, and a
+      Measured, Manufacturer or Derived number that changed needs a new
+      source.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -55,6 +69,8 @@ fn main() -> ExitCode {
         "book-preprocessor" => book::preprocessor::run(rest),
         "check-links" => book::run_link_check(rest),
         "scenario-catalogue" => scenario_catalogue::run(rest),
+        "packs" => packs::run_packs(rest),
+        "feel-tests" => packs::run_feel_tests(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)

@@ -132,6 +132,18 @@ pub fn label(name: &str) -> String {
 /// Reads a Quad definition's file: its shape, Confidences, sources and
 /// ranges. [`check_quad`] reads the values.
 pub fn read_quad_file(file: &str, text: &str) -> Result<QuadFile, Problems> {
+    let (quad, problems) = read_quad_file_as_far_as_it_goes(file, text)?;
+    problems.or(quad)
+}
+
+/// Reads as much of a Quad definition's file as passes, and every problem
+/// with the rest: every setting whose own line is fine is kept. The Feel Test
+/// log rules use it to read the version before a change, which an older
+/// checker may have passed. It fails only when the file isn't readable TOML.
+pub fn read_quad_file_as_far_as_it_goes(
+    file: &str,
+    text: &str,
+) -> Result<(QuadFile, Problems), Problems> {
     let text = document::upgraded(file, text, document::PACK_UPGRADES)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
@@ -218,7 +230,7 @@ pub fn read_quad_file(file: &str, text: &str) -> Result<QuadFile, Problems> {
         }
     }
     let text = |key: &str| texts.get(key).cloned().unwrap_or_default();
-    problems.or(QuadFile {
+    let quad = QuadFile {
         file: file.to_string(),
         name: text("name"),
         description: text("description"),
@@ -226,7 +238,8 @@ pub fn read_quad_file(file: &str, text: &str) -> Result<QuadFile, Problems> {
         picture: text("picture"),
         settings,
         sources,
-    })
+    };
+    Ok((quad, problems))
 }
 
 fn read_section(

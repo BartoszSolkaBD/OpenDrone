@@ -221,3 +221,31 @@ fn a_new_quad_has_nothing_to_compare() {
     );
     assert!(found.is_empty());
 }
+
+#[test]
+fn a_version_an_older_checker_passed_is_still_compared_number_by_number() {
+    // Before #40 a Quad file held only a few sections; whatever of it still
+    // reads is compared.
+    let older = "format = 1\nname = \"Ducted\"\n\n[frame]\ndry_mass = { value = \"23.0 g\", confidence = \"Manufacturer\", source = \"maker\" }\n\n[sources]\nmaker = \"the maker's page\"\n";
+    let (quad, log) = before();
+    let quad = quad.replacen("\"23.0 g\"", "\"24.0 g\"", 1);
+    let found = check_feel_test_rules(
+        QUAD,
+        LOG,
+        QuadVersion {
+            quad: Some(older),
+            feel_tests: None,
+        },
+        QuadVersion {
+            quad: Some(&quad),
+            feel_tests: Some(&log),
+        },
+    );
+    assert_eq!(
+        found.to_string(),
+        at(
+            line_of(&quad, "24.0 g"),
+            "[frame] dry_mass is Manufacturer, so it's locked: it changed from 23.0 g to 24.0 g without a new source; name a new source, or update its line in [sources]"
+        )
+    );
+}
