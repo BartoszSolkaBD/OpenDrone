@@ -61,7 +61,7 @@ fn repo() -> Repo {
 /// A scratch copy of the repo's `scenarios/` and `packs/`.
 fn scratch(case: &str) -> Repo {
     let root: PathBuf = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join("migration")
+        .join("scenario-migration")
         .join(case);
     let _ = fs::remove_dir_all(&root);
     for folder in ["scenarios", "packs"] {

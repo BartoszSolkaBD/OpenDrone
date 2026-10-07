@@ -427,7 +427,7 @@ fn the_pack_steps_lead_one_format_at_a_time_from_format_1_to_the_newest() {
 /// pretend format 0, and the Quads without `restart_tries`.
 fn format_0_repo(case: &str) -> std::path::PathBuf {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join("migration")
+        .join("pack-migration")
         .join(case);
     let _ = fs::remove_dir_all(&root);
     for file in files_of(&repo()) {
