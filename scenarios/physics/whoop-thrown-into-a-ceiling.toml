@@ -1,7 +1,10 @@
 # The Whoop 65 is thrown straight up at 8 m/s from 1 m up on the Floor and
 # ceiling Test Map, whose floor and ceiling are triangle meshes, as a Map's
-# `.glb` gives them. It hits the ceiling, 3.1 m up, falls back to the floor,
-# bounces and settles. Shows E29 in #10 against triangle meshes.
+# `.glb` gives them. It hits the ceiling, 3.1 m up, and falls back to the
+# floor nearly flat (about 0.3° of tilt left from the ceiling), landing a
+# corner first at about 7.9 m/s. That spins it up to about 1,300 °/s: it flips
+# and settles upside down on its duct rings, its centre 15 mm up. Shows E29 in
+# #10 against triangle meshes.
 format = 1
 name   = "A whoop thrown into a ceiling"
 
@@ -44,15 +47,15 @@ timeline = [
 
 [[expect]]
 what    = "height"
-over    = "0 s to 3 s"
+over    = "0 s to 0.4 s"
 highest = "between 3 m and 3.0851 m"
-basis   = "rule: the ceiling is 3.1 m up and the whoop's duct rings reach 15 mm above its centre, so its centre can't rise above 3.085 m (the physics lets a part sit at most 0.1 mm inside a surface)"
+basis   = "rule: the ceiling is 3.1 m up. The whoop is thrown straight up, level and not turning, and nothing turns it in free flight, so it meets the ceiling level, with the tops of its duct rings, 15 mm above its centre: its centre can't rise above 3.085 m (the physics lets a part sit at most 0.1 mm inside a surface). It meets the ceiling at 0.326 s and comes away downward"
 
 [[expect]]
 what    = "height"
 over    = "0 s to 3 s"
 lowest  = "between 0.0099 m and 1 m"
-basis   = "rule: nothing of the whoop reaches lower than its body box, 10 mm below its centre, so the floor keeps its centre at least 0.01 m up (the physics lets a part sit at most 0.1 mm inside a surface); the top of the range only says it came back down"
+basis   = "rule: the whoop's body box, 20 mm tall round its centre and wider than tall, reaches at least 10 mm from its centre in every direction, so whichever way up it lands, the floor keeps its centre at least 0.01 m up (the physics lets a part sit at most 0.1 mm inside a surface); the top of the range only says it came back down"
 
 [[expect]]
 what  = "vertical speed"
@@ -65,3 +68,9 @@ what    = "speed"
 over    = "2.5 s to 3 s"
 highest = "0 m/s ± 0.000001 m/s"
 basis   = "observed: it has settled on the floor"
+
+[[expect]]
+what  = "height"
+at    = "3 s"
+value = "0.015 m ± 0.0001 m"
+basis = "observed: upside down on its duct rings, which reach 15 mm above its centre"

@@ -5,7 +5,7 @@ format   = 1
 scenario = "A whoop thrown into a ceiling"
 
 [[expect]]
-what     = "height, highest over 0 s to 3 s"
+what     = "height, highest over 0 s to 0.4 s"
 basis    = "Rule"
 expected = "between 3 m and 3.0851 m"
 measured = "3.08 m"
@@ -27,6 +27,12 @@ what     = "speed, highest over 2.5 s to 3 s"
 basis    = "Observed"
 expected = "0 m/s ± 0.000001 m/s"
 measured = "0 m/s"
+
+[[expect]]
+what     = "height at 3 s"
+basis    = "Observed"
+expected = "0.015 m ± 0.0001 m"
+measured = "0.0150 m"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"

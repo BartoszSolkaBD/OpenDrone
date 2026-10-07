@@ -45,9 +45,9 @@ timeline = [
 
 [[expect]]
 what    = "distance east"
-over    = "0 s to 0.25 s"
+over    = "0 s to 0.04 s"
 highest = "between 2 m and 2.985 m"
-basis   = "rule: the stub's near side is 3 m - 1.5 cm = 2.985 m east, and the 5-inch's centre of mass is inside its shape, so its centre can't reach 2.985 m without part of the Quad passing through the stub; in 0.25 s it can't go round the 2 m stub"
+basis   = "rule: the stub's near side is 3 m - 1.5 cm = 2.985 m east. Flying free, the 5-inch's front prop discs would meet it at about 0.031 s, and its centre would pass it at 0.033 s and be 3.2 m east by 0.04 s. Its centre is inside its shape, so by 0.04 s only passing through the stub could take its centre to 2.985 m: the stub stands from the ground to 2 m, so it can't go under it, nor over it (a 1 m climb); going round it needs its prop discs about 16 cm sideways in the 9 ms after they meet it"
 
 [[expect]]
 what  = "speed east"

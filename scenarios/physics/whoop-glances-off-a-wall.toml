@@ -46,7 +46,7 @@ timeline = [
 what    = "distance east"
 over    = "0 s to 0.5 s"
 highest = "between 4 m and 5 m"
-basis   = "rule: the wall's face is 5 m east, and the whoop's centre of mass is inside its shape, so its centre can't reach 5 m without part of the whoop passing through the wall"
+basis   = "rule: the wall's face is 5 m east, and the whoop's centre of mass is inside its shape, so its centre can't reach 5 m without part of the whoop passing through the wall or round it; the wall runs 10 m either side of the start and from the ground to 5 m, and in 0.5 s at 5 m/s north the whoop gets 2.5 m north and can't climb 3.5 m"
 
 [[expect]]
 what  = "speed east"

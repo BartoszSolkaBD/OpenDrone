@@ -5,7 +5,7 @@ format   = 1
 scenario = "A whoop at 30 m/s never passes through a 6 cm rail"
 
 [[expect]]
-what     = "distance east, highest over 0 s to 0.25 s"
+what     = "distance east, highest over 0 s to 0.04 s"
 basis    = "Rule"
 expected = "between 2 m and 2.97 m"
 measured = "2.93 m"

@@ -55,7 +55,12 @@
 //!    out at the Quad's bounce times the speed it came in at
 //!    ([`BOUNCE_PASSES`] times through). A hit found a gap away bounces from
 //!    where the step started, at most one step's travel short of the surface:
-//!    3.75 mm at 30 m/s and 8 kHz.
+//!    3.75 mm at 30 m/s and 8 kHz. Friction was worked out in step 2, so it
+//!    is capped by the push that stops the Quad, not by the bigger push that
+//!    also bounces it. So on a slanting hit, friction takes at most friction
+//!    × the speed into the surface off the speed along it, not friction ×
+//!    (1 + bounce) × that. Many physics engines simplify the same way, and
+//!    bounce and friction are Estimates that Feel Tests tune.
 //! 4. **Rest.** When the Map holds the Quad (it pushes and nothing bounced)
 //!    and what is left of its motion is below [`REST_SPEED`] and
 //!    [`REST_TURN`], the Quad stays exactly still. Step 2 works the pushes out
@@ -64,7 +69,11 @@
 //!    creep. A step's gravity alone gives a Quad 1.2 mm/s at 8 kHz, a hundred
 //!    times [`REST_SPEED`], so a Quad that friction can't hold still slides
 //!    away; only on a slope within about half a degree of the steepest its
-//!    friction holds does it stay put instead of creeping off.
+//!    friction holds does it stay put instead of creeping off. The rule acts
+//!    on each step's leftover motion, so what it holds depends on the physics
+//!    rate: any net push below [`REST_SPEED`] per step's length (0.08 m/s² at
+//!    8 kHz, 0.01 m/s² at 1 kHz) and any net turning below [`REST_TURN`] per
+//!    step's length (about 0.8 rad/s² at 8 kHz) is held too.
 //! 5. **The move,** redone from where the step started with the new speeds,
 //!    as the free move does it.
 //! 6. **The guard.** parry3d sweeps the Quad's shape along that move (a

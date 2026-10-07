@@ -45,9 +45,9 @@ timeline = [
 
 [[expect]]
 what    = "distance east"
-over    = "0 s to 0.25 s"
+over    = "0 s to 0.04 s"
 highest = "between 2 m and 2.97 m"
-basis   = "rule: the rail's near side is 3 m - 3 cm = 2.97 m east, and the whoop's centre of mass is inside its shape, so its centre can't reach 2.97 m without part of the whoop passing through the rail; in 0.25 s it can't go round the 10 m rail"
+basis   = "rule: the rail's near side is 3 m - 3 cm = 2.97 m east. Flying free, the whoop's front duct rings, 43 mm ahead of its centre, would reach it at 0.031 s, and its centre would pass it at 0.032 s and be 3.2 m east by 0.04 s. Its centre is inside its shape, so by 0.04 s only passing through the rail could take its centre to 2.97 m: the rail runs 5 m either side; going under it needs a 45 mm drop (from its top, 15 mm above its centre, to the rail's underside, 30 mm below), and gravity gives 8 mm in 0.04 s; going over it needs a 40 mm climb in the 9 ms after its ducts meet the rail"
 
 [[expect]]
 what  = "speed east"

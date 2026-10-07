@@ -9,7 +9,9 @@
 //!   use each other;
 //! - no core crate reaches, even through other libraries, Bevy or another
 //!   library on the never-in-core list, or any outside library missing from
-//!   the core-libraries list.
+//!   the core-libraries list;
+//! - no library the core reaches has a feature on the never-in-core-features
+//!   list turned on.
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -109,6 +111,17 @@ fn check(workspace: &Workspace, rules: &Rules) -> Vec<String> {
         }
         let library = workspace.name(&id);
         let chain = chain.join(" → ");
+        for feature in workspace.features(&id) {
+            if let Some(reason) = rules
+                .never_in_core_features
+                .get(&format!("{library}/{feature}"))
+            {
+                problems.push(format!(
+                    "The core reaches `{library}` with its `{feature}` feature turned on, which \
+                     it must never have: {reason}. It gets there through {chain}."
+                ));
+            }
+        }
         if let Some(reason) = rules.never_reason(library) {
             problems.push(format!(
                 "The core must never reach `{library}`: {reason}. It gets there through {chain}."
@@ -191,6 +204,8 @@ struct Rules {
     crates: BTreeMap<String, CrateRule>,
     core_libraries: BTreeMap<String, String>,
     never_in_core: BTreeMap<String, String>,
+    /// By "library/feature".
+    never_in_core_features: BTreeMap<String, String>,
 }
 
 struct CrateRule {
@@ -222,6 +237,7 @@ impl Rules {
             crates,
             core_libraries: reasons(&table, "core-libraries")?,
             never_in_core: reasons(&table, "never-in-core")?,
+            never_in_core_features: reasons(&table, "never-in-core-features")?,
         })
     }
 
@@ -276,6 +292,9 @@ struct Workspace {
     manifests: BTreeMap<String, String>,
     /// Each package's dependencies, by name.
     dependencies: BTreeMap<String, Vec<Dependency>>,
+    /// The features cargo turns on in each package, merged across the whole
+    /// workspace.
+    features: BTreeMap<String, Vec<String>>,
 }
 
 struct Dependency {
@@ -324,7 +343,13 @@ impl Workspace {
         members.sort_by_key(|id| (name_of(id), id.clone()));
 
         let mut dependencies = BTreeMap::new();
+        let mut features = BTreeMap::new();
         for node in list(&metadata["resolve"]["nodes"], "resolve.nodes")? {
+            let on = list(&node["features"], "a node's features")?
+                .iter()
+                .map(|feature| text(feature, "a feature name"))
+                .collect::<Result<Vec<_>, _>>()?;
+            features.insert(text(&node["id"], "a node id")?, on);
             let mut uses = Vec::new();
             for dependency in list(&node["deps"], "a node's deps")? {
                 let built_with = match dependency["dep_kinds"].as_array() {
@@ -348,6 +373,7 @@ impl Workspace {
             names,
             manifests,
             dependencies,
+            features,
         })
     }
 
@@ -364,6 +390,11 @@ impl Workspace {
             .iter()
             .find(|id| self.name(id) == name)
             .map(String::as_str)
+    }
+
+    /// The features cargo turns on in a package.
+    fn features(&self, id: &str) -> &[String] {
+        self.features.get(id).map_or(&[], Vec::as_slice)
     }
 
     fn dependencies(&self, id: &str) -> &[Dependency] {
