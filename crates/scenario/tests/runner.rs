@@ -1,0 +1,839 @@
+//! Readable checks for the Scenario runner: the committed Scenarios pass, and
+//! broken Scenarios are refused with their file, line and a plain sentence.
+//! Each broken case is the free-fall Scenario with one change, run against
+//! the real built-in Pack.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use opendrone_pack::Packs;
+use opendrone_scenario::agreement::{Computer, compare};
+use opendrone_scenario::{
+    Repo, Report, ResultsFile, ScenarioFile, fingerprints_text, read_scenario, run, run_one,
+};
+
+fn repo() -> Repo {
+    Repo::around(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("the runner lives in the repo")
+}
+
+fn packs() -> Packs {
+    repo()
+        .packs()
+        .unwrap_or_else(|p| panic!("the Packs should read:\n{p}"))
+}
+
+fn free_fall() -> String {
+    fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-fall-is-exactly-g.toml"),
+    )
+    .unwrap()
+}
+
+/// The free-fall Scenario with `old` replaced by `new`, written to a fixture
+/// folder.
+fn changed(case: &str, old: &str, new: &str) -> ScenarioFile {
+    let text = free_fall();
+    assert!(text.contains(old), "the free-fall Scenario has no {old:?}");
+    fixture(case, &text.replacen(old, new, 1))
+}
+
+fn fixture(case: &str, text: &str) -> ScenarioFile {
+    let folder: PathBuf = Path::new(env!("CARGO_TARGET_TMPDIR")).join("scenario-fixtures");
+    fs::create_dir_all(&folder).unwrap();
+    let path = folder.join(format!("{case}.toml"));
+    fs::write(&path, text).unwrap();
+    let _ = fs::remove_file(folder.join(format!("{case}.results.toml")));
+    ScenarioFile {
+        relative: case.to_string(),
+        path,
+    }
+}
+
+fn report(file: &ScenarioFile, results: ResultsFile) -> Report {
+    run_one(file, &packs(), results, None)
+}
+
+fn failures(report: &Report) -> Vec<String> {
+    report
+        .checks
+        .iter()
+        .filter(|(passed, _)| !passed)
+        .map(|(_, line)| line.clone())
+        .collect()
+}
+
+fn line_of(text: &str, needle: &str) -> usize {
+    text.lines().position(|line| line.contains(needle)).unwrap() + 1
+}
+
+#[test]
+fn the_committed_scenarios_pass_and_their_results_are_up_to_date() {
+    let repo = repo();
+    let files = repo.scenario_files().unwrap();
+    assert!(files.len() >= 2, "expected the two physics Scenarios");
+    for file in &files {
+        let report = run_one(file, &packs(), ResultsFile::Check, None);
+        assert!(
+            report.passed(),
+            "{}: {:#?}",
+            file.label(),
+            failures(&report)
+        );
+    }
+    assert_eq!(repo.orphaned_results().unwrap(), Vec::<String>::new());
+}
+
+#[test]
+fn a_failed_expectation_fails_and_says_what_was_measured() {
+    let file = changed(
+        "failed-expectation",
+        "value = \"-9.81 m/s ± 0.00001 m/s\"",
+        "value = \"-9 m/s ± 0.1 m/s\"",
+    );
+    let line = line_of(&free_fall(), "what  = \"vertical speed\"") - 1;
+    assert_eq!(
+        failures(&report(&file, ResultsFile::Write)),
+        [format!(
+            "vertical speed at 1 s: measured -9.81 m/s, expected -9 m/s ± 0.1 m/s (line {line}, Rule)"
+        )]
+    );
+}
+
+#[test]
+fn a_stretch_can_be_measured_by_its_mean_lowest_highest_or_final_value() {
+    // Falling from rest, the vertical speed after step n of 8000 is
+    // -9.81 m/s² × n × 0.125 ms: its mean over the second is -9.81 m/s² ×
+    // 0.125 ms × 8001 / 2 = -4.9056 m/s, and the last is -9.81 m/s.
+    let stretch = |statistic: &str, value: &str| {
+        format!(
+            "\n[[expect]]\nwhat = \"vertical speed\"\nover = \"0 s to 1 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: speed = g × t\"\n"
+        )
+    };
+    let text = free_fall()
+        + &stretch("mean", "-4.9056 m/s ± 0.0001 m/s")
+        + &stretch("lowest", "-9.81 m/s ± 0.00001 m/s")
+        + &stretch("highest", "-0.00122625 m/s ± 0.0000001 m/s")
+        + &stretch("final", "-9.81 m/s ± 0.00001 m/s");
+    let report = report(&fixture("statistics", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+    let lines: Vec<&str> = report
+        .checks
+        .iter()
+        .map(|(_, line)| line.as_str())
+        .collect();
+    for expected in [
+        "vertical speed, mean over 0 s to 1 s: measured -4.91 m/s",
+        "vertical speed, lowest over 0 s to 1 s: measured -9.81 m/s",
+        "vertical speed, highest over 0 s to 1 s: measured -0.00123 m/s",
+        "vertical speed, final over 0 s to 1 s: measured -9.81 m/s",
+    ] {
+        assert!(
+            lines.iter().any(|line| line.starts_with(expected)),
+            "no {expected:?} in {lines:#?}"
+        );
+    }
+}
+
+#[test]
+fn a_starting_state_that_leaves_an_item_out_is_refused_naming_it() {
+    // ADR-0002: no hidden defaults.
+    let file = changed("no-seed", "random_seed       = 1\n", "");
+    assert_eq!(
+        failures(&report(&file, ResultsFile::Write)),
+        ["scenarios/no-seed.toml line 7: [start] is missing `random_seed`"]
+    );
+}
+
+#[test]
+fn every_problem_in_a_scenario_is_listed_at_once() {
+    let text = free_fall()
+        .replacen(
+            "battery           = \"100%\"",
+            "battery           = \"110%\"",
+            1,
+        )
+        .replacen(
+            "flight_mode       = \"Acro\"",
+            "flight_mode       = \"Sport\"",
+            1,
+        );
+    let file = fixture("two-problems", &text);
+    let battery = line_of(&text, "battery ");
+    let mode = line_of(&text, "flight_mode ");
+    assert_eq!(
+        failures(&report(&file, ResultsFile::Write)),
+        [
+            format!(
+                "scenarios/two-problems.toml line {battery}: the battery's charge must be from 0% to 100%"
+            ),
+            format!(
+                "scenarios/two-problems.toml line {mode}: `flight_mode` must be one of \"Acro\", \"Angle\", \"Horizon\", not \"Sport\""
+            ),
+        ]
+    );
+}
+
+#[test]
+fn an_unknown_measurement_is_refused_listing_what_the_runner_measures() {
+    let file = changed(
+        "unknown-measure",
+        "what  = \"vertical speed\"",
+        "what  = \"sink rate\"",
+    );
+    let line = line_of(&free_fall(), "what  = \"vertical speed\"");
+    assert_eq!(
+        failures(&report(&file, ResultsFile::Write)),
+        [format!(
+            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading"
+        )]
+    );
+}
+
+#[test]
+fn an_expectation_needs_a_tolerance_and_a_basis() {
+    let text = free_fall()
+        .replacen(
+            "value = \"-9.81 m/s ± 0.00001 m/s\"",
+            "value = \"-9.81 m/s\"",
+            1,
+        )
+        .replacen(
+            "basis = \"rule: speed = g × t",
+            "basis = \"because: speed = g × t",
+            1,
+        );
+    let file = fixture("no-tolerance-no-basis", &text);
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].ends_with(
+        "a basis starts with \"source:\" (a cited outside reference), \"rule:\" (worked out from physics, with the working shown) or \"observed:\" (what the Simulation did when the Expectation was written), followed by the citation or the working"
+    ));
+    assert!(found[1].ends_with(
+        "\"-9.81 m/s\" needs a tolerance: add \"± amount\" or \"± percent\", or write \"between X and Y\""
+    ));
+}
+
+#[test]
+fn an_expectation_measuring_the_wrong_kind_of_thing_is_refused() {
+    let file = changed(
+        "wrong-kind",
+        "value = \"-9.81 m/s ± 0.00001 m/s\"",
+        "value = \"-9.81 m ± 0.00001 m\"",
+    );
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(
+        found[0].ends_with("vertical speed is a speed, such as \"5 m/s\""),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_moment_between_two_physics_steps_is_refused() {
+    let file = changed("between-steps", "at    = \"1 s\"", "at    = \"1.00001 s\"");
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(
+        found[0].ends_with(
+            "\"1.00001 s\" isn't a whole number of physics steps from the start: at 8000 Hz one step is 0.000125 s"
+        ),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn radians_and_decimal_commas_are_refused_in_a_scenario_too() {
+    let text = free_fall()
+        .replacen(
+            "rotation          = \"0 °/s\"",
+            "rotation          = \"0 rad/s\"",
+            1,
+        )
+        .replacen("at    = \"1 s\"", "at    = \"0,5 s\"", 1);
+    let found = failures(&report(
+        &fixture("radians-commas", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].contains("is in radians, which OpenDrone files never use"));
+    assert!(found[1].contains("numbers take a decimal point, so write \"0.5 s\""));
+}
+
+#[test]
+fn motor_commands_above_0_percent_wait_for_the_motor_model() {
+    let file = changed("motors-on", "motors = \"0%\"", "motors = \"40%\"");
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(found[0].ends_with(
+        "motor commands above 0% need the motor model, which arrives with the Thrust Stand ticket (#41)"
+    ));
+}
+
+#[test]
+fn a_decimal_comma_in_the_motor_commands_is_refused_with_the_fix() {
+    let file = changed("motors-comma", "motors = \"0%\"", "motors = \"0,0%\"");
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(
+        found[0].ends_with(
+            "\"0,0%\" isn't a number OpenDrone can read: numbers take a decimal point, so write \"0.0%\""
+        ),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn stopped_motors_are_only_for_scenarios_that_script_their_motors() {
+    // Where the Flight Controller runs, a landed "fresh" start is Reset, whose
+    // ESCs start up first; "stopped" says they are already ready.
+    let file = changed(
+        "flight-stopped",
+        "kind              = \"physics\"",
+        "kind              = \"flight\"",
+    );
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert!(
+        found.iter().any(|line| line.ends_with(
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start"
+        )),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn only_physics_scenarios_run_so_far() {
+    let file = changed(
+        "thrust-stand",
+        "kind              = \"physics\"",
+        "kind              = \"thrust stand\"",
+    );
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(found[0].contains("only Physics Scenarios can run so far"));
+}
+
+#[test]
+fn a_quad_that_cant_be_found_is_reported_at_the_line_that_names_it() {
+    let file = changed("no-such-quad", "test/whoop-65-no-drag", "test/whoop-99");
+    let line = line_of(&free_fall(), "quad   ");
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(
+        found[0],
+        format!("scenarios/no-such-quad.toml line {line}: can't use the Quad \"test/whoop-99\":")
+    );
+    assert!(found[1].starts_with("scenarios/test-quads/whoop-99.toml: can't be read"));
+}
+
+#[test]
+fn an_angle_is_compared_the_short_way_round() {
+    let tumble = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-tumble-keeps-its-spin.toml"),
+    )
+    .unwrap();
+    // 45° and 405° are the same heading.
+    let file = fixture(
+        "angle-wraps",
+        &tumble.replacen("value = \"45° ± 0.001°\"", "value = \"405° ± 0.001°\"", 1),
+    );
+    let report = report(&file, ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+/// The slow turn through north, with its Expectations replaced by
+/// `expectations` and its start changed by `start`.
+fn slow_turn(start: &[(&str, &str)], expectations: &[(&str, &str, &str)]) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/slow-turn-through-north.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()].to_string();
+    for (old, new) in start {
+        assert!(text.contains(old), "no {old:?}");
+        text = text.replacen(old, new, 1);
+    }
+    for (what, statistic, value) in expectations {
+        text += &format!(
+            "[[expect]]\nwhat = \"{what}\"\nover = \"0 s to 1 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: 2 °/s for 1 s\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_heading_crossing_north_has_the_right_lowest_highest_mean_and_final_value() {
+    // From 359.5° at 2 °/s for 1 s: from just after -0.5° up to 1.5°.
+    let text = slow_turn(
+        &[],
+        &[
+            ("heading", "lowest", "-0.5° ± 0.001°"),
+            ("heading", "highest", "1.5° ± 0.001°"),
+            ("heading", "mean", "0.5° ± 0.001°"),
+            ("heading", "final", "1.5° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("heading-across-north", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn a_heading_that_crossed_north_doesnt_pass_for_staying_at_north() {
+    // The heading reached 1.5°, so "highest 0° ± 1°" must fail.
+    let text = slow_turn(&[], &[("heading", "highest", "0° ± 1°")]);
+    let found = failures(&report(
+        &fixture("highest-past-north", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].starts_with("heading, highest over 0 s to 1 s: measured 1.50°"),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_roll_crossing_upside_down_has_the_right_lowest_highest_mean_and_final_value() {
+    // From 179.5° at 2 °/s for 1 s: through 180° (upside down) to 181.5°,
+    // which reads as -178.5°.
+    let text = slow_turn(
+        &[
+            (
+                "attitude          = \"level, heading 359.5°\"",
+                "attitude          = \"roll 179.5°, pitch 0°, heading 0°\"",
+            ),
+            (
+                "rotation          = \"roll 0 °/s, pitch 0 °/s, yaw 2 °/s\"",
+                "rotation          = \"roll 2 °/s, pitch 0 °/s, yaw 0 °/s\"",
+            ),
+        ],
+        &[
+            ("roll", "lowest", "179.5° ± 0.001°"),
+            ("roll", "highest", "-178.5° ± 0.001°"),
+            ("roll", "mean", "180.5° ± 0.001°"),
+            ("roll", "final", "181.5° ± 0.001°"),
+        ],
+    );
+    let report = report(
+        &fixture("roll-across-upside-down", &text),
+        ResultsFile::Write,
+    );
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+/// What a stretch's lowest, highest or mean measures when the angle jumped.
+fn none(what: &str, statistic: &str) -> String {
+    "none: the {} jumped, or reached half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+        .replacen("{}", what, 1)
+        .replacen("{}", statistic, 1)
+}
+
+/// The free tumble (2000 °/s of roll for 1.125 s, six and a quarter rolls),
+/// with its Expectations replaced by `expectations` over the whole run.
+fn tumble_over_the_run(expectations: &[(&str, &str)]) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-tumble-keeps-its-spin.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()].to_string();
+    for (statistic, value) in expectations {
+        text += &format!(
+            "[[expect]]\nwhat = \"roll\"\nover = \"0 s to 1.125 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_roll_mean_lowest_or_highest_over_whole_rolls_fails_whatever_is_expected() {
+    // The roll sweeps round six times, so it goes more than half a turn from
+    // any expected value: its mean, lowest and highest have no single answer.
+    for expected in ["0° ± 8°", "90° ± 8°", "123° ± 8°", "-150° ± 8°"] {
+        let text = tumble_over_the_run(&[
+            ("mean", expected),
+            ("lowest", expected),
+            ("highest", expected),
+        ]);
+        let found = failures(&report(&fixture("roll-sweeps", &text), ResultsFile::Write));
+        assert_eq!(found.len(), 3, "{expected}: {found:#?}");
+        for (line, statistic) in found.iter().zip(["mean", "lowest", "highest"]) {
+            assert!(
+                line.starts_with(&format!(
+                    "roll, {statistic} over 0 s to 1.125 s: measured {}",
+                    none("roll", statistic)
+                )),
+                "{expected}: {line}"
+            );
+        }
+    }
+}
+
+/// One pitch flip, nose up first, in 1 s at 360 °/s, starting level with the
+/// nose at `heading`, with `expectations` over the whole flip.
+fn pitch_flip(heading: &str, expectations: &[(&str, &str, &str)]) -> String {
+    turning(
+        &format!("level, heading {heading}"),
+        "roll 0 °/s, pitch 360 °/s, yaw 0 °/s",
+        "1 s",
+        expectations,
+    )
+}
+
+/// The free tumble's set-up with another start `attitude` and `rotation`,
+/// and `expectations` over 0 s to `until`.
+fn turning(
+    attitude: &str,
+    rotation: &str,
+    until: &str,
+    expectations: &[(&str, &str, &str)],
+) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-tumble-keeps-its-spin.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()]
+        .replacen(
+            "attitude          = \"roll 0°, pitch 30°, heading 45°\"",
+            &format!("attitude          = \"{attitude}\""),
+            1,
+        )
+        .replacen(
+            "rotation          = \"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s\"",
+            &format!("rotation          = \"{rotation}\""),
+            1,
+        );
+    assert!(text.contains(attitude) && text.contains(rotation));
+    for (what, statistic, value) in expectations {
+        let when = if *statistic == "at" {
+            format!("at = \"{until}\"\nvalue")
+        } else {
+            format!("over = \"0 s to {until}\"\n{statistic}")
+        };
+        text += &format!(
+            "[[expect]]\nwhat = \"{what}\"\n{when} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_roll_or_heading_mean_lowest_or_highest_over_a_pitch_flip_fails_whatever_is_expected() {
+    // As the nose passes straight up and then straight down, roll and heading
+    // jump by half a turn, so over the flip they have no single mean, lowest
+    // or highest.
+    for heading in ["90°", "45°"] {
+        for (what, expected) in [
+            ("roll", "90° ± 1°"),
+            ("roll", "-90° ± 1°"),
+            ("roll", "0° ± 1°"),
+            ("heading", "0° ± 1°"),
+            ("heading", "180° ± 1°"),
+            ("heading", "135° ± 2°"),
+            ("heading", "315° ± 2°"),
+        ] {
+            let checks: Vec<(&str, &str, &str)> = ["mean", "lowest", "highest"]
+                .iter()
+                .map(|statistic| (what, *statistic, expected))
+                .collect();
+            let text = pitch_flip(heading, &checks);
+            let found = failures(&report(&fixture("pitch-flip", &text), ResultsFile::Write));
+            assert_eq!(
+                found.len(),
+                3,
+                "from heading {heading}, {what} {expected}: {found:#?}"
+            );
+            for (line, statistic) in found.iter().zip(["mean", "lowest", "highest"]) {
+                assert!(
+                    line.starts_with(&format!(
+                        "{what}, {statistic} over 0 s to 1 s: measured {}",
+                        none(what, statistic)
+                    )),
+                    "from heading {heading}: {line}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_roll_and_heading_still_have_a_final_value_after_a_pitch_flip() {
+    // A whole flip ends where it started: level, nose at the start heading.
+    for (heading, final_heading) in [("90°", "90° ± 0.001°"), ("45°", "45° ± 0.001°")] {
+        let text = pitch_flip(
+            heading,
+            &[
+                ("roll", "final", "0° ± 0.001°"),
+                ("heading", "final", final_heading),
+                ("pitch", "final", "0° ± 0.001°"),
+            ],
+        );
+        let report = report(&fixture("pitch-flip-final", &text), ResultsFile::Write);
+        assert!(
+            report.passed(),
+            "from heading {heading}: {:#?}",
+            failures(&report)
+        );
+    }
+}
+
+#[test]
+fn a_whole_turn_that_ends_exactly_opposite_the_expected_value_has_no_mean() {
+    // A pitch flip passing just off vertical turns the heading a whole turn,
+    // from 90° back to 90°, exactly opposite -90° at both ends.
+    for roll in ["0.5°", "0.01°", "3°"] {
+        let text = turning(
+            &format!("roll {roll}, pitch 0°, heading 90°"),
+            "roll 0 °/s, pitch 360 °/s, yaw 0 °/s",
+            "1 s",
+            &[("heading", "mean", "-90° ± 7°")],
+        );
+        let found = failures(&report(
+            &fixture("whole-turn-mean", &text),
+            ResultsFile::Write,
+        ));
+        assert_eq!(found.len(), 1, "roll {roll}: {found:#?}");
+        assert!(
+            found[0].starts_with(&format!(
+                "heading, mean over 0 s to 1 s: measured {}",
+                none("heading", "mean")
+            )),
+            "roll {roll}: {found:?}"
+        );
+    }
+    // Five fast flips from heading 45°, ending opposite -135°.
+    let text = turning(
+        "roll 0.2°, pitch 0°, heading 45°",
+        "roll 0 °/s, pitch 2000 °/s, yaw 0 °/s",
+        "0.9 s",
+        &[("heading", "mean", "-135° ± 7°")],
+    );
+    let found = failures(&report(
+        &fixture("whole-turn-mean-fast", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].contains(&none("heading", "mean")), "{found:?}");
+}
+
+#[test]
+fn a_quad_dropped_nose_first_keeps_its_heading() {
+    // Nose straight down, not turning: the heading it was given stays.
+    let text = turning(
+        "roll 0°, pitch -90°, heading 30°",
+        "roll 0 °/s, pitch 0 °/s, yaw 0 °/s",
+        "1 s",
+        &[
+            ("heading", "at", "30° ± 0.001°"),
+            ("heading", "mean", "30° ± 0.001°"),
+            ("heading", "final", "30° ± 0.001°"),
+            ("roll", "final", "0° ± 0.001°"),
+            ("pitch", "final", "-90° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("nose-first", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn with_the_nose_straight_up_roll_reads_0_and_heading_carries_the_turn() {
+    // Roll 30° then nose straight up at heading 45° is the same attitude as
+    // roll 0°, heading 15°: with the nose up, heading minus roll.
+    let text = turning(
+        "roll 30°, pitch 90°, heading 45°",
+        "roll 0 °/s, pitch 0 °/s, yaw 0 °/s",
+        "1 s",
+        &[
+            ("heading", "at", "15° ± 0.001°"),
+            ("roll", "at", "0° ± 0.001°"),
+            ("heading", "mean", "15° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("nose-up-rolled", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn an_angle_tolerance_that_accepts_every_angle_is_refused_as_checking_nothing() {
+    for expected in [
+        "between 0° and 360°",
+        "0° ± 180°",
+        "0° ± 200°",
+        "90° ± 200%",
+    ] {
+        let text = slow_turn(&[], &[("heading", "mean", expected)]);
+        let found = failures(&report(&fixture("whole-circle", &text), ResultsFile::Write));
+        assert_eq!(found.len(), 1, "{expected}: {found:#?}");
+        assert!(
+            found[0].contains("accepts every angle, since angles are compared the short way round, so this Expectation checks nothing; give a tolerance of less than half a turn each way"),
+            "{expected}: {found:?}"
+        );
+    }
+    // Just short of the whole circle still checks something.
+    let text = slow_turn(&[], &[("heading", "mean", "0° ± 179°")]);
+    let report = report(&fixture("nearly-whole-circle", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn a_roll_still_has_a_final_value_after_whole_rolls() {
+    // Six and a quarter rolls end on the right side: 90°.
+    let text = tumble_over_the_run(&[("final", "90° ± 0.001°")]);
+    let report = report(&fixture("roll-sweeps-final", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn a_results_file_holds_every_measured_value_and_the_fingerprints() {
+    let file = changed(
+        "results",
+        "name   = \"Free fall is exactly g\"",
+        "name   = \"Results\"",
+    );
+    assert!(report(&file, ResultsFile::Write).passed());
+    let results = fs::read_to_string(file.results_path()).unwrap();
+    for line in [
+        "scenario = \"Results\"",
+        "what     = \"vertical speed at 1 s\"",
+        "expected = \"-9.81 m/s ± 0.00001 m/s\"",
+        "measured = \"-9.81 m/s\"",
+        "what     = \"height at 1 s\"",
+        "measured = \"-4.91 m\"",
+        "measured = \"none broken\"",
+        "[fingerprints]",
+    ] {
+        assert!(
+            results.lines().any(|l| l == line),
+            "no {line:?} in:\n{results}"
+        );
+    }
+    for key in [
+        "[fingerprints.checkpoints]",
+        "quad = \"",
+        "map  = \"",
+        "run  = \"",
+        "\"0.1 s\" = \"",
+        "\"1 s\" = \"",
+    ] {
+        assert!(results.contains(key), "no {key:?} in:\n{results}");
+    }
+}
+
+#[test]
+fn an_out_of_date_results_file_is_reported_with_the_first_line_that_differs() {
+    let file = changed(
+        "out-of-date",
+        "name   = \"Free fall is exactly g\"",
+        "name   = \"Out of date\"",
+    );
+    assert!(report(&file, ResultsFile::Write).passed());
+    let path = file.results_path();
+    let results = fs::read_to_string(&path).unwrap();
+    fs::write(
+        &path,
+        results.replacen("measured = \"-4.91 m\"", "measured = \"-4.90 m\"", 1),
+    )
+    .unwrap();
+    let found = failures(&report(&file, ResultsFile::Check));
+    assert_eq!(found.len(), 1);
+    assert!(
+        found[0].starts_with("scenarios/out-of-date.results.toml is out of date: run `cargo scenarios run` and commit it. Line "),
+        "{found:?}"
+    );
+    assert!(found[0].ends_with(
+        "says \"measured = \\\"-4.90 m\\\"\", but this run gives \"measured = \\\"-4.91 m\\\"\"."
+    ));
+
+    fs::remove_file(&path).unwrap();
+    let found = failures(&report(&file, ResultsFile::Check));
+    assert!(found[0].ends_with("There's no committed Results file yet."));
+}
+
+#[test]
+fn a_scenario_runs_until_the_last_moment_it_mentions() {
+    let scenario = read_scenario("free-fall.toml", &free_fall()).unwrap();
+    assert_eq!(scenario.length.ticks(), 8000);
+    let outcome = run(&scenario, &packs()).unwrap();
+    assert_eq!(outcome.step_fingerprints.len(), 8001);
+}
+
+fn computers(names: &[&str], text: &str) -> Vec<Computer> {
+    names
+        .iter()
+        .map(|name| Computer {
+            name: name.to_string(),
+            files: [("physics/free-fall".to_string(), text.to_string())].into(),
+        })
+        .collect()
+}
+
+fn free_fall_fingerprints() -> String {
+    let scenario = read_scenario("free-fall.toml", &free_fall()).unwrap();
+    fingerprints_text("physics/free-fall", &run(&scenario, &packs()).unwrap())
+}
+
+#[test]
+fn computers_that_agree_at_every_step_pass_the_agreement_check() {
+    let found = compare(&computers(
+        &["macOS", "Windows", "Linux"],
+        &free_fall_fingerprints(),
+    ));
+    assert!(found.agreed);
+    assert_eq!(
+        found.lines,
+        ["physics/free-fall: all 3 computers agree at the start and after each of its 8000 steps"]
+    );
+}
+
+#[test]
+fn the_agreement_check_names_the_scenario_and_the_first_step_where_computers_split() {
+    let text = free_fall_fingerprints();
+    let mut all = computers(&["macOS", "Windows", "Linux"], &text);
+    let windows = text
+        .lines()
+        .map(|line| match line.split_once(' ') {
+            Some((tick, _)) if tick == "3" || tick == "4" => format!("{tick} 0123456789abcdef"),
+            _ => line.to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    all[1]
+        .files
+        .insert("physics/free-fall".to_string(), windows);
+    let found = compare(&all);
+    assert!(!found.agreed);
+    let step_3 = |line: &str| {
+        line.split_once(' ')
+            .filter(|(t, _)| *t == "3")
+            .map(|(_, f)| f.to_string())
+    };
+    let mac = text.lines().find_map(step_3).unwrap();
+    assert_eq!(
+        found.lines,
+        [format!(
+            "physics/free-fall: the computers split at step 3 (0.000375 s): macOS {mac}, Windows 0123456789abcdef, Linux {mac}"
+        )]
+    );
+}
+
+#[test]
+fn the_agreement_check_fails_when_a_computer_has_no_fingerprints() {
+    let mut all = computers(&["macOS", "Windows", "Linux"], &free_fall_fingerprints());
+    all[2].files.clear();
+    let found = compare(&all);
+    assert!(!found.agreed);
+    assert_eq!(
+        found.lines,
+        [
+            "Linux: no fingerprints at all; did its Scenario run finish?",
+            "physics/free-fall: Linux has no fingerprints for it; did its run of this Scenario finish?",
+        ]
+    );
+}

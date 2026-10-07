@@ -1,0 +1,18 @@
+# The Whoop 65 with every kind of drag set to zero.    id: test/whoop-65-no-drag
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No drag of any kind, so free fall and a free tumble follow the rigid-body rules alone"
+
+# Deliberate test values: no Confidence or source.
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0 s⁻¹"
+
+[ducts]
+ram_drag = "0 s⁻¹"

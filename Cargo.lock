@@ -83,6 +83,11 @@ dependencies = [
 [[package]]
 name = "opendrone-pack"
 version = "0.1.0-alpha.0"
+dependencies = [
+ "opendrone-maths",
+ "opendrone-physics",
+ "toml",
+]
 
 [[package]]
 name = "opendrone-physics"
@@ -97,6 +102,7 @@ version = "0.1.0-alpha.0"
 dependencies = [
  "opendrone-blackbox",
  "opendrone-flight-controller",
+ "opendrone-maths",
  "opendrone-pack",
  "opendrone-sim",
  "opendrone-test-pilot",

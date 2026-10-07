@@ -1,0 +1,87 @@
+# A Quad turning slowly to the right, with nothing to slow it, passes north
+# half a second after it starts. Over the turn its heading reads 359.5°, then
+# 0°, then 1.5°: the runner must take each heading the short way round, so the
+# lowest, highest, mean and final heading come out right across north.
+# Proves exact attitude maths at a fixed step (E1–E3 in #10), and that
+# Expectations on angles hold across 0° and 360°.
+format = 1
+name   = "A slow free turn through north keeps its rate, measured the short way round"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 359.5°"
+speed             = "0 m/s"
+rotation          = "roll 0 °/s, pitch 0 °/s, yaw 2 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what   = "yaw rate"
+over   = "0 s to 1 s"
+lowest = "2 °/s ± 0.001 °/s"
+basis  = "rule: with no torque, a spin about one of the body's main axes of inertia never changes (Euler's equations for a rigid body)"
+
+[[expect]]
+what    = "yaw rate"
+over    = "0 s to 1 s"
+highest = "2 °/s ± 0.001 °/s"
+basis   = "rule: as for the lowest; the lowest and the highest together show the rate never changes"
+
+[[expect]]
+what   = "heading"
+over   = "0 s to 1 s"
+lowest = "-0.5° ± 0.001°"
+basis  = "rule: the heading starts at 359.5°, half a degree left of north, and only grows: after the first step it is 359.5° + 2 °/s × 0.125 ms, within 0.001° of -0.5°"
+
+[[expect]]
+what    = "heading"
+over    = "0 s to 1 s"
+highest = "1.5° ± 0.001°"
+basis   = "rule: 2 °/s for 1 s turns 2°, from 359.5° to 1.5°, through north"
+
+[[expect]]
+what = "heading"
+over = "0 s to 1 s"
+mean = "0.5° ± 0.001°"
+basis = "rule: the heading grows steadily from -0.5° to 1.5°, so it averages 0.5° (0.500125° over the 8000 steps after the start)"
+
+[[expect]]
+what  = "heading"
+over  = "0 s to 1 s"
+final = "1.5° ± 0.001°"
+basis = "rule: 359.5° + 2 °/s × 1 s = 361.5°, which is 1.5°"
+
+[[expect]]
+what  = "roll"
+at    = "1 s"
+value = "0° ± 0.001°"
+basis = "rule: turning about its own up axis keeps a level Quad level"

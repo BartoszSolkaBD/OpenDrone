@@ -1,0 +1,82 @@
+# Results of free-tumble-keeps-its-spin.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A free tumble at 2,000 °/s keeps its spin and ends at the exact attitude"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0.001 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0.001 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "yaw rate, highest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "yaw rate, lowest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "roll at 1.125 s"
+basis    = "Rule"
+expected = "90° ± 0.001°"
+measured = "90.0°"
+
+[[expect]]
+what     = "pitch at 1.125 s"
+basis    = "Rule"
+expected = "30° ± 0.001°"
+measured = "30.0°"
+
+[[expect]]
+what     = "heading at 1.125 s"
+basis    = "Rule"
+expected = "45° ± 0.001°"
+measured = "45.0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "00640ff54c5b9b2d"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "48dd4b7f52b96f14"   # the whole state after each of 9000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1125 s" = "dfa08d8bea9b20dd"
+"0.225 s" = "8642b63d1aa505ea"
+"0.3375 s" = "e7d04371adee209c"
+"0.45 s" = "70ba23c50bc2e09e"
+"0.5625 s" = "6454cebbcf1f09eb"
+"0.675 s" = "65f367c8be3b8ab2"
+"0.7875 s" = "e65ec8bb8111f4ab"
+"0.9 s" = "59e6b84448b08738"
+"1.0125 s" = "5b89b7a2a6321beb"
+"1.125 s" = "dbe41d667ebbafb6"

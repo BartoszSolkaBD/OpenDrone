@@ -15,8 +15,11 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   cargo nextest run --workspace     # needs cargo-nextest
   cargo test --workspace --doc      # the examples in the docs, which nextest skips
   cargo xtask walls
+  cargo scenarios check             # every Scenario, run twice, and its Results
   cargo deny check                  # needs cargo-deny
   ```
+
+- A change that moves a flight updates the Scenarios' Results files: run `cargo scenarios run` and commit them. [Reading a Scenario and its Results](docs/verification/reading-a-scenario.md) explains both.
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
 - Libraries must be permissive or MPL-2.0, from crates.io ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). [`deny.toml`](deny.toml) holds the policy.
@@ -28,7 +31,8 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 
 | Check | What it proves |
 |---|---|
-| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test and every example in the docs passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system. |
+| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test and every example in the docs passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system; and every Scenario passes every Expectation, gives the same fingerprint after every step when run twice (the repeat check), and has an up-to-date Results file (`cargo scenarios check`). |
+| Scenarios agree on every OS | The fingerprint after every step of every Scenario is the same on macOS, Windows and Linux (ADR-0001). On a mismatch it names the Scenario and the first step where the OSes split. |
 | Core builds for iOS, Core builds for Android | The five core crates build for phones, which keeps the mobile door open. |
 | Licences and sources | cargo-deny finds only allowed licences and crates.io sources, and, when a PR changes `Cargo.lock` or `deny.toml`, no library with a known security advisory. |
 

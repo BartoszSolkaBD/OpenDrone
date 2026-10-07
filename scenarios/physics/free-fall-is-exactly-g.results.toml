@@ -1,0 +1,58 @@
+# Results of free-fall-is-exactly-g.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Free fall is exactly g"
+
+[[expect]]
+what     = "vertical acceleration, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "-9.81 m/s² ± 0.00001 m/s²"
+measured = "-9.81 m/s²"
+
+[[expect]]
+what     = "vertical acceleration, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "-9.81 m/s² ± 0.00001 m/s²"
+measured = "-9.81 m/s²"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Rule"
+expected = "-9.81 m/s ± 0.00001 m/s"
+measured = "-9.81 m/s"
+
+[[expect]]
+what     = "height at 1 s"
+basis    = "Rule"
+expected = "-4.905 m ± 0.001 m"
+measured = "-4.91 m"
+
+[[expect]]
+what     = "horizontal speed, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "00640ff54c5b9b2d"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "d3583610ba9e114f"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "731d98421507704f"
+"0.2 s" = "08e811c62178919f"
+"0.3 s" = "51177639ef7e506b"
+"0.4 s" = "64b9c2155a72809c"
+"0.5 s" = "13bcdbe27e91a579"
+"0.6 s" = "0be004028814a6b1"
+"0.7 s" = "89fa17bcdef7fba0"
+"0.8 s" = "9af11a5263f2e122"
+"0.9 s" = "c6fa9270af6b0c6e"
+"1 s" = "ffade74ecb7f2f55"

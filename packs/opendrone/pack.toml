@@ -1,0 +1,10 @@
+# The built-in Pack: the Quads, Maps and Input Devices that come with the game.
+# It is an ordinary Pack, read by the same checker as one a pilot drops in
+# (ADR-0011), and everything in it is CC0.
+format      = 1
+id          = "opendrone"
+name        = "OpenDrone"
+description = "The Quads, Maps and Input Devices that come with the game."
+version     = "0.1"
+author      = "OpenDrone contributors"
+licence     = "CC0-1.0"

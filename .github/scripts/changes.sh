@@ -4,7 +4,8 @@
 #   rust=true       anything other than Markdown changed, so the Rust checks
 #                   run. A PR that only touches docs skips them, and the job
 #                   still reports as passed, so required checks never hang
-#                   (#15 §4).
+#                   (#15 §4). Warning: this skip assumes no Rust check reads
+#                   a `.md` file; a check that ever does must be run here too.
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
 #                   library, or changes the policy, so known security
 #                   advisories are checked (ADR-0014).

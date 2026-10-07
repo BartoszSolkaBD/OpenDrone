@@ -91,6 +91,70 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo xtask walls
 
+      - name: Scenarios (every Expectation, the repeat check, up-to-date Results)
+        # Runs every Scenario in scenarios/ twice and blocks on a failed
+        # Expectation, two runs that differ, or a Results file that is out of
+        # date (#11 §5). It also writes the fingerprint after every step, for
+        # the agreement check below.
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo run --locked --quiet --package opendrone-scenario -- check --fingerprints fingerprints
+
+      - name: Keep this OS's fingerprints for the agreement check
+        # Kept even when a Scenario failed, so the agreement check can say
+        # where this OS split from the others.
+        if: ${{ !cancelled() && steps.changes.outputs.rust == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fingerprints-${{ matrix.name }}
+          path: fingerprints/
+          if-no-files-found: warn
+          retention-days: 30
+
+  agreement:
+    # The whole Simulation gives the same bits on every OS (ADR-0001): the
+    # fingerprint after every step of every Scenario must agree across macOS,
+    # Windows and Linux. On a mismatch it names the Scenario and the first step
+    # where the OSes split (#11 §5).
+    name: Scenarios agree on every OS
+    needs: rust
+    # Runs even when an OS's job failed, because a split often explains why.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Decide what to check
+        id: changes
+        shell: bash
+        run: bash .github/scripts/changes.sh
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        if: steps.changes.outputs.rust == 'true'
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Reuse the build cache
+        if: steps.changes.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Fetch each OS's fingerprints
+        if: steps.changes.outputs.rust == 'true'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: fingerprints-*
+          path: fingerprints
+
+      - name: Compare the fingerprints, step by step
+        if: steps.changes.outputs.rust == 'true'
+        run: >-
+          cargo run --locked --quiet --package opendrone-scenario --
+          agree fingerprints/fingerprints-macOS fingerprints/fingerprints-Windows fingerprints/fingerprints-Linux
+
   mobile:
     # The five core crates must build for phones, to keep the mobile door
     # open (ADR-0001, ADR-0003). Only the core: the game isn't built for them.
