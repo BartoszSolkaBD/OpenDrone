@@ -92,6 +92,14 @@ impl Measure {
         self == Measure::VerticalAcceleration
     }
 
+    /// True when this is roll or heading and the nose is within about
+    /// 0.00000006° of straight up or down, so roll reads 0° and heading
+    /// carries the whole turn (see
+    /// `opendrone_maths::Attitude::is_straight_up_or_down`).
+    pub fn read_straight_up_or_down(self, now: &QuadState) -> bool {
+        matches!(self, Measure::Roll | Measure::Heading) && now.attitude.is_straight_up_or_down()
+    }
+
     /// The value after a step, in SI units, given the state before the step
     /// (`None` at the start) and the step's length in seconds.
     pub fn read(self, before: Option<&QuadState>, now: &QuadState, step: f64) -> Option<f64> {
