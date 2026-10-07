@@ -3,6 +3,8 @@
 # Every job here always runs and reports. A PR that touches only docs skips
 # the Rust work inside each job (see .github/scripts/changes.sh), so the jobs
 # still pass and required checks never hang waiting for a job that never ran.
+# The docs site's job is the exception: it always does its work, because docs
+# are what it checks.
 #
 # Changing this file is a Repo rules change: the Reviewer decides, and the
 # ticket must ask for it.
@@ -205,6 +207,36 @@ jobs:
           -p opendrone-flight-controller
           -p opendrone-sim
           -p opendrone-test-pilot
+
+  docs:
+    # The docs site: one mdBook from docs/, with rustdoc for every crate
+    # (internal items included) under api/, and no broken links (#15 §4 and
+    # §11). It skips nothing on a docs-only PR: docs are what it checks.
+    # .github/workflows/pages.yml publishes the same build from main.
+    name: Docs site and rustdoc
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Reuse the build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Shared with the Pages workflow, which builds the same book.
+          shared-key: docs
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install mdBook (the version in book.toml)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.5.4
+
+      - name: Build the book and rustdoc, and check every link
+        run: cargo xtask book
 
   licences:
     # Libraries must be permissive or MPL-2.0, from crates.io (ADR-0014).

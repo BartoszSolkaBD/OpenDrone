@@ -38,9 +38,10 @@
 # Game
 /crates/opendrone/              @BartoszSolkaBD
 
-# Docs and decisions
+# Docs and decisions (the docs site's settings included)
 /CONTEXT.md                     @BartoszSolkaBD
 /docs/                          @BartoszSolkaBD
+/book.toml                      @BartoszSolkaBD
 
 # Repo rules: CI, root Cargo files, the Rust version, the licence policy,
 # lint settings, xtask and AGENTS.md

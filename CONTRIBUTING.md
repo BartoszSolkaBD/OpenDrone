@@ -7,7 +7,7 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
 ## In short
 
 - One pull request per ticket, described with the [pull request template](.github/pull_request_template.md).
-- Every required check must pass on macOS, Windows and Linux. You can run the same checks locally. Two of them need tools that don't come with Rust: install them once with `cargo install --locked cargo-nextest cargo-deny` (or from their prebuilt downloads).
+- Every required check must pass on macOS, Windows and Linux. You can run the same checks locally. Three of them need tools that don't come with Rust: install them once with `cargo install --locked cargo-nextest cargo-deny` and `cargo install --locked mdbook --version 0.5.4` (or from their prebuilt downloads).
 
   ```sh
   cargo fmt --all --check
@@ -17,11 +17,13 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   cargo xtask walls
   cargo scenarios check             # every Scenario, run twice, and its Results
   cargo deny check                  # needs cargo-deny
+  cargo xtask book                  # needs mdBook: the docs site, rustdoc and every link
   ```
 
 - A change that moves a flight updates the Scenarios' Results files: run `cargo scenarios run` and commit them. [Reading a Scenario and its Results](docs/verification/reading-a-scenario.md) explains both.
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
+- The docs in [`docs/`](docs/README.md) also make the docs site, an mdBook ([`book.toml`](book.toml)). Every page under `docs/` must be listed in [`docs/SUMMARY.md`](docs/SUMMARY.md), its table of contents. `cargo xtask book` builds it into `target/book`, and `mdbook serve` shows it while you edit, without rustdoc.
 - Libraries must be permissive or MPL-2.0, from crates.io ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). [`deny.toml`](deny.toml) holds the policy.
 - By contributing, you agree your work is dual-licensed under MIT or Apache-2.0, as the [README](README.md#licence) says.
 
@@ -35,5 +37,6 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 | Scenarios agree on every OS | The fingerprint after every step of every Scenario is the same on macOS, Windows and Linux (ADR-0001). On a mismatch it names the Scenario and the first step where the OSes split. |
 | Core builds for iOS, Core builds for Android | The five core crates build for phones, which keeps the mobile door open. |
 | Licences and sources | cargo-deny finds only allowed licences and crates.io sources, and, when a PR changes `Cargo.lock` or `deny.toml`, no library with a known security advisory. |
+| Docs site and rustdoc | The docs site builds from `docs/` with every page in it; rustdoc builds for every crate, internal items included, with its warnings as errors; and every link in the book leads somewhere real: a page, a heading, a file of the repo or a rustdoc page (`cargo xtask book`). The [Pages workflow](.github/workflows/pages.yml) publishes the same build from main. |
 
-A pull request that changes only Markdown files skips the Rust work inside these checks, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them.
+A pull request that changes only Markdown files skips the Rust work inside these checks, except the docs site's, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them.
