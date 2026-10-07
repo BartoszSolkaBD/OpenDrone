@@ -127,6 +127,19 @@ fn a_thousands_separator_is_refused_with_the_fix() {
 }
 
 #[test]
+fn a_decimal_comma_among_several_parts_is_refused_fixing_only_the_number() {
+    assert_eq!(
+        parse_parts(
+            "roll 70,5, pitch 90, yaw 140 g·cm²",
+            &["roll", "pitch", "yaw"]
+        )
+        .unwrap_err()
+        .0,
+        "\"roll 70,5, pitch 90, yaw 140 g·cm²\" has a number OpenDrone can't read: numbers take a decimal point, so write \"roll 70.5, pitch 90, yaw 140 g·cm²\""
+    );
+}
+
+#[test]
 fn a_unit_not_on_the_list_is_refused() {
     assert_eq!(
         refusal("5 furlongs"),

@@ -335,6 +335,18 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
             "motors \"settled\" need the motor model, which arrives with the Thrust Stand ticket (#41); write \"stopped\" until then",
         ));
     }
+    // "Stopped" means the ESCs are already powered up and ready. Where our
+    // Flight Controller runs, a landed "fresh" start is exactly Reset, whose
+    // ESCs start up first, so the two would clash: "stopped" is only for
+    // Scenarios whose motors are scripted.
+    if motors == Some(StartingMotors::Stopped)
+        && matches!(kind, Some(Kind::Flight | Kind::FlightController))
+        && let Some(item) = start.get("motors")
+    {
+        problems.push(item.problem(
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start",
+        ));
+    }
     let flight_controller = choice(
         start,
         "flight_controller",
@@ -678,6 +690,10 @@ impl Reader<'_> {
     /// "0%" for all four motors, or four percentages in Betaflight's motor
     /// order.
     fn motor_commands(&mut self, text: &str, item: &Item<'_, '_>) -> Option<MotorCommands> {
+        if let Err(p) = units::refuse_commas_in_numbers(text) {
+            self.problems.push(item.problem(p.0));
+            return None;
+        }
         let mut commands = Vec::new();
         for part in text.split(',') {
             match units::parse_quantity(part).and_then(|q| q.as_a(Dimension::PERCENT)) {

@@ -158,6 +158,17 @@ fn another_rates_types_labels_are_refused_with_an_example() {
 }
 
 #[test]
+fn a_decimal_comma_in_the_throttle_curve_is_refused_with_the_fix() {
+    let found = with_rates(&ACTUAL_RATES.replacen("mid 0.50", "mid 0,50", 1)).unwrap_err();
+    assert_eq!(
+        found,
+        [
+            "\"mid 0,50, hover 0.50, expo 0.00, limit off\" has a number OpenDrone can't read: numbers take a decimal point, so write \"mid 0.50, hover 0.50, expo 0.00, limit off\""
+        ]
+    );
+}
+
+#[test]
 fn a_rate_limit_and_a_throttle_limit_read_per_axis_and_as_scale_or_clip() {
     let rates = with_rates(
         &ACTUAL_RATES

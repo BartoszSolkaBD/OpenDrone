@@ -379,6 +379,7 @@ fn rate_limit(text: &str) -> Result<[u16; 3], String> {
 /// Throttle Limit.
 fn throttle(text: &str) -> Result<(u8, u8, u8, ThrottleLimitType, u8), String> {
     let help = "write the throttle curve as the Betaflight App shows it, like \"mid 0.50, hover 0.50, expo 0.00, limit off\"; mid, hover and expo go from 0.00 to 1.00 in steps of 0.01, and the limit is \"off\", \"scale 80%\" or \"clip 80%\" (25% to 100%)";
+    units::refuse_commas_in_numbers(text).map_err(|p| p.0)?;
     let mut mid = None;
     let mut hover = None;
     let mut expo = None;

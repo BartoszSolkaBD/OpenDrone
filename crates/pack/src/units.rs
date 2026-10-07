@@ -596,30 +596,50 @@ fn split_number(text: &str) -> Option<(String, &str)> {
     Some((number, &text[end..]))
 }
 
-/// Refuses `"31,2 g"` and `"2,000 °/s"` with the fix.
-fn refuse_commas_in_numbers(text: &str) -> Result<(), UnitProblem> {
+/// Refuses a comma inside a number, such as `"31,2 g"` or `"2,000 °/s"`,
+/// with the fix: a decimal point, or no thousands separator. Commas between
+/// parts, such as in `"mid 0.50, hover 0.50"`, are fine. Anything that splits
+/// number text on commas runs this on the whole text first.
+pub fn refuse_commas_in_numbers(text: &str) -> Result<(), UnitProblem> {
+    let text = text.trim();
     let chars: Vec<char> = text.chars().collect();
-    for i in 1..chars.len().saturating_sub(1) {
-        if chars[i] == ',' && chars[i - 1].is_ascii_digit() && chars[i + 1].is_ascii_digit() {
-            let digits_after = chars[i + 1..]
-                .iter()
-                .take_while(|c| c.is_ascii_digit())
-                .count();
-            let text = text.trim();
-            return Err(if digits_after == 3 {
-                problem(format!(
-                    "\"{text}\" isn't a number OpenDrone can read: numbers have no thousands separators, so write \"{}\"",
-                    text.replace(',', "")
-                ))
-            } else {
-                problem(format!(
-                    "\"{text}\" isn't a number OpenDrone can read: numbers take a decimal point, so write \"{}\"",
-                    text.replace(',', ".")
-                ))
-            });
+    let mut fixed = String::with_capacity(text.len());
+    let mut decimal_comma = false;
+    let mut thousands = false;
+    for (i, &c) in chars.iter().enumerate() {
+        let between_digits = c == ','
+            && i > 0
+            && chars[i - 1].is_ascii_digit()
+            && chars.get(i + 1).is_some_and(char::is_ascii_digit);
+        if !between_digits {
+            fixed.push(c);
+            continue;
+        }
+        let digits_after = chars[i + 1..]
+            .iter()
+            .take_while(|c| c.is_ascii_digit())
+            .count();
+        if digits_after == 3 {
+            thousands = true;
+        } else {
+            decimal_comma = true;
+            fixed.push('.');
         }
     }
-    Ok(())
+    if !decimal_comma && !thousands {
+        return Ok(());
+    }
+    let what = if text.contains(", ") {
+        format!("\"{text}\" has a number OpenDrone can't read")
+    } else {
+        format!("\"{text}\" isn't a number OpenDrone can read")
+    };
+    let rule = if decimal_comma {
+        "numbers take a decimal point"
+    } else {
+        "numbers have no thousands separators"
+    };
+    Err(problem(format!("{what}: {rule}, so write \"{fixed}\"")))
 }
 
 /// Parts of a value with a label each, such as
