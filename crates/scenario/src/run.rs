@@ -2,7 +2,10 @@
 
 use opendrone_maths::{Fingerprint, Fingerprinter, functions};
 use opendrone_pack::{Packs, Problem, Problems};
-use opendrone_sim::{QuadSetUp, QuadState, ScriptedMotors, SetUp, SetUpProblem, Simulation};
+use opendrone_sim::{
+    MapShapeProblem, QuadSetUp, QuadState, ScriptedMotors, SetUp, SetUpError, SetUpProblem,
+    Simulation,
+};
 
 use crate::measure::angle_near;
 use crate::read::{BasisKind, Expectation, Named, Scenario, Statistic, When};
@@ -91,6 +94,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let set_up = SetUp {
         physics_rate: start.physics_rate,
         world: map.world,
+        map: map.shapes.clone(),
         random_seed: start.random_seed,
         quads: vec![QuadSetUp {
             parameters: quad.parameters,
@@ -104,14 +108,47 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         }],
     };
     let mut sim = Simulation::new(set_up).map_err(|error| {
-        let sentence = match error.problem {
-            SetUpProblem::MassNotAboveZero => "its mass must be above zero",
-            SetUpProblem::InertiaHasNoInverse => "its inertia can't be turned around (no inverse)",
+        let (line, sentence) = match error {
+            SetUpError::Quad { problem, .. } => {
+                let why = match problem {
+                    SetUpProblem::MassNotAboveZero => "its mass must be above zero",
+                    SetUpProblem::InertiaHasNoInverse => {
+                        "its inertia can't be turned around (no inverse)"
+                    }
+                    SetUpProblem::ShapeCantBeBuilt => {
+                        "its collision shape needs every size above zero, a bounce from 0 to 1 and a friction of 0 or more"
+                    }
+                };
+                (
+                    start.quad.line,
+                    format!("the Quad \"{}\" can't fly: {why}", start.quad.id),
+                )
+            }
+            SetUpError::MapShape { shape, problem } => {
+                let why = match problem {
+                    MapShapeProblem::NotARealNumber => "a number in it isn't a real number",
+                    MapShapeProblem::BoxHasNoSize => "a box needs a size above zero each way",
+                    MapShapeProblem::ConvexHasNoVolume => {
+                        "a convex shape needs four corners that aren't all in one plane"
+                    }
+                    MapShapeProblem::MeshHasNoTriangles => "a triangle mesh needs a triangle",
+                    MapShapeProblem::MeshCornerMissing => {
+                        "a triangle names a corner the mesh doesn't have"
+                    }
+                };
+                (
+                    start.map.line,
+                    format!(
+                        "the Map \"{}\" can't be flown: its shape {shape} (counting from 0) isn't solid: {why}",
+                        start.map.id
+                    ),
+                )
+            }
         };
         Problems(vec![Problem {
             file: scenario.file.clone(),
-            line: start.quad.line,
-            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.id),
+            line,
+            sentence,
         }])
     })?;
 

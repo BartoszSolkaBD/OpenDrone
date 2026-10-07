@@ -1,0 +1,10 @@
+# The built-in Test Map test/wall. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Wall"
+description = "The flat floor with a wall on it: a box 20 m wide, 5 m tall and 0.2 m thick, its face toward the origin 5 m east of it, facing west."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
