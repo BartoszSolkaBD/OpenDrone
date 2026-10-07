@@ -1,0 +1,5 @@
+# cargo-nextest settings. CI runs `cargo nextest run --profile ci`.
+
+[profile.ci]
+# Run every test even after one fails, so one CI run shows every failure.
+fail-fast = false

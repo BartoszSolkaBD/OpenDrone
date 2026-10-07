@@ -1,0 +1,3 @@
+[alias]
+# `cargo xtask <command>` runs the developer tools in crates/xtask.
+xtask = "run --quiet --package xtask --"

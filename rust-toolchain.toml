@@ -1,0 +1,5 @@
+[toolchain]
+# Rust is pinned: a Rust update is a behaviour change and gets its own PR (ADR-0001).
+channel = "1.99.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

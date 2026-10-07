@@ -1,0 +1,19 @@
+[package]
+name = "opendrone-scenario"
+description = "The Scenario runner: headless, used in CI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+opendrone-sim.workspace = true
+opendrone-flight-controller.workspace = true
+opendrone-test-pilot.workspace = true
+opendrone-pack.workspace = true
+opendrone-blackbox.workspace = true
+
+[lints]
+workspace = true

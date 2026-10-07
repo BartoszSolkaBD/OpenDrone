@@ -1,0 +1,16 @@
+[package]
+name = "opendrone-test-pilot"
+description = "The Test Pilot: reads the state and moves only the sticks, through Flight Inputs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+opendrone-maths.workspace = true
+opendrone-sim.workspace = true
+
+[lints]
+workspace = true
