@@ -56,4 +56,4 @@ _Avoid_: Sandbox, practice mode
 - Every part of a Map states whether it is solid. Nothing is solid, or passable, by accident.
 - Every Quad, Map and Input Device profile has a fixed id made of its Pack's id and its own, such as `opendrone/skate-park`. Scenarios and settings use the id. The on-screen name is separate and may change.
 - A Pack never runs code, changes physics rules, touches a pilot's settings or replaces another Pack's items ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)).
-- A broken item in a dropped Pack is skipped and reported in plain words. The rest of the Pack still loads.
+- A broken item in a dropped Pack is skipped and reported in plain words. The rest of the Pack still loads. What the Pack checker refuses: [Checking a Pack](../verification/checking-a-pack.md).

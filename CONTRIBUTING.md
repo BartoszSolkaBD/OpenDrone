@@ -15,6 +15,8 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   cargo nextest run --workspace     # needs cargo-nextest
   cargo test --workspace --doc      # the examples in the docs, which nextest skips
   cargo xtask walls
+  cargo xtask packs                 # every Pack and Test Quad, through the Pack checker
+  cargo xtask feel-tests --base origin/main   # the Feel Test log rules, against main
   cargo scenarios check             # every Scenario, run twice, and its Results
   cargo deny check                  # needs cargo-deny
   cargo xtask book                  # needs mdBook: the docs site, rustdoc and every link
@@ -33,10 +35,10 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 
 | Check | What it proves |
 |---|---|
-| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test and every example in the docs passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system; and every Scenario passes every Expectation, gives the same fingerprint after every step when run twice (the repeat check), and has an up-to-date Results file (`cargo scenarios check`). |
+| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test and every example in the docs passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system; every Pack and Test Quad passes the Pack checker (`cargo xtask packs`); a change to a Quad definition keeps the Feel Test log rules, so a moved Estimate has its log row and stays in its range, and a locked number changes only with a new source (`cargo xtask feel-tests --base HEAD^1`; see [Checking a Pack](docs/verification/checking-a-pack.md)); and every Scenario passes every Expectation, gives the same fingerprint after every step when run twice (the repeat check), and has an up-to-date Results file (`cargo scenarios check`). |
 | Scenarios agree on every OS | The fingerprint after every step of every Scenario is the same on macOS, Windows and Linux (ADR-0001). On a mismatch it names the Scenario and the first step where the OSes split. |
 | Core builds for iOS, Core builds for Android | The five core crates build for phones, which keeps the mobile door open. |
 | Licences and sources | cargo-deny finds only allowed licences and crates.io sources, and, when a PR changes `Cargo.lock` or `deny.toml`, no library with a known security advisory. |
 | Docs site and rustdoc | The docs site builds from `docs/` with every page in it; rustdoc builds for every crate, internal items included, with its warnings as errors; and every link in the book leads somewhere real: a page, a heading, a file of the repo or a rustdoc page (`cargo xtask book`). The [Pages workflow](.github/workflows/pages.yml) publishes the same build from main. |
 
-A pull request that changes only Markdown files skips the Rust work inside these checks, except the docs site's, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them.
+A pull request that changes only Markdown files skips the Rust work inside these checks, except the docs site's, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them, and so does any change under `packs/`, because the Pack checker reads each Quad's Feel Test log.
