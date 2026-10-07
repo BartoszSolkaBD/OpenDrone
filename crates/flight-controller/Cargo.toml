@@ -1,0 +1,15 @@
+[package]
+name = "opendrone-flight-controller"
+description = "Our Betaflight-style Flight Controller, its Betaflight CLI translator and Betaflight's OSD logic."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+opendrone-maths.workspace = true
+
+[lints]
+workspace = true

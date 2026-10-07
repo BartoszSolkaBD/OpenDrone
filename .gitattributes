@@ -1,0 +1,4 @@
+# Check out every text file with plain (LF) line endings on every OS, so the
+# files that tests, Scenarios and fingerprints read are the same bytes on
+# Windows, macOS and Linux.
+* text=auto eol=lf

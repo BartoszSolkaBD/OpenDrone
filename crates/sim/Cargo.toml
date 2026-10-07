@@ -1,0 +1,17 @@
+[package]
+name = "opendrone-sim"
+description = "The Simulation: Flight Inputs, Radio Link, Assists, Flight Controller, physics and session state."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+opendrone-maths.workspace = true
+opendrone-physics.workspace = true
+opendrone-flight-controller.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "opendrone-input"
+description = "Input Devices on their own thread, on SDL 3.4."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# No `[lints] workspace = true` here: this crate may use `unsafe`, because
+# it talks to SDL and the operating system (#15 §4). Every other crate forbids it.

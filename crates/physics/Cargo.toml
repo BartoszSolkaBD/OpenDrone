@@ -1,0 +1,15 @@
+[package]
+name = "opendrone-physics"
+description = "Quad physics and Map collisions, including a \"held on a thrust stand\" set-up."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+opendrone-maths.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,180 @@
+# The required checks, on every PR and every push to main (#15 §4, ADR-0010).
+#
+# Every job here always runs and reports. A PR that touches only docs skips
+# the Rust work inside each job (see .github/scripts/changes.sh), so the jobs
+# still pass and required checks never hang waiting for a job that never ran.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a PR cancels that PR's older run. Runs on main all finish.
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust on ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+          - name: Linux
+            os: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Decide what to check
+        id: changes
+        shell: bash
+        run: bash .github/scripts/changes.sh
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        if: steps.changes.outputs.rust == 'true'
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Reuse the build cache
+        if: steps.changes.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install cargo-nextest
+        if: steps.changes.outputs.rust == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      - name: Formatting (rustfmt)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo fmt --all --check
+
+      - name: Clippy, warnings as errors, with the house rules in the core crates
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Build (unsafe is forbidden outside opendrone-input and the game)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo build --workspace --locked
+
+      - name: Tests (cargo-nextest)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo nextest run --workspace --locked --profile ci
+
+      - name: Examples in the docs (doctests, which cargo-nextest doesn't run)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo test --workspace --doc --locked
+
+      - name: The core is free of Bevy and the operating system (crate walls)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask walls
+
+  mobile:
+    # The five core crates must build for phones, to keep the mobile door
+    # open (ADR-0001, ADR-0003). Only the core: the game isn't built for them.
+    name: Core builds for ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: iOS
+            os: macos-latest
+            target: aarch64-apple-ios
+          - name: Android
+            os: ubuntu-latest
+            target: aarch64-linux-android
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Decide what to check
+        id: changes
+        shell: bash
+        run: bash .github/scripts/changes.sh
+
+      - name: Install the pinned Rust (rust-toolchain.toml) and the ${{ matrix.name }} target
+        if: steps.changes.outputs.rust == 'true'
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }}
+
+      - name: Reuse the build cache
+        if: steps.changes.outputs.rust == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the core crates for ${{ matrix.name }}
+        if: steps.changes.outputs.rust == 'true'
+        # The five core crates, as listed in crates/xtask/walls.toml.
+        run: >-
+          cargo build --locked --target ${{ matrix.target }}
+          -p opendrone-maths
+          -p opendrone-physics
+          -p opendrone-flight-controller
+          -p opendrone-sim
+          -p opendrone-test-pilot
+
+  licences:
+    # Libraries must be permissive or MPL-2.0, from crates.io (ADR-0014).
+    # The policy is deny.toml.
+    name: Licences and sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Decide what to check
+        id: changes
+        shell: bash
+        run: bash .github/scripts/changes.sh
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        if: steps.changes.outputs.rust == 'true'
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install cargo-deny
+        if: steps.changes.outputs.rust == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: Licences, sources and banned libraries (cargo-deny)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo deny --locked check bans licenses sources
+
+      - name: Known security advisories, when this PR adds or upgrades a library
+        # An advisory published later is for the daily scan to report (#81),
+        # so it never blocks unrelated PRs (ADR-0014).
+        if: steps.changes.outputs.rust == 'true' && steps.changes.outputs.libraries == 'true'
+        run: cargo deny --locked check advisories

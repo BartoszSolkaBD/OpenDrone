@@ -1,0 +1,40 @@
+# The OpenDrone workspace: twelve unpublished crates that share one version
+# (ADR-0003). Who may use whom is written in crates/xtask/walls.toml and
+# checked in CI by `cargo xtask walls`.
+
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0-alpha.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/BartoszSolkaBD/OpenDrone"
+publish = false
+
+[workspace.dependencies]
+# OpenDrone's own crates.
+opendrone-maths = { path = "crates/maths" }
+opendrone-physics = { path = "crates/physics" }
+opendrone-flight-controller = { path = "crates/flight-controller" }
+opendrone-sim = { path = "crates/sim" }
+opendrone-test-pilot = { path = "crates/test-pilot" }
+opendrone-input = { path = "crates/input" }
+opendrone-pack = { path = "crates/pack" }
+opendrone-scenario = { path = "crates/scenario" }
+opendrone-blackbox = { path = "crates/blackbox" }
+opendrone-sound = { path = "crates/sound" }
+
+# Outside libraries, pinned to exact versions. Only permissive or MPL-2.0
+# licences, from crates.io (ADR-0014); deny.toml enforces that.
+libm = "=0.2.16"
+serde_json = "=1.0.151"
+toml = "=1.1.6"
+
+# Every crate takes these lints with `[lints] workspace = true`, except
+# opendrone-input and the game, which may use `unsafe` to talk to SDL and the
+# operating system (#15 §4).
+[workspace.lints.rust]
+unsafe_code = "forbid"

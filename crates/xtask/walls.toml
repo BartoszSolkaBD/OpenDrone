@@ -1,0 +1,124 @@
+# The walls between OpenDrone's crates (ADR-0003), checked in CI on every PR by
+# `cargo xtask walls`. Changing this file is a Repo rules change: the Reviewer
+# decides, and the ticket must ask for it.
+
+# The five core crates make up the Simulation. They follow the house rules
+# (ADR-0001), never use Bevy, and never touch the operating system: no clock,
+# no files, no threads, no devices, no network.
+core = [
+    "opendrone-maths",
+    "opendrone-physics",
+    "opendrone-flight-controller",
+    "opendrone-sim",
+    "opendrone-test-pilot",
+]
+
+# Who may use whom. Every crate in the workspace is listed here with the
+# OpenDrone crates it may declare as dependencies (of any kind), and the rule
+# behind that. A crate missing from this list fails the check.
+
+[crates.opendrone-maths]
+may-use = []
+rule = "maths is the shared number types, and uses no other OpenDrone crate (ADR-0003)"
+
+[crates.opendrone-physics]
+may-use = ["opendrone-maths"]
+rule = "physics and the Flight Controller each use only maths, and never each other (ADR-0003)"
+
+[crates.opendrone-flight-controller]
+may-use = ["opendrone-maths"]
+rule = "physics and the Flight Controller each use only maths, and never each other (ADR-0003)"
+
+[crates.opendrone-sim]
+may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller"]
+rule = "the Simulation is the only place where physics and the Flight Controller meet (ADR-0003)"
+
+[crates.opendrone-test-pilot]
+may-use = ["opendrone-maths", "opendrone-sim"]
+rule = "the Test Pilot drives the Simulation from outside, through Flight Inputs (ADR-0003)"
+
+# ADR-0003 names no uses for input, pack and blackbox. They hand the core plain
+# data or read what it puts out, so they may use the core crates and nothing else.
+[crates.opendrone-input]
+may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot"]
+rule = "ADR-0003 names no uses for this edge crate, so it may use the core crates but not another edge crate or the game"
+
+[crates.opendrone-pack]
+may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot"]
+rule = "ADR-0003 names no uses for this edge crate, so it may use the core crates but not another edge crate or the game"
+
+[crates.opendrone-blackbox]
+may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot"]
+rule = "ADR-0003 names no uses for this edge crate, so it may use the core crates but not another edge crate or the game"
+
+[crates.opendrone-scenario]
+may-use = ["opendrone-maths", "opendrone-sim", "opendrone-flight-controller", "opendrone-test-pilot", "opendrone-pack", "opendrone-blackbox"]
+rule = "the Scenario runner uses the Simulation, the Flight Controller, the Test Pilot, pack and blackbox, plus maths' number types (ADR-0003)"
+
+[crates.opendrone-sound]
+may-use = []
+rule = "sound uses no other OpenDrone crate; the game hands it each frame's state (ADR-0003)"
+
+[crates.opendrone]
+may-use = [
+    "opendrone-maths",
+    "opendrone-physics",
+    "opendrone-flight-controller",
+    "opendrone-sim",
+    "opendrone-test-pilot",
+    "opendrone-input",
+    "opendrone-pack",
+    "opendrone-scenario",
+    "opendrone-blackbox",
+    "opendrone-sound",
+]
+rule = "the game uses everything except xtask (ADR-0003)"
+
+[crates.xtask]
+may-use = [
+    "opendrone-maths",
+    "opendrone-physics",
+    "opendrone-flight-controller",
+    "opendrone-sim",
+    "opendrone-test-pilot",
+    "opendrone-input",
+    "opendrone-pack",
+    "opendrone-scenario",
+    "opendrone-blackbox",
+    "opendrone-sound",
+]
+rule = "xtask holds developer tools and is never shipped (ADR-0003); it may use any OpenDrone library, but not the game"
+
+# Outside libraries the core may reach, directly or through another library,
+# each with why it never touches the operating system. Any other outside
+# library anywhere in a core crate's dependencies fails the check, so a new one
+# is added here, with its reason, in the PR that brings it in.
+[core-libraries]
+libm = "pure-Rust maths functions that give the same bits on every platform (ADR-0001)"
+
+# Outside libraries the core must never reach, with why. A name ending in `*`
+# covers every library whose name starts that way. None of these may be added
+# to the list above.
+[never-in-core]
+"bevy" = "it is the game engine, and only the game uses Bevy (ADR-0003)"
+"bevy_*" = "it is part of the Bevy game engine, and only the game uses Bevy (ADR-0003)"
+"libc" = "it calls the operating system's C library"
+"windows*" = "it calls Windows"
+"winapi*" = "it calls Windows"
+"nix" = "it calls Unix system functions"
+"rustix" = "it calls Unix system functions"
+"core-foundation*" = "it calls macOS and iOS"
+"objc*" = "it calls macOS and iOS"
+"jni" = "it calls Android"
+"ndk*" = "it calls Android"
+"getrandom" = "it takes randomness from the operating system, but the core's randomness is seeded (ADR-0001)"
+"rayon*" = "it spreads work over threads, so the order of work isn't fixed (ADR-0001)"
+"mio" = "it waits on the operating system's events"
+"tokio*" = "it runs work on the operating system's threads and network"
+"dirs*" = "it looks up the operating system's folders"
+"sdl3*" = "it talks to Input Devices through SDL"
+"cpal" = "it plays sound on the sound device"
+"alsa*" = "it plays sound on the sound device"
+"firewheel*" = "it plays sound on the sound device"
+"wgpu*" = "it talks to the graphics card"
+"winit" = "it opens windows"

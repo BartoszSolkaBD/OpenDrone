@@ -1,0 +1,72 @@
+# The licence and source policy for every library OpenDrone uses (ADR-0014),
+# enforced in CI by cargo-deny. Changing this file is a Repo rules change: the
+# Reviewer decides, and the ticket must ask for it.
+
+[graph]
+# Check every library any feature of any crate could pull in, on every target.
+all-features = true
+
+[licenses]
+# Only permissive licences, plus MPL-2.0, whose copyleft covers only that
+# library's own files. Everything not listed is refused, so GPL, AGPL, LGPL and
+# code with no licence are never linked.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    # Apache-2.0 with an extra permission for linked code; still Apache-2.0.
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    "MPL-2.0",
+]
+# OFL-1.1 is allowed for fonts only, so it isn't in the list above. A font
+# library is allowed by name, with a line like this one:
+# exceptions = [{ crate = "some-font", allow = ["OFL-1.1"] }]
+confidence-threshold = 0.9
+# The list is the whole policy, so a licence nobody uses yet is fine.
+unused-allowed-license = "allow"
+
+# Operating-system libraries under LGPL (ADR-0014, as amended by #32).
+#
+# cargo-deny only sees Rust libraries, so it can't check these; review does.
+# Such a library is allowed only if it is part of the operating system, loaded
+# when the game starts, and never shipped with the game or built into it. Then
+# LGPL's relinking duty is met, because the copy the game loads is the user's
+# own. Each one is named here with its reason:
+#
+# - alsa-lib (Linux): the system sound library. Every Rust sound library needs
+#   it on Linux, so the game loads the copy installed with the operating
+#   system. Linux builds need the `libasound2-dev` package for this.
+
+[licenses.private]
+# OpenDrone's own crates are unpublished, but they are checked too: each is
+# "MIT OR Apache-2.0".
+ignore = false
+
+[bans]
+# Two versions of one library are reported, never blocking (#15 §4).
+multiple-versions = "warn"
+# A version requirement of `*` is refused, except for paths between our own
+# unpublished crates.
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# Libraries come from crates.io only.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# A library taken straight from git needs a written reason: add its URL here
+# with a comment saying why, and until when.
+allow-git = []
+
+[advisories]
+# A library with a known security advisory blocks the PR that adds or upgrades
+# it. CI runs this check when a PR changes Cargo.lock or this file.
+ignore = []

@@ -1,0 +1,57 @@
+# Who owns each Area of the repo (docs/context/development.md; #15 §9).
+#
+# The same Areas label PRs and fill the Review Report. In Phase 1 the
+# maintainer owns everything; GitHub starts requiring owners' reviews in
+# Phase 2. When several lines match a file, the last one wins, so the
+# catch-all comes first and Repo rules come last.
+
+# Everything else
+*                               @BartoszSolkaBD
+
+# Physics
+/crates/maths/                  @BartoszSolkaBD
+/crates/physics/                @BartoszSolkaBD
+
+# Flight Controller
+/crates/flight-controller/      @BartoszSolkaBD
+
+# Simulation
+/crates/sim/                    @BartoszSolkaBD
+/crates/test-pilot/             @BartoszSolkaBD
+
+# Scenarios (Test Quads included)
+/scenarios/                     @BartoszSolkaBD
+/crates/scenario/               @BartoszSolkaBD
+/crates/blackbox/               @BartoszSolkaBD
+
+# Input
+/crates/input/                  @BartoszSolkaBD
+
+# Sound (added after #15 with the sound crate from #32)
+/crates/sound/                  @BartoszSolkaBD
+
+# Content
+/assets-src/                    @BartoszSolkaBD
+/packs/                         @BartoszSolkaBD
+/crates/pack/                   @BartoszSolkaBD
+
+# Game
+/crates/opendrone/              @BartoszSolkaBD
+
+# Docs and decisions
+/CONTEXT.md                     @BartoszSolkaBD
+/docs/                          @BartoszSolkaBD
+
+# Repo rules: CI, root Cargo files, the Rust version, the licence policy,
+# lint settings, xtask and AGENTS.md
+/.github/                       @BartoszSolkaBD
+/Cargo.toml                     @BartoszSolkaBD
+/Cargo.lock                     @BartoszSolkaBD
+/.cargo/                        @BartoszSolkaBD
+/.config/                       @BartoszSolkaBD
+/rust-toolchain.toml            @BartoszSolkaBD
+/deny.toml                      @BartoszSolkaBD
+/crates/*/clippy.toml           @BartoszSolkaBD
+/crates/xtask/                  @BartoszSolkaBD
+/AGENTS.md                      @BartoszSolkaBD
+/.gitattributes                 @BartoszSolkaBD
