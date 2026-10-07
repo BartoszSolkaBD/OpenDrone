@@ -1,6 +1,6 @@
 //! Running a Scenario through the Simulation and measuring its Expectations.
 
-use opendrone_maths::{Fingerprint, Fingerprinter};
+use opendrone_maths::{Fingerprint, Fingerprinter, functions};
 use opendrone_pack::{Packs, Problem, Problems};
 use opendrone_sim::{QuadSetUp, QuadState, ScriptedMotors, SetUp, SetUpProblem, Simulation};
 
@@ -184,19 +184,22 @@ impl<'s> Tally<'s> {
         if !wanted {
             return;
         }
-        let Some(value) = self.expectation.measure.read(before, now, step) else {
+        let Some(mut value) = self.expectation.measure.read(before, now, step) else {
             return;
         };
+        // Every angle is taken the short way round from the expected value
+        // before it counts, so a heading that crosses north (359.5° to 1.5°)
+        // or a roll that crosses upside down (179.5° to -178.5°) has the
+        // right lowest, highest, mean and final value.
+        if self.expectation.measure.is_an_angle() {
+            value = angle_near(value, self.expectation.expected.centre());
+        }
         self.count += 1;
         self.sum += value;
-        // Written out, not with f64::min and f64::max, which may pick either
-        // zero when given +0 and -0.
-        if value < self.lowest {
-            self.lowest = value;
-        }
-        if value > self.highest {
-            self.highest = value;
-        }
+        // Not std's f64::min and f64::max, which may pick either zero when
+        // given +0 and -0.
+        self.lowest = functions::min(self.lowest, value);
+        self.highest = functions::max(self.highest, value);
         self.last = Some(value);
     }
 
@@ -212,13 +215,6 @@ impl<'s> Tally<'s> {
             }),
             When::Over { .. } => None,
         };
-        let value = value.map(|value| {
-            if e.measure.is_an_angle() {
-                angle_near(value, e.expected.centre())
-            } else {
-                value
-            }
-        });
         let (measured, passed) = match value {
             Some(value) => (
                 e.expected.unit().write(value),

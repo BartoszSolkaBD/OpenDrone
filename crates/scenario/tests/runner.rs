@@ -312,6 +312,88 @@ fn an_angle_is_compared_the_short_way_round() {
     assert!(report.passed(), "{:#?}", failures(&report));
 }
 
+/// The slow turn through north, with its Expectations replaced by
+/// `expectations` and its start changed by `start`.
+fn slow_turn(start: &[(&str, &str)], expectations: &[(&str, &str, &str)]) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/slow-turn-through-north.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()].to_string();
+    for (old, new) in start {
+        assert!(text.contains(old), "no {old:?}");
+        text = text.replacen(old, new, 1);
+    }
+    for (what, statistic, value) in expectations {
+        text += &format!(
+            "[[expect]]\nwhat = \"{what}\"\nover = \"0 s to 1 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: 2 °/s for 1 s\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_heading_crossing_north_has_the_right_lowest_highest_mean_and_final_value() {
+    // From 359.5° at 2 °/s for 1 s: from just after -0.5° up to 1.5°.
+    let text = slow_turn(
+        &[],
+        &[
+            ("heading", "lowest", "-0.5° ± 0.001°"),
+            ("heading", "highest", "1.5° ± 0.001°"),
+            ("heading", "mean", "0.5° ± 0.001°"),
+            ("heading", "final", "1.5° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("heading-across-north", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn a_heading_that_crossed_north_doesnt_pass_for_staying_at_north() {
+    // The heading reached 1.5°, so "highest 0° ± 1°" must fail.
+    let text = slow_turn(&[], &[("heading", "highest", "0° ± 1°")]);
+    let found = failures(&report(
+        &fixture("highest-past-north", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].starts_with("heading, highest over 0 s to 1 s: measured 1.50°"),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_roll_crossing_upside_down_has_the_right_lowest_highest_mean_and_final_value() {
+    // From 179.5° at 2 °/s for 1 s: through 180° (upside down) to 181.5°,
+    // which reads as -178.5°.
+    let text = slow_turn(
+        &[
+            (
+                "attitude          = \"level, heading 359.5°\"",
+                "attitude          = \"roll 179.5°, pitch 0°, heading 0°\"",
+            ),
+            (
+                "rotation          = \"roll 0 °/s, pitch 0 °/s, yaw 2 °/s\"",
+                "rotation          = \"roll 2 °/s, pitch 0 °/s, yaw 0 °/s\"",
+            ),
+        ],
+        &[
+            ("roll", "lowest", "179.5° ± 0.001°"),
+            ("roll", "highest", "-178.5° ± 0.001°"),
+            ("roll", "mean", "180.5° ± 0.001°"),
+            ("roll", "final", "181.5° ± 0.001°"),
+        ],
+    );
+    let report = report(
+        &fixture("roll-across-upside-down", &text),
+        ResultsFile::Write,
+    );
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
 #[test]
 fn a_results_file_holds_every_measured_value_and_the_fingerprints() {
     let file = changed(
