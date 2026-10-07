@@ -56,11 +56,41 @@ pub fn reads_the_clock() -> bool {
 pub fn touches_files_threads_and_the_environment() -> std::io::Result<usize> {
     let file = std::fs::File::open("settings.toml")?;
     drop(file);
+    let opened = std::fs::OpenOptions::new().read(true).open("settings.toml")?;
+    drop(opened);
     let bytes = std::fs::read("settings.toml")?;
     let text = std::fs::read_to_string("settings.toml")?;
+    let entries = std::fs::read_dir(".")?.count();
+    let size = std::fs::metadata("settings.toml")?.len() as usize;
     std::fs::write("results.toml", "")?;
+    std::fs::create_dir_all("results")?;
+    std::fs::copy("results.toml", "results/copy.toml")?;
+    std::fs::rename("results/copy.toml", "results/moved.toml")?;
+    std::fs::remove_file("results/moved.toml")?;
     let worker = std::thread::spawn(|| 1);
     let joined = worker.join().unwrap_or(0);
+    let built = std::thread::Builder::new().spawn(|| 2)?.join().unwrap_or(0);
+    std::thread::sleep(std::time::Duration::from_millis(1));
     let variable = std::env::var("OPENDRONE").map_or(0, |value| value.len());
-    Ok(bytes.len() + text.len() + joined + variable)
+    let raw = std::env::var_os("OPENDRONE").map_or(0, |value| value.len());
+    let all = std::env::vars().count() + std::env::args().count();
+    let here = std::env::current_dir()?.components().count();
+    Ok(bytes.len() + text.len() + entries + size + joined + built + variable + raw + all + here)
+}
+
+pub fn starts_and_stops_programs() -> std::io::Result<u32> {
+    let child: std::process::Child = std::process::Command::new("true").spawn()?;
+    let me = std::process::id() + child.id();
+    if me == 0 {
+        std::process::abort();
+    }
+    std::process::exit(0)
+}
+
+pub fn uses_the_network() -> std::io::Result<()> {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let stream = std::net::TcpStream::connect(listener.local_addr()?)?;
+    let socket = std::net::UdpSocket::bind("127.0.0.1:0")?;
+    drop((stream, socket));
+    Ok(())
 }

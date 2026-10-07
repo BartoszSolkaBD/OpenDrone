@@ -81,13 +81,28 @@ disallowed-methods = [
     { path = "f32::algebraic_div", reason = "use /: the algebraic operations may give different results from run to run (ADR-0001)" },
     { path = "f32::algebraic_rem", reason = "use %: the algebraic operations may give different results from run to run (ADR-0001)" },
 
-    # The core never opens a file, starts a thread or reads the environment
-    # (ADR-0003). The crate walls catch libraries that do; these catch std.
+    # The core never opens a file, starts a thread, waits, reads the
+    # environment, or starts or stops a program (ADR-0003). The crate walls
+    # catch libraries that do; these catch std.
     { path = "std::fs::read", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
     { path = "std::fs::read_to_string", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
+    { path = "std::fs::read_dir", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
+    { path = "std::fs::metadata", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
     { path = "std::fs::write", reason = "the core never writes a file; it hands results to the caller (ADR-0003)" },
+    { path = "std::fs::create_dir_all", reason = "the core never writes a file; it hands results to the caller (ADR-0003)" },
+    { path = "std::fs::remove_file", reason = "the core never writes a file; it hands results to the caller (ADR-0003)" },
+    { path = "std::fs::copy", reason = "the core never writes a file; it hands results to the caller (ADR-0003)" },
+    { path = "std::fs::rename", reason = "the core never writes a file; it hands results to the caller (ADR-0003)" },
     { path = "std::thread::spawn", reason = "the core runs its work in one fixed order, on the caller's thread (ADR-0001)" },
+    { path = "std::thread::sleep", reason = "the core never reads a clock; it counts Simulation Time in steps (ADR-0003)" },
     { path = "std::env::var", reason = "the core takes its settings from the caller, never from the environment (ADR-0003)" },
+    { path = "std::env::var_os", reason = "the core takes its settings from the caller, never from the environment (ADR-0003)" },
+    { path = "std::env::vars", reason = "the core takes its settings from the caller, never from the environment (ADR-0003)" },
+    { path = "std::env::args", reason = "the core takes its settings from the caller, never from the environment (ADR-0003)" },
+    { path = "std::env::current_dir", reason = "the core takes its settings from the caller, never from the environment (ADR-0003)" },
+    { path = "std::process::exit", reason = "the core never starts or stops programs; only the edge crates and the game talk to the operating system (ADR-0003)" },
+    { path = "std::process::abort", reason = "the core never starts or stops programs; only the edge crates and the game talk to the operating system (ADR-0003)" },
+    { path = "std::process::id", reason = "the core never starts or stops programs; only the edge crates and the game talk to the operating system (ADR-0003)" },
 ]
 
 disallowed-types = [
@@ -95,8 +110,16 @@ disallowed-types = [
     { path = "std::collections::HashMap", reason = "its order changes from run to run; use BTreeMap or a Vec (ADR-0001)" },
     { path = "std::collections::HashSet", reason = "its order changes from run to run; use BTreeSet or a Vec (ADR-0001)" },
 
-    # The core never reads a clock or opens a file (ADR-0003).
+    # The core never reads a clock, opens a file, starts a thread or a
+    # program, or uses the network (ADR-0003).
     { path = "std::time::Instant", reason = "the core never reads a clock; it counts Simulation Time in steps (ADR-0003)" },
     { path = "std::time::SystemTime", reason = "the core never reads a clock; it counts Simulation Time in steps (ADR-0003)" },
     { path = "std::fs::File", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
+    { path = "std::fs::OpenOptions", reason = "the core never opens a file; the caller hands it the data (ADR-0003)" },
+    { path = "std::thread::Builder", reason = "the core runs its work in one fixed order, on the caller's thread (ADR-0001)" },
+    { path = "std::process::Command", reason = "the core never starts or stops programs; only the edge crates and the game talk to the operating system (ADR-0003)" },
+    { path = "std::process::Child", reason = "the core never starts or stops programs; only the edge crates and the game talk to the operating system (ADR-0003)" },
+    { path = "std::net::TcpStream", reason = "the core never uses the network; multiplayer moves Flight Inputs and states through the game (ADR-0003)" },
+    { path = "std::net::TcpListener", reason = "the core never uses the network; multiplayer moves Flight Inputs and states through the game (ADR-0003)" },
+    { path = "std::net::UdpSocket", reason = "the core never uses the network; multiplayer moves Flight Inputs and states through the game (ADR-0003)" },
 ]
