@@ -226,3 +226,86 @@ fn min_and_max_pick_the_smaller_and_larger_and_pass_on_not_a_number() {
     assert!(min(f64::NAN, 1.0).is_nan() && min(1.0, f64::NAN).is_nan());
     assert!(max(f64::NAN, 1.0).is_nan() && max(1.0, f64::NAN).is_nan());
 }
+
+fn assert_same_attitude(actual: Attitude, expected: Attitude, within: f64) {
+    for axis in [FORWARD, LEFT, UP] {
+        let (a, e) = (actual.body_to_world(axis), expected.body_to_world(axis));
+        assert!(
+            (a - e).length() < within,
+            "{axis:?} points {a:?}, not {e:?}"
+        );
+    }
+}
+
+fn wrapped_degrees(angle: f64) -> f64 {
+    let degrees = angle / DEGREE;
+    degrees - 360.0 * (degrees / 360.0).floor()
+}
+
+#[test]
+fn with_the_nose_straight_up_or_down_roll_reads_0_and_heading_carries_the_turn() {
+    for (pitch, sign) in [(90.0, -1.0), (-90.0, 1.0)] {
+        for (roll, heading) in [(0.0, 30.0), (30.0, 45.0), (-60.0, 200.0), (170.0, 350.0)] {
+            let start = attitude(roll, pitch, heading);
+            let angles = start.pilot_angles();
+            assert_eq!(
+                angles.roll, 0.0,
+                "roll {roll}, pitch {pitch}, heading {heading}"
+            );
+            assert_angle(angles.pitch, pitch);
+            // Nose up: heading minus roll. Nose down: heading plus roll.
+            let expected = heading + sign * roll;
+            let expected = expected - 360.0 * (expected / 360.0).floor();
+            let read = wrapped_degrees(angles.heading);
+            let apart = (read - expected + 180.0).rem_euclid(360.0) - 180.0;
+            assert!(
+                apart.abs() < 1e-9,
+                "roll {roll}, pitch {pitch}, heading {heading}: heading reads {read}, not {expected}"
+            );
+            assert_same_attitude(Attitude::from_pilot_angles(angles), start, 1e-12);
+        }
+    }
+}
+
+#[test]
+fn just_short_of_straight_up_the_angles_still_give_back_the_same_attitude() {
+    for pitch in [89.9999999, -89.9999999, 89.99999, -89.999] {
+        for (roll, heading) in [(0.0, 45.0), (30.0, 45.0), (-120.0, 300.0)] {
+            let start = attitude(roll, pitch, heading);
+            assert_same_attitude(
+                Attitude::from_pilot_angles(start.pilot_angles()),
+                start,
+                1e-12,
+            );
+        }
+    }
+}
+
+#[test]
+fn a_quad_nose_straight_down_reads_the_heading_it_was_given() {
+    let angles = attitude(0.0, -90.0, 30.0).pilot_angles();
+    assert_eq!(angles.roll, 0.0);
+    assert_angle(angles.heading, 30.0);
+}
+
+#[test]
+fn any_attitude_read_as_angles_gives_back_the_same_attitude() {
+    // A spread of attitudes, from a fixed sequence, with every pitch from
+    // straight down to straight up.
+    let mut seed: u64 = 1;
+    let mut next = || {
+        seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+        (seed >> 11) as f64 / (1_u64 << 53) as f64
+    };
+    for _ in 0..10_000 {
+        let roll = next() * 360.0 - 180.0;
+        let pitch = next() * 180.0 - 90.0;
+        let heading = next() * 360.0;
+        let start = attitude(roll, pitch, heading);
+        assert_same_attitude(
+            Attitude::from_pilot_angles(start.pilot_angles()),
+            start,
+            1e-12,
+        );
+    }
+}

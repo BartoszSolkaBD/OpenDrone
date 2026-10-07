@@ -33,7 +33,9 @@ pub enum Measure {
     Roll,
     /// Nose up is positive, from -90° to 90°.
     Pitch,
-    /// Where the nose points, as on a compass, from 0° to 360°.
+    /// Where the nose points, as on a compass, from 0° to 360°. With the nose
+    /// straight up or down, roll reads 0° and heading carries the whole turn
+    /// (see `opendrone_maths::PilotAngles`).
     Heading,
 }
 

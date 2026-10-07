@@ -1,6 +1,6 @@
-use core::f64::consts::{FRAC_PI_2, TAU};
+use core::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use crate::functions::{asin, atan2, fmod, sin_cos};
+use crate::functions::{atan2, fmod, sin_cos};
 use crate::{Mat3, Vec3};
 
 /// Which way a Quad points: the turn that takes its body directions (forward,
@@ -27,6 +27,12 @@ pub struct Attitude {
 ///
 /// They are applied in that order: heading, then pitch, then roll, as in
 /// aviation.
+///
+/// With the nose straight up or down, roll and heading turn about the same
+/// line, so only their sum or difference says anything. Then
+/// [`Attitude::pilot_angles`] reads roll as 0 and gives heading the whole
+/// turn: with the nose up, heading minus roll; with the nose down, heading
+/// plus roll.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PilotAngles {
     pub roll: f64,
@@ -85,12 +91,41 @@ impl Attitude {
     }
 
     /// The roll, pitch and heading a pilot would read off this attitude.
+    ///
+    /// With the nose straight up or down (to within rounding), roll reads 0
+    /// and heading carries the whole turn about the vertical (see
+    /// [`PilotAngles`]). Turning these angles back into an attitude gives
+    /// this attitude again either way.
     pub fn pilot_angles(self) -> PilotAngles {
         let Attitude { w, x, y, z } = self;
-        let roll = atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y));
-        let sine_of_pitch = (2.0 * (w * y - z * x)).clamp(-1.0, 1.0);
-        let pitch = -asin(sine_of_pitch);
-        let about_up = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
+        // Bernardes and Viollet's direct method ("Quaternion to Euler angles
+        // conversion: a direct, general and computationally efficient
+        // method", PLOS ONE, 2022), for turns about up, then left, then
+        // forward. Each angle comes from an atan2 of numbers that aren't all
+        // tiny, so the angles stay precise right up to straight up or down,
+        // where the usual formulas read rounding errors.
+        let (a, b, c, d) = (w - y, x + z, y + w, z - x);
+        let toward_level = (a * a + b * b).sqrt();
+        let toward_vertical = (c * c + d * d).sqrt();
+        // The turn about the left axis: minus the pitch.
+        let about_left = 2.0 * atan2(toward_vertical, toward_level) - FRAC_PI_2;
+        let plus = atan2(b, a);
+        let minus = atan2(d, c);
+        // Their product is the cosine of the pitch.
+        let (roll, about_up) = if toward_level * toward_vertical < STRAIGHT_UP_OR_DOWN {
+            // Nose straight up or down: roll and heading turn about the same
+            // line, and one of `plus` and `minus` is read from rounding
+            // errors. Roll reads 0, and the heading takes the whole turn from
+            // the other, which is precise.
+            if toward_vertical < toward_level {
+                (0.0, 2.0 * plus)
+            } else {
+                (0.0, 2.0 * minus)
+            }
+        } else {
+            (half_turn_either_way(plus - minus), plus + minus)
+        };
+        let pitch = -about_left;
         let mut heading = fmod(FRAC_PI_2 - about_up, TAU);
         if heading < 0.0 {
             heading += TAU;
@@ -182,6 +217,22 @@ impl Attitude {
         }
     }
 }
+
+/// The same angle, from −π (exclusive) to π.
+fn half_turn_either_way(angle: f64) -> f64 {
+    let wrapped = fmod(angle, TAU);
+    if wrapped > PI {
+        wrapped - TAU
+    } else if wrapped <= -PI {
+        wrapped + TAU
+    } else {
+        wrapped
+    }
+}
+
+/// Below this cosine of the pitch (about 0.00000006° from vertical), the nose
+/// counts as straight up or down: there roll and heading can't be told apart.
+const STRAIGHT_UP_OR_DOWN: f64 = 1e-9;
 
 /// A turn by `angle` radians about `axis`, which must have length one.
 fn turn(axis: Vec3, angle: f64) -> Attitude {
