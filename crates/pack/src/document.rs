@@ -17,6 +17,17 @@ pub struct Problem {
     pub sentence: String,
 }
 
+impl Problem {
+    /// A problem on `line` of `file` (0 for the file as a whole).
+    pub fn of(file: impl Into<String>, line: usize, sentence: impl Into<String>) -> Problem {
+        Problem {
+            file: file.into(),
+            line,
+            sentence: sentence.into(),
+        }
+    }
+}
+
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.line == 0 {
@@ -83,6 +94,65 @@ impl fmt::Display for Problems {
 /// starts with `format = N` (ADR-0011).
 pub const FORMAT: i64 = 1;
 
+/// One step that upgrades a file of format `from` to format `from + 1`, in
+/// memory, rewriting its `format` line too. The format migration tool runs the
+/// same steps over the repo's own files in the PR that changes the format, so
+/// a pilot's older Pack and the repo's Packs are upgraded the same way (#16
+/// §9).
+#[derive(Clone, Copy, Debug)]
+pub struct Upgrade {
+    pub from: i64,
+    pub rewrite: fn(&str) -> Result<String, String>,
+}
+
+/// The steps that upgrade older Pack files. Format 1 is the first, so there
+/// are none yet; the PR that brings format 2 adds its step here.
+pub const PACK_UPGRADES: &[Upgrade] = &[];
+
+/// Brings `text`, written in format `from`, up to format `to`, one step at a
+/// time, or says which step is missing or what went wrong.
+pub fn upgrade_text(text: &str, from: i64, to: i64, steps: &[Upgrade]) -> Result<String, String> {
+    let mut text = text.to_string();
+    for format in from..to {
+        let step = steps
+            .iter()
+            .find(|step| step.from == format)
+            .ok_or_else(|| {
+                format!(
+                    "this file is format {format}, and this OpenDrone has no step that upgrades it"
+                )
+            })?;
+        text = (step.rewrite)(&text).map_err(|error| {
+            format!(
+                "upgrading this file from format {format} to {}: {error}",
+                format + 1
+            )
+        })?;
+    }
+    Ok(text)
+}
+
+/// The text to read: `text` itself when its `format` is the newest or can't
+/// be read (then [`Document::check_format`] says why), or `text` upgraded in
+/// memory when it is older.
+pub fn upgraded<'t>(
+    file: &str,
+    text: &'t str,
+    steps: &[Upgrade],
+) -> Result<std::borrow::Cow<'t, str>, Problems> {
+    let doc = Document::parse(file, text)?;
+    let root = doc.root();
+    let Some(item) = root.get("format") else {
+        return Ok(text.into());
+    };
+    match item.integer() {
+        Some(n) if (1..FORMAT).contains(&n) => upgrade_text(text, n, FORMAT, steps)
+            .map(Into::into)
+            .map_err(|sentence| Problems(vec![item.problem(sentence)])),
+        _ => Ok(text.into()),
+    }
+}
+
 /// A TOML file read with the place of every key and value.
 pub struct Document<'t> {
     file: String,
@@ -142,6 +212,15 @@ impl<'t> Document<'t> {
             });
             return;
         };
+        if root
+            .entries()
+            .first()
+            .is_some_and(|(key, _)| key != "format")
+        {
+            problems.push(item.problem(format!(
+                "every file starts with `format = {FORMAT}`, before anything else but comments"
+            )));
+        }
         match item.integer() {
             Some(n) if n == FORMAT => {}
             Some(n) if n > FORMAT => problems.push(item.problem(format!(
@@ -151,6 +230,16 @@ impl<'t> Document<'t> {
                 "`format` must be a whole number from 1 to {FORMAT}"
             ))),
         }
+    }
+
+    /// Whether the file is written in a newer format than this OpenDrone
+    /// reads. Its other keys may mean something this one doesn't know, so a
+    /// reader stops after saying it needs a newer OpenDrone.
+    pub fn is_newer(&self) -> bool {
+        self.root()
+            .get("format")
+            .and_then(|item| item.integer())
+            .is_some_and(|n| n > FORMAT)
     }
 }
 

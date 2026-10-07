@@ -1,34 +1,157 @@
-# The Whoop 65, modelled on the BetaFPV Meteor65 Pro.    id: opendrone/whoop-65
+# The Whoop 65, modelled on the BetaFPV Meteor65 Pro on a LAVA II 320 mAh pack.
+#                                                        id: opendrone/whoop-65
 #
-# This file holds only the numbers the Simulation uses so far: the mass, the
-# inertia and the drag. The Pack checker ticket (#40) fills in the rest of the
-# Quad definition from #16's sample: props, motors, the rest of the battery,
-# the ducts' nose-up moment, collision shapes, the camera and the sound.
+# Every physics number is { value, confidence, source }, and so is each of the
+# FPV Camera's limits. Only an Estimate may move in a Feel Test, only inside
+# its range, and every move gets a row in feel-tests.md. Measured,
+# Manufacturer and Derived numbers are locked: one changes only with a new
+# source. Counts, choices, the camera defaults and the sound block carry no
+# Confidence. How each Derived number was worked out, and where each
+# Estimate's range comes from: docs/research/quad-definitions.md.
 #
-# Every physics number is { value, confidence, source }. Only Estimates may move
-# in a Feel Test, and only inside their range.
+# Directions: forward, left and up from the centre of mass. Battery voltages
+# are per cell.
 format = 1
 
 name        = "Whoop 65"
 description = "65 mm whoop, modelled on the BetaFPV Meteor65 Pro"
+spec_line   = "35 mm props in ducts, 1S"
+picture     = "picture.png"
+
+[camera]   # #14 and #28
+lens        = "fisheye"
+position    = "15 mm forward, 0 mm left, 12 mm up"   # placed by eye from BetaFPV's photos
+camera_tilt = "30°"     # the Meteor65 Pro's stock insert
+fov         = "160°"    # its C03 camera, corner to corner
+vtx_power   = "25 mW"   # what the maintainer's quads run
+analog_dynamic_range = { value = "7 stops",   confidence = "Estimate",     range = "6–8.5 stops", source = "c03" }
+analog_lines         = { value = "480 lines", confidence = "Manufacturer", source = "c03" }
+analog_sharpness     = { value = "300 TVL",   confidence = "Estimate",     range = "250–380 TVL", source = "ntsc" }
 
 [frame]
-dry_mass  = { value = "23.0 g", confidence = "Manufacturer", source = "betafpv" }
-inertia   = { value = "roll 70, pitch 90, yaw 140 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "dynamics" }
-drag_area = { value = "front 9, side 9, top 25 cm²", confidence = "Estimate", range = "×0.5–×2", source = "not-yet-sourced" }
+dry_mass     = { value = "23.0 g", confidence = "Manufacturer", source = "betafpv" }
+diagonal     = { value = "66 mm",  confidence = "Manufacturer", source = "wheelbase" }   # motor to motor
+inertia      = { value = "roll 70, pitch 90, yaw 140 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "dynamics" }
+rotor_height = { value = "8 mm", confidence = "Estimate", range = "0–15 mm", source = "layout" }   # the props' plane above the centre of mass
+drag_area    = { value = "front 9, side 9, top 25 cm²", confidence = "Estimate", range = "×0.5–×2", source = "first-guess" }
+
+[collision]   # simple shapes (#16 §4, #26 §1); each box is front to back × side to side × top to bottom
+body        = { value = "box 35 × 30 × 20 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "layout" }   # frame and canopy
+pack        = { value = "box 64 × 10 × 6 mm", confidence = "Manufacturer", source = "lava" }
+pack_height = { value = "-6 mm", confidence = "Estimate", range = "-12–0 mm", source = "layout" }   # under the frame
+duct_rings  = { value = "37 mm inside, 1.5 mm wall, 14 mm tall", confidence = "Estimate", range = "×0.9–×1.1", source = "layout" }
+bounce      = { value = "0.3", confidence = "Estimate", range = "0.1–0.6", source = "feel" }
+friction    = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "feel" }
 
 [props]
-rotor_drag = { value = "0.3 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "not-yet-sourced" }
+diameter           = { value = "35 mm", confidence = "Manufacturer", source = "betafpv" }
+blades             = 3            # a count: no Confidence
+direction          = "props-in"   # a choice; the Tune's yaw_motors_reversed must match
+thrust_coefficient = { value = "0.29", confidence = "Estimate", range = "0.2–0.46", source = "thrust-35mm" }
+power_coefficient  = { value = "0.26", confidence = "Estimate", range = "0.18–0.37", source = "motor-model" }
+rotor_drag         = { value = "0.3 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "first-guess" }
+rotor_inertia      = { value = "0.25 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "rotor-inertia" }   # prop and motor bell
+reverse_thrust     = { value = "50%", confidence = "Estimate", range = "25–75%", source = "crashes" }    # of forward, at the same speed
+reverse_torque     = { value = "100%", confidence = "Estimate", range = "50–100%", source = "crashes" }
+grip               = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "crashes" }    # for Prop Strikes
 
-[battery]
-# Stored apart from the dry mass; the reader adds the two.
-mass = { value = "8.2 g", confidence = "Manufacturer", source = "lava" }
+[motors]   # 0802SE, with the ESC's numbers (#26 §5)
+kv                  = { value = "19500 KV", confidence = "Manufacturer", source = "betafpv" }
+poles               = 12   # from the real quad's diff all; the Tune's motor_poles must match
+winding_resistance  = { value = "0.50 Ω", confidence = "Estimate", range = "0.2–0.8 Ω", source = "motor-model" }
+no_load_current     = { value = "0.3 A at 4 V", confidence = "Estimate", range = "0.1–0.6 A", source = "first-guess" }
+spin_up             = { value = "35 ms", confidence = "Estimate", range = "20–50 ms", source = "dynamics" }
+slow_down           = { value = "35 ms", confidence = "Estimate", range = "20–50 ms", source = "dynamics" }
+start_wait          = { value = "0.1 s", confidence = "Manufacturer", source = "bluejay" }
+restart_tries       = 3
+startup_power_limit = { value = "1.96%", confidence = "Manufacturer", source = "bluejay" }
+
+[battery]   # LAVA II 1S 320 mAh
+cells         = 1
+chemistry     = "LiHV"
+full          = { value = "4.35 V", confidence = "Manufacturer", source = "lava" }
+empty         = { value = "3.30 V", confidence = "Estimate", range = "3.2–3.5 V", source = "battery-window" }
+capacity      = { value = "320 mAh", confidence = "Manufacturer", source = "lava" }
+mass          = { value = "8.2 g", confidence = "Manufacturer", source = "lava" }   # stored apart from the dry mass; the checker adds the two
+voltage_curve = { value = "4.35 V at 100%, 4.15 V at 80%, 3.92 V at 50%, 3.77 V at 20%, 3.30 V at 0%",
+                  confidence = "Estimate", range = "×0.97–×1.03", source = "typical-curve" }
+resistance    = { value = "29 mΩ", confidence = "Derived", source = "lava-resistance" }
+recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "battery-model" }
+connector     = { value = "10 mΩ", confidence = "Estimate", range = "5–20 mΩ", source = "dynamics" }   # BT2.0
 
 [ducts]
-ram_drag = { value = "1.2 s⁻¹", confidence = "Estimate", range = "0.6–2.4 s⁻¹", source = "dynamics" }
+ram_drag       = { value = "1.2 s⁻¹", confidence = "Estimate", range = "0.6–2.4 s⁻¹", source = "ducts" }
+nose_up_offset = { value = "13 mm", confidence = "Estimate", range = "9–18 mm", source = "ducts" }   # 0.75 × the 17.5 mm rotor radius
+
+[feel]
+prop_wash_strength = { value = "20%", confidence = "Estimate", range = "10–30%", source = "prop-wash" }   # thrust flicker
+prop_wash_flicker  = { value = "15 Hz", confidence = "Estimate", range = "5–40 Hz", source = "flicker" }
+ground_effect_body = { value = "2", confidence = "Estimate", range = "0–4", source = "ground-effect" }
+
+[board]
+gyro_range = { value = "2000 °/s", confidence = "Manufacturer", source = "bmi270" }   # it reads up to ± this
+
+[sound]   # #32 §6
+buzzer     = false   # like the real Meteor65 Pro
+esc_melody = "Bluejay default"
+
+[sound_block]   # set by ear, with no Confidence; starting values from #34's round 2, not signed off yet
+blade_pass_level      = "1.0"       # the main pitch: blade count × rotation rate
+harmonics             = 8           # how many blade-pass overtones
+harmonic_rolloff      = "1.5"       # higher is darker
+blade_mismatch        = "0.2"       # growl between the harmonics
+shaft_level           = "0.02"      # the once-a-turn tone
+loudness_exponent     = "2.0"       # how much louder at full speed
+whoosh_level          = "0.9"       # broadband prop noise
+whoosh_centre         = "2.0"       # as a multiple of the blade-pass pitch
+whoosh_q              = "0.5"
+whoosh_swish          = "0.5"       # how much the whoosh pulses with the blades
+motor_whine           = "0.05"
+load_brightness       = "0.5"       # a working prop sounds brighter
+load_loudness         = "0.4"       # and louder
+speed_wobble          = "1.5%"      # the sound-side wobble in each motor's speed
+tone_roughness        = "0.6"
+hiss_level            = "1.7"       # blade tips, above hiss_corner
+hiss_corner           = "2000 Hz"
+body_peak             = "2500 Hz"   # the frame and duct resonance
+body_peak_gain        = "1.5 dB"
+body_peak_q           = "1.0"
+hum_level             = "0.03"      # frame hum
+hum_first_mode        = "900 Hz"
+hum_first_mode_q      = "6.0"
+hum_second_mode       = "1600 Hz"
+hum_second_mode_q     = "8.0"
+hum_follow            = "0.5"       # how much the hum follows the motors
+esc_beep_level        = "0.35"
+esc_beep_brightness   = "0.6"       # 0 a pure tone, 1 buzzy
+esc_ring              = "4500 Hz"   # the motor bell's ring
+tick_level            = "0.6"       # Prop Strike ticks
+tick_ring             = "4500 Hz"
+tick_decay            = "2 ms"
+where_you_stand_level = "-12 dB"    # how loud this Quad is from the Launch Spot
+hit_level             = "0.5"       # the hit clip at a 5 m/s impact
 
 [sources]
-betafpv         = "BetaFPV, Meteor65 Pro product page (read 2026-10-03)"
-lava            = "BetaFPV LAVA II 320 mAh battery, product page"
-dynamics        = "docs/research/flight-dynamics.md, section 9.1, and #10's resolution"
-not-yet-sourced = "the placeholder from #16's sample Quad file; the air ticket (#42) works out the real value"
+betafpv         = "BetaFPV, Meteor65 Pro product page: 23.01 g without battery, 0802SE 19500KV motors, 35 mm 3-blade props, C03 camera with a 160° lens, BMI270 gyro, Bluejay ESC firmware (read 2026-10-07)"
+wheelbase       = "docs/research/flight-dynamics.md §8.1: BetaFPV gives the Meteor65 Pro's wheelbase as 66 mm [S49]"
+lava            = "BetaFPV, LAVA II 1S battery product page, 320 mAh: 64 × 10 × 6 mm, 8.2 g, 95C, BT2.0, charged to 4.35 V (read 2026-10-07)"
+lava-resistance = "docs/research/quad-definitions.md: BetaFPV's LAVA II 320 mAh discharge curve at 18 A falls from about 4.33 V at rest to about 3.80 V under load, so (4.33 − 3.80) V ÷ 18 A ≈ 29 mΩ (flight-dynamics.md §5.3 gives the same)"
+dynamics        = "docs/research/flight-dynamics.md §9.1 and #10's resolution §5: inertia, motor lag and the BT2.0 connector"
+thrust-35mm     = "#34's correction to docs/research/flight-dynamics.md §9.1: BetaFPV's 0802 (2026) on 40 mm props gives C_T ≈ 0.29; the same C_T on the 35 mm props hovers at about 22,700 RPM; a Feel Test settles it"
+motor-model     = "docs/research/quad-definitions.md: worked from BetaFPV's 30.6 g at 3.4 A and 4 V through the motor model, using the Estimates for C_T and the no-load current"
+rotor-inertia   = "docs/research/quad-definitions.md: a 0.25 g 35 mm prop plus an 0802 motor's bell; it gives a spin-up of about 30 ms, inside the motor lag's range"
+layout          = "docs/research/quad-definitions.md: estimated from the frame's layout in BetaFPV's photos; nothing measured"
+first-guess     = "a first guess with no source yet, from #16's sample Quad file; the effect's own ticket (motors #41, air #42) works out the real value"
+crashes         = "#26's resolution §3 and §5: reverse thrust and torque, and prop grip"
+bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before a restart, at most 3 restarts after a stall, and start-up power capped at Startup Power Max, 5 of 255 (1.96%)"
+battery-window  = "docs/research/flight-dynamics.md §5.3: a LiHV cell runs from 4.35 V down to about 3.3 V"
+typical-curve   = "docs/research/quad-definitions.md: a typical LiHV open-circuit voltage curve; BetaFPV publishes none for this pack"
+battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]"
+ducts           = "docs/research/flight-dynamics.md §5.1: ram drag about 1.2 s⁻¹ for a Meteor65 Pro in hover, and the ducted rotor's centre of pressure 0.75 rotor radius higher (Pereira [S16])"
+prop-wash       = "docs/research/flight-dynamics.md §4.4: thrust loss and flicker of 10–30% in a rotor's own air [S10, S11]"
+flicker         = "docs/research/flight-dynamics.md §4.4: how fast Prop Wash flickers has no published source, so Feel Tests tune it"
+ground-effect   = "docs/research/flight-dynamics.md §4.5: Sanchez-Cuevas et al.'s body-lift term, K_b ≈ 2 [S12]"
+feel            = "a starting guess for Feel Tests to tune; see feel-tests.md"
+bmi270          = "Bosch BMI270 datasheet: gyro range up to ±2000 °/s; the Meteor65 Pro's gyro, per BetaFPV's product page"
+c03             = "#28 §2 and docs/research/fpv-camera-dynamic-range-and-resolution.md: the BetaFPV C03, NTSC (480 lines), S/N above 50 dB, so at most about 8.3 stops"
+ntsc            = "#28 §2 and docs/research/fpv-camera-dynamic-range-and-resolution.md: NTSC video carries about 330 TVL, whatever the camera claims"

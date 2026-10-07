@@ -70,6 +70,9 @@ pub fn read_map_file(id: &str, file: &str, text: &str) -> Result<MapDefinition, 
     let doc = Document::parse(file, text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
+    if doc.is_newer() {
+        return Err(problems);
+    }
     let root = doc.root();
     let name = root
         .text("name", &mut problems)

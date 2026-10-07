@@ -1,0 +1,17 @@
+# Whoop 65 Tune: Betaflight 2026.6 names and units.
+# Imported from the Meteor65 Pro's diff all: Betaflight 4.3.0, dated 2023-01-16
+#   (docs/research/quad-settings/meteor65-pro.diff-all.txt)
+# Each line's mark says where its value came from:
+#   diff         set on the real quad
+#   4.3 default  not in the diff, so Betaflight 4.3.0's default
+#   ADR-0008     4.3 had no such setting; set to behave like 4.3
+#   (was …)      the setting's 4.3 name
+#   hand-set: …  changed by hand, with the reason
+#
+# So far this holds only the settings the Pack checker compares with the Quad
+# definition. The Flight Controller tickets spell out every other setting
+# (ADR-0015).
+
+# Motors
+set motor_poles = 12                   # diff; must match [motors] poles
+set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction, props-in

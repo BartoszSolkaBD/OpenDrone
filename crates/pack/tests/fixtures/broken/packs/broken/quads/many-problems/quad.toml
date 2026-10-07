@@ -1,0 +1,127 @@
+# A broken fixture Quad: the good one with one problem on each line marked BROKEN.
+format = 1
+
+name        = "Ducted"
+description = "A fixture Quad"
+spec_line   = "35 mm props in ducts"
+picture     = "picture.png"
+
+[camera]
+lens        = "fisheye"
+position    = "15 mm forward, 0 mm left, 12 mm up"
+camera_tilt = "30°"
+fov         = "160°"
+vtx_power   = "25 mW"
+analog_dynamic_range = { value = "7 stops", confidence = "Estimate", range = "6–8.5 stops", source = "guess" }
+analog_lines         = { value = "480 lines", confidence = "Manufacturer", source = "maker" }
+analog_sharpness     = { value = "300 TVL", confidence = "Estimate", range = "250–380 TVL", source = "guess" }
+
+[frame]
+dry_mass     = { value = "23 m",    confidence = "Manufacturer", source = "maker" }   # BROKEN: a mass in metres
+diagonal     = { value = "66,5 mm", confidence = "Manufacturer", source = "maker" }   # BROKEN: a decimal comma
+inertia      = { value = "roll 70, pitch 90, yaw 140 g·cm²", range = "×0.5–×2", source = "guess" }   # BROKEN: no Confidence
+rotor_height = { value = "8 mm", confidence = "Estimate", source = "guess" }   # BROKEN: an Estimate without a range
+drag_area    = { value = "front 9, side 9, top 25 cm²", confidence = "Estimate", range = "×0.5–×2", source = "guess" }
+
+[collision]
+body        = { value = "box 35 × 30 × 20 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "guess" }
+pack        = { value = "box 64 × 10 × 6 mm", confidence = "Manufacturer", source = "maker" }
+pack_height = { value = "-6 mm", confidence = "Estimate", range = "-12–0 mm", source = "guess" }
+duct_rings  = { value = "37 mm inside, 1.5 mm wall, 14 mm tall", confidence = "Estimate", range = "×0.9–×1.1", source = "guess" }
+bounce      = { value = "0.3", confidence = "Estimate", range = "0.1–0.6", source = "guess" }
+friction    = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "guess" }
+
+[props]
+diameter           = { value = "35 mm", confidence = "Manufacturer", source = "maker" }
+blades             = 3
+pitch              = "4.7 in"   # BROKEN: a key OpenDrone doesn't read
+direction          = "props-in"
+thrust_coefficient = { value = "0.29", confidence = "Estimate", range = "0.2–0.46", source = "guess" }
+power_coefficient  = { value = "0.26", confidence = "Estimate", range = "0.18–0.37", source = "guess" }
+rotor_drag         = { value = "0.9 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "guess" }   # BROKEN: outside its range
+rotor_inertia      = { value = "0.25 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "guess" }
+reverse_thrust     = { value = "50%", confidence = "Estimate", range = "25–75%", source = "guess" }
+reverse_torque     = { value = "100%", confidence = "Estimate", range = "50–100%", source = "guess" }
+grip               = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "guess" }
+
+[motors]
+kv                  = { value = "19500 KV", confidence = "Manufacturer", source = "maker" }
+poles               = 12
+winding_resistance  = { value = "0.50 Ω", confidence = "Estimate", range = "0.2–0.8 Ω", source = "guess" }
+no_load_current     = { value = "0.3 A at 4 V", confidence = "Estimate", range = "0.1–0.6 A", source = "guess" }
+spin_up             = { value = "35 ms", confidence = "Estimate", range = "20–50 ms", source = "guess" }
+slow_down           = { value = "35 ms", confidence = "Estimate", range = "20–50 ms", source = "guess" }
+start_wait          = { value = "0.1 s", confidence = "Manufacturer", source = "maker" }
+restart_tries       = 3
+startup_power_limit = { value = "1.96%", confidence = "Manufacturer", source = "maker" }
+
+[battery]
+cells         = 1
+chemistry     = "LiHV"
+full          = { value = "4.35 V", confidence = "Manufacturer", source = "maker" }
+empty         = { value = "3.30 V", confidence = "Estimate", range = "3.2–3.5 V", source = "guess" }
+capacity      = { value = "320 mAh", confidence = "Manufacturer", source = "maker" }
+mass          = { value = "8.2 g", confidence = "Manufacturer", source = "maker" }
+voltage_curve = { value = "4.35 V at 100%, 3.92 V at 50%, 3.30 V at 0%", confidence = "Estimate", range = "×0.97–×1.03", source = "guess" }
+resistance    = { value = "29 mΩ", confidence = "Derived", source = "worked-out" }
+recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "guess" }
+connector     = { value = "10 mΩ", confidence = "Estimate", range = "5–20 mΩ", source = "guess" }
+
+[ducts]
+ram_drag       = { value = "1.2 s⁻¹", confidence = "Estimate", range = "0.6–2.4 s⁻¹", source = "guess" }
+nose_up_offset = { value = "13 mm", confidence = "Estimate", range = "9–18 mm", source = "guess" }
+
+[feel]
+prop_wash_strength = { value = "20%", confidence = "Estimate", range = "10–30%", source = "guess" }
+prop_wash_flicker  = { value = "15 Hz", confidence = "Estimate", range = "5–40 Hz", source = "guess" }
+ground_effect_body = { value = "2", confidence = "Estimate", range = "0–4", source = "guess" }
+
+[board]
+gyro_range = { value = "2000 °/s", confidence = "Manufacturer", source = "maker" }
+
+[sound]
+buzzer     = true
+esc_melody = "Bluejay default"
+
+[sound_block]
+blade_pass_level      = "1.0"
+harmonics             = 8
+harmonic_rolloff      = "1.5"
+blade_mismatch        = "0.2"
+shaft_level           = "0.02"
+loudness_exponent     = "2.0"
+whoosh_level          = "0.9"
+whoosh_centre         = "2.0"
+whoosh_q              = "0.5"
+whoosh_swish          = "0.5"
+motor_whine           = "0.05"
+load_brightness       = "0.5"
+load_loudness         = "0.4"
+speed_wobble          = "1.5%"
+tone_roughness        = "0.6"
+hiss_level            = "1.7"
+hiss_corner           = "2000 Hz"
+body_peak             = "2500 Hz"
+body_peak_gain        = "1.5 dB"
+body_peak_q           = "1.0"
+hum_level             = "0.03"
+hum_first_mode        = "900 Hz"
+hum_first_mode_q      = "6.0"
+hum_second_mode       = "1600 Hz"
+hum_second_mode_q     = "8.0"
+hum_follow            = "0.5"
+esc_beep_level        = "0.35"
+esc_beep_brightness   = "0.6"
+esc_ring              = "4500 Hz"
+buzzer_pitch          = "2700 Hz"
+buzzer_level          = "0.25"
+tick_level            = "0.6"
+tick_ring             = "4500 Hz"
+tick_decay            = "2 ms"
+where_you_stand_level = "-12 dB"
+hit_level             = "0.5"
+
+[sources]
+maker      = "the maker's page"
+worked-out = "worked out from the maker's numbers"
+guess      = "a guess"

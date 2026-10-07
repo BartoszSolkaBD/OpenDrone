@@ -93,6 +93,20 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo xtask walls
 
+      - name: Packs (every Pack and Test Quad passes the Pack checker)
+        # The checker the game uses, over packs/ and scenarios/test-quads/.
+        # Any problem blocks, listed with its file, line and a plain sentence
+        # (#16, ADR-0011).
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask packs
+
+      - name: Feel Test log rules (an Estimate moves with a log row and inside its range; a locked number changes with its source)
+        # Compares every Quad definition with this PR's base: HEAD^1 of the
+        # merge commit (fetch-depth 2), or main's previous commit on a push
+        # (#16 §3).
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask feel-tests --base HEAD^1
+
       - name: Scenarios (every Expectation, the repeat check, up-to-date Results)
         # Runs every Scenario in scenarios/ twice and blocks on a failed
         # Expectation, two runs that differ, or a Results file that is out of

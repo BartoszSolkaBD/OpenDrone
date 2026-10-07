@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Tells a CI job what this run needs to check, as two step outputs:
 #
-#   rust=true       anything other than Markdown changed, so the Rust checks
-#                   run. A PR that only touches docs skips them, and the job
-#                   still reports as passed, so required checks never hang
-#                   (#15 §4). Warning: this skip assumes no Rust check reads
-#                   a `.md` file; a check that ever does must be run here too.
+#   rust=true       anything other than Markdown changed, or anything under
+#                   packs/, so the Rust checks run. A PR that only touches
+#                   docs skips them, and the job still reports as passed, so
+#                   required checks never hang (#15 §4). Warning: this skip
+#                   assumes no Rust check reads a `.md` file outside packs/;
+#                   the Pack checker reads each Quad's feel-tests.md, which is
+#                   why any change under packs/ runs the checks.
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
 #                   library, or changes the policy, so known security
 #                   advisories are checked (ADR-0014).
@@ -31,6 +33,9 @@ sed 's/^/  /' <<< "$changed"
 
 if grep -qvE '\.md$' <<< "$changed"; then
   echo "Something other than docs changed, so the Rust checks run."
+  echo "rust=true" >> "$GITHUB_OUTPUT"
+elif grep -qE '^packs/' <<< "$changed"; then
+  echo "A Pack's Markdown changed (a Feel Test log), which the Pack checker reads, so the Rust checks run."
   echo "rust=true" >> "$GITHUB_OUTPUT"
 else
   echo "Only docs changed, so the Rust checks are skipped and report as passed."

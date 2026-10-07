@@ -1,0 +1,14 @@
+# Freestyle 5″ Tune: Betaflight 2026.6 names and units.
+# Betaflight 2026.6.2's firmware defaults, read from its source (#21), so most
+# lines are marked "2026.6 default". Each line's mark says where its value
+# came from:
+#   2026.6 default  Betaflight 2026.6.2's default
+#   hand-set: …     changed by hand, with the reason
+#
+# So far this holds only the settings the Pack checker compares with the Quad
+# definition. The Flight Controller tickets spell out every other setting
+# (ADR-0015).
+
+# Motors
+set motor_poles = 14                   # 2026.6 default; must match [motors] poles (the Velox V2207 V3 is 12N14P)
+set yaw_motors_reversed = OFF          # 2026.6 default; must match [props] direction, props-in

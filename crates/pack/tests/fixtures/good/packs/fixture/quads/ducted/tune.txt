@@ -1,0 +1,9 @@
+# Fixture Tune: Betaflight 2026.6 names and units, written for the readable checks.
+
+# Motors
+set motor_poles = 12                   # diff; must match [motors] poles
+set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
+set motor_idle = 600                   # diff (was dshot_idle_value)
+set small_angle = 180                  # hand-set: arms at any angle, like the real quad
+set feedforward_yaw_hold_gain = 0      # ADR-0008
+set crashflip_rate = 0                 # 2026.6 default

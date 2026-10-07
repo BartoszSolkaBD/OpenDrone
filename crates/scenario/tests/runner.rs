@@ -323,7 +323,10 @@ fn a_quad_that_cant_be_found_is_reported_at_the_line_that_names_it() {
         found[0],
         format!("scenarios/no-such-quad.toml line {line}: can't use the Quad \"test/whoop-99\":")
     );
-    assert!(found[1].starts_with("scenarios/test-quads/whoop-99.toml: can't be read"));
+    assert_eq!(
+        found[1],
+        "test/whoop-99: there's no Test Quad here: scenarios/test-quads/whoop-99.toml doesn't exist"
+    );
 }
 
 #[test]

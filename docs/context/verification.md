@@ -2,7 +2,7 @@
 
 How we prove the simulation behaves correctly, and keeps behaving correctly. Back to the [map](../../CONTEXT.md).
 
-How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). How every number is written: [the unit list](../units.md).
+How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). How every number is written: [the unit list](../units.md). What the Pack checker refuses, how Test Quads are written, and the Feel Test log rules CI checks: [Checking a Pack](../verification/checking-a-pack.md).
 
 ## Language
 
@@ -58,6 +58,10 @@ _Avoid_: Mock Quad, debug switch
 **Feel Test**:
 A session in which a pilot who flies the real Quad flies the simulated one against their memory of it, following a written checklist of manoeuvres. Whatever the pilot signs off is pinned in Scenarios.
 _Avoid_: Playtest, vibe check
+
+**Feel Test log**:
+A Quad's record, kept beside its definition as `feel-tests.md`, of every Estimate that moved: the date, the number, its old and new values, and why. It only grows, and CI checks every change to the Quad against it.
+_Avoid_: Changelog, tuning notes
 
 ## Rules
 

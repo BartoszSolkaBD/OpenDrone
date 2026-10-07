@@ -1,0 +1,14 @@
+# The fixture Quad with every kind of drag set to zero.
+format   = 1
+based_on = "fixture/ducted"
+why      = "No drag, for the readable checks"
+
+# Deliberate test values: no Confidence or source.
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0 s⁻¹"
+
+[ducts]
+ram_drag = "0 s⁻¹"

@@ -40,6 +40,10 @@ _Avoid_: Drifting contest
 A bundle of content made only of data and assets, never code: Quad definitions, Maps and Input Device profiles. The game's own content is a Pack too. A Pack can be added to the repository or dropped in by a pilot at runtime.
 _Avoid_: Mod, plugin, DLC
 
+**Pack checker**:
+The part of OpenDrone that reads a Pack and refuses anything that breaks the Pack rules, listing every problem with its file, its line and a plain sentence. It checks the game's own Pack in CI and a dropped Pack when the game loads it ([Checking a Pack](../verification/checking-a-pack.md)).
+_Avoid_: Validator, linter
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
@@ -56,4 +60,4 @@ _Avoid_: Sandbox, practice mode
 - Every part of a Map states whether it is solid. Nothing is solid, or passable, by accident.
 - Every Quad, Map and Input Device profile has a fixed id made of its Pack's id and its own, such as `opendrone/skate-park`. Scenarios and settings use the id. The on-screen name is separate and may change.
 - A Pack never runs code, changes physics rules, touches a pilot's settings or replaces another Pack's items ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)).
-- A broken item in a dropped Pack is skipped and reported in plain words. The rest of the Pack still loads.
+- A broken item in a dropped Pack is skipped and reported in plain words. The rest of the Pack still loads. What the Pack checker refuses: [Checking a Pack](../verification/checking-a-pack.md).
