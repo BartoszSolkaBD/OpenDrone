@@ -1,0 +1,109 @@
+# Publishes the docs site to GitHub Pages on every push to main (#15 §11).
+#
+# It builds the book exactly as CI's "Docs site and rustdoc" check does
+# (`cargo xtask book`: the mdBook from docs/, rustdoc under api/, every link
+# checked) and publishes it.
+#
+# Switching Pages on is the maintainer's step (#83): Settings → Pages →
+# Source: "GitHub Actions". Until then, this workflow still builds the book,
+# skips publishing with a notice saying so, and passes, so main never goes red
+# for it.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One publish at a time, in order; a newer push waits rather than cancelling.
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build the docs site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      publish: ${{ steps.pages.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Is GitHub Pages switched on?
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if answer=$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq .build_type 2>&1); then
+            if [[ "$answer" == "workflow" ]]; then
+              echo "GitHub Pages is on and publishes from GitHub Actions, so the book is published."
+              echo "publish=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::notice title=Docs site not published::GitHub Pages is on, but it publishes from a branch. Set Settings → Pages → Source to \"GitHub Actions\" (#83), and the next push to main publishes the book."
+              echo "publish=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif [[ "$answer" == *"HTTP 404"* ]]; then
+            echo "::notice title=Docs site not published::GitHub Pages isn't switched on for this repo yet, so the book was built and checked but not published. Switching it on is the maintainer's step (#83): Settings → Pages → Source: \"GitHub Actions\"."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not ask GitHub whether Pages is on: $answer"
+            exit 1
+          fi
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Reuse the build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # The same cache as CI's docs check, which saves it from main.
+          shared-key: docs
+          save-if: false
+
+      - name: Install mdBook (the version in book.toml)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.5.4
+
+      - name: Build the book and rustdoc, and check every link
+        run: cargo xtask book
+
+      - name: Hand the book to GitHub Pages
+        if: steps.pages.outputs.publish == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: target/book
+
+  publish:
+    name: Publish the docs site
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

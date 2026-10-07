@@ -2,7 +2,7 @@
 
 How we prove the simulation behaves correctly, and keeps behaving correctly. Back to the [map](../../CONTEXT.md).
 
-How to read a Scenario file and the Results beside it, with the shared unit list: [Reading a Scenario and its Results](../verification/reading-a-scenario.md).
+How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). How every number is written: [the unit list](../units.md).
 
 ## Language
 

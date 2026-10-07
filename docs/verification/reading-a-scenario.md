@@ -142,23 +142,4 @@ measured = "-4.91 m"
 
 ## Units
 
-Every number in a Scenario or Pack file is text with its unit, read by one shared unit list (`crates/pack/src/units.rs`). Our tools always write symbols, but plain-keyboard spellings read the same.
-
-| Kind | Units | Plain spellings |
-|---|---|---|
-| Length | `m`, `km`, `cm`, `mm` | |
-| Mass | `g`, `kg`, `mg` | |
-| Time | `s`, `ms`, `µs`, `min`, `h` | `us` for `µs` |
-| Angle | `°` | `deg` |
-| Rotation speed | `°/s`, `RPM` | `deg/s`, `rpm` |
-| Frequency, rate | `Hz`, `kHz`, `MHz`, `s⁻¹` | `hz`, `s^-1`, `1/s` |
-| Electrical | `V`, `mV`, `A`, `mA`, `Ω`, `mΩ`, `kΩ`, `mAh`, `Ah`, `W`, `mW`, `kW`, `Wh`, `KV` | `ohm` for `Ω`, `kv` for `KV` |
-| Force | `N`, `mN` | |
-| Camera and sound | `stops`, `lines`, `TVL`, `dB` | `db` |
-| Percent | `%` | |
-| Combinations | such as `m/s`, `m/s²`, `kg·m²`, `g·cm²`, `cm²`, `kg/m³` | `*` or a space for `·`, `^2` for `²` |
-
-- Use whichever everyday prefix keeps the number ordinary: "140 g·cm²", not "0.000014 kg·m²".
-- A decimal point only: "31,2 g" and "2,000 °/s" are refused, with the fix.
-- Never radians: angles are degrees and spin speeds are °/s or RPM.
-- A value with labelled parts may write its unit once, at the end, when every part has the same unit: "roll 70, pitch 90, yaw 140 g·cm²". If any other part has a unit of its own, each part keeps the unit it was written with.
+Every number in a Scenario or Pack file is text with its unit, such as `"9.81 m/s²"`, read by one shared unit list. Our tools always write symbols, but plain-keyboard spellings read the same. [The unit list](../units.md) shows every unit, its plain spellings, how tolerances and ranges are written, and what is refused.
