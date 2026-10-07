@@ -50,6 +50,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
         [
             "test/freestyle-5-bench-supply",
             "test/freestyle-5-no-drag",
+            "test/freestyle-5-output-limit-80",
             "test/whoop-65-bench-supply",
             "test/whoop-65-no-drag"
         ]
@@ -158,6 +159,70 @@ fn both_tunes_agree_with_their_quads_poles_and_prop_direction() {
         assert_eq!(q.props.direction, PropDirection::PropsIn);
         assert_eq!(q.tune.settings["yaw_motors_reversed"].value, "OFF");
     }
+}
+
+#[test]
+fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_setting_the_flight_controller_reads()
+ {
+    // Basis: Source (Betaflight 2026.6.2's defaults: src/main/flight/pid.h
+    // PID_ROLL_DEFAULT, PID_PITCH_DEFAULT, PID_YAW_DEFAULT, PIDSUM_LIMIT and
+    // PIDSUM_LIMIT_YAW; src/main/flight/pid.c resetPidProfile for
+    // iterm_windup, pid_at_min_throttle and motor_output_limit;
+    // src/main/flight/imu.c DEFAULT_SMALL_ANGLE; src/main/pg/rx.c for
+    // min_check, mid_rc and airmode_start_throttle_percent;
+    // src/main/fc/rc_controls.c for the deadbands and yaw_control_reversed;
+    // src/main/pg/motor.c for motor_idle and the DShot600 protocol;
+    // src/main/flight/mixer_init.c for yaw_motors_reversed and mixer_type).
+    const DEFAULTS: &[(&str, &str)] = &[
+        ("small_angle", "25"),
+        ("p_roll", "45"),
+        ("i_roll", "80"),
+        ("d_roll", "30"),
+        ("p_pitch", "47"),
+        ("i_pitch", "84"),
+        ("d_pitch", "34"),
+        ("p_yaw", "45"),
+        ("i_yaw", "80"),
+        ("d_yaw", "0"),
+        ("motor_output_limit", "100"),
+        ("pidsum_limit", "500"),
+        ("pidsum_limit_yaw", "400"),
+        ("iterm_windup", "80"),
+        ("pid_at_min_throttle", "ON"),
+        ("min_check", "1050"),
+        ("mid_rc", "1500"),
+        ("deadband", "0"),
+        ("yaw_deadband", "0"),
+        ("yaw_control_reversed", "OFF"),
+        ("airmode_start_throttle_percent", "25"),
+        ("motor_pwm_protocol", "DSHOT600"),
+        ("motor_idle", "550"),
+        ("yaw_motors_reversed", "OFF"),
+        ("mixer_type", "LEGACY"),
+    ];
+    let five = quad("opendrone/freestyle-5");
+    // Every setting the Flight Controller reads, and in the same order: the
+    // Betaflight App's tabs, Configuration, PID Tuning, Receiver, Motors.
+    let reads = opendrone_flight_controller::Tune::settings();
+    assert_eq!(
+        DEFAULTS.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        reads
+    );
+    let mut lines: Vec<(&str, usize)> = reads
+        .iter()
+        .map(|name| (*name, five.tune.settings[*name].line))
+        .collect();
+    lines.sort_by_key(|(_, line)| *line);
+    assert_eq!(
+        lines.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+        reads
+    );
+    for (name, value) in DEFAULTS {
+        let setting = &five.tune.settings[*name];
+        assert_eq!(setting.value, *value, "{name}");
+        assert!(setting.mark.starts_with("2026.6.2 default"), "{name}");
+    }
+    assert!(five.flight_controller.is_ok());
 }
 
 #[test]

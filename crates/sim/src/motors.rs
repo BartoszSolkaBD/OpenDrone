@@ -1,3 +1,4 @@
+use opendrone_flight_controller::{Channels, DebugRecord, SensorReadings};
 use opendrone_maths::Fingerprinter;
 use opendrone_physics::MotorCommands;
 
@@ -6,18 +7,34 @@ use crate::SimulationTime;
 /// What plugs into the Flight Controller seam: each tick it gives the four
 /// motor commands.
 ///
-/// Our Flight Controller (#48) will plug in here and receive sensor readings
-/// and Channels; for now the only thing that plugs in is [`ScriptedMotors`].
+/// Three things can plug in (ADR-0003): our Flight Controller
+/// ([`OurFlightController`](crate::OurFlightController)), the
+/// [`ScriptedMotors`] stand-in for Physics and Thrust Stand Scenarios, and
+/// later perhaps a SITL bridge in its own crate.
 pub trait FlightControllerSeam {
-    /// The motor commands for the tick that starts at `time`.
-    fn step(&mut self, time: SimulationTime) -> MotorCommands;
+    /// The motor commands for the tick that starts at `time`, given what the
+    /// sensors read at that moment and the Radio Link frame that arrived
+    /// then, if one did.
+    fn step(
+        &mut self,
+        time: SimulationTime,
+        readings: &SensorReadings,
+        frame: Option<&Channels>,
+    ) -> MotorCommands;
+
+    /// What our Flight Controller's last loop did, for the flight log, the
+    /// OSD and Scenarios; `None` for anything else that plugs in.
+    fn debug(&self) -> Option<DebugRecord> {
+        None
+    }
 
     /// Feeds whatever it remembers into the Simulation's fingerprint.
     fn write_fingerprint(&self, f: &mut Fingerprinter);
 }
 
 /// The scripted-motors stand-in for Physics and Thrust Stand Scenarios: motor
-/// commands set at given moments, each holding until the next.
+/// commands set at given moments, each holding until the next. It reads
+/// neither the sensors nor the Radio Link.
 #[derive(Clone, Debug)]
 pub struct ScriptedMotors {
     timeline: Vec<(SimulationTime, MotorCommands)>,
@@ -37,10 +54,9 @@ impl ScriptedMotors {
             current: MotorCommands::STOPPED,
         }
     }
-}
 
-impl FlightControllerSeam for ScriptedMotors {
-    fn step(&mut self, time: SimulationTime) -> MotorCommands {
+    /// The commands for the tick that starts at `time`.
+    pub fn at(&mut self, time: SimulationTime) -> MotorCommands {
         while let Some((at, commands)) = self.timeline.get(self.next) {
             if *at > time {
                 break;
@@ -49,6 +65,17 @@ impl FlightControllerSeam for ScriptedMotors {
             self.next += 1;
         }
         self.current
+    }
+}
+
+impl FlightControllerSeam for ScriptedMotors {
+    fn step(
+        &mut self,
+        time: SimulationTime,
+        _readings: &SensorReadings,
+        _frame: Option<&Channels>,
+    ) -> MotorCommands {
+        self.at(time)
     }
 
     fn write_fingerprint(&self, f: &mut Fingerprinter) {

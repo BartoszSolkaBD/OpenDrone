@@ -63,6 +63,7 @@ _Avoid_: Input profile, controller config, mapping file
 - Every Action can be rebound. An Action fires once, when its key, button or switch moves into the bound position, and it works from every connected device.
 - Only the Flying Input Device's Channels fly. Losing it runs Failsafe even when another Input Device is connected.
 - Channels keep the Input Device's full resolution, after its Calibration and channel mapping.
+- At the Simulation's front door a Channel is a whole number: the step an ELRS receiver hands the Flight Controller over CRSF, from 172 (-100%, 988 µs) through 992 (centre, 1500 µs) to 1811 (+100%, 2012 µs), about 0.625 µs a step. Each value from an Input Device, and each stick a Scenario writes in percent, is rounded to the nearest step. Betaflight reads step s as 0.62477 × s + 881 µs, so a centred stick reads 1500.77 µs, as on a real quad on ELRS.
 - Arm, Flight Mode and Crash Flip reach the Flight Controller as switch Channels with fixed meanings: Arm on AUX1 (high is armed), Flight Mode on AUX2 (low Acro, middle Horizon, high Angle) and Crash Flip on AUX3 (high is on). The Input Device profile turns whatever the pilot flips, presses or types into those ([ADR-0017](../adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md)).
 - Each switch Channel has one source at a time: a Radio switch, a Gamepad button or a key.
 - Calibrated full stick lands at 988 and 2012 µs and centre at 1500 µs, where ELRS puts ±100% and centre. A Radio at EdgeTX defaults gives the numbers a real quad gets, calibrated or not.

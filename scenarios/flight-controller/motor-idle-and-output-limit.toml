@@ -1,0 +1,79 @@
+# Motor idle and the motor output limit set the bottom and the top of the
+# motors' range, as Betaflight 2026.6.2's `dshotInitEndpoints`
+# (src/main/drivers/dshot.c) and `applyMixToMotors` (src/main/flight/mixer.c)
+# set them. Each case is a fresh, armed Flight Controller, one Radio Link
+# frame and one loop, with nothing to correct but the centre stick's 0.11 °/s
+# (see mixer-and-airmode.toml), which moves a motor by at most a DShot step.
+#
+# On the Freestyle 5″'s Tune, idle is `motor_idle` 550 (5.5%) and the output
+# limit `motor_output_limit` 100%, so the range runs from 48 + 5.5% × 1999 =
+# 157.9 to 2047. test/freestyle-5-output-limit-80.toml shows a limit below
+# 100%.
+format = 1
+name   = "Motor idle and the output limit set the motors' range, as Betaflight does"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+# Zero throttle: idle.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "158 ± 0"
+basis = "source: dshotInitEndpoints: idle is 48 + motor_idle 5.5% × 1999 = 157.9, sent as the nearest whole DShot value, 158"
+
+# Half throttle.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "50%"
+arm      = "on"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "1051 ± 1"
+basis = "source: updateRcCommands (src/main/fc/rc.c) and applyMixToMotors: 50% stick is 1500.77 µs, so the throttle is (1500 - min_check 1050) × 1000 ÷ 950 = 473 thousandths through the straight throttle curve; 157.9 + (2047 - 157.9) × 0.473 = 1051"
+
+# Full throttle: the top of the range.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "100%"
+arm      = "on"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "2047 ± 0"
+basis = "source: dshotInitEndpoints: with motor_output_limit 100% the top is 2047 - 1999 × (1 - 1.00) = 2047, DShot's highest throttle"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "2046 ± 1"
+basis = "source: dshotInitEndpoints and applyMixerAdjustment: the top is 2047; the centre stick's corrections push motor 3 against it, so Airmode takes the throttle down a hair and the others sit a step below"

@@ -1,0 +1,74 @@
+# Results of kiss-rates.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "KISS rates turn each stick into the rotation speed Betaflight gives"
+
+[[expect]]
+what     = "roll setpoint with the sticks at rest"
+basis    = "Source"
+expected = "0.25 °/s ± 0.01 °/s"
+measured = "0.248 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 25%"
+basis    = "Source"
+expected = "50.83 °/s ± 0.01 °/s"
+measured = "50.8 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 50%"
+basis    = "Source"
+expected = "136.32 °/s ± 0.01 °/s"
+measured = "136 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 75%"
+basis    = "Source"
+expected = "305.67 °/s ± 0.01 °/s"
+measured = "306 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 100%"
+basis    = "Source"
+expected = "666.67 °/s ± 0.01 °/s"
+measured = "667 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll -50%"
+basis    = "Source"
+expected = "-135.50 °/s ± 0.01 °/s"
+measured = "-135 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 50%"
+basis    = "Source"
+expected = "-530.80 °/s ± 0.01 °/s"
+measured = "-531 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 100%"
+basis    = "Source"
+expected = "-1998.00 °/s ± 0.01 °/s"
+measured = "-2000 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "c1bec7225c9c3eeb"   # the Flight Controller's whole state after each of 8 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "657c65ef95a20027"
+"case 2" = "6fd7a55ee79fd51e"
+"case 3" = "c3addab65a6625e8"
+"case 4" = "f79fe24e5b43162f"
+"case 5" = "85d807e95cb16274"
+"case 6" = "c9aff09cea6b8260"
+"case 7" = "1a003324da8d1332"
+"case 8" = "e0122c431041f69f"

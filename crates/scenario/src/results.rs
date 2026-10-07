@@ -58,11 +58,34 @@ pub fn results_text(scenario: &Scenario, outcome: &Outcome) -> String {
         "quad = \"{}\"   # {}: what the Simulation receives from it",
         outcome.quad.fingerprint, outcome.quad.id
     );
-    let _ = writeln!(
-        text,
-        "map  = \"{}\"   # {}",
-        outcome.map.fingerprint, outcome.map.id
-    );
+    match &outcome.map {
+        Some(map) => {
+            let _ = writeln!(text, "map  = \"{}\"   # {}", map.fingerprint, map.id);
+        }
+        None => {
+            let _ = writeln!(
+                text,
+                "map  = \"none\"   # the Flight Controller runs alone, with no Map"
+            );
+        }
+    }
+    if outcome.steps_are_cases {
+        let cases = outcome.step_fingerprints.len();
+        let _ = writeln!(
+            text,
+            "run  = \"{}\"   # the Flight Controller's whole state after each of {cases} cases, in order",
+            outcome.run_fingerprint()
+        );
+        let _ = writeln!(text);
+        let _ = writeln!(
+            text,
+            "[fingerprints.checkpoints]   # the Flight Controller's whole state after each case"
+        );
+        for (k, fingerprint) in outcome.step_fingerprints.iter().enumerate() {
+            let _ = writeln!(text, "\"case {}\" = \"{fingerprint}\"", k + 1);
+        }
+        return text;
+    }
     let _ = writeln!(
         text,
         "run  = \"{}\"   # the whole state after each of {steps} steps at {} Hz, in order",

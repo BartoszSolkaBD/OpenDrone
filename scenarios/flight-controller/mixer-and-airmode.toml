@@ -1,0 +1,208 @@
+# The Legacy mixer with Airmode, always on, mixes the PID loop's sums as
+# Betaflight 2026.6.2 does (`mixTable`, `applyMixerAdjustment` and
+# `applyMixToMotors`, src/main/flight/mixer.c). Each case is a fresh, armed
+# Flight Controller, one Radio Link frame and one loop, with the gyro reading
+# a rotation the PID loop corrects.
+#
+# How a case's numbers come about:
+#
+# - Each PID sum, on one fresh loop, is P plus one loop's I: 0.032029 × P gain
+#   × error, plus 0.244381 × I gain × error ÷ 8000 (yaw's I gain counts 2.5
+#   times). D is zero on a fresh Flight Controller's first loop. At low
+#   throttle, before Airmode starts, I is emptied after the loop, but the sum
+#   has already used it.
+# - The 5″'s gains are P/I 45/80 roll, 47/84 pitch and 45/80 yaw. Centred
+#   sticks reach Betaflight at 1500.77 µs over CRSF (see actual-rates.toml), so
+#   Actual 70/670 asks for 0.11 °/s on each axis: a correction of about 0.16
+#   that moves a motor by up to a DShot step.
+# - The mixer holds each sum within its limit (500 roll and pitch, 400 yaw),
+#   divides by 1000, and gives each motor roll, pitch and yaw by its place on
+#   the X frame (Betaflight's motor order: 1 rear right, 2 front right, 3 rear
+#   left, 4 front left). Props-in turns yaw round.
+# - Airmode: a mix wider than the whole range shrinks to fit; then the
+#   throttle moves just enough that no motor clips.
+# - Each motor's DShot value is idle plus its share of the range: 48 + 5.5% ×
+#   1999 = 157.9 up to 2047, sent as the nearest whole number.
+format = 1
+name   = "The mixer spreads corrections over the motors with Airmode, as Betaflight does"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+# Zero throttle, nothing to correct: every motor idles.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "158 ± 1"
+basis = "source: dshotInitEndpoints (src/main/drivers/dshot.c): idle is 48 + motor_idle 5.5% × 1999 = 157.9, sent as 158; the centre stick's 0.11 °/s corrections move a motor by at most a step"
+
+[[case.expect]]
+what  = "motor 2 DShot"
+value = "158 ± 1"
+basis = "source: dshotInitEndpoints: idle 48 + 5.5% × 1999 = 157.9, sent as 158"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "158 ± 1"
+basis = "source: dshotInitEndpoints: idle 48 + 5.5% × 1999 = 157.9; the centre stick's corrections add to this motor on every axis, 1889 × 0.00065, making 159"
+
+[[case.expect]]
+what  = "motor 4 DShot"
+value = "158 ± 1"
+basis = "source: dshotInitEndpoints: idle 48 + 5.5% × 1999 = 157.9, sent as 158"
+
+# Airmode: at zero throttle a roll correction still drives the motors apart.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+
+[[case.expect]]
+what  = "roll PID sum"
+value = "144.53 ± 0.01"
+basis = "source: pidController (src/main/flight/pid.c): the error is 0.11 + 100 = 100.11 °/s; P = 0.032029 × 45 × 100.11 = 144.29, plus one loop's I, 0.244381 × 80 × 100.11 ÷ 8000 = 0.24"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "158 ± 1"
+basis = "source: mixTable and applyMixerAdjustment (src/main/flight/mixer.c): the right motors get -0.1445 of the range and the left +0.1445; Airmode raises the throttle from 0 to 0.1445 so no motor drops below idle, leaving the right motors at idle, 158"
+
+[[case.expect]]
+what  = "motor 2 DShot"
+value = "158 ± 1"
+basis = "source: mixTable and applyMixerAdjustment: Airmode leaves the right motors at idle, 158"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "704 ± 1"
+basis = "source: mixTable, applyMixerAdjustment and applyMixToMotors: the left motors get 2 × 0.1445 of the range above idle, 157.9 + 1889.1 × 0.289 = 704; the centre stick's small pitch and yaw corrections set the two left motors a step apart"
+
+[[case.expect]]
+what  = "motor 4 DShot"
+value = "704 ± 1"
+basis = "source: mixTable, applyMixerAdjustment and applyMixToMotors: 157.9 + 1889.1 × 0.289 = 704, within a step"
+
+# A mix wider than the whole motor range shrinks to fit.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "50%"
+arm      = "on"
+rotation = "roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+
+[[case.expect]]
+what  = "roll PID sum"
+value = "1443.91 ± 0.01"
+basis = "source: pidController: P = 0.032029 × 45 × 1000.11 = 1441.46, plus one loop's I, 0.244381 × 80 × 1000.11 ÷ 8000 = 2.44; the PID loop doesn't hold the sum, the mixer does"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "1102 ± 1"
+basis = "source: mixTable and applyMixerAdjustment: roll and pitch each held at 500, so the mix runs from -1 (front right) to +1 (rear left), twice the range; shrunk by half, then the throttle moves to 0.5 so neither end clips: the rear right motor sits at 0.5, 157.9 + 1889.1 × 0.5 = 1102"
+
+[[case.expect]]
+what  = "motor 2 DShot"
+value = "158 ± 0"
+basis = "source: mixTable and applyMixerAdjustment: the front right motor's -0.5, plus the throttle's 0.5, leaves it at idle, 158"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "2047 ± 0"
+basis = "source: mixTable and applyMixerAdjustment: the rear left motor's +0.5, plus the throttle's 0.5, takes it to the top of the range, 2047"
+
+[[case.expect]]
+what  = "motor 4 DShot"
+value = "1102 ± 1"
+basis = "source: mixTable and applyMixerAdjustment: the front left motor sits at 0.5, 157.9 + 1889.1 × 0.5 = 1102"
+
+# At full throttle Airmode lowers the throttle so the correction fits.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "100%"
+arm      = "on"
+rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "1500 ± 1"
+basis = "source: applyMixerAdjustment: the left motors' +0.1445 would clip at full throttle, so the throttle drops to 1 - 0.1445 = 0.8555, leaving the right motors 2 × 0.1445 below the top: 157.9 + 1889.1 × (1 - 0.289) = 1500"
+
+[[case.expect]]
+what  = "motor 2 DShot"
+value = "1500 ± 1"
+basis = "source: applyMixerAdjustment: 157.9 + 1889.1 × (1 - 0.289) = 1500"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "2047 ± 0"
+basis = "source: applyMixerAdjustment: the left motors reach the top, 2047, and no further"
+
+[[case.expect]]
+what  = "motor 4 DShot"
+value = "2047 ± 1"
+basis = "source: applyMixerAdjustment: the left motors reach the top, 2047; the centre stick's small corrections leave this one a step short"
+
+# Yaw right, props-in: the props that turn anticlockwise (front right and
+# rear left) speed up, and their drag twists the frame clockwise.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "100%"
+throttle = "50%"
+arm      = "on"
+
+[[case.expect]]
+what  = "yaw PID sum"
+value = "969.77 ± 0.01"
+basis = "source: pidController: full yaw right asks for 670 °/s nose right; P = 0.032029 × 45 × 670 = 965.67, plus one loop's I, 0.244381 × 80 × 2.5 × 670 ÷ 8000 = 4.09"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "296 ± 1"
+basis = "source: mixTable: the sum is held at the yaw limit, 400, so the clockwise props' motors (rear right and front left) get -0.4 and the others +0.4; with the throttle at 47.3% (50% stick is 1500.77 µs: (1500 - 1050) × 1000 ÷ 950 = 473), 157.9 + 1889.1 × 0.073 = 296"
+
+[[case.expect]]
+what  = "motor 2 DShot"
+value = "1807 ± 1"
+basis = "source: mixTable: the front right motor's +0.4 on a throttle of 0.473: 157.9 + 1889.1 × 0.873 = 1807"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "1807 ± 1"
+basis = "source: mixTable: the rear left motor's +0.4 on a throttle of 0.473: 157.9 + 1889.1 × 0.873 = 1807"
+
+[[case.expect]]
+what  = "motor 4 DShot"
+value = "296 ± 1"
+basis = "source: mixTable: the front left motor's -0.4 on a throttle of 0.473: 157.9 + 1889.1 × 0.073 = 296"

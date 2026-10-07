@@ -7,8 +7,8 @@
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
     BatteryParameters, Drag, EscParameters, LineCrossing, MapShape, MapShapeProblem,
-    MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadSetUp,
-    QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp, SetUpError, Simulation,
+    MotorParameters, Mount, PacketRate, PhysicsRate, PropDirection, PropParameters, QuadParameters,
+    QuadSetUp, QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp, SetUpError, Simulation,
     StartingMotors, World,
 };
 
@@ -132,6 +132,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
         motors: StartingMotors::Stopped,
         battery: 1.0,
         mount: Mount::Free,
+        packet_rate: PacketRate::from_hz(250).unwrap(),
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }

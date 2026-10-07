@@ -1,0 +1,64 @@
+# Results of mirrored-sticks.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Mirrored sticks give a mirrored flight"
+
+[[expect]]
+what     = "roll rate at 0.9 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "yaw rate at 0.9 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "pitch rate at 0.9 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "-0.00000000000135 °/s"
+
+[[expect]]
+what     = "distance east at 1 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "distance north at 1 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "-0.00000000000000355 m"
+
+[[expect]]
+what     = "height at 1 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0.0000000000000142 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "5df3e361ab2f6b10"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "71fbaafa67801436"
+"0.2 s" = "ad2bd76f78c992aa"
+"0.3 s" = "42ee4d9d32e4763f"
+"0.4 s" = "ea8797ff0c3f063e"
+"0.5 s" = "0f78c1aae20918bd"
+"0.6 s" = "04934a3da0bff859"
+"0.7 s" = "7c0002218801f1b3"
+"0.8 s" = "77dd378ab6d00eca"
+"0.9 s" = "95f80c064590237f"
+"1 s" = "5d309ad6f1c0e713"

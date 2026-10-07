@@ -1,8 +1,34 @@
 //! What an Expectation can measure: the words a Scenario's `what` may use.
 
-use opendrone_maths::{PilotRates, functions};
+use opendrone_maths::{DEGREE, PilotRates, functions};
 use opendrone_pack::units::Dimension;
-use opendrone_sim::QuadOutput;
+use opendrone_sim::{DebugRecord, QuadOutput};
+
+/// What one step gave, to measure: the Quad's output (none where the Flight
+/// Controller runs alone), and what our Flight Controller's loop did (none
+/// where the motors are scripted, and before the first loop).
+#[derive(Clone, Copy, Debug)]
+pub struct Sample {
+    pub quad: Option<QuadOutput>,
+    pub flight_controller: Option<DebugRecord>,
+}
+
+/// One of the three rotation axes, as pilots name them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Axis {
+    Roll,
+    Pitch,
+    Yaw,
+}
+
+/// One of the PID loop's terms, or their sum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Term {
+    P,
+    I,
+    D,
+    Sum,
+}
 
 /// One measurable quantity of the Quad, read from its output after a step.
 ///
@@ -63,9 +89,20 @@ pub enum Measure {
     /// How far the battery's voltage sits below its resting voltage at its
     /// charge.
     BatterySag,
+    /// The rotation speed the Rates ask for: our Flight Controller's
+    /// setpoint, in the pilot's directions (rolling right, pitching nose up,
+    /// yawing nose right positive).
+    Setpoint(Axis),
+    /// One of the PID loop's terms on Betaflight's scale (1000 is the whole
+    /// motor range), in the pilot's directions: a positive pitch term pushes
+    /// the nose up.
+    PidTerm(Axis, Term),
+    /// The DShot value our Flight Controller sends a motor: 0 is "stop", 48
+    /// to 2047 the throttle.
+    MotorDshot(usize),
 }
 
-const ALL: [(&str, Measure); 40] = [
+const ALL: [(&str, Measure); 59] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -106,6 +143,25 @@ const ALL: [(&str, Measure); 40] = [
     ("battery current", Measure::BatteryCurrent),
     ("battery charge used", Measure::BatteryChargeUsed),
     ("battery sag", Measure::BatterySag),
+    ("roll setpoint", Measure::Setpoint(Axis::Roll)),
+    ("pitch setpoint", Measure::Setpoint(Axis::Pitch)),
+    ("yaw setpoint", Measure::Setpoint(Axis::Yaw)),
+    ("roll P term", Measure::PidTerm(Axis::Roll, Term::P)),
+    ("roll I term", Measure::PidTerm(Axis::Roll, Term::I)),
+    ("roll D term", Measure::PidTerm(Axis::Roll, Term::D)),
+    ("roll PID sum", Measure::PidTerm(Axis::Roll, Term::Sum)),
+    ("pitch P term", Measure::PidTerm(Axis::Pitch, Term::P)),
+    ("pitch I term", Measure::PidTerm(Axis::Pitch, Term::I)),
+    ("pitch D term", Measure::PidTerm(Axis::Pitch, Term::D)),
+    ("pitch PID sum", Measure::PidTerm(Axis::Pitch, Term::Sum)),
+    ("yaw P term", Measure::PidTerm(Axis::Yaw, Term::P)),
+    ("yaw I term", Measure::PidTerm(Axis::Yaw, Term::I)),
+    ("yaw D term", Measure::PidTerm(Axis::Yaw, Term::D)),
+    ("yaw PID sum", Measure::PidTerm(Axis::Yaw, Term::Sum)),
+    ("motor 1 DShot", Measure::MotorDshot(0)),
+    ("motor 2 DShot", Measure::MotorDshot(1)),
+    ("motor 3 DShot", Measure::MotorDshot(2)),
+    ("motor 4 DShot", Measure::MotorDshot(3)),
 ];
 
 impl Measure {
@@ -135,6 +191,7 @@ impl Measure {
         {
             names.insert(at + k, motor);
         }
+        names.push("motor N DShot");
         names
     }
 
@@ -162,7 +219,19 @@ impl Measure {
             Measure::MotorDrive(_) => Dimension::PERCENT,
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
+            Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
+            Measure::PidTerm(..) | Measure::MotorDshot(_) => Dimension::NONE,
         }
+    }
+
+    /// True for what our Flight Controller's loop does: the only things a
+    /// Flight Controller Scenario measures, and nothing a Scenario with
+    /// scripted motors can.
+    pub fn of_the_flight_controller(self) -> bool {
+        matches!(
+            self,
+            Measure::Setpoint(_) | Measure::PidTerm(..) | Measure::MotorDshot(_)
+        )
     }
 
     /// True for angles, which are compared the short way round the circle.
@@ -179,14 +248,22 @@ impl Measure {
     /// 0.00000006° of straight up or down, so roll reads 0° and heading
     /// carries the whole turn (see
     /// `opendrone_maths::Attitude::is_straight_up_or_down`).
-    pub fn read_straight_up_or_down(self, now: &QuadOutput) -> bool {
+    pub fn read_straight_up_or_down(self, now: &Sample) -> bool {
         matches!(self, Measure::Roll | Measure::Heading)
-            && now.state.attitude.is_straight_up_or_down()
+            && now
+                .quad
+                .is_some_and(|quad| quad.state.attitude.is_straight_up_or_down())
     }
 
-    /// The value after a step, in SI units, given the output before the step
-    /// (`None` at the start) and the step's length in seconds.
-    pub fn read(self, before: Option<&QuadOutput>, now: &QuadOutput, step: f64) -> Option<f64> {
+    /// The value after a step, in SI units, given what the step before gave
+    /// (`None` at the start) and the step's length in seconds. `None` when
+    /// this step has nothing to measure it by.
+    pub fn read(self, before: Option<&Sample>, now: &Sample, step: f64) -> Option<f64> {
+        if self.of_the_flight_controller() {
+            return self.read_flight_controller(now.flight_controller.as_ref()?);
+        }
+        let before = before.and_then(|b| b.quad.as_ref());
+        let now = now.quad.as_ref()?;
         let state = &now.state;
         let v = state.velocity;
         let rates = || PilotRates::from_body(state.rotation);
@@ -217,6 +294,37 @@ impl Measure {
             Measure::BatteryCurrent => now.battery.current,
             Measure::BatteryChargeUsed => now.battery.charge_used,
             Measure::BatterySag => now.battery.sag,
+            Measure::Setpoint(_) | Measure::PidTerm(..) | Measure::MotorDshot(_) => return None,
+        })
+    }
+
+    fn read_flight_controller(self, record: &DebugRecord) -> Option<f64> {
+        // Betaflight's axes turn into the pilot's: pitch and yaw turn round.
+        let pilot = |axis: Axis, value: f64| match axis {
+            Axis::Roll => value,
+            Axis::Pitch | Axis::Yaw => -value,
+        };
+        let index = |axis: Axis| match axis {
+            Axis::Roll => 0,
+            Axis::Pitch => 1,
+            Axis::Yaw => 2,
+        };
+        Some(match self {
+            Measure::Setpoint(axis) => pilot(axis, record.setpoint[index(axis)]) * DEGREE,
+            Measure::PidTerm(axis, term) => {
+                let terms = record.terms[index(axis)];
+                pilot(
+                    axis,
+                    match term {
+                        Term::P => terms.p,
+                        Term::I => terms.i,
+                        Term::D => terms.d,
+                        Term::Sum => terms.sum,
+                    },
+                )
+            }
+            Measure::MotorDshot(k) => f64::from(record.motors[k].dshot),
+            _ => return None,
         })
     }
 }

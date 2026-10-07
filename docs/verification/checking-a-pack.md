@@ -119,8 +119,9 @@ set yaw_motors_reversed = OFF          # 4.3 default; must match [props] directi
 - Every line carries a mark: `diff`, a version's default such as `4.3 default` or `2026.6 default`, `ADR-0008`, or `hand-set: <reason>`, optionally followed by `(was <old name>)`. A note may follow a `;`.
 - No setting twice.
 - `motor_poles` must equal `[motors] poles`, and `yaw_motors_reversed` must be `OFF` for props-in and `ON` for props-out. Both lines are required.
+- Every setting the Flight Controller reads must hold a value it can read, written as Betaflight's CLI writes it: a whole number within Betaflight 2026.6.2's range for that setting, `OFF` or `ON`, or one of its words. A word Betaflight knows but OpenDrone doesn't simulate is refused with the reason, such as `mixer_type = LINEAR` (only the Legacy mixer is simulated) or a motor protocol other than DShot.
 
-For now each Tune holds only those two lines; the Flight Controller tickets spell out every other setting.
+A Quad flies only once its Tune spells out every setting the Flight Controller reads (ADR-0015). The Freestyle 5″'s Tune does: Betaflight 2026.6.2's firmware defaults, each line marked `2026.6.2 default`, grouped by the Betaflight App's tabs (Configuration, PID Tuning, Receiver, Motors), each tab's CLI-only settings after the ones it shows. The Whoop 65's still holds only `motor_poles` and `yaw_motors_reversed`: it gets the rest from the Meteor65 Pro's `diff all` through the importer (#53). Until then the Pack checker loads it, and the Scenario runner refuses to fly it, naming the settings its Tune lacks. Each later Flight Controller ticket adds the settings it reads.
 
 ## Test Quads
 
@@ -137,6 +138,7 @@ rotor_drag = "0 s⁻¹"   # a deliberate test value: no Confidence or source
 
 - It lists only what it changes, so a change to the real Quad carries into it.
 - Its changes carry no Confidence, and each must name a setting the real Quad has.
+- It may change the real Quad's Tune in a `[tune]` section, written in Betaflight's own units as `tune.txt` is: `motor_output_limit = 80`. Each must be a setting the real Quad's Tune sets, and its value is checked as the Flight Controller reads it, at the Test Quad's own line. The changed line is marked `hand-set: Test Quad <id>`.
 - It builds on a real Quad, never on another Test Quad.
 - The result is checked like any Quad, Tune cross-checks included.
 

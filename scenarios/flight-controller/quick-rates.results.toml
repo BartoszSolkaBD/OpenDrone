@@ -1,0 +1,81 @@
+# Results of quick-rates.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Quick rates turn each stick into the rotation speed Betaflight gives"
+
+[[expect]]
+what     = "roll setpoint with the sticks at rest"
+basis    = "Source"
+expected = "0.31 °/s ± 0.01 °/s"
+measured = "0.310 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 25%"
+basis    = "Source"
+expected = "62.54 °/s ± 0.01 °/s"
+measured = "62.5 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 50%"
+basis    = "Source"
+expected = "160.09 °/s ± 0.01 °/s"
+measured = "160 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 75%"
+basis    = "Source"
+expected = "333.73 °/s ± 0.01 °/s"
+measured = "334 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 100%"
+basis    = "Source"
+expected = "670.00 °/s ± 0.01 °/s"
+measured = "670 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll -50%"
+basis    = "Source"
+expected = "-159.19 °/s ± 0.01 °/s"
+measured = "-159 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 25%"
+basis    = "Source"
+expected = "-56.73 °/s ± 0.01 °/s"
+measured = "-56.7 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 50%"
+basis    = "Source"
+expected = "-132.64 °/s ± 0.01 °/s"
+measured = "-133 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 75%"
+basis    = "Source"
+expected = "-269.27 °/s ± 0.01 °/s"
+measured = "-269 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "ec3691e866b9ba45"   # the Flight Controller's whole state after each of 9 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "fd0b2392c6dddf10"
+"case 2" = "f7c05946f04e4317"
+"case 3" = "c022f99781c5731a"
+"case 4" = "c317bbfd6fdde57d"
+"case 5" = "eaa46bcb5026d11f"
+"case 6" = "750f3df22441262a"
+"case 7" = "d9665e71bc55a167"
+"case 8" = "1ad2a3f2a4ed7251"
+"case 9" = "c6e8071ee3b18813"

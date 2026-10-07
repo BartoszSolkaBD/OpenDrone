@@ -1,0 +1,88 @@
+# Results of pid-scaling-and-limits.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The PID loop's terms follow Betaflight's scaling, and I stops at its limit"
+
+[[expect]]
+what     = "roll I term at 0.5 s"
+basis    = "Source"
+expected = "1.0719 ± 0.0001"
+measured = "1.07"
+
+[[expect]]
+what     = "roll D term at 0.500125 s"
+basis    = "Source"
+expected = "126.96 ± 0.01"
+measured = "127"
+
+[[expect]]
+what     = "roll D term at 0.55 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll P term at 0.55 s"
+basis    = "Source"
+expected = "1.5994 ± 0.0001"
+measured = "1.60"
+
+[[expect]]
+what     = "roll I term at 0.61 s"
+basis    = "Source"
+expected = "22.813 ± 0.001"
+measured = "22.8"
+
+[[expect]]
+what     = "roll P term at 0.7 s"
+basis    = "Source"
+expected = "144.29 ± 0.01"
+measured = "144"
+
+[[expect]]
+what     = "yaw P term at 0.7 s"
+basis    = "Source"
+expected = "-143.97 ± 0.01"
+measured = "-144"
+
+[[expect]]
+what     = "roll I term at 1.5 s"
+basis    = "Source"
+expected = "400 ± 0"
+measured = "400"
+
+[[expect]]
+what     = "yaw I term at 1.5 s"
+basis    = "Source"
+expected = "-320 ± 0"
+measured = "-320"
+
+[[expect]]
+what     = "roll PID sum at 1.5 s"
+basis    = "Source"
+expected = "544.29 ± 0.01"
+measured = "544"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "8adccfee603876c3"   # the whole state after each of 12000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.15 s" = "f1ddffe2e0f97c8d"
+"0.3 s" = "d688148cebfc0c26"
+"0.45 s" = "b39d178ff4c9b1e8"
+"0.6 s" = "29672f0cdc50ef5d"
+"0.75 s" = "f7b96440822f648d"
+"0.9 s" = "9b3a143197727904"
+"1.05 s" = "719e6b1a852e1e27"
+"1.2 s" = "4525de410aab42e2"
+"1.35 s" = "8e825dd3ebad7342"
+"1.5 s" = "3534c874b548564c"

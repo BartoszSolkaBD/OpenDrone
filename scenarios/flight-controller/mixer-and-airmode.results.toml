@@ -1,0 +1,161 @@
+# Results of mixer-and-airmode.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The mixer spreads corrections over the motors with Airmode, as Betaflight does"
+
+[[expect]]
+what     = "motor 1 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "motor 2 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "motor 3 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "159"
+
+[[expect]]
+what     = "motor 4 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "roll PID sum with arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "144.53 ± 0.01"
+measured = "145"
+
+[[expect]]
+what     = "motor 1 DShot with arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "motor 2 DShot with arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "motor 3 DShot with arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "704 ± 1"
+measured = "705"
+
+[[expect]]
+what     = "motor 4 DShot with arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "704 ± 1"
+measured = "703"
+
+[[expect]]
+what     = "roll PID sum with throttle 50%, arm on, rotation roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "1443.91 ± 0.01"
+measured = "1440"
+
+[[expect]]
+what     = "motor 1 DShot with throttle 50%, arm on, rotation roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "1102 ± 1"
+measured = "1100"
+
+[[expect]]
+what     = "motor 2 DShot with throttle 50%, arm on, rotation roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 3 DShot with throttle 50%, arm on, rotation roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 4 DShot with throttle 50%, arm on, rotation roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "1102 ± 1"
+measured = "1100"
+
+[[expect]]
+what     = "motor 1 DShot with throttle 100%, arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "1500 ± 1"
+measured = "1500"
+
+[[expect]]
+what     = "motor 2 DShot with throttle 100%, arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "1500 ± 1"
+measured = "1500"
+
+[[expect]]
+what     = "motor 3 DShot with throttle 100%, arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 4 DShot with throttle 100%, arm on, rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+basis    = "Source"
+expected = "2047 ± 1"
+measured = "2050"
+
+[[expect]]
+what     = "yaw PID sum with yaw 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "969.77 ± 0.01"
+measured = "970"
+
+[[expect]]
+what     = "motor 1 DShot with yaw 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "296 ± 1"
+measured = "296"
+
+[[expect]]
+what     = "motor 2 DShot with yaw 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "1807 ± 1"
+measured = "1810"
+
+[[expect]]
+what     = "motor 3 DShot with yaw 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "1807 ± 1"
+measured = "1810"
+
+[[expect]]
+what     = "motor 4 DShot with yaw 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "296 ± 1"
+measured = "296"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "e448bac78c614571"   # the Flight Controller's whole state after each of 5 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "513b5965e5d604c5"
+"case 2" = "07826430454245d6"
+"case 3" = "236b9542302953ef"
+"case 4" = "eaf58fd829bea7eb"
+"case 5" = "d6e622f7f95d2fde"

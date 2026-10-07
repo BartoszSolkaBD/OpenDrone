@@ -1,0 +1,108 @@
+# The first flight: the Flight Controller and the physics fly the Freestyle 5″
+# together. Scripted sticks enter at the front door as whole-number Channels,
+# travel through the Radio Link at 250 Hz as CRSF frames, and the Flight
+# Controller (Betaflight 2026.6.2's defaults, from the 5″'s Tune) turns them
+# into motor commands through the Rates, the PID loop and the mixer, one loop
+# per 8 kHz physics step.
+#
+# It starts mid-air, armed, with its motors "settled" and the throttle at
+# 30%, high enough for Airmode to start (25%); then holds full right roll for
+# half a second. Betaflight's default Rates, Actual 70/670/0, ask for 670 °/s
+# at full stick.
+format = 1
+name   = "Full right roll reaches the max rate"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "1 s",   roll = "100%" },
+  { at = "1.5 s", roll = "0%" },
+]
+
+[[expect]]
+what  = "roll setpoint"
+at    = "1.25 s"
+value = "670 °/s ± 0.01 °/s"
+basis = "source: applyActualRates (Betaflight 2026.6.2, src/main/fc/rc.c): full stick asks for the max rate, 670 °/s"
+
+[[expect]]
+what  = "roll rate"
+at    = "1.25 s"
+value = "670 °/s ± 3%"
+basis = "source: Betaflight's Actual rates: full right roll holds the max rate, 670 °/s, as the Betaflight App shows it"
+
+[[expect]]
+what  = "roll rate"
+over  = "1.3 s to 1.5 s"
+mean  = "670 °/s ± 3%"
+basis = "source: Betaflight's Actual rates: full right roll holds the max rate, 670 °/s"
+
+[[expect]]
+what  = "roll rate"
+at    = "0.9 s"
+value = "0 °/s ± 0.5 °/s"
+basis = "observed: with the sticks centred the Quad holds still; a centred stick reaches Betaflight at 1500.77 µs over CRSF, which asks for only 0.11 °/s"
+
+[[expect]]
+what    = "pitch rate"
+over    = "1 s to 1.5 s"
+lowest  = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "pitch rate"
+over    = "1 s to 1.5 s"
+highest = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "yaw rate"
+over    = "1 s to 1.5 s"
+lowest  = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "yaw rate"
+over    = "1 s to 1.5 s"
+highest = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "roll rate"
+over    = "1 s to 1.5 s"
+highest = "869 °/s ± 2%"
+basis   = "observed: the roll overshoots the max rate: the I term winds up while the roll spins up, as Betaflight's would without I-term relax and feedforward, which come with #50 and #49"
+
+[[expect]]
+what  = "roll rate"
+at    = "1.8 s"
+value = "-1.8 °/s ± 1 °/s"
+basis = "observed: after the stick is let go the roll stops and bounces back a little, the wound-up I term unwinding; I-term relax (#50) is what stops that bounce"

@@ -261,6 +261,7 @@ dependencies = [
 name = "opendrone-pack"
 version = "0.1.0-alpha.0"
 dependencies = [
+ "opendrone-flight-controller",
  "opendrone-maths",
  "opendrone-physics",
  "toml",

@@ -1,0 +1,17 @@
+# The Freestyle 5″ with its motor output limit at 80%.    id: test/freestyle-5-output-limit-80
+#
+# Betaflight's `motor_output_limit` cuts the top of the motors' range, as
+# pilots do to fly a higher-voltage pack. The Freestyle 5″ flies Betaflight's
+# default, 100%, so its Tune never shows the limit at work; this Test Quad
+# does. Everything else is the Freestyle 5″'s.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "The motor output limit at 80%, so a Scenario can show it cutting the top of the motors' range"
+
+# A Tune change keeps Betaflight's own units, as `tune.txt` does: percent here.
+[tune]
+motor_output_limit = 80

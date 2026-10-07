@@ -1,0 +1,39 @@
+# Results of motor-output-limit.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A motor output limit of 80% cuts the top of the motors' range"
+
+[[expect]]
+what     = "motor 1 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 1 DShot with throttle 50%, arm on"
+basis    = "Source"
+expected = "862 ± 1"
+measured = "862"
+
+[[expect]]
+what     = "motor 3 DShot with throttle 100%, arm on"
+basis    = "Source"
+expected = "1647 ± 0"
+measured = "1650"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d144194ddbf96544"   # test/freestyle-5-output-limit-80: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "c637cb52e134cd7e"   # the Flight Controller's whole state after each of 3 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "bb982c733d26c1d1"
+"case 2" = "f34fbd38cda77a3b"
+"case 3" = "a1c3c4d691da27d0"

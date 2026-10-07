@@ -1,0 +1,108 @@
+# The Flight Controller alone, fed one stick at a time: Quick rates with
+# `quickrates_rc_expo` on apply the expo to the stick itself rather than to
+# the super factor, as Betaflight 2026.6.2 does. Each case is a fresh Flight
+# Controller, one Radio Link frame and one loop.
+#
+# Each stick reaches the Flight Controller as an ExpressLRS receiver hands it
+# over CRSF (ELRS puts -100%, centre and +100% at steps 172, 992 and 1811),
+# and Betaflight 2026.6.2 reads step s as 0.62477120 × s + 881 µs
+# (`crsfReadRawRC`, src/main/rx/crsf.c). The stick's deflection is then
+# (µs - 1500) ÷ 500, held within -1 to 1, and turned round for yaw
+# (`updateRcCommands`, src/main/fc/rc.c), so it sits a little off the
+# percent, as on a real quad on ELRS:
+#
+# | Stick | CRSF step | µs       | Deflection |
+# |-------|-----------|----------|------------|
+# |    0% |       992 | 1500.773 |    0.00155 |
+# |   25% |      1196 | 1628.226 |    0.25645 |
+# |   50% |      1401 | 1756.304 |    0.51261 |
+# |   75% |      1606 | 1884.383 |    0.76877 |
+# |  100% |      1811 | 2012.461 |    1.00000 |
+# |  -50% |       582 | 1244.617 |   -0.51077 |
+#
+# Full stick reads 2012.46 µs, more than 500 µs from centre, so its deflection
+# is held at exactly 1.
+format = 1
+name   = "Quick rates with RC expo bend the stick itself, as Betaflight does"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Quick"
+roll               = "rc rate 1.00, max rate 670 °/s, expo 0.00"
+pitch              = "rc rate 1.00, max rate 670 °/s, expo 0.50"
+yaw                = "rc rate 1.00, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "on"
+
+[[case]]
+roll     = "0%"
+pitch    = "25%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-33.33 °/s ± 0.01 °/s"
+basis = "source: applyQuickRates with quickrates_rc_expo (Betaflight 2026.6.2, src/main/fc/rc.c): expo 0.50 bends the stick itself, 0.50 x³ + 0.50 x, times 200 °/s ÷ (1 - 0.70149 |x|), 33.33 °/s with x = 0.25645 for 25% pitch, nose down"
+
+[[case]]
+roll     = "0%"
+pitch    = "50%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-101.08 °/s ± 0.01 °/s"
+basis = "source: applyQuickRates with quickrates_rc_expo (Betaflight 2026.6.2, src/main/fc/rc.c): expo 0.50 bends the stick itself, 0.50 x³ + 0.50 x, times 200 °/s ÷ (1 - 0.70149 |x|), 101.08 °/s with x = 0.51261 for 50% pitch, nose down"
+
+[[case]]
+roll     = "0%"
+pitch    = "75%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-265.48 °/s ± 0.01 °/s"
+basis = "source: applyQuickRates with quickrates_rc_expo (Betaflight 2026.6.2, src/main/fc/rc.c): expo 0.50 bends the stick itself, 0.50 x³ + 0.50 x, times 200 °/s ÷ (1 - 0.70149 |x|), 265.48 °/s with x = 0.76877 for 75% pitch, nose down"
+
+[[case]]
+roll     = "0%"
+pitch    = "100%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-670.00 °/s ± 0.01 °/s"
+basis = "source: applyQuickRates with quickrates_rc_expo (Betaflight 2026.6.2, src/main/fc/rc.c): expo 0.50 bends the stick itself, 0.50 x³ + 0.50 x, times 200 °/s ÷ (1 - 0.70149 |x|), 670.00 °/s with x = 1.00000 for 100% pitch, nose down"
+
+[[case]]
+roll     = "0%"
+pitch    = "-50%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "100.36 °/s ± 0.01 °/s"
+basis = "source: applyQuickRates with quickrates_rc_expo (Betaflight 2026.6.2, src/main/fc/rc.c): expo 0.50 bends the stick itself, 0.50 x³ + 0.50 x, times 200 °/s ÷ (1 - 0.70149 |x|), 100.36 °/s with x = -0.51077 for -50% pitch, nose up"

@@ -1,0 +1,53 @@
+# Results of quick-rates-rc-expo.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Quick rates with RC expo bend the stick itself, as Betaflight does"
+
+[[expect]]
+what     = "pitch setpoint with pitch 25%"
+basis    = "Source"
+expected = "-33.33 °/s ± 0.01 °/s"
+measured = "-33.3 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 50%"
+basis    = "Source"
+expected = "-101.08 °/s ± 0.01 °/s"
+measured = "-101 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 75%"
+basis    = "Source"
+expected = "-265.48 °/s ± 0.01 °/s"
+measured = "-265 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 100%"
+basis    = "Source"
+expected = "-670.00 °/s ± 0.01 °/s"
+measured = "-670 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch -50%"
+basis    = "Source"
+expected = "100.36 °/s ± 0.01 °/s"
+measured = "100 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "08644654f60452df"   # the Flight Controller's whole state after each of 5 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "be822a3ef85c3db9"
+"case 2" = "5e0a684c1fc1c0cc"
+"case 3" = "6927bc8ccfec6275"
+"case 4" = "a3909f3286048994"
+"case 5" = "780c93434e44752a"
