@@ -59,6 +59,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 
 - [Proving the physics](book/proving-the-physics.md)
 - [Reading a Scenario and its Results](verification/reading-a-scenario.md)
+- [Checking a Pack](verification/checking-a-pack.md)
 - [The Scenario catalogue](book/scenario-catalogue.md)
 - [The Feel Test checklist](feel-test-checklist.md)
 - [Feel Test logs](book/feel-test-logs.md)
@@ -78,6 +79,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
   - [The goggles OSD](research/goggles-osd.md)
   - [Bevy 0.20](research/bevy-0.20.md)
   - [Quad sound](research/quad-sound.md)
+  - [The alpha Quads' numbers](research/quad-definitions.md)
 
 # Working on OpenDrone
 
