@@ -1,0 +1,12 @@
+# A good fixture Pack for the Pack checker's readable checks. Each broken case
+# in crates/pack/tests is a copy of this folder with one line changed.
+format      = 1
+id          = "fixture"
+name        = "Fixture"
+description = "A Pack made for the readable checks."
+version     = "1"
+author      = "OpenDrone contributors"
+licence     = "CC0-1.0"
+
+[licences]
+"quads/ducted/picture.png" = { licence = "CC-BY-4.0", credit = "Picture by the OpenDrone contributors" }

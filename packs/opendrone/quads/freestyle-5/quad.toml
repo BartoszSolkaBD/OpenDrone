@@ -1,0 +1,159 @@
+# The Freestyle 5″: a typical 5″ freestyle quad, Nazgul Evoque F5 V2 class,
+# with T-Motor Velox V2207 V3 1750KV motors, T5147 props and a 6S 1400 mAh
+# LiPo, and no action camera.                       id: opendrone/freestyle-5
+#
+# Every physics number is { value, confidence, source }, and so is each of the
+# FPV Camera's limits. Nobody Feel-Tests this Quad: its Estimates are fitted
+# to public flight logs (#10 §7), but they still move only inside their range,
+# and every move gets a row in feel-tests.md. Measured, Manufacturer and
+# Derived numbers are locked: one changes only with a new source. Counts,
+# choices, the camera defaults and the sound block carry no Confidence. How
+# each Derived number was worked out, and where each Estimate's range comes
+# from: docs/research/quad-definitions.md.
+#
+# Directions: forward, left and up from the centre of mass. Battery voltages
+# are per cell.
+format = 1
+
+name        = "Freestyle 5″"
+description = "A typical 5″ freestyle quad on 6S"
+spec_line   = "5.1″ props, 6S 1400 mAh"
+picture     = "picture.png"
+
+[camera]   # #14 and #28
+lens        = "fisheye"
+position    = "55 mm forward, 0 mm left, -10 mm up"   # in the front of the frame, below the pack-raised centre of mass
+camera_tilt = "30°"
+fov         = "155°"
+vtx_power   = "400 mW"
+analog_dynamic_range = { value = "8.5 stops", confidence = "Estimate",     range = "7–10 stops", source = "camera-5in" }
+analog_lines         = { value = "480 lines", confidence = "Manufacturer", source = "camera-5in" }
+analog_sharpness     = { value = "400 TVL",   confidence = "Estimate",     range = "330–480 TVL", source = "ntsc" }
+
+[frame]
+dry_mass     = { value = "419 g", confidence = "Manufacturer", source = "iflight" }
+diagonal     = { value = "225 mm", confidence = "Manufacturer", source = "iflight" }   # motor to motor
+inertia      = { value = "roll 14, pitch 15, yaw 25 kg·cm²", confidence = "Estimate", range = "×0.7–×1.8", source = "dynamics" }
+rotor_height = { value = "-5 mm", confidence = "Estimate", range = "-20–10 mm", source = "layout" }   # the pack on top lifts the centre of mass above the props
+drag_area    = { value = "front 45, side 45, top 100 cm²", confidence = "Estimate", range = "×0.5–×2", source = "first-guess" }
+
+[collision]   # simple shapes (#16 §4, #26 §1); each box is front to back × side to side × top to bottom
+body        = { value = "box 80 × 45 × 35 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "layout" }   # plates and stack; the prop discs cover the arms
+pack        = { value = "box 75 × 35 × 40 mm", confidence = "Estimate", range = "×0.9–×1.1", source = "pack-6s" }
+pack_height = { value = "26 mm", confidence = "Estimate", range = "15–40 mm", source = "layout" }   # on top of the frame
+bounce      = { value = "0.3", confidence = "Estimate", range = "0.1–0.6", source = "feel" }
+friction    = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "feel" }
+
+[props]   # T5147
+diameter           = { value = "129.5 mm", confidence = "Manufacturer", source = "tmotor" }   # 5.1″
+blades             = 3
+direction          = "props-in"   # the Tune's yaw_motors_reversed must match
+thrust_coefficient = { value = "0.187", confidence = "Derived", source = "tmotor-fit" }
+power_coefficient  = { value = "0.09", confidence = "Estimate", range = "0.07–0.11", source = "tmotor-fit" }
+rotor_drag         = { value = "0.4 s⁻¹", confidence = "Estimate", range = "0.24–0.54 s⁻¹", source = "rotor-drag" }
+rotor_inertia      = { value = "55 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "rotor-inertia" }   # prop and motor bell
+reverse_thrust     = { value = "48%", confidence = "Measured", source = "reverse-thrust" }   # of forward, at the same speed
+reverse_torque     = { value = "100%", confidence = "Estimate", range = "50–100%", source = "crashes" }
+grip               = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "crashes" }   # for Prop Strikes
+
+[motors]   # Velox V2207 V3 1750KV, with the ESC's numbers (#26 §5)
+kv                  = { value = "1750 KV", confidence = "Manufacturer", source = "tmotor" }
+poles               = 14   # 12N14P; the Tune's motor_poles must match
+winding_resistance  = { value = "0.20 Ω", confidence = "Estimate", range = "0.05–0.3 Ω", source = "motor-model" }
+no_load_current     = { value = "1.2 A at 10 V", confidence = "Manufacturer", source = "tmotor" }
+spin_up             = { value = "36 ms", confidence = "Estimate", range = "33–39 ms", source = "motor-lag" }
+slow_down           = { value = "36 ms", confidence = "Estimate", range = "33–39 ms", source = "motor-lag" }
+start_wait          = { value = "0.1 s", confidence = "Manufacturer", source = "bluejay" }
+restart_tries       = 3
+startup_power_limit = { value = "1.96%", confidence = "Manufacturer", source = "bluejay" }
+
+[battery]   # a typical 6S 1400 mAh LiPo
+cells         = 6
+chemistry     = "LiPo"
+full          = { value = "4.20 V", confidence = "Manufacturer", source = "lipo" }
+empty         = { value = "3.50 V", confidence = "Estimate", range = "3.3–3.6 V", source = "battery-window" }
+capacity      = { value = "1400 mAh", confidence = "Manufacturer", source = "lipo" }
+mass          = { value = "225 g", confidence = "Derived", source = "iflight" }   # stored apart from the dry mass; the checker adds the two
+voltage_curve = { value = "4.20 V at 100%, 4.02 V at 80%, 3.84 V at 50%, 3.73 V at 20%, 3.50 V at 0%",
+                  confidence = "Estimate", range = "×0.97–×1.03", source = "typical-curve" }
+resistance    = { value = "28 mΩ", confidence = "Estimate", range = "15–45 mΩ", source = "pack-resistance" }
+recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "battery-model" }
+connector     = { value = "2 mΩ", confidence = "Estimate", range = "1–5 mΩ", source = "pack-resistance" }   # XT60
+
+[feel]
+prop_wash_strength = { value = "20%", confidence = "Estimate", range = "10–30%", source = "prop-wash" }   # thrust flicker
+prop_wash_flicker  = { value = "15 Hz", confidence = "Estimate", range = "5–40 Hz", source = "flicker" }
+ground_effect_body = { value = "2", confidence = "Estimate", range = "0–4", source = "ground-effect" }
+
+[board]
+gyro_range = { value = "2000 °/s", confidence = "Manufacturer", source = "gyro" }   # it reads up to ± this
+
+[sound]   # #32 §6
+buzzer     = true
+esc_melody = "Bluejay default"
+
+[sound_block]   # set by ear, with no Confidence; starting values from #34's round 2, not signed off yet
+blade_pass_level      = "1.0"       # the main pitch: blade count × rotation rate
+harmonics             = 12          # how many blade-pass overtones
+harmonic_rolloff      = "1.3"       # higher is darker
+blade_mismatch        = "0.25"      # growl between the harmonics
+shaft_level           = "0.08"      # the once-a-turn tone
+loudness_exponent     = "2.0"       # how much louder at full speed
+whoosh_level          = "1.0"       # broadband prop noise
+whoosh_centre         = "4.0"       # as a multiple of the blade-pass pitch
+whoosh_q              = "0.7"
+whoosh_swish          = "0.5"       # how much the whoosh pulses with the blades
+motor_whine           = "0.06"
+load_brightness       = "0.6"       # a working prop sounds brighter
+load_loudness         = "0.5"       # and louder
+speed_wobble          = "1.2%"      # the sound-side wobble in each motor's speed
+tone_roughness        = "0.5"
+hiss_level            = "1.2"       # blade tips, above hiss_corner
+hiss_corner           = "1500 Hz"
+body_peak             = "2500 Hz"   # the frame's resonance
+body_peak_gain        = "2.0 dB"
+body_peak_q           = "1.2"
+hum_level             = "0.2"       # frame hum
+hum_first_mode        = "180 Hz"
+hum_first_mode_q      = "4.0"
+hum_second_mode       = "420 Hz"
+hum_second_mode_q     = "6.0"
+hum_follow            = "0.3"       # how much the hum follows the motors
+esc_beep_level        = "0.3"
+esc_beep_brightness   = "0.6"       # 0 a pure tone, 1 buzzy
+esc_ring              = "2500 Hz"   # the motor bell's ring
+buzzer_pitch          = "2700 Hz"   # #34: an active buzzer
+buzzer_level          = "0.25"
+tick_level            = "0.8"       # Prop Strike ticks
+tick_ring             = "3000 Hz"
+tick_decay            = "3 ms"
+where_you_stand_level = "0 dB"      # how loud this Quad is from the Launch Spot
+hit_level             = "0.8"       # the hit clip at a 5 m/s impact
+
+[sources]
+iflight         = "docs/research/flight-dynamics.md §8.2: iFlight's Nazgul Evoque F5 V2 weighs 419 g dry and about 644 g with a 6S 1400 mAh pack (so the pack is 225 g), with a 225 mm diagonal [S52]"
+tmotor          = "T-Motor Velox V2207 V3 1750KV, T-Motor's store page: 12N14P, 1.2 A no-load at 10 V, and the T5147 thrust table, up to 1,591 g at 29,447 RPM and 34.6 A at 23.5 V (read 2026-10-07)"
+tmotor-fit      = "docs/research/quad-definitions.md: C_T fitted to T-Motor's T5147 thrust table (it holds within 10% from 20% to 100% throttle); C_P from the same table through the motor model, which spreads it from 0.07 to 0.11"
+motor-model     = "docs/research/quad-definitions.md: about 0.2 Ω makes the motor model meet T-Motor's table from 60% to 100% throttle; #10 fits it to the TII logs"
+motor-lag       = "docs/research/flight-dynamics.md §3.2: 5″ motor time constants measured at 33 ms (NeuroBEM [S6]) and 39 ms (Agilicious [S26]) on similar quads"
+rotor-drag      = "docs/research/flight-dynamics.md §4.2: 0.24–0.54 s⁻¹ measured on a 610 g quad with six-inch props (Faessler et al. [S5]); #10 refines it against the TII logs"
+rotor-inertia   = "docs/research/quad-definitions.md: a 4.5 g T5147 prop plus a 2207 motor's bell; it gives a spin-up of about 30 ms, inside the measured motor lag"
+reverse-thrust  = "#26's resolution §3: 48% of forward, measured on a similar 5.1″ 3-blade prop (a 6″ quad study agrees at about 50%)"
+crashes         = "#26's resolution §3 and §5: reverse torque and prop grip"
+dynamics        = "docs/research/flight-dynamics.md §9.1 and #10's resolution §5: inertia about (1.4, 1.5, 2.5) × 10⁻³ kg·m², checked against NeuroBEM's 6″ quad, (2.5, 2.1, 4.3) × 10⁻³ kg·m² [S6]"
+layout          = "docs/research/quad-definitions.md: estimated from a 225 mm frame's layout with the pack on top; nothing measured"
+first-guess     = "docs/research/quad-definitions.md: a first guess from the frame's size, with a drag coefficient of 1; the air ticket (#42) fits it to the TII logs"
+pack-6s         = "docs/research/quad-definitions.md: the size of a typical 6S 1400 mAh LiPo; #10 names no particular pack"
+pack-resistance = "#10's resolution §5: about 30 mΩ for a 6S pack with its leads, an Estimate; split here into the pack and its XT60"
+lipo            = "#10's resolution §5: a 6S 1400 mAh LiPo, charged to 4.20 V a cell, as every LiPo maker rates them"
+battery-window  = "docs/research/flight-dynamics.md §5.3: a LiPo cell runs from 4.2 V down to about 3.5 V"
+typical-curve   = "docs/research/quad-definitions.md: a typical LiPo open-circuit voltage curve"
+battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]"
+bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before a restart, at most 3 restarts after a stall, and start-up power capped at Startup Power Max, 5 of 255 (1.96%)"
+prop-wash       = "docs/research/flight-dynamics.md §4.4: thrust loss and flicker of 10–30% in a rotor's own air [S10, S11]"
+flicker         = "docs/research/flight-dynamics.md §4.4: how fast Prop Wash flickers has no published source"
+ground-effect   = "docs/research/flight-dynamics.md §4.5: Sanchez-Cuevas et al.'s body-lift term, K_b ≈ 2 [S12]"
+feel            = "a starting guess; nobody Feel-Tests the 5″, so Scenarios pin it"
+gyro            = "the ICM-42688-P and BMI270, the gyros on typical 5″ flight controllers: both read up to ±2000 °/s (makers' datasheets)"
+camera-5in      = "#28 §2 and docs/research/fpv-camera-dynamic-range-and-resolution.md: a typical 5″ analog camera (Ratel 2 or Phoenix 2 class), NTSC (480 lines)"
+ntsc            = "#28 §2 and docs/research/fpv-camera-dynamic-range-and-resolution.md: NTSC video carries about 330 TVL, whatever the camera claims"
