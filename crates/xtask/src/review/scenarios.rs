@@ -5,13 +5,18 @@
 //! it, or loosening its tolerance waits for the maintainer. Observed ones may
 //! be updated with a one-line reason; a loosened tolerance on one, or removing
 //! one, is for the Reviewer to decide. A deleted Scenario is for the Reviewer
-//! too. An Expectation is matched by what it measures and when, so moving it
-//! within the file, or moving the file to another folder, changes nothing.
+//! too. An Expectation is matched by what it measures and when (with its
+//! moment read as a time, so "1 s" and "1.0 s" match), so moving it within the
+//! file changes nothing. A deleted Scenario's Expectations are looked for in
+//! every Scenario the pull request adds, whatever its file or name: one found
+//! unchanged has only moved, and a Source or Rule one found nowhere unchanged
+//! waits for the maintainer.
 
-use opendrone_pack::units::{Dimension, Expected, Tolerance, parse_expected};
+use opendrone_pack::units::{Dimension, Expected, Tolerance, parse_expected, parse_quantity};
 
 use super::changes::Changes;
 use super::flags::{Level, RedFlag};
+use super::markdown::{code, plain};
 
 /// Where the Scenarios live.
 pub const FOLDER: &str = "scenarios/";
@@ -163,14 +168,40 @@ impl Expectation {
         text.split_once(':').map_or(text, |(_, rest)| rest).trim()
     }
 
+    /// A moment or stretch as a value, so "1 s", "1.0 s" and "1000 ms" are
+    /// the same moment. Text that isn't a time stays as written.
+    fn when(&self, key: &str) -> Option<String> {
+        let text = self.text(key)?;
+        let moment = |part: &str| match parse_quantity(part) {
+            Ok(q) if q.dimension() == Dimension::TIME => format!("{:e} s", q.value),
+            _ => part.trim().to_string(),
+        };
+        Some(match text.split_once(" to ") {
+            Some((from, to)) => format!("{} to {}", moment(from), moment(to)),
+            None => moment(text),
+        })
+    }
+
     /// Two Expectations are the same check if they measure the same thing at
     /// the same moment or with the same statistic over the same stretch.
     fn same_check(&self, other: &Expectation) -> bool {
         self.section == other.section
             && self.text("what") == other.text("what")
-            && self.text("at") == other.text("at")
-            && self.text("over") == other.text("over")
+            && self.when("at") == other.when("at")
+            && self.when("over") == other.when("over")
             && self.statistic().map(|(key, _)| key) == other.statistic().map(|(key, _)| key)
+    }
+
+    /// The same check with the same expected value, Basis and every other
+    /// field, however its moment is spelled.
+    fn same_as(&self, other: &Expectation) -> bool {
+        self.same_check(other)
+            && self
+                .table
+                .keys()
+                .chain(other.table.keys())
+                .filter(|key| key.as_str() != "at" && key.as_str() != "over")
+                .all(|key| self.table.get(key) == other.table.get(key))
     }
 
     /// Whether this Expectation accepts a wider spread of values than `base`
@@ -209,88 +240,110 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
         .map(String::as_str)
         .filter(|p| is_scenario(p))
         .collect();
+    // Scenarios the pull request adds: where a deleted Scenario's
+    // Expectations may have gone, whatever the new file or name.
+    let added: Vec<(&str, ScenarioFile)> = changed
+        .iter()
+        .filter(|path| changes.base.read(path).is_none())
+        .filter_map(|path| Some((*path, ScenarioFile::read(&changes.head.text(path)?)?)))
+        .collect();
     for path in &changed {
-        let Some(base_text) = changes.base.text(path) else {
+        let Some(base) = changes.base.text(path).and_then(|t| ScenarioFile::read(&t)) else {
             continue;
         };
-        let Some(base) = ScenarioFile::read(&base_text) else {
-            continue;
-        };
-        let head_text = changes.head.text(path);
-        let (head_path, head_text) = match head_text {
-            Some(text) => (path.to_string(), text),
-            None => match moved_to(changes, &changed, base.name.as_deref()) {
-                Some(found) => found,
-                None => {
+        match changes.head.text(path) {
+            None => {
+                let candidates: Vec<(&str, &ScenarioFile)> =
+                    added.iter().map(|(p, f)| (*p, f)).collect();
+                let all_found = compare(path, &base, &candidates, &mut flags);
+                if !all_found {
+                    let name = base
+                        .name
+                        .as_deref()
+                        .map(|name| format!(" (\"{}\")", plain(name)))
+                        .unwrap_or_default();
                     flags.push(RedFlag::new(
                         Level::ReviewerDecides,
                         "A Scenario deleted",
                         format!(
-                            "`{path}`{}. It must be replaced, or the ticket must ask for it.",
-                            base.name
-                                .as_deref()
-                                .map(|name| format!(" (\"{name}\")"))
-                                .unwrap_or_default()
+                            "{}{name}. It must be replaced, or the ticket must ask for it.",
+                            code(path)
                         ),
                     ));
-                    continue;
+                }
+            }
+            Some(text) => match ScenarioFile::read(&text) {
+                Some(head) => {
+                    compare(path, &base, &[(path, &head)], &mut flags);
+                }
+                None => {
+                    let locked = base
+                        .expectations
+                        .iter()
+                        .filter(|e| e.basis().locked())
+                        .count();
+                    if locked > 0 {
+                        flags.push(RedFlag::new(
+                            Level::WaitsForMaintainer,
+                            "A Scenario with Source or Rule Expectations can't be read",
+                            format!(
+                                "{} isn't readable TOML any more, so its {locked} Source or Rule \
+                                 Expectations can't be shown unchanged.",
+                                code(path)
+                            ),
+                        ));
+                    }
                 }
             },
-        };
-        let Some(head) = ScenarioFile::read(&head_text) else {
-            let locked = base
-                .expectations
-                .iter()
-                .filter(|e| e.basis().locked())
-                .count();
-            if locked > 0 {
-                flags.push(RedFlag::new(
-                    Level::WaitsForMaintainer,
-                    "A Scenario with Source or Rule Expectations can't be read",
-                    format!(
-                        "`{head_path}` isn't readable TOML any more, so its {locked} Source or Rule \
-                         Expectations can't be shown unchanged."
-                    ),
-                ));
-            }
-            continue;
-        };
-        compare(&head_path, &base, &head, &mut flags);
+        }
     }
     flags
 }
 
-/// Where a deleted Scenario went: an added Scenario file with the same name.
-fn moved_to(changes: &Changes, changed: &[&str], name: Option<&str>) -> Option<(String, String)> {
-    let name = name?;
-    changed.iter().find_map(|path| {
-        if changes.base.read(path).is_some() {
-            return None;
-        }
-        let text = changes.head.text(path)?;
-        let file = ScenarioFile::read(&text)?;
-        (file.name.as_deref() == Some(name)).then(|| (path.to_string(), text))
-    })
-}
-
-fn compare(path: &str, base: &ScenarioFile, head: &ScenarioFile, flags: &mut Vec<RedFlag>) {
+/// Compares a base Scenario's Expectations with where they may be now: the
+/// same file's new version, or, for a deleted file, every added Scenario.
+/// Returns whether every one of them was found, changed or not.
+fn compare(
+    path: &str,
+    base: &ScenarioFile,
+    candidates: &[(&str, &ScenarioFile)],
+    flags: &mut Vec<RedFlag>,
+) -> bool {
+    let mut all_found = true;
+    let find = |test: &dyn Fn(&Expectation) -> bool| {
+        candidates
+            .iter()
+            .find_map(|(p, file)| file.expectations.iter().find(|e| test(e)).map(|e| (*p, e)))
+    };
     for before in &base.expectations {
-        if head.expectations.contains(before) {
+        if find(&|e| e.same_as(before)).is_some() {
             continue;
         }
-        let after = head.expectations.iter().find(|e| e.same_check(before));
+        let after = find(&|e| e.same_check(before));
+        all_found &= after.is_some();
         let basis = before.basis();
-        let what = before.description();
+        let what = plain(&before.description());
+        // Where the Expectation is now, if it moved to another file.
+        let place = |now: &str| {
+            if now == path {
+                format!("{}: \"{what}\"", code(path))
+            } else {
+                format!("{}, moved from {}: \"{what}\"", code(now), code(path))
+            }
+        };
+        let removed = format!(
+            "{}: \"{what}\" ({}) was removed, or now measures something else.",
+            code(path),
+            code(before.expected())
+        );
         if basis.locked() {
             let detail = match after {
-                Some(after) => format!(
-                    "`{path}`: \"{what}\" {}.",
+                Some((now, after)) => format!(
+                    "{} {}.",
+                    place(now),
                     differences(before, after).join(", and ")
                 ),
-                None => format!(
-                    "`{path}`: \"{what}\" (`{}`) was removed, or now measures something else.",
-                    before.expected()
-                ),
+                None => removed,
             };
             flags.push(RedFlag::new(
                 Level::WaitsForMaintainer,
@@ -309,14 +362,11 @@ fn compare(path: &str, base: &ScenarioFile, head: &ScenarioFile, flags: &mut Vec
             None => flags.push(RedFlag::new(
                 Level::ReviewerDecides,
                 "An Observed Expectation removed",
-                format!(
-                    "`{path}`: \"{what}\" (`{}`) was removed, or now measures something else.",
-                    before.expected()
-                ),
+                removed,
             )),
-            Some(after) => {
+            Some((now, after)) => {
                 let reason = if after.basis_text() != before.basis_text() {
-                    format!("Reason given: \"{}\"", after.basis_text())
+                    format!("Reason given: \"{}\"", plain(after.basis_text()))
                 } else {
                     "Its basis line is unchanged, so it gives no new reason".to_string()
                 };
@@ -332,13 +382,15 @@ fn compare(path: &str, base: &ScenarioFile, head: &ScenarioFile, flags: &mut Vec
                     level,
                     title,
                     format!(
-                        "`{path}`: \"{what}\" {}. {reason}.",
+                        "{} {}. {reason}.",
+                        place(now),
                         differences(before, after).join(", and ")
                     ),
                 ));
             }
         }
     }
+    all_found
 }
 
 /// What changed in one Expectation, in plain words.
@@ -351,9 +403,9 @@ fn differences(before: &Expectation, after: &Expectation) -> Vec<String> {
             ""
         };
         differences.push(format!(
-            "went from `{}` to `{}`{loosened}",
-            before.expected(),
-            after.expected()
+            "went from {} to {}{loosened}",
+            code(before.expected()),
+            code(after.expected())
         ));
     }
     if before.basis() != after.basis() {
@@ -374,7 +426,9 @@ fn differences(before: &Expectation, after: &Expectation) -> Vec<String> {
         .table
         .keys()
         .chain(after.table.keys())
-        .filter(|key| !VALUE_KEYS.contains(&key.as_str()) && key.as_str() != "basis")
+        .filter(|key| {
+            !VALUE_KEYS.contains(&key.as_str()) && !["basis", "at", "over"].contains(&key.as_str())
+        })
         .any(|key| before.table.get(key) != after.table.get(key));
     if other {
         differences.push("has other fields changed".to_string());

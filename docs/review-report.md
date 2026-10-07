@@ -12,7 +12,7 @@ Every pull request gets one **Review Report**: a comment from CI (`github-action
 | **Renders** | Pictures of every changed Map. None yet: they arrive with #63. |
 | **Downloads** | Blackbox logs and builds. None yet: they arrive with #55 and #81. |
 
-The Verdict section updates whenever the maintainer's account comments on the PR. The rest updates after every push.
+The whole Report is worked out again after every push, and whenever the maintainer's account comments on the PR.
 
 ## Red Flags
 
@@ -20,16 +20,16 @@ The **Red Flag gate** is a required check. It fails when a Red Flag waits for yo
 
 | Red Flag | Level | How CI spots it |
 |---|---|---|
-| A Source or Rule Expectation changed, including a loosened tolerance | **Waits for you** | It compares every Scenario file with main. Any change to such an Expectation counts: its value or tolerance (even a tighter one), its Basis, any other field, or removing it. Expectations are matched by what they measure and when, so reordering them, respacing the file or moving it to another folder doesn't count, and neither does adding a new one. |
+| A Source or Rule Expectation changed, including a loosened tolerance | **Waits for you** | It compares every Scenario file with where the PR branched off main. Any change to such an Expectation counts: its value or tolerance (even a tighter one), its Basis, any other field, or removing it. Expectations are matched by what they measure and when, with the moment read as a time, so "1 s" and "1.0 s" are the same. Reordering them, respacing the file, or adding a new one doesn't count. When a Scenario file is deleted, its Expectations are looked for in every Scenario the PR adds, whatever its file or name: one found unchanged has only moved, and a Source or Rule one found changed, or nowhere, waits. |
 | An existing ADR edited | **Waits for you** | Any change to a file in `docs/adr/` that exists on main: an edit, a rename or a deletion. |
 | Bevy moving to a new 0.N, with its wgpu major | **Waits for you** | It compares `Cargo.lock` with main. A patch release, a release candidate becoming the release, or Bevy's first arrival doesn't count. |
-| A deleted Scenario | The Reviewer decides | A Scenario file is gone, and no new file has its name. A Scenario that moved isn't deleted. |
+| A deleted Scenario | The Reviewer decides | A Scenario file is gone, and not every one of its Expectations turns up in a Scenario the PR adds. Its Source and Rule Expectations also wait for you, as above, so this alone applies to a Scenario with only Observed ones. |
 | A loosened tolerance on an Observed Expectation | The Reviewer decides | The range it accepts got wider, compared in the same units, so "± 1 mm/s" is the same as "± 0.001 m/s". Removing an Observed Expectation counts here too. |
-| A house-rule exception in a core crate | The Reviewer decides | A new `allow` or `expect` of a `clippy::disallowed_*` lint in a core crate, or a change to a core crate's `clippy.toml`. |
-| New `unsafe` code | The Reviewer decides | The word `unsafe` in a new line of Rust, outside comments and quoted text, or a change to the `unsafe_code` setting. |
-| A change to the Repo rules | The Reviewer decides | Any file in the Repo rules Area of `.github/CODEOWNERS`: CI, lint settings, the licence policy, CODEOWNERS, the Rust version, xtask and `AGENTS.md`. |
+| A house-rule exception in a core crate | The Reviewer decides | In a core crate: a newly allowed or expected `clippy::disallowed_*` lint, or a group that holds them (`clippy::style`, `clippy::all`, `clippy::restriction`, `clippy`, `warnings`), however the attribute is spread over lines; a change to the `[lints]` in its `Cargo.toml`; or a change to its `clippy.toml`. |
+| New `unsafe` code | The Reviewer decides | The word `unsafe` in a new line of Rust, outside comments and quoted text; a newly allowed `unsafe_code` lint; a crate other than `opendrone-input` and the game that stops taking the workspace's lints (which forbid `unsafe`); or a change to the workspace's `unsafe_code = "forbid"`. |
+| A change to the Repo rules | The Reviewer decides | Any file in the Repo rules Area of `.github/CODEOWNERS`: CI, the root Cargo files, `.cargo/`, the Rust version (`rust-toolchain.toml` or the older `rust-toolchain`), lint and format settings, the licence policy, CODEOWNERS, xtask and `AGENTS.md`. |
 | An Observed Expectation updated | Listed | Its value changed. The new basis line is its one-line reason. |
-| A new outside library | Listed | A library in the PR's `Cargo.lock` whose name main's lacks, with its licence. cargo-deny checks the licence. |
+| A new outside library | Listed | A library in the PR's `Cargo.lock` whose name main's lacks, with its licence as crates.io gives it (at most 30 are looked up). cargo-deny checks the licence. |
 | A new ADR, or a new glossary term | Listed | A new file in `docs/adr/`, or a new `**Term**:` line in a deep dive. |
 
 **When a Red Flag waits for you:** read it, then either merge the PR by hand or ask for changes. A merge by hand goes past a failing check, so the Review Reports after it name that merge (see below).
@@ -58,10 +58,39 @@ After every merge into main, CI checks that the merged PR's last commit had pass
 
 ## How it's built, and why it's safe
 
-A workflow that can write to a PR must never run the PR's own code, or a PR could use that access. So the work is split in two:
+The workflow that posts the Report can write to the PR, so it must never run anything the PR controls. Otherwise a PR could change how it is judged, or use that write access. So everything happens in one workflow, **`.github/workflows/review.yml`**, which only ever runs main's code.
 
-- **`.github/workflows/review-report.yml`** runs on every PR with a read-only token and no secrets. It reads the PR's files as data, with `git show`, and runs `cargo xtask review-report`. That writes the Report's sections from Red Flags down, and fails when a Red Flag waits for you: this job is the **Red Flag gate**. It builds the gate from main's code, so a PR can't change how it is judged. Only while main has no gate yet does the PR's own run. It leaves the Report as a download.
-- **`.github/workflows/review.yml`** has write access. It runs only as it is on main: after the Review Report workflow finishes, when the maintainer's account comments, and after a merge. It checks out main, builds main's xtask, and reads the PR through GitHub's API. The download is the one thing a PR can shape, so xtask treats it as text only. It must be for the PR's latest commit, it is cut short if it's long, and anything that could pass for the Report's hidden marker is stripped. Only Areas in main's CODEOWNERS become labels. The workflow then sets the Review check, posts or edits the Report (found by its hidden marker, and only if CI posted it), and adds the labels.
+**It runs:**
+
+- after every push to a PR (`pull_request_target`);
+- whenever the maintainer's account comments on a PR (`issue_comment`);
+- after a merge into main (`push`).
+
+For all three, GitHub runs the workflow file as it is on main, even when the PR changes it.
+
+**Trusted, because it comes from main:**
+
+- the workflow and its script, `.github/scripts/review.sh`;
+- xtask, built from main's checkout with main's Rust version;
+- `.github/CODEOWNERS`, which decides the Areas and so the labels;
+- the rules for every Red Flag.
+
+**Data only, never run, built or checked out:**
+
+- **The PR's commits.** They are fetched as git objects and read only with `git show` and `git diff`, against the commit where the PR branched off main. No `cargo`, `rustup` or other tool ever runs on the PR's files, so its `rust-toolchain`, `.cargo/config.toml`, build scripts or workflow changes have no effect here.
+- **The PR's comments and details,** from GitHub's API. Only the maintainer's account's comments count as Verdicts.
+- **The new libraries' licences,** from crates.io's API. The names and versions come from the PR's `Cargo.lock`, so they are checked before they go into a web address.
+
+**Every piece of text from the PR or crates.io is escaped before it reaches the Report.** That covers file names, Scenario text and reasons, lines of code, library names and licences. So it can't start a heading, open HTML, forge the Report's hidden marker, fake a Verdict section or mention anyone.
+
+**What the workflow posts:**
+
+- **The Red Flag gate,** as a commit status on the PR's latest commit: failure when a Red Flag waits for you. It is pending while being worked out, and an error if that fails, so it never passes by accident.
+- **The Review check,** as a commit status on the same commit.
+- **The Review Report comment.** It is found by its hidden marker, and only if CI posted it.
+- **The labels.** Only Areas in main's CODEOWNERS become labels.
+
+No job is named "Red Flag gate" or "Review check", so a job can't pass for either status.
 
 Branch protection (#83) should require **Red Flag gate** and **Review check**, beside the CI checks in [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
@@ -69,5 +98,6 @@ You can work out the Report locally: `cargo xtask review-report --base origin/ma
 
 **Limits:**
 
-- A PR can still edit `review-report.yml` itself. That is a change to the Repo rules, and the Reviewer decides on it.
-- Dependabot's own runs get a read-only token. So on a Dependabot PR, the Report and the Review check appear once the maintainer's account comments.
+- A change to the review workflow, its script or xtask takes effect only once it is on main. Until then the PR is judged by main's copy. That is why such a change is a Repo rules change: the Reviewer judges it from the diff, not from the Report.
+- CI (`ci.yml`) does run the PR's code, as it must, but with a read-only token, and nothing it produces reaches the Red Flag gate or the Report.
+- Dependabot's own runs get a read-only token. So on a Dependabot PR, the Report and both statuses appear once the maintainer's account comments.

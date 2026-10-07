@@ -1,12 +1,16 @@
 //! Red Flags: changes that could weaken a check or a decision (#15 §5,
 //! `docs/context/development.md`). Each one waits for the maintainer, is
 //! decided by the Reviewer, or is only listed.
+//!
+//! Every detail is Markdown that is safe to post: text from the pull request
+//! goes through [`code`] or [`plain`].
 
 use std::collections::BTreeSet;
 
 use super::areas::{Areas, REPO_RULES};
 use super::changes::Changes;
 use super::libraries::{self, NewLibrary};
+use super::markdown::{code, plain};
 use super::scenarios;
 
 /// What a Red Flag asks for.
@@ -61,6 +65,8 @@ const ADRS: &str = "docs/adr/";
 const DEEP_DIVES: &str = "docs/context/";
 /// The walls between crates name the five core crates.
 const WALLS: &str = include_str!("../../walls.toml");
+/// The crates that may use `unsafe` (#15 §4).
+const MAY_USE_UNSAFE: [&str; 2] = ["crates/input/Cargo.toml", "crates/opendrone/Cargo.toml"];
 
 /// Every Red Flag in a set of changes.
 pub fn detect(changes: &Changes, areas: &Areas, new_libraries: &[NewLibrary]) -> Vec<RedFlag> {
@@ -75,10 +81,10 @@ pub fn detect(changes: &Changes, areas: &Areas, new_libraries: &[NewLibrary]) ->
             Level::ListedOnly,
             "A new outside library",
             format!(
-                "`{}` {} (licence: {}).",
-                library.name,
-                library.version,
-                library.licence.as_deref().unwrap_or("not looked up")
+                "{} {} (licence: {}).",
+                code(&library.name),
+                plain(&library.version),
+                plain(library.licence.as_deref().unwrap_or("not looked up"))
             ),
         ));
     }
@@ -94,17 +100,23 @@ fn adrs(changes: &Changes, flags: &mut Vec<RedFlag>) {
             (Some(_), Some(_)) => flags.push(RedFlag::new(
                 Level::WaitsForMaintainer,
                 "An existing ADR edited",
-                format!("`{path}`. A decision changes only with the maintainer."),
+                format!(
+                    "{}. A decision changes only with the maintainer.",
+                    code(path)
+                ),
             )),
             (Some(_), None) => flags.push(RedFlag::new(
                 Level::WaitsForMaintainer,
                 "An existing ADR deleted or renamed",
-                format!("`{path}`. A decision changes only with the maintainer."),
+                format!(
+                    "{}. A decision changes only with the maintainer.",
+                    code(path)
+                ),
             )),
             (None, Some(_)) => flags.push(RedFlag::new(
                 Level::ListedOnly,
                 "A new ADR",
-                format!("`{path}`."),
+                format!("{}.", code(path)),
             )),
             (None, None) => {}
         }
@@ -124,11 +136,11 @@ fn bevy_and_wgpu(changes: &Changes, flags: &mut Vec<RedFlag>) {
             Level::WaitsForMaintainer,
             &format!("{name} moves to a new version"),
             format!(
-                "`{}` goes from {} to {} in `Cargo.lock`. Before it merges, the maintainer runs \
+                "{} goes from {} to {} in `Cargo.lock`. Before it merges, the maintainer runs \
                  the Frame Check and looks at both Maps in both Video Looks (ADR-0021).",
-                moved.name,
-                moved.from.join(", "),
-                moved.to.join(", ")
+                code(&moved.name),
+                plain(&moved.from.join(", ")),
+                plain(&moved.to.join(", "))
             ),
         ));
     }
@@ -147,35 +159,88 @@ fn core_folders() -> Vec<String> {
         .collect()
 }
 
-/// A house-rule exception in a core crate: allowing one of Clippy's
-/// `disallowed_*` lints, which carry the house rules (ADR-0001), or changing a
-/// core crate's `clippy.toml`.
+/// Whether allowing a lint turns a house rule off. Clippy's `disallowed_*`
+/// lints carry the house rules (ADR-0001); `clippy::style` holds them,
+/// `clippy::all` holds that, and `warnings` covers everything CI denies.
+fn turns_off_a_house_rule(lint: &str) -> bool {
+    lint.starts_with("clippy::disallowed_")
+        || matches!(
+            lint,
+            "clippy" | "clippy::all" | "clippy::style" | "clippy::restriction" | "warnings"
+        )
+}
+
+/// Every lint a Rust file allows or expects, by name: in `#[allow(…)]`,
+/// `#![allow(…)]`, `#[expect(…)]` or inside a `cfg_attr`, however the
+/// attribute is spread over lines. Comments and strings don't count.
+fn allowed_lints(text: &str) -> Vec<String> {
+    let code: String = text.lines().map(code_part).collect::<Vec<_>>().join(" ");
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    let mut lints = Vec::new();
+    for keyword in ["allow(", "expect("] {
+        for (at, _) in compact.match_indices(keyword) {
+            let before = compact[..at].chars().next_back();
+            if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                continue;
+            }
+            let inside = &compact[at + keyword.len()..];
+            let end = inside.find(')').unwrap_or(inside.len());
+            lints.extend(
+                inside[..end]
+                    .split(',')
+                    .filter(|lint| !lint.is_empty())
+                    .map(str::to_string),
+            );
+        }
+    }
+    lints
+}
+
+/// A house-rule exception in a core crate: newly allowing a lint that carries
+/// a house rule, a change to a core crate's lint settings in its `Cargo.toml`,
+/// or a change to its `clippy.toml`, which holds the house rules.
 fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
     let mut settings = Vec::new();
     for folder in core_folders() {
         for path in changes.under(&folder) {
             if path.ends_with("/clippy.toml") {
-                settings.push(format!("`{path}`"));
-                continue;
-            }
-            if !path.ends_with(".rs") {
-                continue;
-            }
-            let exceptions: Vec<String> = changes
-                .added_lines(path)
-                .into_iter()
-                .filter(|line| {
-                    let line = line.replace(' ', "");
-                    (line.contains("allow(") || line.contains("expect("))
-                        && line.contains("clippy::disallowed_")
-                })
-                .collect();
-            if !exceptions.is_empty() {
-                flags.push(RedFlag::new(
-                    Level::ReviewerDecides,
-                    "A house-rule exception in a core crate",
-                    format!("`{path}` adds {}.", quoted_lines(&exceptions)),
-                ));
+                settings.push(code(path));
+            } else if path == format!("{folder}Cargo.toml") {
+                if lints_of(changes.base.text(path)) != lints_of(changes.head.text(path)) {
+                    flags.push(RedFlag::new(
+                        Level::ReviewerDecides,
+                        "A house-rule exception in a core crate",
+                        format!("{} changes the crate's lint settings.", code(path)),
+                    ));
+                }
+            } else if path.ends_with(".rs") {
+                let mut before: Vec<String> = changes
+                    .base
+                    .text(path)
+                    .map(|t| allowed_lints(&t))
+                    .unwrap_or_default();
+                let mut new = Vec::new();
+                for lint in changes
+                    .head
+                    .text(path)
+                    .map(|t| allowed_lints(&t))
+                    .unwrap_or_default()
+                {
+                    match before.iter().position(|b| *b == lint) {
+                        Some(at) => {
+                            before.remove(at);
+                        }
+                        None if turns_off_a_house_rule(&lint) => new.push(code(&lint)),
+                        None => {}
+                    }
+                }
+                if !new.is_empty() {
+                    flags.push(RedFlag::new(
+                        Level::ReviewerDecides,
+                        "A house-rule exception in a core crate",
+                        format!("{} now allows {}.", code(path), new.join(", ")),
+                    ));
+                }
             }
         }
     }
@@ -191,14 +256,42 @@ fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
     }
 }
 
-/// New `unsafe` code anywhere, or a change to where it's allowed.
+/// A manifest's `[lints]` table, if it can be read.
+fn lints_of(manifest: Option<String>) -> Option<toml::Value> {
+    manifest?.parse::<toml::Table>().ok()?.get("lints").cloned()
+}
+
+/// Whether a crate's manifest takes the workspace's lints, which forbid
+/// `unsafe` code.
+fn takes_workspace_lints(manifest: Option<String>) -> bool {
+    lints_of(manifest)
+        .and_then(|lints| lints.get("workspace").and_then(toml::Value::as_bool))
+        .unwrap_or(false)
+}
+
+/// The workspace's `unsafe_code` setting in the root `Cargo.toml`.
+fn workspace_unsafe_setting(manifest: Option<String>) -> Option<toml::Value> {
+    manifest?
+        .parse::<toml::Table>()
+        .ok()?
+        .get("workspace")?
+        .get("lints")?
+        .get("rust")?
+        .get("unsafe_code")
+        .cloned()
+}
+
+/// New `unsafe` code anywhere, or a change to where it's allowed: a line that
+/// allows it, a crate that stops taking the workspace's lints, or a change to
+/// the workspace's `unsafe_code = "forbid"`.
 fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
     for path in &changes.paths {
         let is_rust = path.ends_with(".rs");
-        if !is_rust && !path.ends_with("Cargo.toml") {
+        let is_manifest = path.ends_with("Cargo.toml");
+        if !is_rust && !is_manifest {
             continue;
         }
-        let added: Vec<String> = changes
+        let mut found: Vec<String> = changes
             .added_lines(path)
             .into_iter()
             .filter(|line| {
@@ -210,15 +303,54 @@ fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
                     has_word(&code, "unsafe_code") && code.contains('=')
                 }
             })
+            .map(|line| code(&line))
             .collect();
-        if !added.is_empty() {
+        if is_rust
+            && let Some(text) = changes.head.text(path)
+            && allowed_lints(&text).iter().any(|l| l == "unsafe_code")
+            && !changes
+                .base
+                .text(path)
+                .is_some_and(|t| allowed_lints(&t).iter().any(|l| l == "unsafe_code"))
+            && found.is_empty()
+        {
+            found.push("an allowance of `unsafe_code`".to_string());
+        }
+        if is_manifest
+            && path.starts_with("crates/")
+            && !MAY_USE_UNSAFE.contains(&path.as_str())
+            && takes_workspace_lints(changes.base.text(path))
+            && !takes_workspace_lints(changes.head.text(path))
+        {
+            found.push(
+                "no `[lints] workspace = true` any more, so `unsafe` isn't forbidden there"
+                    .to_string(),
+            );
+        }
+        if path == "Cargo.toml"
+            && workspace_unsafe_setting(changes.base.text(path))
+                != workspace_unsafe_setting(changes.head.text(path))
+        {
+            found.push("a change to the workspace's `unsafe_code = \"forbid\"`".to_string());
+        }
+        if !found.is_empty() {
             flags.push(RedFlag::new(
                 Level::ReviewerDecides,
                 "New `unsafe` code",
-                format!("`{path}` adds {}.", quoted_lines(&added)),
+                format!("{} adds {}.", code(path), listed(&found, 3, "such lines")),
             ));
         }
     }
+}
+
+/// Whether a line of Rust changes the `unsafe_code` lint, such as
+/// `#![allow(unsafe_code)]`.
+fn allows_unsafe_code(code: &str) -> bool {
+    let compact = code.replace(' ', "");
+    has_word(code, "unsafe_code")
+        && ["allow(", "expect(", "warn("]
+            .iter()
+            .any(|attribute| compact.contains(attribute))
 }
 
 /// A line without its comment and without the insides of its strings, so a
@@ -248,16 +380,6 @@ fn code_part(line: &str) -> String {
     code
 }
 
-/// Whether a line of Rust changes the `unsafe_code` lint, such as
-/// `#![allow(unsafe_code)]`.
-fn allows_unsafe_code(code: &str) -> bool {
-    let compact = code.replace(' ', "");
-    has_word(code, "unsafe_code")
-        && ["allow(", "expect(", "warn("]
-            .iter()
-            .any(|attribute| compact.contains(attribute))
-}
-
 /// Whether `word` appears in `text` on its own, not inside a longer name.
 fn has_word(text: &str, word: &str) -> bool {
     let is_name = |c: char| c.is_alphanumeric() || c == '_';
@@ -271,11 +393,11 @@ fn has_word(text: &str, word: &str) -> bool {
 /// A change to the Repo rules Area: CI, lint settings, the licence policy,
 /// CODEOWNERS, the Rust version, xtask or AGENTS.md.
 fn repo_rules(changes: &Changes, areas: &Areas, flags: &mut Vec<RedFlag>) {
-    let files: Vec<&str> = changes
+    let files: Vec<String> = changes
         .paths
         .iter()
-        .map(String::as_str)
         .filter(|path| areas.of(path) == Some(REPO_RULES))
+        .map(|path| code(path))
         .collect();
     if !files.is_empty() {
         flags.push(RedFlag::new(
@@ -284,7 +406,7 @@ fn repo_rules(changes: &Changes, areas: &Areas, flags: &mut Vec<RedFlag>) {
             format!(
                 "{}. The ticket must ask for it, and a check is never weakened unless the ticket \
                  says so.",
-                listed(&files, 10)
+                listed(&files, 10, "files")
             ),
         ));
     }
@@ -315,32 +437,22 @@ fn glossary_terms(changes: &Changes, flags: &mut Vec<RedFlag>) {
             flags.push(RedFlag::new(
                 Level::ListedOnly,
                 "A new glossary term",
-                format!("**{term}**, in `{path}`."),
+                format!("**{}**, in {}.", plain(&term), code(path)),
             ));
         }
     }
 }
 
-/// Up to `most` files, quoted, and how many more there are.
-fn listed(files: &[&str], most: usize) -> String {
-    let shown: Vec<String> = files.iter().take(most).map(|f| format!("`{f}`")).collect();
-    match files.len().saturating_sub(most) {
-        0 => shown.join(", "),
-        more => format!("{} and {more} more files", shown.join(", ")),
-    }
-}
-
-/// Up to three lines of code, quoted, and how many more there are.
-fn quoted_lines(lines: &[String]) -> String {
-    let shown: Vec<String> = lines
+/// Up to `most` items, and how many more there are.
+fn listed(items: &[String], most: usize, more_of: &str) -> String {
+    let shown = items
         .iter()
-        .take(3)
-        .map(|line| format!("`{}`", line.trim().replace('`', "'")))
-        .collect();
-    let more = lines.len().saturating_sub(3);
-    if more > 0 {
-        format!("{} and {more} more such lines", shown.join(", "))
-    } else {
-        shown.join(", ")
+        .take(most)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    match items.len().saturating_sub(most) {
+        0 => shown,
+        more => format!("{shown} and {more} more {more_of}"),
     }
 }

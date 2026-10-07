@@ -65,6 +65,8 @@ PR [#88](https://github.com/BartoszSolkaBD/OpenDrone/pull/88) has two real Verdi
 
 CI works out the Review check again whenever the maintainer's account comments on the PR, and after every push. It shows the result as the commit status **Review check** and at the top of the Review Report.
 
+The Report is worked out by main's code, so a PR that changes the review workflow, its script or xtask isn't judged by its own change. Judge such a change from the diff: it is a change to the Repo rules.
+
 | The Review check | When |
 |---|---|
 | **passes** | The newest Verdict covers the PR's latest commit and says pass. The PR was opened by the maintainer's account or by Dependabot, from a branch in this repo. Fewer than 3 review rounds have failed. |

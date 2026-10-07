@@ -10,6 +10,7 @@ use super::areas::{Areas, EVERYTHING_ELSE};
 use super::changes::Changes;
 use super::flags::{self, Level, RedFlag};
 use super::libraries::{self, NewLibrary};
+use super::markdown::{code, plain};
 use super::results::{self, Moved};
 
 /// Where the Areas are written.
@@ -202,7 +203,7 @@ impl Review {
             let _ = writeln!(text, "None: this PR changes no files.\n");
         }
         for (area, files) in &self.areas {
-            let shown: Vec<String> = files.iter().take(5).map(|f| format!("`{f}`")).collect();
+            let shown: Vec<String> = files.iter().take(5).map(|f| code(f)).collect();
             let more = if files.len() > 5 {
                 format!(" and {} more", files.len() - 5)
             } else {
@@ -260,7 +261,7 @@ fn touched(changes: &Changes, areas: &Areas) -> Vec<(String, Vec<String>)> {
         .collect()
 }
 
-/// Text safe inside a Markdown table cell.
+/// Text from the pull request, safe inside a Markdown table cell.
 fn cell(text: &str) -> String {
-    text.replace('|', "\\|").replace('\n', " ")
+    plain(text)
 }

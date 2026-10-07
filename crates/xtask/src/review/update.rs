@@ -1,10 +1,11 @@
-//! What the privileged workflow posts: the Review Report comment, the PR's
-//! labels and the Review check's commit status.
+//! What the review workflow posts: the Review Report comment, the PR's labels,
+//! and the Red Flag gate's and the Review check's commit statuses.
 //!
-//! The Review Report's sections from Red Flags down come from the unprivileged
-//! workflow's download, which a pull request could shape, so they are only
-//! ever text: checked against the PR's latest commit, kept short, stripped of
-//! anything that could pass for this comment's marker, and their Areas checked
+//! The Review Report's sections from Red Flags down are worked out by
+//! `review-report`, in the same job, from main's code. Text from the pull
+//! request in them is already escaped ([`super::markdown`]). Even so, they are
+//! checked against the PR's latest commit, kept short, kept from passing for
+//! this comment's marker or for a Verdict heading, and their Areas checked
 //! against main's CODEOWNERS. The Verdict section is worked out here, from the
 //! comments.
 
@@ -14,7 +15,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::verdict::{self, Comment, PullRequest, ReviewCheck};
+use super::verdict::{self, Comment, PullRequest, ReviewCheck, State};
 
 /// The hidden first line that marks the Review Report comment.
 pub const MARKER: &str = "<!-- opendrone-review-report -->";
@@ -26,7 +27,7 @@ pub const NEEDS_MAINTAINER: &str = "needs-maintainer";
 pub const SKIPPED_A_CHECK: &str = "skipped-a-check";
 /// Area labels start with this, such as `area: Physics`.
 pub const AREA_PREFIX: &str = "area: ";
-/// The most Report text taken from the download; a comment holds 65,536.
+/// The most Report text posted; a comment holds 65,536 characters.
 const MOST_REPORT: usize = 60_000;
 
 /// A label to make sure exists, and to add.
@@ -70,7 +71,7 @@ impl Label {
     }
 }
 
-/// The Report sections from the unprivileged workflow, once checked.
+/// The Report's sections from Red Flags down, once checked.
 #[derive(Clone, Debug)]
 pub enum Report {
     Ready {
@@ -79,19 +80,23 @@ pub enum Report {
         areas: Vec<String>,
     },
     /// Not there, or not for the PR's latest commit: why, in plain words.
-    NotYet(String),
+    Missing(String),
 }
 
 impl Report {
-    /// Reads the download folder (`report.md`, `review.json`, `pr.json`), if
-    /// it is for this PR's latest commit.
+    /// Reads `review-report`'s folder (`report.md`, `review.json` and the
+    /// `pr.json` naming the PR and commit it is for), if it is for this PR's
+    /// latest commit.
     pub fn read(folder: Option<&Path>, pr: &PullRequest) -> Report {
         let head = verdict::short(&pr.head_sha);
+        let missing = || {
+            Report::Missing(format!(
+                "The rest of this report couldn't be worked out for `{head}`. The Review \
+                 workflow's run says why, and the next push or comment tries again."
+            ))
+        };
         let Some(folder) = folder else {
-            return Report::NotYet(format!(
-                "The rest of this report appears when the Review Report workflow has finished \
-                 for `{head}`."
-            ));
+            return missing();
         };
         let read_json = |name: &str| -> Option<Value> {
             serde_json::from_str(&fs::read_to_string(folder.join(name)).ok()?).ok()
@@ -101,18 +106,12 @@ impl Report {
             read_json("review.json"),
             fs::read_to_string(folder.join("report.md")),
         ) else {
-            return Report::NotYet(format!(
-                "The Review Report workflow didn't finish its report for `{head}`; its run on \
-                 the PR's Checks tab says why."
-            ));
+            return missing();
         };
         let number = about.get("number").and_then(Value::as_u64);
         let sha = about.get("head_sha").and_then(Value::as_str);
         if number != Some(pr.number) || sha != Some(pr.head_sha.as_str()) {
-            return Report::NotYet(format!(
-                "The rest of this report appears when the Review Report workflow has finished \
-                 for `{head}`."
-            ));
+            return missing();
         }
         Report::Ready {
             markdown: sanitise(&markdown),
@@ -132,10 +131,23 @@ impl Report {
     }
 }
 
-/// Report text from a download, made safe to post: no comment markers, and
-/// short enough for one comment.
+/// Report text made safe to post as part of the comment: nothing that could
+/// pass for the comment's hidden marker, no heading that could pass for the
+/// Verdict section, and short enough for one comment.
 fn sanitise(markdown: &str) -> String {
-    let mut text = markdown.replace("<!--", "&lt;!--");
+    let mut text: String = markdown
+        .replace("<!--", "&lt;!--")
+        .lines()
+        .map(|line| {
+            let heading = line.trim_start().starts_with('#');
+            if heading && line.to_lowercase().contains("verdict") {
+                format!("\\{}", line.trim_start())
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     if text.len() > MOST_REPORT {
         let mut cut = MOST_REPORT;
         while !text.is_char_boundary(cut) {
@@ -174,10 +186,12 @@ impl SkippedMerge {
     }
 }
 
-/// Everything the privileged workflow posts.
+/// Everything the review workflow posts.
 #[derive(Clone, Debug)]
 pub struct Update {
     pub check: ReviewCheck,
+    /// The Red Flag gate's commit status: its state and description.
+    pub gate: (State, String),
     pub comment: String,
     /// The Review Report comment to edit, or none yet.
     pub comment_id: Option<u64>,
@@ -195,6 +209,23 @@ pub fn update(
     known_areas: &[String],
 ) -> Update {
     let check = verdict::review_check(pr, comments);
+    let gate = match report {
+        Report::Ready {
+            waits_for_maintainer: true,
+            ..
+        } => (
+            State::Failure,
+            "A Red Flag waits for the maintainer: see the Review Report".to_string(),
+        ),
+        Report::Ready { .. } => (
+            State::Success,
+            "No Red Flag waits for the maintainer".to_string(),
+        ),
+        Report::Missing(_) => (
+            State::Error,
+            "The Red Flags couldn't be worked out: see the Review workflow's run".to_string(),
+        ),
+    };
 
     let mut comment = String::new();
     let _ = writeln!(
@@ -225,7 +256,7 @@ pub fn update(
         Report::Ready { markdown, .. } => {
             let _ = writeln!(comment, "{}", markdown.trim_end());
         }
-        Report::NotYet(why) => {
+        Report::Missing(why) => {
             let _ = writeln!(comment, "_{why}_");
         }
     }
@@ -240,7 +271,7 @@ pub fn update(
     let _ = writeln!(
         comment,
         "\n---\n<sub>CI keeps this comment up to date: the Verdict part whenever a comment \
-         arrives, the rest after every push. It covers commit `{}`; {guide}.</sub>",
+         arrives, the rest too, and after every push. It covers commit `{}`; {guide}.</sub>",
         verdict::short(&pr.head_sha)
     );
 
@@ -279,6 +310,7 @@ pub fn update(
     }
     Update {
         check,
+        gate,
         comment,
         comment_id,
         add,

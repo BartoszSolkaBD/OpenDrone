@@ -107,8 +107,44 @@ fn moving_a_scenario_and_loosening_a_rule_expectation_in_it_waits_for_the_mainta
     assert!(!review.gate_passed, "{}", review.output);
     review.waits_for_the_maintainer(
         "A Rule Expectation changed",
-        "`scenarios/flight/free-fall.toml`: \"vertical speed at 1 s\"",
+        "`scenarios/flight/free-fall.toml`, moved from `scenarios/physics/free-fall.toml`: \
+         \"vertical speed at 1 s\" went from `-9.81 m/s ± 0.00001 m/s` to \
+         `-9.81 m/s ± 0.001 m/s`, a loosened tolerance",
     );
+}
+
+#[test]
+fn renaming_a_scenario_and_its_file_and_loosening_a_rule_expectation_waits_for_the_maintainer() {
+    // The Reviewer's case on #92: a new file, a new name, and "height at 1 s"
+    // loosened from ± 0.001 m to ± 0.5 m.
+    let review = PullRequest::new("scenario-renamed-and-loosened")
+        .delete(FREE_FALL)
+        .change(
+            "scenarios/physics/free-fall-renamed.toml",
+            "free-fall-renamed-and-loosened.toml",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Rule Expectation changed",
+        "`scenarios/physics/free-fall-renamed.toml`, moved from \
+         `scenarios/physics/free-fall.toml`: \"height at 1 s\" went from `-4.905 m ± 0.001 m` \
+         to `-4.905 m ± 0.5 m`, a loosened tolerance",
+    );
+    assert!(
+        !review.report.contains("A Scenario deleted"),
+        "every Expectation was found again, so the Scenario only moved:\n{}",
+        review.report
+    );
+}
+
+#[test]
+fn the_same_moment_spelled_another_way_raises_no_red_flag() {
+    let review = PullRequest::new("moments-respelled")
+        .change(FREE_FALL, "free-fall-respelled.toml")
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.has_no_red_flags();
 }
 
 // Observed Expectations and deleted Scenarios.
@@ -166,17 +202,35 @@ fn removing_an_observed_expectation_is_for_the_reviewer_to_decide() {
 }
 
 #[test]
-fn a_deleted_scenario_is_for_the_reviewer_to_decide() {
-    let review = PullRequest::new("scenario-deleted")
-        .delete(FREE_FALL)
-        .delete("scenarios/physics/free-fall.results.toml")
+fn a_deleted_scenario_with_only_observed_expectations_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("observed-scenario-deleted")
+        .delete("scenarios/feel/whoop-hover.toml")
         .review();
     assert!(review.gate_passed, "{}", review.output);
     review.reviewer_decides(
         "A Scenario deleted",
-        "`scenarios/physics/free-fall.toml` (\"Free fall is exactly g\"). It must be replaced, \
-         or the ticket must ask for it.",
+        "`scenarios/feel/whoop-hover.toml` (\"The Whoop 65 hovers at the signed-off throttle\"). \
+         It must be replaced, or the ticket must ask for it.",
     );
+}
+
+#[test]
+fn deleting_a_scenario_with_rule_and_source_expectations_waits_for_the_maintainer() {
+    let review = PullRequest::new("scenario-deleted")
+        .delete(FREE_FALL)
+        .delete("scenarios/physics/free-fall.results.toml")
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Rule Expectation changed",
+        "`scenarios/physics/free-fall.toml`: \"height at 1 s\" (`-4.905 m ± 0.001 m`) was \
+         removed",
+    );
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "\"vertical acceleration, mean over 0 s to 1 s\" (`-9.81 m/s² ± 0.01 m/s²`) was removed",
+    );
+    review.reviewer_decides("A Scenario deleted", "`scenarios/physics/free-fall.toml`");
 }
 
 // ADRs, Bevy and wgpu.
@@ -261,7 +315,74 @@ fn allowing_a_house_rule_lint_in_a_core_crate_is_for_the_reviewer_to_decide() {
     assert!(review.gate_passed, "{}", review.output);
     review.reviewer_decides(
         "A house-rule exception in a core crate",
-        "`crates/physics/src/lib.rs` adds `#[allow(clippy::disallowed_methods)]`.",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn a_house_rule_lint_allowed_over_several_lines_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("house-rule-split")
+        .change(
+            "crates/physics/src/lib.rs",
+            "physics-allows-split-over-lines.rs.txt",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn allowing_the_lint_group_that_holds_the_house_rules_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("house-rule-group")
+        .change(
+            "crates/physics/src/lib.rs",
+            "physics-allows-style-group.rs.txt",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::style`.",
+    );
+}
+
+#[test]
+fn changing_a_core_crate_s_lint_settings_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("core-lint-settings")
+        .write(
+            "crates/physics/Cargo.toml",
+            "[package]\nname = \"opendrone-physics\"\n\n\
+             [lints.clippy]\ndisallowed_methods = \"allow\"\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/Cargo.toml` changes the crate's lint settings.",
+    );
+    review.reviewer_decides(
+        "New `unsafe` code",
+        "`crates/physics/Cargo.toml` adds no `[lints] workspace = true` any more, so `unsafe` \
+         isn't forbidden there.",
+    );
+}
+
+#[test]
+fn an_edge_crate_dropping_the_workspace_s_lints_is_new_unsafe_code_for_the_reviewer() {
+    let review = PullRequest::new("edge-crate-drops-lints")
+        .write(
+            "crates/pack/Cargo.toml",
+            "[package]\nname = \"opendrone-pack\"\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "New `unsafe` code",
+        "`crates/pack/Cargo.toml` adds no `[lints] workspace = true` any more",
+    );
+    assert!(
+        !review.report.contains("A house-rule exception"),
+        "pack isn't a core crate:\n{}",
+        review.report
     );
 }
 
@@ -354,6 +475,26 @@ fn a_new_outside_library_is_listed_with_its_licence() {
         "a new version of a library, or a new OpenDrone crate, isn't a new outside library:\n{}",
         review.report
     );
+}
+
+#[test]
+fn text_from_a_pull_request_cannot_fake_the_report_s_structure_or_mention_anyone() {
+    let review = PullRequest::new("hostile-text")
+        .change(FREE_FALL, "free-fall-observed-hostile-reason.toml")
+        .review();
+    review.lists("An Observed Expectation updated", "Reason given:");
+    assert!(!review.report.contains("<!--"), "{}", review.report);
+    assert!(!review.report.contains("<pre>"), "{}", review.report);
+    assert!(
+        review
+            .report
+            .lines()
+            .all(|line| !line.contains("Verdict") || !line.starts_with('#')),
+        "a reason can't start a line, so it can't make a Verdict heading:\n{}",
+        review.report
+    );
+    review.says("&lt;\\!-- opendrone-review-report --&gt; \\#\\#\\# Verdict");
+    review.says("\\[click\\](https://example.com) @\u{200B}someone");
 }
 
 #[test]
@@ -663,17 +804,14 @@ impl Review {
     }
 }
 
-/// Copies a folder; a fixture's `.rs.txt` or `.md.txt` becomes `.rs` or `.md`.
+/// Copies a folder; a fixture's `.txt` ending comes off, so `lib.rs.txt`
+/// becomes `lib.rs`.
 fn copy_folder(from: &Path, to: &Path) {
     fs::create_dir_all(to).expect("can make the folder");
     for entry in fs::read_dir(from).expect("can read the fixture folder") {
         let entry = entry.expect("can read the entry");
         let name = entry.file_name().to_string_lossy().into_owned();
-        let target = to.join(
-            name.strip_suffix(".txt")
-                .filter(|n| n.ends_with(".rs") || n.ends_with(".md"))
-                .unwrap_or(&name),
-        );
+        let target = to.join(name.strip_suffix(".txt").unwrap_or(&name));
         if entry.file_type().expect("has a type").is_dir() {
             copy_folder(&entry.path(), &target);
         } else {

@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use opendrone_pack::units::parse_quantity;
 
 use super::changes::Changes;
+use super::markdown::plain;
 use super::scenarios::{FOLDER, RESULTS_ENDING};
 
 /// One Expectation whose measured value moved.
@@ -75,11 +76,12 @@ impl Size {
 pub struct Moved {
     /// Measured values that moved, biggest first.
     pub moves: Vec<Move>,
-    /// Expectations only the head measures: "Scenario: what".
+    /// Expectations only the head measures: "Scenario: what", as Markdown.
     pub new: Vec<String>,
-    /// Expectations only the base measured: "Scenario: what".
+    /// Expectations only the base measured: "Scenario: what", as Markdown.
     pub gone: Vec<String>,
-    /// For each Scenario whose fingerprints moved, which ones, in plain words.
+    /// For each Scenario whose fingerprints moved, which ones, in plain words,
+    /// as Markdown.
     pub fingerprints: Vec<String>,
 }
 
@@ -161,7 +163,7 @@ pub fn moved(changes: &Changes) -> Moved {
             (None, Some(head)) => {
                 moved.new.push(format!(
                     "{}: a new Scenario, with {}",
-                    head.scenario,
+                    plain(&head.scenario),
                     expectations(head.measured.len())
                 ));
                 continue;
@@ -169,7 +171,7 @@ pub fn moved(changes: &Changes) -> Moved {
             (Some(base), None) => {
                 moved.gone.push(format!(
                     "{}: the whole Scenario, with {}",
-                    base.scenario,
+                    plain(&base.scenario),
                     expectations(base.measured.len())
                 ));
                 continue;
@@ -190,12 +192,16 @@ pub fn moved(changes: &Changes) -> Moved {
                     });
                 }
                 Some(_) => {}
-                None => moved.new.push(format!("{}: {what}", head.scenario)),
+                None => moved
+                    .new
+                    .push(format!("{}: {}", plain(&head.scenario), plain(what))),
             }
         }
         for (what, _) in &base.measured {
             if !head.measured.iter().any(|(w, _)| w == what) {
-                moved.gone.push(format!("{}: {what}", base.scenario));
+                moved
+                    .gone
+                    .push(format!("{}: {}", plain(&base.scenario), plain(what)));
             }
         }
         if let Some(line) = fingerprint_line(&base, &head, any_value_moved) {
@@ -265,7 +271,7 @@ fn fingerprint_line(
             })
             .map(|(time, _)| time.clone());
         let when = match first {
-            Some(time) => format!(", first seen at the {time} checkpoint"),
+            Some(time) => format!(", first seen at the {} checkpoint", plain(&time)),
             None => String::new(),
         };
         let inside = if any_value_moved {
@@ -275,5 +281,5 @@ fn fingerprint_line(
         };
         parts.push(format!("the flight's fingerprint moved{when}{inside}"));
     }
-    (!parts.is_empty()).then(|| format!("{}: {}", head.scenario, parts.join("; ")))
+    (!parts.is_empty()).then(|| format!("{}: {}", plain(&head.scenario), parts.join("; ")))
 }

@@ -47,7 +47,7 @@ Two more come from the [review workflow](.github/workflows/review.yml), as commi
 
 | Check | What it proves |
 |---|---|
-| Red Flag gate | No Red Flag waits for the maintainer: no Source or Rule Expectation changed, no existing ADR edited, and no move to a new Bevy 0.N or wgpu major version. It also writes the Review Report's Red Flags, What moved and Areas touched. Locally: `cargo xtask review-report --base origin/main --head HEAD`. |
+| Red Flag gate | No Red Flag waits for the maintainer: no Source or Rule Expectation changed or removed, no existing ADR edited, and no move to a new Bevy 0.N or wgpu major version. It is worked out by main's code, from the PR's commits read as data, with the Review Report's Red Flags, What moved and Areas touched. Locally: `cargo xtask review-report --base origin/main --head HEAD`. |
 | Review check | The newest Verdict covers the PR's latest commit and says pass, the PR was opened by the maintainer's account or by Dependabot from a branch in this repo, and fewer than 3 review rounds have failed. |
 
 How to read the Review Report: [`docs/review-report.md`](docs/review-report.md). What the Reviewer checks and the Verdict format: [`docs/agents/reviewer.md`](docs/agents/reviewer.md).

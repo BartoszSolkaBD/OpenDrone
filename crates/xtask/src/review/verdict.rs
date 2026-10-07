@@ -160,13 +160,15 @@ pub fn verdicts(comments: &[Comment]) -> Vec<Verdict> {
         .collect()
 }
 
-/// The commit status GitHub shows as the Review check.
+/// A commit status, as GitHub shows the Review check and the Red Flag gate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum State {
     Success,
     /// Waiting for a Verdict on the latest commit.
     Pending,
     Failure,
+    /// The check couldn't be worked out.
+    Error,
 }
 
 impl State {
@@ -176,6 +178,7 @@ impl State {
             State::Success => "success",
             State::Pending => "pending",
             State::Failure => "failure",
+            State::Error => "error",
         }
     }
 }

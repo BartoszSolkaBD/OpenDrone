@@ -110,14 +110,21 @@ pub fn skipped_checks(required: &[String], check_runs: &str, status: &Value) -> 
     };
     let mut skipped = Vec::new();
     for name in names {
+        // As GitHub does: when a check run and a status share a name, both
+        // must have passed.
         let run = runs.get(&name).map(|(_, state)| state.as_str());
         let status = statuses.get(&name).map(String::as_str);
-        let passed =
-            matches!(run, Some("success" | "neutral" | "skipped")) || status == Some("success");
-        if passed {
+        let run_passed = run.is_none_or(|s| matches!(s, "success" | "neutral" | "skipped"));
+        let status_passed = status.is_none_or(|s| s == "success");
+        if (run.is_some() || status.is_some()) && run_passed && status_passed {
             continue;
         }
-        let state = run.or(status).unwrap_or("never reported").to_string();
+        let state = match (run, status) {
+            (Some(run), _) if !run_passed => run,
+            (_, Some(status)) if !status_passed => status,
+            _ => "never reported",
+        }
+        .to_string();
         if !skipped.iter().any(|s: &Skipped| s.check == name) {
             skipped.push(Skipped { check: name, state });
         }

@@ -89,6 +89,8 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
   - [Issue tracker](agents/issue-tracker.md)
   - [Triage labels](agents/triage-labels.md)
   - [Domain docs](agents/domain.md)
+  - [The Reviewer and the Verdict](agents/reviewer.md)
+- [Reading the Review Report](review-report.md)
 - [The data policy](data-policy.md)
 
 # The code

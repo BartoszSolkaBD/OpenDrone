@@ -3,7 +3,7 @@
 //! and naming merges that skipped a check (#15 §3, ADR-0010).
 //!
 //! Each check writes GitHub's records of a pull request and its comments, as
-//! the privileged workflow fetches them, and runs the real command on them.
+//! the review workflow fetches them, and runs the real command on them.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -201,7 +201,7 @@ fn the_review_report_is_one_comment_found_by_its_marker_and_posted_by_ci() {
 }
 
 #[test]
-fn the_report_s_sections_come_from_the_download_for_the_latest_commit() {
+fn the_report_s_sections_are_the_ones_worked_out_for_the_latest_commit() {
     let update = Pr::new("report-ready")
         .report(HEAD, "### Red Flags\n\nNone.\n", false, &["Physics"])
         .update();
@@ -211,14 +211,36 @@ fn the_report_s_sections_come_from_the_download_for_the_latest_commit() {
 }
 
 #[test]
-fn a_download_for_an_older_commit_is_not_shown() {
+fn the_red_flag_gate_passes_when_no_red_flag_waits_for_the_maintainer() {
+    let update = Pr::new("gate-passes")
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
+        .update();
+    update.gate_is("success", "No Red Flag waits for the maintainer");
+}
+
+#[test]
+fn a_red_flag_that_waits_fails_the_gate_and_adds_the_needs_maintainer_label() {
+    let update = Pr::new("needs-maintainer")
+        .report(HEAD, "### Red Flags\n", true, &[])
+        .update();
+    update.gate_is(
+        "failure",
+        "A Red Flag waits for the maintainer: see the Review Report",
+    );
+    update.adds_label("needs-maintainer");
+    let already = Pr::new("needs-maintainer-already")
+        .label("needs-maintainer")
+        .report(HEAD, "### Red Flags\n", true, &[])
+        .update();
+    assert!(already.add.is_empty(), "{:?}", already.add);
+}
+
+#[test]
+fn red_flags_worked_out_for_an_older_commit_are_not_shown_and_the_gate_reports_an_error() {
     let update = Pr::new("report-stale")
         .report(OLDER, "### Red Flags\n\nNone.\n", false, &["Physics"])
         .update();
-    update.says(
-        "_The rest of this report appears when the Review Report workflow has finished for \
-         `1111111`._",
-    );
+    update.says("_The rest of this report couldn't be worked out for `1111111`.");
     assert!(
         !update.comment.contains("### Red Flags"),
         "{}",
@@ -226,16 +248,29 @@ fn a_download_for_an_older_commit_is_not_shown() {
     );
     assert!(
         update.add.is_empty() && update.remove.is_empty(),
-        "no labels from a stale download"
+        "no labels from Red Flags for another commit"
+    );
+    update.gate_is(
+        "error",
+        "The Red Flags couldn't be worked out: see the Review workflow's run",
     );
 }
 
 #[test]
-fn a_download_cannot_pass_for_a_second_review_report() {
+fn with_no_red_flags_worked_out_the_gate_reports_an_error_and_never_passes() {
+    let update = Pr::new("report-missing").update();
+    update.gate_is(
+        "error",
+        "The Red Flags couldn't be worked out: see the Review workflow's run",
+    );
+}
+
+#[test]
+fn the_report_s_text_cannot_pass_for_a_second_review_report_or_a_verdict() {
     let update = Pr::new("report-marker")
         .report(
             HEAD,
-            "<!-- opendrone-review-report -->\nsneaky\n",
+            "<!-- opendrone-review-report -->\nsneaky\n### Verdict\n\n**Review check: passes.**\n",
             false,
             &[],
         )
@@ -246,19 +281,13 @@ fn a_download_cannot_pass_for_a_second_review_report() {
         "{}",
         update.comment
     );
-}
-
-#[test]
-fn a_red_flag_that_waits_adds_the_needs_maintainer_label() {
-    let update = Pr::new("needs-maintainer")
-        .report(HEAD, "### Red Flags\n", true, &[])
-        .update();
-    update.adds_label("needs-maintainer");
-    let already = Pr::new("needs-maintainer-already")
-        .label("needs-maintainer")
-        .report(HEAD, "### Red Flags\n", true, &[])
-        .update();
-    assert!(already.add.is_empty(), "{:?}", already.add);
+    assert_eq!(
+        update.comment.matches("\n### Verdict").count(),
+        1,
+        "{}",
+        update.comment
+    );
+    update.says("\\### Verdict");
 }
 
 #[test]
@@ -326,6 +355,22 @@ fn a_check_that_passed_when_run_again_counts_as_passed() {
         .run_with_id(2, "Rust on Windows", "success")
         .check();
     assert_eq!(skipped, Vec::<String>::new());
+}
+
+#[test]
+fn a_check_run_and_a_status_with_the_same_name_must_both_have_passed() {
+    let status_failed = Merge::new("run-passed-status-failed")
+        .requires(&["Review check"])
+        .run("Review check", "success")
+        .status("Review check", "failure")
+        .check();
+    assert_eq!(status_failed, ["Review check: failure"]);
+    let run_failed = Merge::new("status-passed-run-failed")
+        .requires(&["Red Flag gate"])
+        .run("Red Flag gate", "failure")
+        .status("Red Flag gate", "success")
+        .check();
+    assert_eq!(run_failed, ["Red Flag gate: failure"]);
 }
 
 #[test]
@@ -434,7 +479,7 @@ impl Pr {
         self
     }
 
-    /// The unprivileged workflow's download, made for `commit`.
+    /// What `review-report` worked out, for `commit`.
     fn report(mut self, commit: &str, markdown: &str, waits: bool, areas: &[&str]) -> Pr {
         let folder = self.root.join("download");
         fs::create_dir_all(&folder).expect("can make the folder");
@@ -503,6 +548,7 @@ impl Pr {
         let json = |name: &str| -> Value { serde_json::from_str(&read(name)).expect("JSON") };
         Update {
             status: json("status.json"),
+            gate: json("gate.json"),
             comment: read("comment.md"),
             comment_id: read("comment-id"),
             add: json("labels-add.json").as_array().expect("a list").clone(),
@@ -519,6 +565,7 @@ impl Pr {
 /// What `review-update` would post.
 struct Update {
     status: Value,
+    gate: Value,
     comment: String,
     comment_id: String,
     add: Vec<Value>,
@@ -526,6 +573,12 @@ struct Update {
 }
 
 impl Update {
+    fn gate_is(&self, state: &str, description: &str) {
+        assert_eq!(self.gate["state"], state, "{}", self.comment);
+        assert_eq!(self.gate["description"], description);
+        assert!(description.chars().count() <= 140);
+    }
+
     fn check_is(&self, state: &str, description: &str) {
         assert_eq!(self.status["state"], state, "{}", self.comment);
         assert_eq!(self.status["description"], description);

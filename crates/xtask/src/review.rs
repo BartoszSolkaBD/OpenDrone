@@ -1,17 +1,19 @@
 //! The Review Report, the Red Flag gate and the Review check (#77; #15 §3,
 //! §5 and §10; [ADR-0010]).
 //!
-//! Three commands, each run by a CI workflow:
+//! CI runs these commands in one workflow, `.github/workflows/review.yml`,
+//! built from main's code. They read a pull request only as data: its commits
+//! through `git show` and `git diff`, and its comments through GitHub's API.
+//! Nothing from the pull request is ever run, built or checked out.
 //!
 //! - `review-report` compares a pull request's base and head and writes the
 //!   Review Report's sections from Red Flags to Downloads (`report.md`), with
-//!   `review.json` for the labels. It fails when a Red Flag waits for the
-//!   maintainer: that is the Red Flag gate. It reads the pull request's files
-//!   as data and runs without write access
-//!   (`.github/workflows/review-report.yml`).
+//!   `review.json` for the labels and the Red Flag gate. It fails when a Red
+//!   Flag waits for the maintainer.
+//! - `new-libraries` lists the outside libraries a pull request adds, so the
+//!   workflow can look up their licences.
 //! - `review-update` works out the Review check from the PR and its comments,
-//!   and the Review Report comment and labels to post. It runs in the
-//!   privileged workflow, built from main (`.github/workflows/review.yml`).
+//!   and the Review Report comment, labels and both commit statuses to post.
 //! - `merge-check` names every required check a just-merged PR hadn't passed,
 //!   so later Review Reports can name that merge.
 //!
@@ -25,6 +27,7 @@ mod areas;
 mod changes;
 mod flags;
 mod libraries;
+mod markdown;
 mod merges;
 mod report;
 mod results;
@@ -52,6 +55,10 @@ pub const REPORT_USAGE: &str = "\
       the changes between two commits (or two copies of the repo), and fail
       if a Red Flag waits for the maintainer (the Red Flag gate). With --out,
       write report.md and review.json there.";
+
+pub const NEW_LIBRARIES_USAGE: &str = "\
+  new-libraries --base <commit> --head <commit>
+      Print each outside library the head's Cargo.lock adds, as \"name version\".";
 
 pub const UPDATE_USAGE: &str = "\
   review-update --pr <pr.json> --comments <comments.json> --codeowners <file>
@@ -134,6 +141,41 @@ pub fn run_report(args: &[String]) -> ExitCode {
     }
 }
 
+/// `cargo xtask new-libraries`.
+pub fn run_new_libraries(args: &[String]) -> ExitCode {
+    let result = options(args, &["base", "head"]).and_then(|options| {
+        let (Some(base), Some(head)) = (options.get("base"), options.get("head")) else {
+            return Err("give --base and --head".to_string());
+        };
+        let changes = Changes::between_commits(base, head)?;
+        if !changes.touches("Cargo.lock") {
+            return Ok(Vec::new());
+        }
+        Ok(libraries::new_libraries(
+            &libraries::read_lock(&changes.base.text("Cargo.lock").unwrap_or_default()),
+            &libraries::read_lock(&changes.head.text("Cargo.lock").unwrap_or_default()),
+            None,
+        ))
+    });
+    match result {
+        Ok(new) => {
+            for library in new {
+                println!("{} {}", library.name, library.version);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("new-libraries: {error}\n\nUsage:\n{NEW_LIBRARIES_USAGE}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+/// Every review command's usage, for `cargo xtask` with no command.
+pub fn usage() -> String {
+    [REPORT_USAGE, NEW_LIBRARIES_USAGE, UPDATE_USAGE, MERGE_USAGE].join("\n")
+}
+
 /// `cargo xtask review-update`.
 pub fn run_update(args: &[String]) -> ExitCode {
     let result = options(
@@ -174,6 +216,13 @@ pub fn run_update(args: &[String]) -> ExitCode {
                 "description": update.check.description,
             })),
         )?;
+        write(
+            &out.join("gate.json"),
+            &pretty(&json!({
+                "state": update.gate.0.word(),
+                "description": update.gate.1,
+            })),
+        )?;
         write(&out.join("comment.md"), &update.comment)?;
         write(
             &out.join("comment-id"),
@@ -198,6 +247,11 @@ pub fn run_update(args: &[String]) -> ExitCode {
                 "Review check: {} ({})",
                 update.check.state.word(),
                 update.check.description
+            );
+            println!(
+                "Red Flag gate: {} ({})",
+                update.gate.0.word(),
+                update.gate.1
             );
             for label in &update.add {
                 println!("Adds the label `{}`", label.name);
