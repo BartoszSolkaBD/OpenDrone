@@ -5,7 +5,7 @@ use opendrone_pack::{Packs, Problem, Problems};
 use opendrone_sim::{QuadSetUp, QuadState, ScriptedMotors, SetUp, SetUpProblem, Simulation};
 
 use crate::measure::angle_near;
-use crate::read::{BasisKind, Expectation, Scenario, Statistic, When};
+use crate::read::{BasisKind, Expectation, Named, Scenario, Statistic, When};
 
 /// What one run of a Scenario measured.
 #[derive(Clone, Debug)]
@@ -17,9 +17,17 @@ pub struct Outcome {
     /// The whole state's fingerprint at the start (0) and after every step.
     pub step_fingerprints: Vec<Fingerprint>,
     /// What the Simulation received from the Quad and the Map.
-    pub quad: (String, Fingerprint),
-    pub map: (String, Fingerprint),
+    pub quad: Received,
+    pub map: Received,
     pub physics_rate: u32,
+}
+
+/// A Quad or Map's id and the fingerprint of what the Simulation received
+/// from it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Received {
+    pub id: String,
+    pub fingerprint: Fingerprint,
 }
 
 /// One Expectation's measured value.
@@ -59,21 +67,21 @@ impl Outcome {
 pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let start = &scenario.start;
     let mut problems = Problems::new();
-    let named = |what: &str, (id, line): &(String, usize), found: Problems| {
+    let named = |what: &str, named: &Named, found: Problems| {
         let mut all = Problems(vec![Problem {
             file: scenario.file.clone(),
-            line: *line,
-            sentence: format!("can't use the {what} \"{id}\":"),
+            line: named.line,
+            sentence: format!("can't use the {what} \"{}\":", named.id),
         }]);
         all.extend(found);
         all
     };
     let quad = packs
-        .quad(&start.quad.0)
+        .quad(&start.quad.id)
         .map_err(|found| problems.extend(named("Quad", &start.quad, found)))
         .ok();
     let map = packs
-        .map(&start.map.0)
+        .map(&start.map.id)
         .map_err(|found| problems.extend(named("Map", &start.map, found)))
         .ok();
     let (Some(quad), Some(map)) = (quad, map) else {
@@ -92,7 +100,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
                 attitude: start.attitude,
                 rotation: start.rotation,
             },
-            flight_controller: Box::new(ScriptedMotors::new(scenario.motor_script.clone())),
+            flight_controller: Box::new(ScriptedMotors::new(scenario.timeline.clone())),
         }],
     };
     let mut sim = Simulation::new(set_up).map_err(|error| {
@@ -102,8 +110,8 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         };
         Problems(vec![Problem {
             file: scenario.file.clone(),
-            line: start.quad.1,
-            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.0),
+            line: start.quad.line,
+            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.id),
         }])
     })?;
 
@@ -134,8 +142,14 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         expectations: tallies.into_iter().map(Tally::finish).collect(),
         first_broken_number,
         step_fingerprints,
-        quad: (quad.id.clone(), quad.fingerprint()),
-        map: (map.id.clone(), map.fingerprint()),
+        quad: Received {
+            id: quad.id.clone(),
+            fingerprint: quad.fingerprint(),
+        },
+        map: Received {
+            id: map.id.clone(),
+            fingerprint: map.fingerprint(),
+        },
         physics_rate: start.physics_rate.hz(),
     })
 }

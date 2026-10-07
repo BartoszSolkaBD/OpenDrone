@@ -154,11 +154,14 @@ fn agree(args: &[String]) -> Result<bool, String> {
     for line in &found.lines {
         println!("  {line}");
     }
-    let agreed = readable && found.agreed;
-    if agreed {
+    if !readable {
+        println!(
+            "Some computers' fingerprints are missing, so the agreement check can't pass; see why above."
+        );
+    } else if found.agreed {
         println!("Every computer agrees on every Scenario, at every step.");
     } else {
         println!("The computers don't agree: the Simulation isn't the same everywhere (ADR-0001).");
     }
-    Ok(agreed)
+    Ok(readable && found.agreed)
 }

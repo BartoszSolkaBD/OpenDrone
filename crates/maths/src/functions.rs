@@ -35,7 +35,8 @@ pub fn asin(x: f64) -> f64 {
     libm::asin(x)
 }
 
-/// The remainder of `x / y` that has the sign of `x`, as C's `fmod`.
-pub fn remainder(x: f64, y: f64) -> f64 {
+/// What is left of `x` after taking away whole `y`s, with the sign of `x`
+/// (C's `fmod`).
+pub fn fmod(x: f64, y: f64) -> f64 {
     libm::fmod(x, y)
 }

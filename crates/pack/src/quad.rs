@@ -7,7 +7,7 @@
 //! Estimate adds the `range` it may move within. The rest of the Quad
 //! definition, and the full Pack checker, arrive with #40.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{Drag, QuadParameters};
@@ -109,13 +109,13 @@ pub fn read_quad_file(file: &str, text: &str) -> Result<QuadFile, Problems> {
         .text("name", &mut problems)
         .map(|(name, _)| name.to_string());
 
-    let mut sources = BTreeMap::new();
+    let mut sources = BTreeSet::new();
     if let Some(item) = root.get("sources")
         && let Some(table) = item.table(&mut problems)
     {
         for (key, item) in table.entries() {
             if item.text(&mut problems).is_some() {
-                sources.insert(key, ());
+                sources.insert(key);
             }
         }
     }
@@ -149,7 +149,7 @@ pub fn read_quad_file(file: &str, text: &str) -> Result<QuadFile, Problems> {
 fn read_setting(
     doc: &Document<'_>,
     item: &Item<'_, '_>,
-    sources: &BTreeMap<String, ()>,
+    sources: &BTreeSet<String>,
     problems: &mut Problems,
 ) -> Option<Setting> {
     let file = doc.file().to_string();
@@ -178,7 +178,7 @@ fn read_setting(
         confidence
     });
     let source = table.text("source", problems).and_then(|(text, item)| {
-        if sources.contains_key(text) {
+        if sources.contains(text) {
             Some(text.to_string())
         } else {
             problems.push(item.problem(format!(

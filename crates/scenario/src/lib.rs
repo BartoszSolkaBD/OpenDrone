@@ -38,12 +38,12 @@ use opendrone_pack::{Packs, Problems};
 
 pub use measure::Measure;
 pub use read::{
-    Assists, Basis, BasisKind, Expectation, FlightMode, Kind, Rates, RatesType, Scenario, Start,
-    StartingFlightController, StartingMotors, Statistic, ThrottleCurve, ThrottleLimit, When,
+    Assists, Basis, BasisKind, Expectation, FlightMode, Kind, Named, Rates, RatesType, Scenario,
+    Start, StartingFlightController, StartingMotors, Statistic, ThrottleCurve, ThrottleLimit, When,
     read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
-pub use run::{Measured, Outcome, run};
+pub use run::{Measured, Outcome, Received, run};
 
 /// The ending of every Results file, beside its Scenario.
 pub const RESULTS_ENDING: &str = ".results.toml";
@@ -158,7 +158,13 @@ impl Repo {
     }
 }
 
-fn walk(folder: &Path, prefix: &str, found: &mut dyn FnMut(&str, &Path)) -> std::io::Result<()> {
+/// Calls `found` with every file in `folder` and the folders inside it, in
+/// name order, with its path from `folder` (`/` between folders).
+pub(crate) fn walk(
+    folder: &Path,
+    prefix: &str,
+    found: &mut dyn FnMut(&str, &Path),
+) -> std::io::Result<()> {
     let mut entries: Vec<_> = fs::read_dir(folder)?.collect::<Result<_, _>>()?;
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {

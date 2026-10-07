@@ -118,7 +118,7 @@ impl Measure {
 /// `near`, so 359.9° and 0.1° count as 0.2° apart.
 pub fn angle_near(angle: f64, near: f64) -> f64 {
     let turn = 2.0 * core::f64::consts::PI;
-    let mut difference = functions::remainder(angle - near, turn);
+    let mut difference = functions::fmod(angle - near, turn);
     if difference > turn / 2.0 {
         difference -= turn;
     } else if difference < -turn / 2.0 {

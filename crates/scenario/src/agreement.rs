@@ -32,8 +32,20 @@ impl Computer {
             .strip_prefix("fingerprints-")
             .unwrap_or(&folder_name)
             .to_string();
+        let mut paths = Vec::new();
         let mut files = BTreeMap::new();
-        read_folder(folder, "", &mut files).map_err(|error| {
+        crate::walk(folder, "", &mut |relative, path| {
+            if let Some(scenario) = relative.strip_suffix(FINGERPRINTS_ENDING) {
+                paths.push((scenario.to_string(), path.to_path_buf()));
+            }
+        })
+        .and_then(|()| {
+            for (scenario, path) in paths {
+                files.insert(scenario, fs::read_to_string(path)?);
+            }
+            Ok(())
+        })
+        .map_err(|error| {
             format!(
                 "{name}: can't read its fingerprints in {}: {error}; did its Scenario run finish?",
                 folder.display()
@@ -41,25 +53,6 @@ impl Computer {
         })?;
         Ok(Computer { name, files })
     }
-}
-
-fn read_folder(
-    folder: &Path,
-    prefix: &str,
-    files: &mut BTreeMap<String, String>,
-) -> std::io::Result<()> {
-    let mut entries: Vec<_> = fs::read_dir(folder)?.collect::<Result<_, _>>()?;
-    entries.sort_by_key(|entry| entry.file_name());
-    for entry in entries {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let path = entry.path();
-        if path.is_dir() {
-            read_folder(&path, &format!("{prefix}{name}/"), files)?;
-        } else if let Some(scenario) = name.strip_suffix(FINGERPRINTS_ENDING) {
-            files.insert(format!("{prefix}{scenario}"), fs::read_to_string(&path)?);
-        }
-    }
-    Ok(())
 }
 
 /// What the agreement check found: one line per Scenario, and whether every

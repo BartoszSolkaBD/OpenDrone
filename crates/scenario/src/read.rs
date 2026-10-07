@@ -15,8 +15,9 @@ pub struct Scenario {
     pub file: String,
     pub name: String,
     pub start: Start,
-    /// The scripted motor commands of a Physics Scenario, in time order.
-    pub motor_script: Vec<(SimulationTime, MotorCommands)>,
+    /// The Timeline of a Physics Scenario: motor commands and the moments
+    /// they start, in time order.
+    pub timeline: Vec<(SimulationTime, MotorCommands)>,
     pub expectations: Vec<Expectation>,
     /// The run lasts until the last moment the file mentions.
     pub length: SimulationTime,
@@ -36,10 +37,8 @@ pub enum Kind {
 #[derive(Clone, Debug)]
 pub struct Start {
     pub kind: Kind,
-    /// The Quad's id and the line it is named on.
-    pub quad: (String, usize),
-    /// The Map's id and the line it is named on.
-    pub map: (String, usize),
+    pub quad: Named,
+    pub map: Named,
     /// From the Map's origin, in metres (east, north, up).
     pub position: Vec3,
     /// In m/s (east, north, up).
@@ -59,6 +58,14 @@ pub struct Start {
     pub physics_rate: PhysicsRate,
     pub random_seed: u64,
     pub rates: Rates,
+}
+
+/// A Quad or Map named by its id, such as `opendrone/whoop-65`, with the line
+/// that names it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Named {
+    pub id: String,
+    pub line: usize,
 }
 
 /// How the motors start.
@@ -106,6 +113,9 @@ pub struct Rates {
     /// The rate limit for roll, pitch and yaw, in degrees per second.
     pub limit: [f64; 3],
     pub throttle: ThrottleCurve,
+    /// Betaflight's `quickrates_rc_expo`: whether Quick rates apply their expo
+    /// to the stick, as RC expo.
+    pub quick_rates_rc_expo: bool,
 }
 
 /// Betaflight's five Rates types.
@@ -120,8 +130,11 @@ pub enum RatesType {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ThrottleCurve {
-    /// From 0 to 1.
+    /// Where on the stick the hover point sits, from 0 to 1 (`thr_mid`).
     pub mid: f64,
+    /// The throttle output at the hover point, from 0 to 1 (`thr_hover`).
+    pub hover: f64,
+    /// `thr_expo`, from 0 to 1.
     pub expo: f64,
     pub limit: ThrottleLimit,
 }
@@ -233,7 +246,15 @@ const START: &[&str] = &[
     "random_seed",
     "rates",
 ];
-const RATES: &[&str] = &["type", "roll", "pitch", "yaw", "limit", "throttle"];
+const RATES: &[&str] = &[
+    "type",
+    "roll",
+    "pitch",
+    "yaw",
+    "limit",
+    "throttle",
+    "quickrates_rc_expo",
+];
 const ASSISTS: &[&str] = &["input_smoothing", "endless_battery", "auto_arm"];
 const PACKET_RATES: [u32; 7] = [50, 100, 150, 250, 333, 500, 1000];
 
@@ -265,9 +286,9 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         problems: &mut problems,
         rate,
     };
-    let motor_script = reader.inputs(&root, kind);
+    let timeline = reader.inputs(&root, kind);
     let expectations = reader.expectations(&root);
-    let length = motor_script
+    let length = timeline
         .iter()
         .map(|(time, _)| time.ticks())
         .chain(expectations.iter().map(|e| match e.when {
@@ -283,7 +304,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         file: file.to_string(),
         name,
         start,
-        motor_script,
+        timeline,
         expectations,
         length: SimulationTime::from_ticks(length),
     })
@@ -310,9 +331,10 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         ));
     }
     let id = |key: &str, problems: &mut Problems| {
-        start
-            .text(key, problems)
-            .map(|(id, item)| (id.to_string(), item.line()))
+        start.text(key, problems).map(|(id, item)| Named {
+            id: id.to_string(),
+            line: item.line(),
+        })
     };
     let quad = id("quad", problems);
     let map = id("map", problems);
@@ -649,9 +671,15 @@ fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rates> {
     );
     let mut axis = |key: &str| -> Option<[f64; 3]> {
         let (text, item) = rates.text(key, problems)?;
+        // Read through the shared unit list, as plain numbers: Betaflight's
+        // rate profile gives each its meaning for the Rates type.
         let numbers: Vec<Option<f64>> = text
             .split('/')
-            .map(|n| n.trim().parse::<f64>().ok().filter(|n| n.is_finite()))
+            .map(|n| {
+                units::parse_quantity(n)
+                    .and_then(|q| q.as_a(Dimension::NONE))
+                    .ok()
+            })
             .collect();
         match numbers.as_slice() {
             [Some(a), Some(b), Some(c)] => Some([*a, *b, *c]),
@@ -703,6 +731,12 @@ fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rates> {
                     None
                 }
             });
+    let quick_rates_rc_expo = choice(
+        rates,
+        "quickrates_rc_expo",
+        &[("on", true), ("off", false)],
+        problems,
+    );
     Some(Rates {
         kind: kind?,
         roll: roll?,
@@ -710,13 +744,17 @@ fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rates> {
         yaw: yaw?,
         limit: limit?,
         throttle: throttle?,
+        quick_rates_rc_expo: quick_rates_rc_expo?,
     })
 }
 
-/// "mid 50%, expo 0, limit off" (or "limit scale 80%", "limit clip 80%").
+/// "mid 50%, hover 50%, expo 0, limit off" (or "limit scale 80%",
+/// "limit clip 80%"): Betaflight's `thr_mid`, `thr_hover`, `thr_expo`,
+/// `throttle_limit_type` and `throttle_limit_percent`.
 fn throttle_curve(text: &str) -> Result<ThrottleCurve, String> {
-    let help = "write the throttle curve like \"mid 50%, expo 0, limit off\"; the limit is \"off\", \"scale 80%\" or \"clip 80%\"";
+    let help = "write the throttle curve like \"mid 50%, hover 50%, expo 0, limit off\"; the limit is \"off\", \"scale 80%\" or \"clip 80%\"";
     let mut mid = None;
+    let mut hover = None;
     let mut expo = None;
     let mut limit = None;
     for part in text.split(',').map(str::trim) {
@@ -731,6 +769,7 @@ fn throttle_curve(text: &str) -> Result<ThrottleCurve, String> {
         };
         match word {
             "mid" => mid = Some(percent(value)?),
+            "hover" => hover = Some(percent(value)?),
             "expo" => {
                 expo = Some(
                     units::parse_quantity(value)
@@ -749,9 +788,16 @@ fn throttle_curve(text: &str) -> Result<ThrottleCurve, String> {
             _ => return Err(format!("\"{part}\" can't be read; {help}")),
         }
     }
-    match (mid, expo, limit) {
-        (Some(mid), Some(expo), Some(limit)) => Ok(ThrottleCurve { mid, expo, limit }),
-        _ => Err(format!("\"{text}\" needs mid, expo and limit; {help}")),
+    match (mid, hover, expo, limit) {
+        (Some(mid), Some(hover), Some(expo), Some(limit)) => Ok(ThrottleCurve {
+            mid,
+            hover,
+            expo,
+            limit,
+        }),
+        _ => Err(format!(
+            "\"{text}\" needs mid, hover, expo and limit; {help}"
+        )),
     }
 }
 
@@ -793,16 +839,16 @@ impl Reader<'_> {
     }
 
     fn inputs(&mut self, root: &Table<'_, '_>, kind: Kind) -> Vec<(SimulationTime, MotorCommands)> {
-        let mut script = Vec::new();
+        let mut moments = Vec::new();
         let Some(inputs) = root.table("inputs", self.problems) else {
-            return script;
+            return moments;
         };
         inputs.refuse_unknown(&["timeline"], self.problems);
         let Some(timeline) = inputs
             .require("timeline", self.problems)
             .and_then(|t| t.array(self.problems))
         else {
-            return script;
+            return moments;
         };
         for entry in timeline {
             let Some(entry) = entry.table(self.problems) else {
@@ -818,10 +864,10 @@ impl Reader<'_> {
                 .text("motors", self.problems)
                 .and_then(|(text, item)| self.motor_commands(text, &item));
             if let (Some((tick, _)), Some(motors)) = (at, motors) {
-                script.push((SimulationTime::from_ticks(tick), motors));
+                moments.push((SimulationTime::from_ticks(tick), motors));
             }
         }
-        script
+        moments
     }
 
     /// "0%" for all four motors, or four percentages in Betaflight's motor

@@ -26,12 +26,13 @@ physics_rate      = "8 kHz"
 random_seed       = 1
 
 [start.rates]
-type     = "Actual"
-roll     = "70 / 670 / 0"       # centre °/s, max °/s, expo
-pitch    = "70 / 670 / 0"
-yaw      = "70 / 670 / 0"
-limit    = "1998 °/s"
-throttle = "mid 50%, expo 0, limit off"
+type               = "Actual"
+roll               = "70 / 670 / 0"     # centre °/s, max °/s, expo
+pitch              = "70 / 670 / 0"
+yaw                = "70 / 670 / 0"
+limit              = "1998 °/s"
+throttle           = "mid 50%, hover 50%, expo 0, limit off"
+quickrates_rc_expo = "off"
 
 [inputs]
 # A Physics Scenario scripts the four motor commands instead of the sticks.
@@ -49,7 +50,7 @@ basis  = "rule: with no drag and no thrust, gravity is the only force, so the ac
 what    = "vertical acceleration"
 over    = "0 s to 1 s"
 highest = "-9.81 m/s² ± 0.00001 m/s²"
-basis   = "rule: as above; the lowest and the highest together show it never changes"
+basis   = "rule: gravity, 9.81 m/s² downward, is the only force at every step; the lowest and the highest together show the acceleration never changes"
 
 [[expect]]
 what  = "vertical speed"

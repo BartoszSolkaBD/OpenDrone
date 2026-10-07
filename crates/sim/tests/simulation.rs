@@ -130,12 +130,14 @@ fn scripted_motors_hold_each_command_until_the_next() {
 fn the_simulation_reports_the_motor_commands_the_seam_gave() {
     let mut quad = quad_at(0.0);
     quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
-        SimulationTime::START,
-        MotorCommands::all(0.0),
+        SimulationTime::from_ticks(1),
+        MotorCommands::all(0.25),
     )]));
     let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
     sim.step();
     assert_eq!(sim.motor_commands(0), MotorCommands::STOPPED);
+    sim.step();
+    assert_eq!(sim.motor_commands(0), MotorCommands::all(0.25));
 }
 
 #[test]

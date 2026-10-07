@@ -28,12 +28,13 @@ physics_rate      = "8 kHz"
 random_seed       = 1
 
 [start.rates]
-type     = "Actual"
-roll     = "70 / 670 / 0"       # centre °/s, max °/s, expo
-pitch    = "70 / 670 / 0"
-yaw      = "70 / 670 / 0"
-limit    = "1998 °/s"
-throttle = "mid 50%, expo 0, limit off"
+type               = "Actual"
+roll               = "70 / 670 / 0"     # centre °/s, max °/s, expo
+pitch              = "70 / 670 / 0"
+yaw                = "70 / 670 / 0"
+limit              = "1998 °/s"
+throttle           = "mid 50%, hover 50%, expo 0, limit off"
+quickrates_rc_expo = "off"
 
 [inputs]
 # A Physics Scenario scripts the four motor commands instead of the sticks.
@@ -51,7 +52,7 @@ basis  = "rule: with no torque, a spin about one of the body's main axes of iner
 what    = "roll rate"
 over    = "0 s to 1.125 s"
 highest = "2000 °/s ± 0.001 °/s"
-basis   = "rule: as above; the lowest and the highest together show it never changes"
+basis   = "rule: Euler's equation, J × dω/dt = torque − ω × J × ω, has no torque and, for a spin about one main axis, ω × J × ω = 0, so the spin can't change; the lowest and the highest together show it didn't"
 
 [[expect]]
 what    = "pitch rate"
@@ -63,19 +64,19 @@ basis   = "rule: a spin about the roll axis alone never leaks into the other axe
 what   = "pitch rate"
 over   = "0 s to 1.125 s"
 lowest = "0 °/s ± 0.001 °/s"
-basis  = "rule: as above"
+basis  = "rule: with no torque and ω × J × ω = 0 (Euler's equation), nothing turns the Quad about its pitch axis"
 
 [[expect]]
 what    = "yaw rate"
 over    = "0 s to 1.125 s"
 highest = "0 °/s ± 0.001 °/s"
-basis   = "rule: as above"
+basis   = "rule: with no torque and ω × J × ω = 0 (Euler's equation), nothing turns the Quad about its yaw axis"
 
 [[expect]]
 what   = "yaw rate"
 over   = "0 s to 1.125 s"
 lowest = "0 °/s ± 0.001 °/s"
-basis  = "rule: as above"
+basis  = "rule: with no torque and ω × J × ω = 0 (Euler's equation), nothing turns the Quad about its yaw axis"
 
 [[expect]]
 what  = "roll"
@@ -93,4 +94,4 @@ basis = "rule: rolling turns the Quad about its own nose, so the nose keeps poin
 what  = "heading"
 at    = "1.125 s"
 value = "45° ± 0.001°"
-basis = "rule: as above, the nose still points north-east"
+basis = "rule: rolling turns the Quad about its own nose, so the nose keeps pointing the same way: still north-east, 45°"

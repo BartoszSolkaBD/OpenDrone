@@ -56,9 +56,13 @@ pub fn results_text(scenario: &Scenario, outcome: &Outcome) -> String {
     let _ = writeln!(
         text,
         "quad = \"{}\"   # {}: what the Simulation receives from it",
-        outcome.quad.1, outcome.quad.0
+        outcome.quad.fingerprint, outcome.quad.id
     );
-    let _ = writeln!(text, "map  = \"{}\"   # {}", outcome.map.1, outcome.map.0);
+    let _ = writeln!(
+        text,
+        "map  = \"{}\"   # {}",
+        outcome.map.fingerprint, outcome.map.id
+    );
     let _ = writeln!(
         text,
         "run  = \"{}\"   # the whole state after each of {steps} steps at {} Hz, in order",

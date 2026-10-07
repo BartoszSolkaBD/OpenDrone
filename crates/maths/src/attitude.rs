@@ -1,6 +1,6 @@
 use core::f64::consts::{FRAC_PI_2, TAU};
 
-use crate::functions::{asin, atan2, remainder, sin_cos};
+use crate::functions::{asin, atan2, fmod, sin_cos};
 use crate::{Mat3, Vec3};
 
 /// Which way a Quad points: the turn that takes its body directions (forward,
@@ -91,7 +91,7 @@ impl Attitude {
         let sine_of_pitch = (2.0 * (w * y - z * x)).clamp(-1.0, 1.0);
         let pitch = -asin(sine_of_pitch);
         let about_up = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z));
-        let mut heading = remainder(FRAC_PI_2 - about_up, TAU);
+        let mut heading = fmod(FRAC_PI_2 - about_up, TAU);
         if heading < 0.0 {
             heading += TAU;
         }

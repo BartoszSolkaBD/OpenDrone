@@ -31,7 +31,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
 | `rotation` | `"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s"` | Rolling right, pitching nose up and yawing nose right are positive, as in Betaflight. |
 | `armed` | `false` | Whether the Quad is armed. |
-| `motors` | `"stopped"` | `"stopped"`, or `"settled"`: spinning at the speed that holds the stated motion (needs the motor model, which comes later). |
+| `motors` | `"stopped"` | `"stopped"`: the props aren't turning. Or `"settled"`: spinning at the speed that holds the stated motion, with the ESCs running (needs the motor model, which comes later). |
 | `flight_controller` | `"fresh"` | As right after Reset powers it up. |
 | `battery` | `"100%"` | The charge. |
 | `flight_mode` | `"Acro"` | `"Acro"`, `"Angle"` or `"Horizon"`. |
@@ -39,7 +39,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `radio_link` | `"250 Hz"` | The Packet Rate: 50, 100, 150, 250, 333, 500 or 1000 Hz. |
 | `physics_rate` | `"8 kHz"` | Physics steps a second. |
 | `random_seed` | `1` | The seed for the Simulation's random numbers. |
-| `[start.rates]` | `type = "Actual"`, `roll = "70 / 670 / 0"`, … | Every Rates field: the type, each axis's three numbers as Betaflight's rate profile holds them (for Actual: centre °/s, max °/s, expo), the rate limit and the throttle curve (`"mid 50%, expo 0, limit off"`). |
+| `[start.rates]` | `type = "Actual"`, `roll = "70 / 670 / 0"`, … | Every field of a Betaflight 2026.6 rate profile: the type; each axis's three numbers as the rate profile holds them (for Actual: centre °/s, max °/s, expo); the rate limit, once for all axes or `"roll 1998, pitch 1998, yaw 1998 °/s"`; the throttle curve, `"mid 50%, hover 50%, expo 0, limit off"` (the limit is `off`, `scale 80%` or `clip 80%`); and `quickrates_rc_expo`, `"on"` or `"off"`. |
 
 In a Physics Scenario the Flight Controller doesn't run, so `armed` down to the Rates change nothing. They are written down all the same, so the format never needs them added later.
 
