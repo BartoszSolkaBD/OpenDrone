@@ -31,6 +31,7 @@ mod markdown;
 mod merges;
 mod report;
 mod results;
+mod rust;
 mod scenarios;
 mod update;
 mod verdict;
@@ -45,16 +46,17 @@ use serde_json::{Value, json};
 use changes::Changes;
 use flags::Level;
 use report::Review;
-use update::{Report, SkippedMerge};
+use update::{Report, SharingPr, SkippedMerge};
 use verdict::{Comment, PullRequest};
 
 pub const REPORT_USAGE: &str = "\
   review-report (--base <commit> --head <commit> | --before <folder> --after <folder>)
-                [--metadata <cargo-metadata.json>] [--out <folder>]
+                [--metadata <cargo-metadata.json>] [--codeowners <file>] [--out <folder>]
       Work out the Review Report's sections from Red Flags to Downloads for
       the changes between two commits (or two copies of the repo), and fail
-      if a Red Flag waits for the maintainer (the Red Flag gate). With --out,
-      write report.md and review.json there.";
+      if a Red Flag waits for the maintainer (the Red Flag gate). The Areas
+      come from --codeowners (CI gives main's), else from the base's. With
+      --out, write report.md and review.json there.";
 
 pub const NEW_LIBRARIES_USAGE: &str = "\
   new-libraries --base <commit> --head <commit>
@@ -63,8 +65,10 @@ pub const NEW_LIBRARIES_USAGE: &str = "\
 pub const UPDATE_USAGE: &str = "\
   review-update --pr <pr.json> --comments <comments.json> --codeowners <file>
                 --out <folder> [--report <folder>] [--skipped-merges <search.json>]
-      Work out the Review check, the Review Report comment and the PR's
-      labels from GitHub's records, and write them to the --out folder.";
+                [--head-pulls <commit-pulls.json>]
+      Work out the Review check, the Review Report comment, the PR's labels
+      and the commit statuses to set (statuses.json) from GitHub's records,
+      and write them to the --out folder.";
 
 pub const MERGE_USAGE: &str = "\
   merge-check --branch <branch.json> --rules <rules.json>
@@ -76,7 +80,15 @@ pub const MERGE_USAGE: &str = "\
 pub fn run_report(args: &[String]) -> ExitCode {
     let result = options(
         args,
-        &["base", "head", "before", "after", "metadata", "out"],
+        &[
+            "base",
+            "head",
+            "before",
+            "after",
+            "metadata",
+            "codeowners",
+            "out",
+        ],
     )
     .and_then(|options| {
         let changes = match (
@@ -95,7 +107,11 @@ pub fn run_report(args: &[String]) -> ExitCode {
             Some(path) => Some(read_json(path)?),
             None => None,
         };
-        let review = Review::of(&changes, metadata.as_ref());
+        let codeowners = match options.get("codeowners") {
+            Some(path) => Some(read_text(path)?),
+            None => None,
+        };
+        let review = Review::of(&changes, metadata.as_ref(), codeowners.as_deref());
         if let Some(out) = options.get("out") {
             let out = PathBuf::from(out);
             fs::create_dir_all(&out)
@@ -187,6 +203,7 @@ pub fn run_update(args: &[String]) -> ExitCode {
             "out",
             "report",
             "skipped-merges",
+            "head-pulls",
         ],
     )
     .and_then(|options| {
@@ -203,25 +220,31 @@ pub fn run_update(args: &[String]) -> ExitCode {
             Some(path) => SkippedMerge::list_from_api(&read_json(path)?),
             None => Vec::new(),
         };
+        let sharing = match options.get("head-pulls") {
+            Some(path) => SharingPr::list_from_api(&read_json(path)?),
+            None => Vec::new(),
+        };
         let report = Report::read(options.get("report").map(Path::new), &pr);
-        let update = update::update(&pr, &comments, &report, &skipped, &known_areas);
+        let update = update::update(&pr, &comments, &report, &skipped, &known_areas, &sharing);
 
         let out = PathBuf::from(need("out")?);
         fs::create_dir_all(&out)
             .map_err(|error| format!("couldn't make {}: {error}", out.display()))?;
         write(
-            &out.join("status.json"),
-            &pretty(&json!({
-                "state": update.check.state.word(),
-                "description": update.check.description,
-            })),
-        )?;
-        write(
-            &out.join("gate.json"),
-            &pretty(&json!({
-                "state": update.gate.0.word(),
-                "description": update.gate.1,
-            })),
+            &out.join("statuses.json"),
+            &pretty(&Value::Array(
+                update
+                    .statuses
+                    .iter()
+                    .map(|s| {
+                        json!({
+                            "context": s.context,
+                            "state": s.state.word(),
+                            "description": s.description,
+                        })
+                    })
+                    .collect(),
+            )),
         )?;
         write(&out.join("comment.md"), &update.comment)?;
         write(
@@ -243,16 +266,17 @@ pub fn run_update(args: &[String]) -> ExitCode {
     });
     match result {
         Ok(update) => {
-            println!(
-                "Review check: {} ({})",
-                update.check.state.word(),
-                update.check.description
-            );
-            println!(
-                "Red Flag gate: {} ({})",
-                update.gate.0.word(),
-                update.gate.1
-            );
+            if update.statuses.is_empty() {
+                println!("Sets no statuses: the PR doesn't merge into the default branch.");
+            }
+            for status in &update.statuses {
+                println!(
+                    "{}: {} ({})",
+                    status.context,
+                    status.state.word(),
+                    status.description
+                );
+            }
             for label in &update.add {
                 println!("Adds the label `{}`", label.name);
             }

@@ -17,6 +17,13 @@
 # sets on the PR's latest commit, because a check run from issue_comment would
 # land on main's commit instead. That is also why no job here is named "Red
 # Flag gate" or "Review check": a job with that name could pass for the status.
+# A status belongs to a commit, not to a PR, so only PRs into main set them,
+# and both fail when two open PRs into main hold the same commit.
+#
+# Limit: any workflow with `statuses: write` can set those statuses too, and a
+# PR from a branch in this repo can change or add one. So for a PR that
+# changes CI's workflows the two statuses can't be trusted; the Report flags
+# such a PR (docs/review-report.md, Limits).
 #
 # Changing this file is a Repo rules change: the Reviewer decides, and the
 # ticket must ask for it. A PR that changes it is still judged by main's copy.
@@ -24,10 +31,10 @@
 name: Review
 
 on:
-  # A PR opened, pushed to or reopened.
+  # A PR opened, pushed to, reopened, or moved onto main. Any PR is reported
+  # on, but only one into main sets the two statuses.
   pull_request_target:
-    types: [opened, synchronize, reopened]
-    branches: [main]
+    types: [opened, synchronize, reopened, edited]
   # A Verdict posted, edited or deleted.
   issue_comment:
     types: [created, edited, deleted]
@@ -42,8 +49,10 @@ jobs:
     name: Post the Review Report and set the Red Flag gate and Review check
     # Only the maintainer's account posts Verdicts (agents work under it), so
     # nobody else's comment starts a run.
+    # An edit counts only when it changes the base branch.
     if: >-
-      github.event_name == 'pull_request_target'
+      (github.event_name == 'pull_request_target'
+       && (github.event.action != 'edited' || github.event.changes.base))
       || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.login == 'BartoszSolkaBD')

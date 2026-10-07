@@ -30,12 +30,14 @@ pub struct Review {
 }
 
 impl Review {
-    /// Works out the Review Report for a set of changes. `metadata` is the
-    /// head's `cargo metadata`, for the new libraries' licences.
-    pub fn of(changes: &Changes, metadata: Option<&Value>) -> Review {
-        let codeowners = changes
-            .base
-            .text(CODEOWNERS)
+    /// Works out the Review Report for a set of changes. `metadata` gives the
+    /// new libraries' licences, shaped like `cargo metadata`'s output.
+    /// `codeowners` is main's CODEOWNERS, which decides the Areas; without it,
+    /// the base's is used.
+    pub fn of(changes: &Changes, metadata: Option<&Value>, codeowners: Option<&str>) -> Review {
+        let codeowners = codeowners
+            .map(str::to_string)
+            .or_else(|| changes.base.text(CODEOWNERS))
             .or_else(|| changes.head.text(CODEOWNERS))
             .unwrap_or_default();
         let areas = Areas::parse(&codeowners);

@@ -139,6 +139,32 @@ fn renaming_a_scenario_and_its_file_and_loosening_a_rule_expectation_waits_for_t
 }
 
 #[test]
+fn a_new_setup_under_rule_and_source_expectations_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("setup-changed")
+        .change(FREE_FALL, "free-fall-setup-changed.toml")
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A Scenario's setup changed under its Source or Rule Expectations",
+        "`scenarios/physics/free-fall.toml`: `inputs.timeline`, `start.random_seed` changed, so \
+         its Source and Rule Expectations now check a different flight.",
+    );
+}
+
+#[test]
+fn a_new_setup_in_a_scenario_with_only_observed_expectations_raises_no_red_flag() {
+    let review = PullRequest::new("observed-setup-changed")
+        .write(
+            "scenarios/feel/whoop-hover.toml",
+            "format = 1\nname = \"The Whoop 65 hovers at the signed-off throttle\"\n\n\
+             [start]\nrandom_seed = 2\n\n[[expect]]\nwhat = \"height\"\nat = \"5 s\"\n\
+             value = \"2 m ± 0.1 m\"\nbasis = \"observed: the maintainer's Feel Test sign-off\"\n",
+        )
+        .review();
+    review.has_no_red_flags();
+}
+
+#[test]
 fn the_same_moment_spelled_another_way_raises_no_red_flag() {
     let review = PullRequest::new("moments-respelled")
         .change(FREE_FALL, "free-fall-respelled.toml")
@@ -320,6 +346,55 @@ fn allowing_a_house_rule_lint_in_a_core_crate_is_for_the_reviewer_to_decide() {
 }
 
 #[test]
+fn a_char_literal_holding_a_quote_cannot_hide_a_house_rule_exception() {
+    // The Reviewer's case on #92: `'"'` once looked like the start of a string.
+    let review = PullRequest::new("char-literal-hides-allow")
+        .change(
+            "crates/physics/src/lib.rs",
+            "physics-char-literal-hides-allow.rs.txt",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn a_char_literal_holding_a_quote_cannot_hide_unsafe_code() {
+    let review = PullRequest::new("char-literal-hides-unsafe")
+        .change(
+            "crates/sim/src/lib.rs",
+            "sim-unsafe-after-char-literal.rs.txt",
+        )
+        .review();
+    review.reviewer_decides(
+        "New `unsafe` code",
+        "`crates/sim/src/lib.rs` adds `let _q = '\"'; let first = unsafe { *x.as_ptr() };`.",
+    );
+}
+
+#[test]
+fn raw_strings_byte_strings_block_comments_and_lifetimes_are_not_code() {
+    let review = PullRequest::new("words-not-code")
+        .change(
+            "crates/sim/src/lib.rs",
+            "sim-unsafe-in-raw-strings-and-comments.rs.txt",
+        )
+        .review();
+    assert!(
+        !review.report.contains("New `unsafe` code"),
+        "{}",
+        review.report
+    );
+    assert!(
+        !review.report.contains("A house-rule exception"),
+        "{}",
+        review.report
+    );
+}
+
+#[test]
 fn a_house_rule_lint_allowed_over_several_lines_is_for_the_reviewer_to_decide() {
     let review = PullRequest::new("house-rule-split")
         .change(
@@ -432,7 +507,7 @@ fn allowing_unsafe_code_in_a_crate_is_for_the_reviewer_to_decide() {
         .review();
     in_the_manifest.reviewer_decides(
         "New `unsafe` code",
-        "`crates/sim/Cargo.toml` adds `unsafe_code = \"allow\"`.",
+        "`crates/sim/Cargo.toml` adds its own `unsafe_code` setting, `\"allow\"`.",
     );
     let in_the_code = PullRequest::new("unsafe-allowed-in-code")
         .write(
@@ -442,8 +517,41 @@ fn allowing_unsafe_code_in_a_crate_is_for_the_reviewer_to_decide() {
         .review();
     in_the_code.reviewer_decides(
         "New `unsafe` code",
-        "`crates/sim/src/lib.rs` adds `#![allow(unsafe_code)]`.",
+        "`crates/sim/src/lib.rs` adds an allowance of the `unsafe_code` lint.",
     );
+}
+
+#[test]
+fn a_change_to_ci_workflows_says_the_pr_s_own_statuses_can_t_be_trusted() {
+    let review = PullRequest::new("workflow-changed")
+        .write(
+            ".github/workflows/extra.yml",
+            "name: Extra\non: pull_request\npermissions:\n  statuses: write\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A change to CI workflows",
+        "`.github/workflows/extra.yml`. A workflow can set any commit status, so for this PR the \
+         Red Flag gate's and the Review check's own results can't be trusted.",
+    );
+}
+
+#[test]
+fn a_file_name_cannot_hide_behind_invisible_formatting_characters() {
+    let review = PullRequest::new("bidi-file-name")
+        .write("docs/notes-\u{202E}dm.txt", "Notes.\n")
+        .review();
+    assert!(!review.report.contains('\u{202E}'), "{}", review.report);
+    review.says("`docs/notes-\\u{202E}dm.txt`");
+}
+
+#[test]
+fn the_areas_come_from_main_s_codeowners_when_ci_gives_it() {
+    let review = PullRequest::new("main-codeowners")
+        .write("README.md", "# OpenDrone\n")
+        .review_with_codeowners("# Front page\n/README.md @BartoszSolkaBD\n");
+    assert_eq!(review.json["areas"], serde_json::json!(["Front page"]));
+    review.says("- **Front page**: `README.md`");
 }
 
 #[test]
@@ -632,6 +740,8 @@ fn fixtures() -> PathBuf {
 struct PullRequest {
     root: PathBuf,
     metadata: Option<PathBuf>,
+    /// Main's CODEOWNERS, as CI gives it.
+    codeowners: Option<PathBuf>,
 }
 
 impl PullRequest {
@@ -650,6 +760,7 @@ impl PullRequest {
         PullRequest {
             root,
             metadata: None,
+            codeowners: None,
         }
     }
 
@@ -685,6 +796,13 @@ impl PullRequest {
         self.copy(from, to).delete(from)
     }
 
+    fn review_with_codeowners(mut self, text: &str) -> Review {
+        let path = self.root.join("main-CODEOWNERS");
+        fs::write(&path, text).expect("can write CODEOWNERS");
+        self.codeowners = Some(path);
+        self.review()
+    }
+
     fn review_with_metadata(mut self, fixture: &str) -> Review {
         self.metadata = Some(fixtures().join("changes").join(fixture));
         self.review()
@@ -704,6 +822,9 @@ impl PullRequest {
             .arg(&out);
         if let Some(metadata) = &self.metadata {
             command.arg("--metadata").arg(metadata);
+        }
+        if let Some(codeowners) = &self.codeowners {
+            command.arg("--codeowners").arg(codeowners);
         }
         let output = command.output().expect("xtask runs");
         let text = format!(

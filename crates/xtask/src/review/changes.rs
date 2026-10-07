@@ -113,26 +113,6 @@ impl Changes {
             .binary_search_by(|p| p.as_str().cmp(path))
             .is_ok()
     }
-
-    /// The lines of `path` on the head side that aren't on the base side: the
-    /// lines this pull request adds, counted so a line it adds a second time
-    /// counts too.
-    pub fn added_lines(&self, path: &str) -> Vec<String> {
-        let base = self.base.text(path).unwrap_or_default();
-        let head = self.head.text(path).unwrap_or_default();
-        let mut base_lines: Vec<&str> = base.lines().collect();
-        base_lines.sort_unstable();
-        let mut added = Vec::new();
-        for line in head.lines() {
-            match base_lines.binary_search(&line) {
-                Ok(index) => {
-                    base_lines.remove(index);
-                }
-                Err(_) => added.push(line.to_string()),
-            }
-        }
-        added
-    }
 }
 
 fn walk(folder: &Path, prefix: &str, paths: &mut BTreeSet<String>) -> std::io::Result<()> {

@@ -15,7 +15,8 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::verdict::{self, Comment, PullRequest, ReviewCheck, State};
+use super::markdown::code;
+use super::verdict::{self, Comment, PullRequest, State};
 
 /// The hidden first line that marks the Review Report comment.
 pub const MARKER: &str = "<!-- opendrone-review-report -->";
@@ -186,12 +187,50 @@ impl SkippedMerge {
     }
 }
 
+/// A PR that shares the head commit, from GitHub's list of the commit's PRs
+/// (`GET /repos/{owner}/{repo}/commits/{sha}/pulls`).
+#[derive(Clone, Debug)]
+pub struct SharingPr {
+    pub number: u64,
+    pub open: bool,
+    pub base_ref: String,
+}
+
+impl SharingPr {
+    pub fn list_from_api(pulls: &Value) -> Vec<SharingPr> {
+        pulls
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|pr| {
+                Some(SharingPr {
+                    number: pr.get("number")?.as_u64()?,
+                    open: pr.get("state").and_then(Value::as_str) == Some("open"),
+                    base_ref: pr.pointer("/base/ref")?.as_str()?.to_string(),
+                })
+            })
+            .collect()
+    }
+}
+
+/// A commit status to set on the PR's latest commit.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Status {
+    pub context: &'static str,
+    pub state: State,
+    pub description: String,
+}
+
+/// The names of the two statuses.
+pub const GATE: &str = "Red Flag gate";
+pub const REVIEW_CHECK: &str = "Review check";
+
 /// Everything the review workflow posts.
 #[derive(Clone, Debug)]
 pub struct Update {
-    pub check: ReviewCheck,
-    /// The Red Flag gate's commit status: its state and description.
-    pub gate: (State, String),
+    /// The commit statuses to set: the Red Flag gate and the Review check,
+    /// or none for a PR that doesn't merge into the default branch.
+    pub statuses: Vec<Status>,
     pub comment: String,
     /// The Review Report comment to edit, or none yet.
     pub comment_id: Option<u64>,
@@ -200,13 +239,21 @@ pub struct Update {
 }
 
 /// Works out the update. `known_areas` are the Areas in main's CODEOWNERS:
-/// only those become labels.
+/// only those become labels. `sharing` are the PRs that hold the same head
+/// commit, this one included or not.
+///
+/// A commit status belongs to a commit, not to a PR, so:
+/// - only a PR into the default branch gets the two statuses; one into any
+///   other branch is reported on but never sets them;
+/// - if another open PR into the default branch shares the commit, both
+///   statuses fail, since one commit can't carry two PRs' results.
 pub fn update(
     pr: &PullRequest,
     comments: &[Comment],
     report: &Report,
     skipped: &[SkippedMerge],
     known_areas: &[String],
+    sharing: &[SharingPr],
 ) -> Update {
     let check = verdict::review_check(pr, comments);
     let gate = match report {
@@ -227,12 +274,78 @@ pub fn update(
         ),
     };
 
+    let others: Vec<String> = sharing
+        .iter()
+        .filter(|p| p.open && p.base_ref == pr.default_branch && p.number != pr.number)
+        .map(|p| format!("#{}", p.number))
+        .collect();
+    let (statuses, note) = if !pr.merges_into_default_branch() {
+        (
+            Vec::new(),
+            Some(format!(
+                "**Not judged:** this PR merges into {}, not {}, so CI sets neither the Red Flag \
+                 gate nor the Review check on its commits. Only PRs into {} are judged; the Red \
+                 Flags below are against {}.",
+                code(&pr.base_ref),
+                code(&pr.default_branch),
+                code(&pr.default_branch),
+                code(&pr.base_ref)
+            )),
+        )
+    } else if !others.is_empty() {
+        let description = format!(
+            "Other open PRs into {} share this commit ({}): keep one",
+            pr.default_branch,
+            others.join(", ")
+        );
+        let description: String = description.chars().take(140).collect();
+        (
+            vec![
+                Status {
+                    context: GATE,
+                    state: State::Failure,
+                    description: description.clone(),
+                },
+                Status {
+                    context: REVIEW_CHECK,
+                    state: State::Failure,
+                    description,
+                },
+            ],
+            Some(format!(
+                "**Both checks fail:** other open PRs into {} hold this same commit ({}). A \
+                 commit's checks can carry only one PR's results, so close all but one.",
+                code(&pr.default_branch),
+                others.join(", ")
+            )),
+        )
+    } else {
+        (
+            vec![
+                Status {
+                    context: GATE,
+                    state: gate.0,
+                    description: gate.1,
+                },
+                Status {
+                    context: REVIEW_CHECK,
+                    state: check.state,
+                    description: check.description.clone(),
+                },
+            ],
+            None,
+        )
+    };
+
     let mut comment = String::new();
     let _ = writeln!(
         comment,
         "{MARKER}\n## Review Report\n\n### Verdict\n\n{}\n",
         check.report
     );
+    if let Some(note) = note {
+        let _ = writeln!(comment, "{note}\n");
+    }
     if !skipped.is_empty() {
         let merges: Vec<String> = skipped
             .iter()
@@ -309,8 +422,7 @@ pub fn update(
         }
     }
     Update {
-        check,
-        gate,
+        statuses,
         comment,
         comment_id,
         add,

@@ -266,6 +266,50 @@ fn with_no_red_flags_worked_out_the_gate_reports_an_error_and_never_passes() {
 }
 
 #[test]
+fn a_pr_into_another_branch_sets_neither_status_and_the_report_says_why() {
+    let update = Pr::new("into-another-branch")
+        .into_branch("ticket/41-thrust-stand")
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
+        .update();
+    assert!(update.statuses.is_empty(), "{:?}", update.statuses);
+    update.says(
+        "**Not judged:** this PR merges into `ticket/41-thrust-stand`, not `main`, so CI sets \
+         neither the Red Flag gate nor the Review check on its commits.",
+    );
+}
+
+#[test]
+fn both_checks_fail_while_another_open_pr_into_main_holds_the_same_commit() {
+    let update = Pr::new("shared-head")
+        .sharing_with(78, "open", "main")
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
+        .update();
+    update.gate_is(
+        "failure",
+        "Other open PRs into main share this commit (#78): keep one",
+    );
+    update.check_is(
+        "failure",
+        "Other open PRs into main share this commit (#78): keep one",
+    );
+    update.says("**Both checks fail:** other open PRs into `main` hold this same commit (#78).");
+}
+
+#[test]
+fn a_closed_pr_or_one_into_another_branch_with_the_same_commit_changes_nothing() {
+    let update = Pr::new("shared-head-elsewhere")
+        .sharing_with(78, "closed", "main")
+        .sharing_with(79, "open", "ticket/41-thrust-stand")
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
+        .update();
+    update.gate_is("success", "No Red Flag waits for the maintainer");
+    update.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+}
+
+#[test]
 fn the_report_s_text_cannot_pass_for_a_second_review_report_or_a_verdict() {
     let update = Pr::new("report-marker")
         .report(
@@ -424,6 +468,8 @@ struct Pr {
     comments: Vec<Value>,
     report: Option<PathBuf>,
     skipped: Vec<Value>,
+    /// The PRs that hold the same head commit, as GitHub lists them.
+    sharing: Vec<Value>,
 }
 
 impl Pr {
@@ -434,15 +480,20 @@ impl Pr {
                 "number": 77,
                 "user": { "login": MAINTAINER },
                 "head": { "sha": HEAD, "repo": { "full_name": "BartoszSolkaBD/OpenDrone" } },
-                "base": { "repo": {
-                    "full_name": "BartoszSolkaBD/OpenDrone",
-                    "html_url": "https://github.com/BartoszSolkaBD/OpenDrone",
-                } },
+                "base": {
+                    "ref": "main",
+                    "repo": {
+                        "full_name": "BartoszSolkaBD/OpenDrone",
+                        "html_url": "https://github.com/BartoszSolkaBD/OpenDrone",
+                        "default_branch": "main",
+                    },
+                },
                 "labels": [],
             }),
             comments: Vec::new(),
             report: None,
             skipped: Vec::new(),
+            sharing: vec![json!({ "number": 77, "state": "open", "base": { "ref": "main" } })],
         }
     }
 
@@ -453,6 +504,19 @@ impl Pr {
 
     fn opened_from_a_fork(mut self) -> Pr {
         self.pr["head"]["repo"]["full_name"] = json!("someone/OpenDrone");
+        self
+    }
+
+    fn into_branch(mut self, branch: &str) -> Pr {
+        self.pr["base"]["ref"] = json!(branch);
+        self.sharing[0]["base"]["ref"] = json!(branch);
+        self
+    }
+
+    /// Another PR holding the same head commit.
+    fn sharing_with(mut self, number: u64, state: &str, branch: &str) -> Pr {
+        self.sharing
+            .push(json!({ "number": number, "state": state, "base": { "ref": branch } }));
         self
     }
 
@@ -515,6 +579,7 @@ impl Pr {
             format!("{}\n{}", json!(first), json!(second)),
         )
         .expect("can write the comments");
+        write_json(&self.root.join("head-pulls.json"), &json!(self.sharing));
         write_json(
             &self.root.join("skipped.json"),
             &json!({ "items": self.skipped }),
@@ -530,6 +595,8 @@ impl Pr {
             .arg(self.root.join("comments.json"))
             .arg("--skipped-merges")
             .arg(self.root.join("skipped.json"))
+            .arg("--head-pulls")
+            .arg(self.root.join("head-pulls.json"))
             .arg("--codeowners")
             .arg(codeowners)
             .arg("--out")
@@ -547,8 +614,7 @@ impl Pr {
         let read = |name: &str| fs::read_to_string(out.join(name)).expect("the file was written");
         let json = |name: &str| -> Value { serde_json::from_str(&read(name)).expect("JSON") };
         Update {
-            status: json("status.json"),
-            gate: json("gate.json"),
+            statuses: json("statuses.json").as_array().expect("a list").clone(),
             comment: read("comment.md"),
             comment_id: read("comment-id"),
             add: json("labels-add.json").as_array().expect("a list").clone(),
@@ -564,8 +630,8 @@ impl Pr {
 
 /// What `review-update` would post.
 struct Update {
-    status: Value,
-    gate: Value,
+    /// The commit statuses to set, by context.
+    statuses: Vec<Value>,
     comment: String,
     comment_id: String,
     add: Vec<Value>,
@@ -573,15 +639,24 @@ struct Update {
 }
 
 impl Update {
+    fn status(&self, context: &str) -> &Value {
+        self.statuses
+            .iter()
+            .find(|s| s["context"] == context)
+            .unwrap_or_else(|| panic!("no {context} status in {:?}", self.statuses))
+    }
+
     fn gate_is(&self, state: &str, description: &str) {
-        assert_eq!(self.gate["state"], state, "{}", self.comment);
-        assert_eq!(self.gate["description"], description);
+        let gate = self.status("Red Flag gate");
+        assert_eq!(gate["state"], state, "{}", self.comment);
+        assert_eq!(gate["description"], description);
         assert!(description.chars().count() <= 140);
     }
 
     fn check_is(&self, state: &str, description: &str) {
-        assert_eq!(self.status["state"], state, "{}", self.comment);
-        assert_eq!(self.status["description"], description);
+        let status = self.status("Review check");
+        assert_eq!(status["state"], state, "{}", self.comment);
+        assert_eq!(status["description"], description);
         let length = description.chars().count();
         assert!(
             length <= 140,

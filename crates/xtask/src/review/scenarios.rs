@@ -12,6 +12,8 @@
 //! unchanged has only moved, and a Source or Rule one found nowhere unchanged
 //! waits for the maintainer.
 
+use std::collections::BTreeMap;
+
 use opendrone_pack::units::{Dimension, Expected, Tolerance, parse_expected, parse_quantity};
 
 use super::changes::Changes;
@@ -41,6 +43,9 @@ pub fn is_scenario(path: &str) -> bool {
 struct ScenarioFile {
     name: Option<String>,
     expectations: Vec<Expectation>,
+    /// Everything that sets up the flight: every field but the Expectations,
+    /// the name and the format, by dotted name, such as `start.physics_rate`.
+    setup: BTreeMap<String, toml::Value>,
 }
 
 impl ScenarioFile {
@@ -48,13 +53,37 @@ impl ScenarioFile {
         let table: toml::Table = text.parse().ok()?;
         let mut expectations = Vec::new();
         collect(&table, "", &mut expectations);
+        let mut setup = BTreeMap::new();
+        flatten(&table, "", &mut setup);
         Some(ScenarioFile {
             name: table
                 .get("name")
                 .and_then(toml::Value::as_str)
                 .map(str::to_string),
             expectations,
+            setup,
         })
+    }
+}
+
+/// Every setup field, by dotted name: every value but the Expectations, and,
+/// at the top, the name and the format.
+fn flatten(table: &toml::Table, prefix: &str, into: &mut BTreeMap<String, toml::Value>) {
+    for (key, value) in table {
+        if key == "expect" || (prefix.is_empty() && (key == "name" || key == "format")) {
+            continue;
+        }
+        let name = if prefix.is_empty() {
+            key.clone()
+        } else {
+            format!("{prefix}.{key}")
+        };
+        match value.as_table() {
+            Some(inner) => flatten(inner, &name, into),
+            None => {
+                into.insert(name, value.clone());
+            }
+        }
     }
 }
 
@@ -256,6 +285,16 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                 let candidates: Vec<(&str, &ScenarioFile)> =
                     added.iter().map(|(p, f)| (*p, f)).collect();
                 let all_found = compare(path, &base, &candidates, &mut flags);
+                // Where the Scenario went, if it moved: the added file with its
+                // first Expectation.
+                let moved_to = base.expectations.first().and_then(|first| {
+                    candidates
+                        .iter()
+                        .find(|(_, file)| file.expectations.iter().any(|e| e.same_check(first)))
+                });
+                if let Some((now, head)) = moved_to {
+                    setup_changed(path, now, &base, head, &mut flags);
+                }
                 if !all_found {
                     let name = base
                         .name
@@ -275,6 +314,7 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
             Some(text) => match ScenarioFile::read(&text) {
                 Some(head) => {
                     compare(path, &base, &[(path, &head)], &mut flags);
+                    setup_changed(path, path, &base, &head, &mut flags);
                 }
                 None => {
                     let locked = base
@@ -298,6 +338,56 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
         }
     }
     flags
+}
+
+/// A change to how a Scenario holding Source or Rule Expectations sets up its
+/// flight: its starting state, its inputs, or any other field but its
+/// Expectations. Those Expectations then check a different flight, so the
+/// Reviewer decides. It doesn't wait for the maintainer, because the format
+/// migration tool (#60) writes new starting-state items into every Scenario.
+fn setup_changed(
+    path: &str,
+    now: &str,
+    base: &ScenarioFile,
+    head: &ScenarioFile,
+    flags: &mut Vec<RedFlag>,
+) {
+    if !base.expectations.iter().any(|e| e.basis().locked()) {
+        return;
+    }
+    let changed: Vec<String> = base
+        .setup
+        .keys()
+        .chain(
+            head.setup
+                .keys()
+                .filter(|key| !base.setup.contains_key(*key)),
+        )
+        .filter(|key| base.setup.get(*key) != head.setup.get(*key))
+        .map(|key| code(key))
+        .collect();
+    if changed.is_empty() {
+        return;
+    }
+    let place = if now == path {
+        code(path)
+    } else {
+        format!("{}, moved from {}", code(now), code(path))
+    };
+    let shown: Vec<String> = changed.iter().take(10).cloned().collect();
+    let more = match changed.len().saturating_sub(10) {
+        0 => String::new(),
+        more => format!(" and {more} more"),
+    };
+    flags.push(RedFlag::new(
+        Level::ReviewerDecides,
+        "A Scenario's setup changed under its Source or Rule Expectations",
+        format!(
+            "{place}: {}{more} changed, so its Source and Rule Expectations now check a \
+             different flight.",
+            shown.join(", ")
+        ),
+    ));
 }
 
 /// Compares a base Scenario's Expectations with where they may be now: the

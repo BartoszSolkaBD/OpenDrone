@@ -87,7 +87,8 @@ licences() {
   local packages="$work/packages.jsonl"
   : > "$packages"
   while read -r name version; do
-    [[ "$name" =~ ^[A-Za-z0-9_-]{1,64}$ && "$version" =~ ^[0-9A-Za-z.+-]{1,64}$ ]] || continue
+    [[ "$name" =~ ^[A-Za-z0-9_-]{1,64}$ && "$version" =~ ^[0-9][0-9A-Za-z.+-]{0,63}$ ]] || continue
+    [[ "$version" != *..* ]] || continue
     if (( count >= 30 )); then
       break
     fi
@@ -115,27 +116,33 @@ update() {
     echo "#$pr is closed, so its Review Report stays as it is."
     return 0
   fi
-  local head base_ref
+  local head base_ref default_branch
   head="$(jq -r .head.sha "$work/pr.json")"
   base_ref="$(jq -r .base.ref "$work/pr.json")"
-  if [[ ! "$head" =~ ^[0-9a-f]{40}$ || ! "$base_ref" =~ ^[A-Za-z0-9._/-]{1,100}$ ]]; then
+  default_branch="$(jq -r .base.repo.default_branch "$work/pr.json")"
+  if [[ ! "$head" =~ ^[0-9a-f]{40}$ || ! "$base_ref" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] \
+    || [[ "$base_ref" == *..* ]]; then
     echo "#$pr's latest commit or base branch looks wrong: $head, $base_ref" >&2
     return 1
   fi
 
-  # The PR's commits, as git objects only: nothing is checked out or run.
-  git fetch --no-tags --quiet origin \
-    "+refs/pull/$pr/head:refs/review/head" "+refs/heads/$base_ref:refs/review/base"
-  if [[ "$(git rev-parse refs/review/head)" != "$head" ]]; then
-    echo "#$pr moved on while this ran; the run for its newest push updates it."
-    return 0
-  fi
+  # The PR's latest commit, by its SHA, and its base branch, as git objects
+  # only: nothing is checked out or run.
+  git -c protocol.version=2 fetch --no-tags --quiet origin \
+    "+$head:refs/review/head" "+refs/heads/$base_ref:refs/review/base"
   local base
   base="$(git merge-base refs/review/base refs/review/head)"
-  judged="$head"
-  post_status "$head" "Red Flag gate" pending "Working out the Red Flags" "${RUN_URL:-}"
+  # Only a PR into the default branch sets the statuses (xtask decides; this
+  # only says "pending" first).
+  if [[ "$base_ref" == "$default_branch" ]]; then
+    judged="$head"
+    post_status "$head" "Red Flag gate" pending "Working out the Red Flags" "${RUN_URL:-}"
+  fi
 
   api --paginate "repos/$REPO/issues/$pr/comments?per_page=100" > "$work/comments.json"
+  # Every PR holding this same commit: if another one into the default branch
+  # is open, the commit can't carry this PR's results alone.
+  api "repos/$REPO/commits/$head/pulls?per_page=100" > "$work/head-pulls.json"
   api "search/issues?q=repo:$REPO+is:pr+is:merged+label:skipped-a-check&per_page=20" \
     > "$work/skipped.json" || echo '{"items": []}' > "$work/skipped.json"
 
@@ -145,7 +152,8 @@ update() {
   # below says so. Anything else but 0 means the Report couldn't be made.
   local report=() code=0
   "$XTASK" review-report --base "$base" --head "$head" \
-    --metadata "$work/metadata.json" --out "$work/report" || code=$?
+    --metadata "$work/metadata.json" --codeowners .github/CODEOWNERS \
+    --out "$work/report" || code=$?
   if (( code == 0 || code == 1 )); then
     jq -n --argjson number "$pr" --arg head_sha "$head" '{number: $number, head_sha: $head_sha}' \
       > "$work/report/pr.json"
@@ -158,6 +166,7 @@ update() {
     --pr "$work/pr.json" \
     --comments "$work/comments.json" \
     --skipped-merges "$work/skipped.json" \
+    --head-pulls "$work/head-pulls.json" \
     --codeowners .github/CODEOWNERS \
     --out "$work/out" \
     ${report[@]+"${report[@]}"}
@@ -183,14 +192,18 @@ update() {
     echo "Posted the Review Report: $url"
   fi
 
-  local gate_url="$url"
-  if [[ "$(jq -r .state "$work/out/gate.json")" == "error" ]]; then
-    gate_url="${RUN_URL:-$url}"
+  # The statuses xtask decided: none for a PR into another branch.
+  local context state description status_url
+  while IFS=$'\t' read -r context state description; do
+    status_url="$url"
+    if [[ "$state" == "error" ]]; then
+      status_url="${RUN_URL:-$url}"
+    fi
+    post_status "$head" "$context" "$state" "$description" "$status_url"
+  done < <(jq -r '.[] | [.context, .state, .description] | @tsv' "$work/out/statuses.json")
+  if [[ "$base_ref" != "$default_branch" ]]; then
+    echo "#$pr merges into $base_ref, not $default_branch, so it sets no statuses."
   fi
-  post_status "$head" "Red Flag gate" "$(jq -r .state "$work/out/gate.json")" \
-    "$(jq -r .description "$work/out/gate.json")" "$gate_url"
-  post_status "$head" "Review check" "$(jq -r .state "$work/out/status.json")" \
-    "$(jq -r .description "$work/out/status.json")" "$url"
   judged=""
 }
 

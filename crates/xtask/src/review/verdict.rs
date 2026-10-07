@@ -32,6 +32,19 @@ pub struct PullRequest {
     pub labels: Vec<String>,
     /// The repo's web address, such as `https://github.com/owner/repo`.
     pub repo_url: String,
+    /// The branch the PR merges into.
+    pub base_ref: String,
+    /// The repo's default branch, main.
+    pub default_branch: String,
+}
+
+impl PullRequest {
+    /// Whether the PR merges into the default branch: only those PRs are
+    /// judged, because a commit status belongs to a commit, whatever PR it
+    /// is in.
+    pub fn merges_into_default_branch(&self) -> bool {
+        !self.default_branch.is_empty() && self.base_ref == self.default_branch
+    }
 }
 
 impl PullRequest {
@@ -65,6 +78,8 @@ impl PullRequest {
                 .map(str::to_string)
                 .collect(),
             repo_url: text("/base/repo/html_url").unwrap_or_default(),
+            base_ref: text("/base/ref").unwrap_or_default(),
+            default_branch: text("/base/repo/default_branch").unwrap_or_default(),
         })
     }
 }

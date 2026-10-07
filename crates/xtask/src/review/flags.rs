@@ -11,6 +11,7 @@ use super::areas::{Areas, REPO_RULES};
 use super::changes::Changes;
 use super::libraries::{self, NewLibrary};
 use super::markdown::{code, plain};
+use super::rust::code_only;
 use super::scenarios;
 
 /// What a Red Flag asks for.
@@ -75,6 +76,7 @@ pub fn detect(changes: &Changes, areas: &Areas, new_libraries: &[NewLibrary]) ->
     bevy_and_wgpu(changes, &mut flags);
     house_rules(changes, &mut flags);
     unsafe_code(changes, &mut flags);
+    workflows(changes, &mut flags);
     repo_rules(changes, areas, &mut flags);
     for library in new_libraries {
         flags.push(RedFlag::new(
@@ -172,10 +174,13 @@ fn turns_off_a_house_rule(lint: &str) -> bool {
 
 /// Every lint a Rust file allows or expects, by name: in `#[allow(…)]`,
 /// `#![allow(…)]`, `#[expect(…)]` or inside a `cfg_attr`, however the
-/// attribute is spread over lines. Comments and strings don't count.
+/// attribute is spread over lines. Comments, strings and char literals don't
+/// count, and can't hide one.
 fn allowed_lints(text: &str) -> Vec<String> {
-    let code: String = text.lines().map(code_part).collect::<Vec<_>>().join(" ");
-    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    let compact: String = code_only(text)
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
     let mut lints = Vec::new();
     for keyword in ["allow(", "expect("] {
         for (at, _) in compact.match_indices(keyword) {
@@ -281,57 +286,78 @@ fn workspace_unsafe_setting(manifest: Option<String>) -> Option<toml::Value> {
         .cloned()
 }
 
-/// New `unsafe` code anywhere, or a change to where it's allowed: a line that
-/// allows it, a crate that stops taking the workspace's lints, or a change to
-/// the workspace's `unsafe_code = "forbid"`.
+/// The lines of Rust a pull request adds, as written, judged by their code
+/// alone: a line counts only if its code, without comments, strings and char
+/// literals, is new.
+fn added_code_lines(changes: &Changes, path: &str) -> Vec<(String, String)> {
+    let base = code_only(&changes.base.text(path).unwrap_or_default());
+    let head_text = changes.head.text(path).unwrap_or_default();
+    let head = code_only(&head_text);
+    let mut base_lines: Vec<&str> = base.lines().map(str::trim_end).collect();
+    base_lines.sort_unstable();
+    let mut added = Vec::new();
+    for (code, line) in head.lines().zip(head_text.lines()) {
+        match base_lines.binary_search(&code.trim_end()) {
+            Ok(at) => {
+                base_lines.remove(at);
+            }
+            Err(_) => added.push((code.to_string(), line.to_string())),
+        }
+    }
+    added
+}
+
+/// New `unsafe` code anywhere, or a change to where it's allowed: a line of
+/// Rust with `unsafe` in its code, a newly allowed `unsafe_code` lint, a
+/// crate's own `unsafe_code` setting, a crate that stops taking the
+/// workspace's lints, or a change to the workspace's `unsafe_code = "forbid"`.
 fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
     for path in &changes.paths {
-        let is_rust = path.ends_with(".rs");
-        let is_manifest = path.ends_with("Cargo.toml");
-        if !is_rust && !is_manifest {
-            continue;
-        }
-        let mut found: Vec<String> = changes
-            .added_lines(path)
-            .into_iter()
-            .filter(|line| {
-                let code = code_part(line);
-                if is_rust {
-                    has_word(&code, "unsafe") || allows_unsafe_code(&code)
-                } else {
-                    // A lint setting in a manifest, such as `unsafe_code = "allow"`.
-                    has_word(&code, "unsafe_code") && code.contains('=')
-                }
-            })
-            .map(|line| code(&line))
-            .collect();
-        if is_rust
-            && let Some(text) = changes.head.text(path)
-            && allowed_lints(&text).iter().any(|l| l == "unsafe_code")
-            && !changes
-                .base
-                .text(path)
-                .is_some_and(|t| allowed_lints(&t).iter().any(|l| l == "unsafe_code"))
-            && found.is_empty()
-        {
-            found.push("an allowance of `unsafe_code`".to_string());
-        }
-        if is_manifest
-            && path.starts_with("crates/")
-            && !MAY_USE_UNSAFE.contains(&path.as_str())
-            && takes_workspace_lints(changes.base.text(path))
-            && !takes_workspace_lints(changes.head.text(path))
-        {
-            found.push(
-                "no `[lints] workspace = true` any more, so `unsafe` isn't forbidden there"
-                    .to_string(),
+        let mut found: Vec<String> = Vec::new();
+        if path.ends_with(".rs") {
+            found.extend(
+                added_code_lines(changes, path)
+                    .into_iter()
+                    .filter(|(code, _)| has_word(code, "unsafe"))
+                    .map(|(_, line)| code(&line)),
             );
-        }
-        if path == "Cargo.toml"
-            && workspace_unsafe_setting(changes.base.text(path))
+            let allows = |text: Option<String>| {
+                text.map(|t| allowed_lints(&t))
+                    .unwrap_or_default()
+                    .iter()
+                    .filter(|lint| lint.as_str() == "unsafe_code")
+                    .count()
+            };
+            if allows(changes.head.text(path)) > allows(changes.base.text(path)) {
+                found.push("an allowance of the `unsafe_code` lint".to_string());
+            }
+        } else if path == "Cargo.toml" {
+            if workspace_unsafe_setting(changes.base.text(path))
                 != workspace_unsafe_setting(changes.head.text(path))
-        {
-            found.push("a change to the workspace's `unsafe_code = \"forbid\"`".to_string());
+            {
+                found.push("a change to the workspace's `unsafe_code = \"forbid\"`".to_string());
+            }
+        } else if path.starts_with("crates/") && path.ends_with("/Cargo.toml") {
+            let setting = |text: Option<String>| {
+                lints_of(text).and_then(|lints| lints.get("rust")?.get("unsafe_code").cloned())
+            };
+            if let Some(now) = setting(changes.head.text(path))
+                && setting(changes.base.text(path)).as_ref() != Some(&now)
+            {
+                found.push(format!(
+                    "its own `unsafe_code` setting, {}",
+                    code(&now.to_string())
+                ));
+            }
+            if !MAY_USE_UNSAFE.contains(&path.as_str())
+                && takes_workspace_lints(changes.base.text(path))
+                && !takes_workspace_lints(changes.head.text(path))
+            {
+                found.push(
+                    "no `[lints] workspace = true` any more, so `unsafe` isn't forbidden there"
+                        .to_string(),
+                );
+            }
         }
         if !found.is_empty() {
             flags.push(RedFlag::new(
@@ -343,41 +369,32 @@ fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
     }
 }
 
-/// Whether a line of Rust changes the `unsafe_code` lint, such as
-/// `#![allow(unsafe_code)]`.
-fn allows_unsafe_code(code: &str) -> bool {
-    let compact = code.replace(' ', "");
-    has_word(code, "unsafe_code")
-        && ["allow(", "expect(", "warn("]
-            .iter()
-            .any(|attribute| compact.contains(attribute))
-}
+/// The folders whose files GitHub runs as workflows, or as their actions.
+const WORKFLOWS: [&str; 2] = [".github/workflows/", ".github/actions/"];
 
-/// A line without its comment and without the insides of its strings, so a
-/// word in a comment or a message isn't taken for code.
-fn code_part(line: &str) -> String {
-    let mut code = String::new();
-    let mut in_string = false;
-    let mut chars = line.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '\\' if in_string => {
-                chars.next();
-            }
-            '"' => {
-                in_string = !in_string;
-                code.push(c);
-            }
-            '/' if !in_string && chars.peek() == Some(&'/') => break,
-            '#' if !in_string && code.trim().is_empty() && chars.peek() == Some(&' ') => {
-                // A TOML comment.
-                break;
-            }
-            _ if in_string => {}
-            _ => code.push(c),
-        }
+/// A change to CI's workflows. Any workflow can set any commit status, so a
+/// PR that changes one could set the Red Flag gate and the Review check
+/// itself: the Report says so plainly.
+fn workflows(changes: &Changes, flags: &mut Vec<RedFlag>) {
+    let files: Vec<String> = changes
+        .paths
+        .iter()
+        .filter(|path| WORKFLOWS.iter().any(|folder| path.starts_with(folder)))
+        .map(|path| code(path))
+        .collect();
+    if !files.is_empty() {
+        flags.push(RedFlag::new(
+            Level::ReviewerDecides,
+            "A change to CI workflows",
+            format!(
+                "{}. A workflow can set any commit status, so for this PR the Red Flag gate's and \
+                 the Review check's own results can't be trusted. Check that no workflow it \
+                 changes or adds asks for `statuses: write` or sets a status, and the maintainer \
+                 should merge it by hand.",
+                listed(&files, 10, "files")
+            ),
+        ));
     }
-    code
 }
 
 /// Whether `word` appears in `text` on its own, not inside a longer name.
