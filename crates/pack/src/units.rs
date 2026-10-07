@@ -596,15 +596,20 @@ fn split_number(text: &str) -> Option<(String, &str)> {
     Some((number, &text[end..]))
 }
 
-/// Refuses a comma inside a number, such as `"31,2 g"` or `"2,000 °/s"`,
+/// Refuses a comma between two digits, such as `"31,2 g"` or `"2,000 °/s"`,
 /// with the fix: a decimal point, or no thousands separator. Commas between
 /// parts, such as in `"mid 0.50, hover 0.50"`, are fine. Anything that splits
 /// number text on commas runs this on the whole text first.
+///
+/// The fix is offered only when it can't be wrong: one decimal comma, or
+/// thousands separators only. Several commas between digits, as in
+/// `"25,25,25,25%"`, may be a list written without spaces, so then the
+/// sentence says how to write both instead.
 pub fn refuse_commas_in_numbers(text: &str) -> Result<(), UnitProblem> {
     let text = text.trim();
     let chars: Vec<char> = text.chars().collect();
     let mut fixed = String::with_capacity(text.len());
-    let mut decimal_comma = false;
+    let mut decimal_commas = 0;
     let mut thousands = false;
     for (i, &c) in chars.iter().enumerate() {
         let between_digits = c == ','
@@ -622,11 +627,11 @@ pub fn refuse_commas_in_numbers(text: &str) -> Result<(), UnitProblem> {
         if digits_after == 3 {
             thousands = true;
         } else {
-            decimal_comma = true;
+            decimal_commas += 1;
             fixed.push('.');
         }
     }
-    if !decimal_comma && !thousands {
+    if decimal_commas == 0 && !thousands {
         return Ok(());
     }
     let what = if text.contains(", ") {
@@ -634,12 +639,13 @@ pub fn refuse_commas_in_numbers(text: &str) -> Result<(), UnitProblem> {
     } else {
         format!("\"{text}\" isn't a number OpenDrone can read")
     };
-    let rule = if decimal_comma {
-        "numbers take a decimal point"
-    } else {
-        "numbers have no thousands separators"
-    };
-    Err(problem(format!("{what}: {rule}, so write \"{fixed}\"")))
+    Err(problem(match (decimal_commas, thousands) {
+        (0, _) => format!("{what}: numbers have no thousands separators, so write \"{fixed}\""),
+        (1, false) => format!("{what}: numbers take a decimal point, so write \"{fixed}\""),
+        _ => format!(
+            "{what}: numbers take a decimal point and have no thousands separators, and values are separated by a comma and a space, such as \"0.5%, 0.5%\""
+        ),
+    }))
 }
 
 /// Parts of a value with a label each, such as

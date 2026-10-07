@@ -140,6 +140,20 @@ fn a_decimal_comma_among_several_parts_is_refused_fixing_only_the_number() {
 }
 
 #[test]
+fn several_commas_between_digits_are_refused_without_guessing_a_fix() {
+    // It may be a list written without spaces, so "25.25.25.25%" would be a
+    // wrong fix.
+    assert_eq!(
+        refusal("25,25,25,25%"),
+        "\"25,25,25,25%\" isn't a number OpenDrone can read: numbers take a decimal point and have no thousands separators, and values are separated by a comma and a space, such as \"0.5%, 0.5%\""
+    );
+    assert_eq!(
+        refusal("1,000,000 m"),
+        "\"1,000,000 m\" isn't a number OpenDrone can read: numbers have no thousands separators, so write \"1000000 m\""
+    );
+}
+
+#[test]
 fn a_unit_not_on_the_list_is_refused() {
     assert_eq!(
         refusal("5 furlongs"),
