@@ -3,23 +3,31 @@
 //!
 //! - An Estimate that moves needs a new row in its Quad's log, and must stay
 //!   inside its range. A relative range, such as `"×0.5–×2"`, is measured
-//!   from the value the Estimate started at: the old value of its earliest row
-//!   already in the log before this change, or, with none, the value before
-//!   this change. A row added in the same change never sets the start.
+//!   from the value the Estimate started at: the new value of its latest
+//!   "New source" row already in the log, or else the old value of its
+//!   earliest row there, or else its value before this change. A row added
+//!   in the same change never sets the start.
 //! - Every row a change adds records a move that change makes: the same
 //!   Estimate, its value before as the old value and its value after as the
 //!   new one, compared as numbers with their units, so "300 ms" matches
 //!   "0.3 s". A row whose values can't be read is refused.
 //! - A Measured, Manufacturer or Derived number is locked: it changes only
 //!   with a new source.
-//! - An Estimate's range, or any number's Confidence, also changes only with
-//!   a new source, so a Feel Test can't widen its own range, and so does the
-//!   number of points on a curve. An Estimate that moves in the same change
-//!   still needs its row.
+//! - What's known about a number also changes only with a new source: its
+//!   Confidence, its range, and where its numbers hold (a curve's places and
+//!   points, the condition of a value "at" one). So a Feel Test can't widen
+//!   its own range, or move a curve's points sideways instead of up and down.
+//! - An Estimate moved with a new source still needs its row, and that row's
+//!   why starts with "New source": the range is measured from the new value
+//!   from then on. A "New source" row needs a real new source.
 //! - The log only grows: earlier rows stay as they were.
+//! - Quads are paired by id, not by folder ([`compare_packs`]): a change that
+//!   removes a Quad may add one only as a pure rename or move.
 //!
 //! "A new source" means the number names a different `[sources]` key, or the
-//! line of its `[sources]` key says something different.
+//! line of its `[sources]` key says something different. That is easy to do,
+//! so CI lists every number that passed only because its source changed, and
+//! the Reviewer judges whether each new source is real.
 //!
 //! The log is a Markdown table, oldest row first:
 //!
@@ -256,6 +264,30 @@ pub struct QuadVersion<'a> {
     pub feel_tests: Option<&'a str>,
 }
 
+/// What comparing Quads before and after a change found.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FeelTestReport {
+    /// Every break of the Feel Test log rules.
+    pub problems: Problems,
+    /// Every number that changed and passed only because its source changed
+    /// too, as a sentence each. The Reviewer judges whether each new source is
+    /// real, so CI lists them.
+    pub passed_on_a_new_source: Vec<String>,
+    /// Every count or choice that changed. They carry no Confidence, so the
+    /// rules can't judge them, and CI lists them for the Reviewer too.
+    pub changed_without_a_confidence: Vec<String>,
+}
+
+impl FeelTestReport {
+    fn extend(&mut self, other: FeelTestReport) {
+        self.problems.extend(other.problems);
+        self.passed_on_a_new_source
+            .extend(other.passed_on_a_new_source);
+        self.changed_without_a_confidence
+            .extend(other.changed_without_a_confidence);
+    }
+}
+
 /// Compares a Quad before and after a change, and lists every break of the
 /// Feel Test log rules. `quad_file` and `log_file` name the two files in
 /// problems. A Quad that is new, or removed, has nothing to compare.
@@ -265,10 +297,170 @@ pub fn check_feel_test_rules(
     before: QuadVersion<'_>,
     after: QuadVersion<'_>,
 ) -> Problems {
-    let (Some(before_text), Some(after_text)) = (before.quad, after.quad) else {
-        return Problems::new();
+    compare_quad(quad_file, log_file, before, after).problems
+}
+
+/// One Quad's files in one version of the repo, named by the Quad's id.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct QuadFiles {
+    /// Such as `opendrone/whoop-65`: the Pack's id from its `pack.toml`, and
+    /// the Quad's folder name.
+    pub id: String,
+    /// The definition's path, such as
+    /// `packs/opendrone/quads/whoop-65/quad.toml`, for problems.
+    pub quad_file: String,
+    pub log_file: String,
+    pub quad: String,
+    pub feel_tests: Option<String>,
+}
+
+impl QuadFiles {
+    fn version(&self) -> QuadVersion<'_> {
+        QuadVersion {
+            quad: Some(&self.quad),
+            feel_tests: self.feel_tests.as_deref(),
+        }
+    }
+}
+
+/// Compares every Quad before a change with the same Quad after it, paired by
+/// id, not by path, so moving a Pack's folder changes nothing.
+///
+/// A Quad that keeps its id is compared as [`check_feel_test_rules`] does.
+/// When a change removes any Quad, each Quad it adds is read as that Quad
+/// renamed or moved (to a new folder, another Pack, or a Pack with a new id),
+/// so it must be a pure rename: every setting the same as a removed Quad's. A
+/// rename that also moves a number would compare it with nothing, so it's
+/// refused. Adding a Quad in a change that removes none is a new Quad.
+pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestReport {
+    let mut report = FeelTestReport::default();
+    let compare = |was: &QuadFiles, is: &QuadFiles| {
+        compare_quad(&is.quad_file, &is.log_file, was.version(), is.version())
     };
-    let whole_file = |sentence: &str| Problems(vec![Problem::of(quad_file, 0, sentence)]);
+    let removed: Vec<&QuadFiles> = before
+        .iter()
+        .filter(|was| !after.iter().any(|is| is.id == was.id))
+        .collect();
+    let mut renamed_from = vec![false; removed.len()];
+    for is in after {
+        if let Some(was) = before.iter().find(|was| was.id == is.id) {
+            report.extend(compare(was, is));
+            continue;
+        }
+        if removed.is_empty() {
+            continue;
+        }
+        let pure_rename = removed
+            .iter()
+            .enumerate()
+            .find(|(i, was)| !renamed_from[*i] && same_settings(&was.quad, &is.quad));
+        match pure_rename {
+            Some((i, was)) => {
+                renamed_from[i] = true;
+                report.extend(compare(was, is));
+            }
+            None => report.problems.push(Problem::of(
+                &is.quad_file,
+                0,
+                format!(
+                    "this change adds the Quad {} and removes {}, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another",
+                    is.id,
+                    removed
+                        .iter()
+                        .map(|was| was.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            )),
+        }
+    }
+    report
+}
+
+/// Whether two Quad files hold the same settings: the same keys, values (read
+/// with their units), Confidences and ranges.
+fn same_settings(a: &str, b: &str) -> bool {
+    let (Ok((a, _)), Ok((b, _))) = (
+        quad::read_quad_file_as_far_as_it_goes("a", a),
+        quad::read_quad_file_as_far_as_it_goes("b", b),
+    ) else {
+        return false;
+    };
+    a.settings.len() == b.settings.len()
+        && a.settings.iter().all(|(name, x)| {
+            b.settings.get(name).is_some_and(|y| {
+                same_value(name, &x.value.text(), &y.value.text())
+                    && x.confidence == y.confidence
+                    && x.range.as_ref().map(Range::text) == y.range.as_ref().map(Range::text)
+            })
+        })
+}
+
+/// Whether a log row records a re-sourcing: its why starts with "New source".
+fn is_new_source(row: &Row) -> bool {
+    row.why.to_lowercase().starts_with("new source")
+}
+
+/// The value a relative range is measured from, from the log before a change:
+/// the new value of the latest "New source" row for `name`, or else the old
+/// value of its earliest row, or else the value before the change.
+fn start_of(name: &str, rows: &[Row], value_before: &str) -> String {
+    let mut start: Option<&str> = None;
+    for row in rows.iter().filter(|row| row.setting == name) {
+        if is_new_source(row) {
+            start = Some(&row.new);
+        } else if start.is_none() {
+            start = Some(&row.old);
+        }
+    }
+    start.unwrap_or(value_before).to_string()
+}
+
+/// The part of a value that says where its numbers hold, rather than the
+/// numbers a range limits: a curve's places (and how many points it has), and
+/// the condition of a value "at" one. Moving it changes what the number is,
+/// so it needs a new source.
+fn shape_change(name: &str, before: &str, after: &str) -> Option<String> {
+    let form = schema::find(name).and_then(|(_, key)| movable_form(key.kind))?;
+    let (before, after) = (
+        read_value(name, before).ok()?,
+        read_value(name, after).ok()?,
+    );
+    let places = |numbers: &[f64]| -> Vec<f64> {
+        match form {
+            Form::Curve(..) => numbers.iter().skip(1).step_by(2).copied().collect(),
+            Form::At(..) => numbers.iter().skip(1).copied().collect(),
+            _ => Vec::new(),
+        }
+    };
+    let (was, is) = (places(&before), places(&after));
+    if same_numbers(&was, &is) {
+        return None;
+    }
+    Some(match form {
+        Form::Curve(..) if was.len() != is.len() => {
+            format!("it now has {} points and had {}", is.len(), was.len())
+        }
+        Form::Curve(..) => "the places its points hold at moved".to_string(),
+        _ => "the condition it holds at changed".to_string(),
+    })
+}
+
+/// Compares one Quad before and after a change.
+fn compare_quad(
+    quad_file: &str,
+    log_file: &str,
+    before: QuadVersion<'_>,
+    after: QuadVersion<'_>,
+) -> FeelTestReport {
+    let mut report = FeelTestReport::default();
+    let (Some(before_text), Some(after_text)) = (before.quad, after.quad) else {
+        return report;
+    };
+    let whole_file = |sentence: &str| FeelTestReport {
+        problems: Problems(vec![Problem::of(quad_file, 0, sentence)]),
+        ..FeelTestReport::default()
+    };
     let Ok(after_quad) = quad::read_quad_file(quad_file, after_text) else {
         return whole_file(
             "the Feel Test log rules can't be checked until this file passes the Pack checker (`cargo xtask packs`)",
@@ -292,11 +484,14 @@ pub fn check_feel_test_rules(
     };
     let after_rows = match read_after {
         Ok(rows) => rows,
-        Err(problems) => return problems,
+        Err(problems) => {
+            report.problems = problems;
+            return report;
+        }
     };
     let before_rows = read_before.unwrap_or_default();
+    let problems = &mut report.problems;
 
-    let mut problems = Problems::new();
     let kept = before_rows.len() <= after_rows.len()
         && before_rows
             .iter()
@@ -313,6 +508,13 @@ pub fn check_feel_test_rules(
         &after_rows[before_rows.len()..]
     } else {
         &[]
+    };
+    let new_source_of = |name: &str| match (
+        before_quad.settings.get(name),
+        after_quad.settings.get(name),
+    ) {
+        (Some(was), Some(is)) => source_changed(&before_quad, was, &after_quad, is),
+        _ => false,
     };
 
     // Every row this change adds must record a move this change makes.
@@ -338,11 +540,17 @@ pub fn check_feel_test_rules(
             continue;
         };
         let (old_value, new_value) = (plain(&was.value.text()), plain(&is.value.text()));
+        let new_source = new_source_of(&row.setting);
+        let moved = !same_value(&row.setting, &old_value, &new_value);
         if is.confidence != Some(Confidence::Estimate) {
             problems.push(at_row(format!(
                 "this row moves {row_label}, but it isn't an Estimate, so no Feel Test moves it"
             )));
-        } else if same_value(&row.setting, &old_value, &new_value) {
+        } else if is_new_source(row) && !new_source {
+            problems.push(at_row(format!(
+                "this row says {row_label} has a new source, but this change doesn't change its source; a \"New source\" row records a re-sourcing, which moves where its range is measured from"
+            )));
+        } else if !moved && !is_new_source(row) {
             problems.push(at_row(format!(
                 "this row records {row_label} moving from {} to {}, but this change doesn't move it",
                 row.old, row.new
@@ -357,37 +565,109 @@ pub fn check_feel_test_rules(
         }
     }
 
+    // A number taken out (an optional section, such as [ducts], removed)
+    // changes the Quad as much as moving it, so it needs a new source: its
+    // source's line changes, or goes.
+    for (name, before) in &before_quad.settings {
+        if before.confidence.is_none() || after_quad.settings.contains_key(name) {
+            continue;
+        }
+        let line_of_source = |quad: &QuadFile| {
+            before
+                .source
+                .as_ref()
+                .and_then(|key| quad.sources.get(key))
+                .map(|text| plain(text))
+        };
+        let label = label(name);
+        if line_of_source(&before_quad) == line_of_source(&after_quad) {
+            problems.push(Problem::of(
+                quad_file,
+                0,
+                format!(
+                    "{label} was taken out, which changes the Quad as much as moving it, so it needs a new source: change or remove its source's line in [sources]"
+                ),
+            ));
+        } else {
+            report.passed_on_a_new_source.push(format!(
+                "{quad_file}: {label} was taken out, with a new source"
+            ));
+        }
+    }
+
     for (name, after) in &after_quad.settings {
         let Some(before) = before_quad.settings.get(name) else {
             continue;
         };
         let (Some(was), Some(is)) = (before.confidence, after.confidence) else {
+            if after.confidence.is_none()
+                && before.confidence.is_none()
+                && plain(&before.value.text()) != plain(&after.value.text())
+            {
+                report.changed_without_a_confidence.push(format!(
+                    "{quad_file} line {}: {} changed ({} → {}); it carries no Confidence",
+                    after.line,
+                    label(name),
+                    plain(&before.value.text()),
+                    plain(&after.value.text())
+                ));
+            }
             continue;
         };
-        let new_source = source_changed(&before_quad, before, &after_quad, after);
+        let new_source = new_source_of(name);
         let range_text = |s: &Setting| s.range.as_ref().map(Range::text);
         let (old_value, new_value) = (plain(&before.value.text()), plain(&after.value.text()));
         let label = label(name);
-        // What's known about the number changes only with a new source.
-        if (was != is || range_text(before) != range_text(after)) && !new_source {
-            let what = if was != is {
-                format!(
-                    "its Confidence changed from {} to {}",
+        let moved = !same_value(name, &old_value, &new_value);
+        let known_changed = was != is || range_text(before) != range_text(after);
+        let shape = if moved {
+            shape_change(name, &old_value, &new_value)
+        } else {
+            None
+        };
+        // What's known about a number changes only with a new source: its
+        // Confidence, its range, and where its numbers hold.
+        if !new_source {
+            if was != is {
+                problems.push(after.problem(format!(
+                    "{label}: its Confidence changed from {} to {}, which changes what's known about it, so it needs a new source too",
                     was.word(),
                     is.word()
-                )
-            } else {
-                format!(
-                    "its range changed from {} to {}",
+                )));
+            } else if range_text(before) != range_text(after) {
+                problems.push(after.problem(format!(
+                    "{label}: its range changed from {} to {}, which changes what's known about it, so it needs a new source too",
                     range_text(before).unwrap_or_default(),
                     range_text(after).unwrap_or_default()
-                )
-            };
-            problems.push(after.problem(format!(
-                "{label}: {what}, which changes what's known about it, so it needs a new source too"
-            )));
+                )));
+            }
+            if let Some(what) = &shape {
+                problems.push(after.problem(format!(
+                    "{label}: {what}, which changes what's known about it, so it needs a new source"
+                )));
+            }
+        } else if moved || known_changed {
+            report.passed_on_a_new_source.push(format!(
+                "{quad_file} line {}: {label} changed ({}) with a new source",
+                after.line,
+                [
+                    moved.then(|| format!("{old_value} → {new_value}")),
+                    (was != is).then(|| format!("Confidence {} → {}", was.word(), is.word())),
+                    (range_text(before) != range_text(after)).then(|| {
+                        format!(
+                            "range {} → {}",
+                            range_text(before).unwrap_or_default(),
+                            range_text(after).unwrap_or_default()
+                        )
+                    }),
+                ]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join("; ")
+            ));
         }
-        if same_value(name, &old_value, &new_value) {
+        if !moved {
             continue;
         }
         if is != Confidence::Estimate {
@@ -401,27 +681,45 @@ pub fn check_feel_test_rules(
         }
         // An Estimate that moves, whatever else changed with it, is logged
         // and stays inside its range.
-        let logged = new_rows.iter().any(|row| {
+        let row = new_rows.iter().find(|row| {
             &row.setting == name
                 && same_value(name, &row.old, &old_value)
                 && same_value(name, &row.new, &new_value)
         });
-        if !logged {
+        let Some(row) = row else {
             problems.push(after.problem(format!(
                 "{label} is an Estimate that moved from {old_value} to {new_value}, so {log_file} needs a new row for it: the date, {label}, {old_value} → {new_value}, and why"
             )));
+            continue;
+        };
+        // A move that comes with a new source, recorded as such, starts its
+        // range afresh: the new value is where it's measured from next time.
+        if new_source && is_new_source(row) {
+            if let Some(sentence) = outside_absolute_range(name, after, &new_value) {
+                problems.push(after.problem(sentence));
+            }
+            continue;
         }
-        // Its start: the earliest row already in the log before this change,
-        // or the value before it. Never a row this change adds.
-        let start = before_rows
-            .iter()
-            .find(|row| &row.setting == name)
-            .map_or(old_value.clone(), |row| row.old.clone());
-        if let Some(sentence) = outside_its_range(name, after, &new_value, &start, new_source) {
+        if new_source {
+            problems.push(Problem::of(
+                log_file,
+                row.line,
+                format!(
+                    "{label} moved with a new source, so its row's why starts with \"New source\", which records where its range is measured from now"
+                ),
+            ));
+            continue;
+        }
+        // A shape change without a new source is refused above already.
+        if shape.is_some() {
+            continue;
+        }
+        let start = start_of(name, &before_rows, &old_value);
+        if let Some(sentence) = outside_its_range(name, after, &new_value, &start) {
             problems.push(after.problem(sentence));
         }
     }
-    problems
+    report
 }
 
 fn source_changed(
@@ -439,59 +737,66 @@ fn source_changed(
     before.source != after.source || line(before_quad, before) != line(after_quad, after)
 }
 
+/// An Estimate's new value against an absolute range.
+fn outside_absolute_range(name: &str, setting: &Setting, new_value: &str) -> Option<String> {
+    let range @ Range::Absolute { .. } = setting.range.as_ref()? else {
+        return None;
+    };
+    let form = schema::find(name).and_then(|(_, key)| movable_form(key.kind))?;
+    let label = label(name);
+    let new = match read_value(name, new_value) {
+        Ok(new) => new,
+        Err(sentence) => return Some(format!("{label}'s new value can't be read: {sentence}")),
+    };
+    quad::outside_range(form, range, new_value, &new).map(|sentence| format!("{label}: {sentence}"))
+}
+
 /// Whether an Estimate's new value is outside its range: an absolute range
-/// directly, a relative one measured from `start`, point by point on a curve.
-/// A value that can't be read is a problem, never a pass.
+/// directly, a relative one measured from `start`, point by point on a curve
+/// (whose places the shape check holds still). A value that can't be read is
+/// a problem, never a pass.
 fn outside_its_range(
     name: &str,
     setting: &Setting,
     new_value: &str,
     start: &str,
-    new_source: bool,
 ) -> Option<String> {
     let range = setting.range.as_ref()?;
+    let Range::Relative { low, high } = range else {
+        return outside_absolute_range(name, setting, new_value);
+    };
     let label = label(name);
     let form = schema::find(name).and_then(|(_, key)| movable_form(key.kind))?;
     let new = match read_value(name, new_value) {
         Ok(new) => new,
         Err(sentence) => return Some(format!("{label}'s new value can't be read: {sentence}")),
     };
-    match range {
-        Range::Absolute { .. } => quad::outside_range(form, range, new_value, &new)
-            .map(|sentence| format!("{label}: {sentence}")),
-        Range::Relative { low, high } => {
-            let from = match read_value(name, start) {
-                Ok(from) => from,
-                Err(sentence) => {
-                    return Some(format!(
-                        "{label}'s relative range is measured from the value it started at, {start}, which can't be read: {sentence}"
-                    ));
-                }
-            };
-            let (new, from) = (quad::ranged(form, &new), quad::ranged(form, &from));
-            if new.len() != from.len() {
-                return (!new_source).then(|| {
-                    format!(
-                        "{label} now has {} points and started with {}; a change in its points changes what's known about it, so it needs a new source",
-                        new.len(),
-                        from.len()
-                    )
-                });
-            }
-            let fits = new.iter().zip(&from).all(|(new, from)| {
-                if *from == 0.0 {
-                    *new == 0.0
-                } else {
-                    let ratio = new / from;
-                    *low <= ratio && ratio <= *high
-                }
-            });
-            (!fits).then(|| {
-                format!(
-                    "{label} moved to {new_value}, outside its range, {}, measured from {start}, the value it started at",
-                    range.text()
-                )
-            })
+    let from = match read_value(name, start) {
+        Ok(from) => from,
+        Err(sentence) => {
+            return Some(format!(
+                "{label}'s relative range is measured from the value it started at, {start}, which can't be read: {sentence}"
+            ));
         }
+    };
+    if shape_change(name, start, new_value).is_some() {
+        return Some(format!(
+            "{label}'s relative range is measured from the value it started at, {start}, whose points or condition differ from its value now; record its re-sourcing with a \"New source\" row"
+        ));
     }
+    let (new, from) = (quad::ranged(form, &new), quad::ranged(form, &from));
+    let fits = new.iter().zip(&from).all(|(new, from)| {
+        if *from == 0.0 {
+            *new == 0.0
+        } else {
+            let ratio = new / from;
+            *low <= ratio && ratio <= *high
+        }
+    });
+    (!fits).then(|| {
+        format!(
+            "{label} moved to {new_value}, outside its range, {}, measured from {start}, the value it started at",
+            range.text()
+        )
+    })
 }

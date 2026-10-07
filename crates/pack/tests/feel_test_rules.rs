@@ -5,7 +5,9 @@
 mod common;
 
 use common::{LOG, QUAD, good_fixture, line_of};
-use opendrone_pack::feel_tests::{QuadVersion, check_feel_test_rules};
+use opendrone_pack::feel_tests::{
+    FeelTestReport, QuadFiles, QuadVersion, check_feel_test_rules, compare_packs,
+};
 
 /// The fixture's Quad definition and Feel Test log, before any change.
 fn before() -> (String, String) {
@@ -183,7 +185,7 @@ fn a_curve_that_changes_its_number_of_points_needs_a_new_source() {
         problems(&quad, &log),
         [at(
             line_of(&quad, "4.10 V at 75%"),
-            "[battery] voltage_curve now has 4 points and started with 3; a change in its points changes what's known about it, so it needs a new source"
+            "[battery] voltage_curve: it now has 4 points and had 3, which changes what's known about it, so it needs a new source"
         )]
     );
 }
@@ -374,5 +376,256 @@ fn a_version_an_older_checker_passed_is_still_compared_number_by_number() {
             line_of(&quad, "24.0 g"),
             "[frame] dry_mass is Manufacturer, so it's locked: it changed from 23.0 g to 24.0 g without a new source; name a new source, or update its line in [sources]"
         )
+    );
+}
+
+/// The full report of a change: problems and the numbers that passed on a
+/// new source.
+fn report(quad: &str, log: &str) -> FeelTestReport {
+    let (quad_before, log_before) = before();
+    compare_packs(
+        &[files("fixture/ducted", &quad_before, &log_before)],
+        &[files("fixture/ducted", quad, log)],
+    )
+}
+
+fn files(id: &str, quad: &str, log: &str) -> QuadFiles {
+    let folder = format!(
+        "packs/{}/quads/{}",
+        id.split('/').next().unwrap(),
+        id.split('/').nth(1).unwrap()
+    );
+    QuadFiles {
+        id: id.to_string(),
+        quad_file: format!("{folder}/quad.toml"),
+        log_file: format!("{folder}/feel-tests.md"),
+        quad: quad.to_string(),
+        feel_tests: Some(log.to_string()),
+    }
+}
+
+fn sentences(problems: &opendrone_pack::Problems) -> Vec<String> {
+    problems.0.iter().map(ToString::to_string).collect()
+}
+
+#[test]
+fn a_curve_whose_points_move_sideways_needs_a_new_source() {
+    // Reviewer's round-2 case: the same voltages at other charge levels change
+    // the curve as much as moving the voltages, but no range covers them.
+    let old = "4.35 V at 100%, 3.92 V at 50%, 3.30 V at 0%";
+    let new = "4.35 V at 100%, 3.92 V at 5%, 3.30 V at 0%";
+    let quad = changed(old, new);
+    let log = log_with(&format!(
+        "| 2026-11-09 | [battery] voltage_curve | {old} → {new} | sideways |"
+    ));
+    assert_eq!(
+        problems(&quad, &log),
+        [at(
+            line_of(&quad, "3.92 V at 5%"),
+            "[battery] voltage_curve: the places its points hold at moved, which changes what's known about it, so it needs a new source"
+        )]
+    );
+}
+
+#[test]
+fn a_value_whose_condition_changes_needs_a_new_source() {
+    // Reviewer's round-2 case: "0.3 A at 4 V" to "0.3 A at 0.05 V" keeps the
+    // current, but the Simulation receives the voltage too.
+    let quad = changed("\"0.3 A at 4 V\"", "\"0.3 A at 0.05 V\"");
+    let log = log_with(
+        "| 2026-11-09 | [motors] no_load_current | 0.3 A at 4 V → 0.3 A at 0.05 V | measured lower |",
+    );
+    assert_eq!(
+        problems(&quad, &log),
+        [at(
+            line_of(&quad, "0.05 V"),
+            "[motors] no_load_current: the condition it holds at changed, which changes what's known about it, so it needs a new source"
+        )]
+    );
+}
+
+#[test]
+fn an_estimate_re_sourced_with_a_new_source_row_starts_its_range_afresh() {
+    // Rotor inertia, ×0.5–×2, moved ×4 with a new source and a "New source"
+    // row: it passes, and CI lists it for the Reviewer.
+    let quad = changed(
+        "\"0.25 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"guess\"",
+        "\"1 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"worked-out\"",
+    );
+    let log = log_with(
+        "| 2026-11-09 | [props] rotor_inertia | 0.25 g·cm² → 1 g·cm² | New source: weighed the props and bells |",
+    );
+    let found = report(&quad, &log);
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+    assert_eq!(
+        found.passed_on_a_new_source,
+        [format!(
+            "{QUAD} line {}: [props] rotor_inertia changed (0.25 g·cm² → 1 g·cm²) with a new source",
+            line_of(&quad, "1 g·cm²")
+        )]
+    );
+    // The next change is measured from 1 g·cm², the value the new source
+    // gave: ×1.5 from there passes, though it is ×6 from where it started.
+    let later_quad = quad.replacen("\"1 g·cm²\"", "\"1.5 g·cm²\"", 1);
+    let later_log = log.clone()
+        + "| 2026-11-16 | [props] rotor_inertia | 1 g·cm² → 1.5 g·cm² | spins up a touch slowly |\n";
+    let later = check_feel_test_rules(
+        QUAD,
+        LOG,
+        QuadVersion {
+            quad: Some(&quad),
+            feel_tests: Some(&log),
+        },
+        QuadVersion {
+            quad: Some(&later_quad),
+            feel_tests: Some(&later_log),
+        },
+    );
+    assert_eq!(sentences(&later), Vec::<String>::new());
+}
+
+#[test]
+fn a_new_source_row_needs_a_real_new_source() {
+    // Without a new source, a "New source" row can't move the start.
+    let quad = changed(
+        "roll 70, pitch 90, yaw 140 g·cm²",
+        "roll 140, pitch 180, yaw 280 g·cm²",
+    );
+    let log = log_with(
+        "| 2026-11-09 | [frame] inertia | roll 70, pitch 90, yaw 140 g·cm² → roll 140, pitch 180, yaw 280 g·cm² | New source: trust me |",
+    );
+    assert_eq!(
+        problems(&quad, &log),
+        [log_at(
+            line_of(&log, "trust me"),
+            "this row says [frame] inertia has a new source, but this change doesn't change its source; a \"New source\" row records a re-sourcing, which moves where its range is measured from"
+        )]
+    );
+}
+
+#[test]
+fn an_estimate_moved_with_a_new_source_says_so_in_its_row() {
+    let quad = changed(
+        "\"0.25 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"guess\"",
+        "\"1 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"worked-out\"",
+    );
+    let log =
+        log_with("| 2026-11-09 | [props] rotor_inertia | 0.25 g·cm² → 1 g·cm² | weighed them |");
+    assert_eq!(
+        problems(&quad, &log),
+        [log_at(
+            line_of(&log, "weighed them"),
+            "[props] rotor_inertia moved with a new source, so its row's why starts with \"New source\", which records where its range is measured from now"
+        )]
+    );
+}
+
+#[test]
+fn every_number_that_passes_only_on_a_new_source_is_listed() {
+    let quad = changed("\"23.0 g\"", "\"24.0 g\"").replace(
+        "maker      = \"the maker's page\"",
+        "maker      = \"the maker's page, read again\"",
+    );
+    let found = report(&quad, &before().1);
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+    let listed: Vec<&str> = found
+        .passed_on_a_new_source
+        .iter()
+        .map(|line| line.split(": ").nth(1).unwrap())
+        .collect();
+    assert!(
+        listed.contains(&"[frame] dry_mass changed (23.0 g → 24.0 g) with a new source"),
+        "{listed:?}"
+    );
+}
+
+#[test]
+fn quads_are_paired_by_id_so_a_pure_rename_passes() {
+    let (quad, log) = before();
+    let found = compare_packs(
+        &[files("fixture/ducted", &quad, &log)],
+        &[files("fixture/ducted-pro", &quad, &log)],
+    );
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+}
+
+#[test]
+fn a_rename_that_also_moves_a_number_is_refused() {
+    // Reviewer's round-2 case: renaming the Quad's folder (or its Pack's id)
+    // made it a new Quad, so a 20× inertia move compared with nothing.
+    let (quad, log) = before();
+    let moved = changed(
+        "roll 70, pitch 90, yaw 140 g·cm²",
+        "roll 1400, pitch 1800, yaw 2800 g·cm²",
+    );
+    for new_id in ["fixture/ducted-pro", "renamed-pack/ducted"] {
+        let found = compare_packs(
+            &[files("fixture/ducted", &quad, &log)],
+            &[files(new_id, &moved, &log)],
+        );
+        let folder = format!(
+            "packs/{}/quads/{}",
+            new_id.split('/').next().unwrap(),
+            new_id.split('/').nth(1).unwrap()
+        );
+        assert_eq!(
+            sentences(&found.problems),
+            [format!(
+                "{folder}/quad.toml: this change adds the Quad {new_id} and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another"
+            )]
+        );
+    }
+}
+
+#[test]
+fn a_new_quad_beside_the_old_ones_has_nothing_to_compare() {
+    let (quad, log) = before();
+    let other = changed(
+        "roll 70, pitch 90, yaw 140 g·cm²",
+        "roll 1400, pitch 1800, yaw 2800 g·cm²",
+    );
+    let found = compare_packs(
+        &[files("fixture/ducted", &quad, &log)],
+        &[
+            files("fixture/ducted", &quad, &log),
+            files("fixture/heavy", &other, &log),
+        ],
+    );
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+}
+
+#[test]
+fn taking_a_number_out_needs_a_new_source() {
+    // Taking the ducts off a whoop changes its physics as much as moving
+    // their numbers.
+    let quad = changed(
+        "[ducts]\nram_drag       = { value = \"1.2 s⁻¹\", confidence = \"Estimate\", range = \"0.6–2.4 s⁻¹\", source = \"guess\" }\nnose_up_offset = { value = \"13 mm\", confidence = \"Estimate\", range = \"9–18 mm\", source = \"guess\" }\n",
+        "",
+    )
+    .replace(
+        "duct_rings  = { value = \"37 mm inside, 1.5 mm wall, 14 mm tall\", confidence = \"Estimate\", range = \"×0.9–×1.1\", source = \"guess\" }\n",
+        "",
+    );
+    let found = problems(&quad, &before().1);
+    assert_eq!(found.len(), 3, "{found:?}");
+    assert_eq!(
+        found[0],
+        format!(
+            "{QUAD}: [collision] duct_rings was taken out, which changes the Quad as much as moving it, so it needs a new source: change or remove its source's line in [sources]"
+        )
+    );
+}
+
+#[test]
+fn a_count_or_choice_that_changes_is_listed_for_the_reviewer() {
+    let quad = changed("blades             = 3", "blades             = 4");
+    let found = report(&quad, &before().1);
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+    assert_eq!(
+        found.changed_without_a_confidence,
+        [format!(
+            "{QUAD} line {}: [props] blades changed (3 → 4); it carries no Confidence",
+            line_of(&quad, "blades")
+        )]
     );
 }

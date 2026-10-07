@@ -144,17 +144,21 @@ Each Quad keeps a log of every Estimate a Feel Test moves, oldest first:
 | 2026-11-02 | [props] rotor_drag | 0.3 s⁻¹ → 0.35 s⁻¹ | carved too wide after a sprint |
 ```
 
-The values are written with their units, as `quad.toml` writes them; they're compared as numbers, so "300 ms" matches "0.3 s". The Pack checker refuses a row whose values don't read as its number. `cargo xtask feel-tests` compares each Quad definition with the base of the change and refuses:
+The values are written with their units, as `quad.toml` writes them; they're compared as numbers, so "300 ms" matches "0.3 s". The Pack checker refuses a row whose values don't read as its number.
+
+`cargo xtask feel-tests` compares each Quad with the same Quad before the change. Quads are paired by id (the Pack's id from its `pack.toml`, and the Quad's folder), so moving a Pack's folder changes nothing. It refuses:
 
 - an Estimate that moved without a new row naming it, its old value and its new one, even when its range was re-sourced in the same change;
 - a new row that doesn't record a move this change makes: the same Estimate, its value before the change as the old value, and its value after as the new one;
-- an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the old value of its earliest row already in the log, or, with none, its value before this change. A row added in the same change never sets the start, so a made-up earlier row can't stretch a range.
-- a curve that changes its number of points without a new source;
+- an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the new value of its latest "New source" row already in the log, or else the old value of its earliest row there, or else its value before this change. A row added in the same change never sets the start, so a made-up earlier row can't stretch a range.
 - a Measured, Manufacturer or Derived number that changed without a new source, meaning a different source key, or a changed line for its key in `[sources]`;
-- an Estimate's range, or any number's Confidence, changed without a new source, so a Feel Test can't widen its own range;
+- a change to what's known about a number without a new source: its Confidence, its range, or where its numbers hold (a curve's places or number of points, or the condition of a value written "at" one, such as the 4 V in "0.3 A at 4 V"). So a Feel Test can't widen its own range, or move a curve's points sideways instead of up and down;
+- an Estimate moved with a new source whose row's why doesn't start with "New source", and a "New source" row with no real new source. A "New source" row starts the range afresh from its new value. One may also record a re-sourced range whose value stayed put, with the same old and new value;
+- a number taken out, such as a whoop's `[ducts]` section, without a new source;
+- a change that removes a Quad and adds one, unless the added Quad keeps every setting of a removed one: a pure rename or move. Rename or move a Quad in a change of its own, and change its numbers in another;
 - an earlier row changed or removed: the log only grows.
 
-Counts, choices, camera defaults and the sound block move freely. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
+"A new source" is easy to write, so CI lists every number that passed only because its source changed, and the Reviewer judges whether each new source is real. Counts, choices, camera defaults and the sound block carry no Confidence and move freely; CI lists the counts and choices that changed too. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
 
 ## Fingerprints
 

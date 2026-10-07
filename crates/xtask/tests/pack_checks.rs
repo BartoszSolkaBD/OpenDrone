@@ -181,6 +181,91 @@ fn a_locked_number_changed_without_a_new_source_blocks() {
     );
 }
 
+/// The fixture's inertia moved 20×, against its range of ×0.5–×2.
+const INERTIA: &str = "roll 70, pitch 90, yaw 140 g·cm²";
+const INERTIA_20X: &str = "roll 1400, pitch 1800, yaw 2800 g·cm²";
+
+#[test]
+fn moving_a_packs_folder_keeps_its_quads_ids_so_the_rules_still_compare_them() {
+    // Reviewer's round-2 case: the Pack's folder renamed with a 20× move.
+    let scratch = Scratch::new("feel-tests-pack-folder").with_base();
+    fs::rename(
+        scratch.root.join("packs/fixture"),
+        scratch.root.join("packs/built-in"),
+    )
+    .unwrap();
+    scratch.change(
+        "packs/built-in/quads/ducted/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("rename the Pack's folder and move the inertia");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains("packs/built-in/quads/ducted/quad.toml line 22: [frame] inertia is an Estimate that moved"),
+        "{text}"
+    );
+}
+
+#[test]
+fn renaming_a_quads_folder_must_keep_every_number() {
+    // Reviewer's round-2 case: the Quad's folder renamed with a 20× move.
+    let scratch = Scratch::new("feel-tests-quad-folder").with_base();
+    fs::rename(
+        scratch.root.join("packs/fixture/quads/ducted"),
+        scratch.root.join("packs/fixture/quads/ducted-pro"),
+    )
+    .unwrap();
+    scratch.change(
+        "packs/fixture/quads/ducted-pro/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("rename the Quad's folder and move the inertia");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains("packs/fixture/quads/ducted-pro/quad.toml: this change adds the Quad fixture/ducted-pro and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was"),
+        "{text}"
+    );
+}
+
+#[test]
+fn renaming_a_quads_folder_alone_passes() {
+    let scratch = Scratch::new("feel-tests-pure-rename").with_base();
+    fs::rename(
+        scratch.root.join("packs/fixture/quads/ducted"),
+        scratch.root.join("packs/fixture/quads/ducted-pro"),
+    )
+    .unwrap();
+    scratch.commit("rename the Quad's folder");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+}
+
+#[test]
+fn a_number_that_passes_on_a_new_source_is_listed_for_the_reviewer() {
+    let scratch = Scratch::new("feel-tests-listed").with_base();
+    scratch.change(QUAD, "\"23.0 g\"", "\"24.0 g\"");
+    scratch.change(
+        QUAD,
+        "maker      = \"the maker's page\"",
+        "maker      = \"the maker's page, read again\"",
+    );
+    scratch.commit("heavier, with a new source");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("These changed and passed only because their source changed too; the Reviewer judges whether each new source is real:"),
+        "{text}"
+    );
+    assert!(
+        text.contains("[frame] dry_mass changed (23.0 g → 24.0 g) with a new source"),
+        "{text}"
+    );
+}
+
 #[test]
 fn feel_tests_needs_a_base_revision_that_exists() {
     let scratch = Scratch::new("feel-tests-no-base").with_base();

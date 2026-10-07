@@ -5,18 +5,21 @@
 //!   `scenarios/test-quads/` with the same checker the game uses, and lists
 //!   every problem with its file, line and a plain sentence.
 //! - `feel-tests --base <revision>` compares every Quad definition with the
-//!   one at `<revision>` (in CI, the pull request's base, `HEAD^1`): an
-//!   Estimate that moved needs a new row in its Quad's `feel-tests.md` and must
-//!   stay inside its range, and a Measured, Manufacturer or Derived number
-//!   that changed needs a new source. The rules themselves live in
-//!   `opendrone_pack::feel_tests`; this only fetches the old files from git.
+//!   same Quad at `<revision>` (in CI, the pull request's base, `HEAD^1`),
+//!   paired by id: the Pack's id from its `pack.toml` and the Quad's folder
+//!   name, so moving a folder changes nothing. An Estimate that moved needs a
+//!   new row in its Quad's `feel-tests.md` and must stay inside its range,
+//!   and a Measured, Manufacturer or Derived number that changed needs a new
+//!   source. Every number that passed only because its source changed is
+//!   listed, for the Reviewer. The rules themselves live in
+//!   `opendrone_pack::feel_tests`; this only reads both versions' files.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use opendrone_pack::Packs;
-use opendrone_pack::feel_tests::{QuadVersion, check_feel_test_rules};
+use opendrone_pack::feel_tests::{QuadFiles, compare_packs};
+use opendrone_pack::{Packs, read_manifest};
 
 /// The repo around the current folder: the nearest folder holding `packs/`.
 fn repo() -> Result<PathBuf, String> {
@@ -92,53 +95,56 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
     let checked = repo().and_then(|root| {
         let git = Git { root: &root, base };
         git.check_base()?;
-        let mut problems = Vec::new();
-        let quads = quad_folders(&root);
-        for folder in &quads {
-            let quad = format!("{folder}/quad.toml");
-            let log = format!("{folder}/feel-tests.md");
-            let now = |file: &str| fs::read_to_string(root.join(file)).ok();
-            let (quad_now, log_now) = (now(&quad), now(&log));
-            let (quad_before, log_before) = (git.show(&quad)?, git.show(&log)?);
-            let found = check_feel_test_rules(
-                &quad,
-                &log,
-                QuadVersion {
-                    quad: quad_before.as_deref(),
-                    feel_tests: log_before.as_deref(),
-                },
-                QuadVersion {
-                    quad: quad_now.as_deref(),
-                    feel_tests: log_now.as_deref(),
-                },
-            );
-            problems.extend(found.0.iter().map(ToString::to_string));
-        }
-        Ok((quads.len(), problems))
+        let before = quads_at_base(&git)?;
+        let after = quads_now(&root);
+        Ok((after.len(), compare_packs(&before, &after)))
     });
-    match checked {
+    let (quads, report) = match checked {
         Err(message) => {
             eprintln!("The Feel Test log rules can't be checked: {message}");
-            ExitCode::from(2)
+            return ExitCode::from(2);
         }
-        Ok((quads, problems)) if problems.is_empty() => {
-            println!(
-                "The Feel Test log rules hold for all {quads} Quad(s), compared with {base}: every Estimate that moved has its log row and stays inside its range, and every locked number that changed has a new source."
-            );
-            ExitCode::SUCCESS
-        }
-        Ok((_, problems)) => {
-            println!("The Feel Test log rules are broken, compared with {base}:");
-            for problem in &problems {
-                println!("- {problem}");
-            }
-            ExitCode::FAILURE
+        Ok(found) => found,
+    };
+    if !report.passed_on_a_new_source.is_empty() {
+        println!(
+            "These changed and passed only because their source changed too; the Reviewer judges whether each new source is real:"
+        );
+        for line in &report.passed_on_a_new_source {
+            println!("- {line}");
         }
     }
+    if !report.changed_without_a_confidence.is_empty() {
+        println!(
+            "These changed and carry no Confidence (counts and choices), so the rules can't judge them; the Reviewer checks them:"
+        );
+        for line in &report.changed_without_a_confidence {
+            println!("- {line}");
+        }
+    }
+    if report.problems.is_empty() {
+        println!(
+            "The Feel Test log rules hold for all {quads} Quad(s), compared with {base}: every Estimate that moved has its log row and stays inside its range, and every locked number that changed has a new source."
+        );
+        return ExitCode::SUCCESS;
+    }
+    println!("The Feel Test log rules are broken, compared with {base}:");
+    for problem in &report.problems.0 {
+        println!("- {problem}");
+    }
+    ExitCode::FAILURE
 }
 
-/// Every Quad's folder in the working tree, as `packs/<pack>/quads/<quad>`.
-fn quad_folders(root: &Path) -> Vec<String> {
+/// A Pack's id from its `pack.toml`, or its folder's name when the manifest
+/// can't be read (the Pack checker says why).
+fn pack_id(folder: &str, manifest: Option<&str>) -> String {
+    manifest
+        .and_then(|text| read_manifest("pack.toml", text).ok())
+        .map_or_else(|| folder.to_string(), |manifest| manifest.id)
+}
+
+/// Every Quad in the working tree, by id.
+fn quads_now(root: &Path) -> Vec<QuadFiles> {
     let names = |folder: &Path| -> Vec<String> {
         let mut names: Vec<String> = fs::read_dir(folder)
             .map(|entries| {
@@ -153,13 +159,51 @@ fn quad_folders(root: &Path) -> Vec<String> {
         names.sort();
         names
     };
-    let mut folders = Vec::new();
+    let read = |path: &str| fs::read_to_string(root.join(path)).ok();
+    let mut quads = Vec::new();
     for pack in names(&root.join("packs")) {
+        let id = pack_id(&pack, read(&format!("packs/{pack}/pack.toml")).as_deref());
         for quad in names(&root.join("packs").join(&pack).join("quads")) {
-            folders.push(format!("packs/{pack}/quads/{quad}"));
+            let folder = format!("packs/{pack}/quads/{quad}");
+            let Some(text) = read(&format!("{folder}/quad.toml")) else {
+                continue;
+            };
+            quads.push(QuadFiles {
+                id: format!("{id}/{quad}"),
+                quad_file: format!("{folder}/quad.toml"),
+                log_file: format!("{folder}/feel-tests.md"),
+                quad: text,
+                feel_tests: read(&format!("{folder}/feel-tests.md")),
+            });
         }
     }
-    folders
+    quads
+}
+
+/// Every Quad at the base revision, by id, read from git.
+fn quads_at_base(git: &Git<'_>) -> Result<Vec<QuadFiles>, String> {
+    let files = git.list("packs")?;
+    let mut quads = Vec::new();
+    for path in &files {
+        let parts: Vec<&str> = path.split('/').collect();
+        let ["packs", pack, "quads", quad, "quad.toml"] = parts.as_slice() else {
+            continue;
+        };
+        let manifest = git.show(&format!("packs/{pack}/pack.toml"))?;
+        let id = pack_id(pack, manifest.as_deref());
+        let folder = format!("packs/{pack}/quads/{quad}");
+        let Some(text) = git.show(path)? else {
+            continue;
+        };
+        quads.push(QuadFiles {
+            id: format!("{id}/{quad}"),
+            quad_file: format!("{folder}/quad.toml"),
+            log_file: format!("{folder}/feel-tests.md"),
+            quad: text,
+            feel_tests: git.show(&format!("{folder}/feel-tests.md"))?,
+        });
+    }
+    Ok(quads)
 }
 
 /// The files of one revision, read with git.
@@ -192,6 +236,23 @@ impl Git<'_> {
                 self.base
             ))
         }
+    }
+
+    /// Every file under `folder` in the base revision, with `/` between
+    /// folders.
+    fn list(&self, folder: &str) -> Result<Vec<String>, String> {
+        let listed = self.run(&["ls-tree", "-r", "--name-only", self.base, "--", folder])?;
+        if !listed.status.success() {
+            return Err(format!(
+                "git can't list {folder} at {}: {}",
+                self.base,
+                String::from_utf8_lossy(&listed.stderr).trim()
+            ));
+        }
+        Ok(String::from_utf8_lossy(&listed.stdout)
+            .lines()
+            .map(str::to_string)
+            .collect())
     }
 
     /// The file at `path` in the base revision, or `None` when it wasn't
