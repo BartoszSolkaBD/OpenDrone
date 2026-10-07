@@ -25,8 +25,9 @@
 //!   ([`MapDefinition`]).
 //!
 //! Every file starts with `format = N`: a newer format is refused ("needs a
-//! newer OpenDrone"), and an older one is upgraded in memory
-//! ([`document::upgraded`]).
+//! newer OpenDrone"), and an older one is upgraded in memory by the same
+//! steps `cargo xtask migrate` runs over the repo's own files
+//! ([`migration`]).
 //!
 //! The numbers it hands the Simulation must be the same on every computer
 //! (ADR-0001), so it converts units with multiplication and division only, and
@@ -38,6 +39,7 @@ pub mod document;
 pub mod feel_tests;
 mod manifest;
 mod map;
+pub mod migration;
 mod quad;
 pub mod schema;
 mod tune;

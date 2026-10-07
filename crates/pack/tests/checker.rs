@@ -9,7 +9,6 @@
 mod common;
 
 use common::{Fixture, LOG, MANIFEST, QUAD, TEST_QUAD, TUNE};
-use opendrone_pack::document::{FORMAT, Upgrade, upgrade_text};
 use opendrone_pack::{Confidence, PropDirection, read_quad_file};
 
 fn at(file: &str, line: usize, sentence: &str) -> String {
@@ -791,39 +790,6 @@ fn every_file_starts_with_its_format() {
             "every file starts with `format = 1`, before anything else but comments"
         )]
     );
-}
-
-#[test]
-fn an_older_format_is_upgraded_in_memory_one_step_at_a_time() {
-    fn one_to_two(text: &str) -> Result<String, String> {
-        Ok(text
-            .replace("format = 1", "format = 2")
-            .replace("frame_mass", "dry_mass"))
-    }
-    fn two_to_three(text: &str) -> Result<String, String> {
-        Ok(text.replace("format = 2", "format = 3") + "# upgraded\n")
-    }
-    let steps = [
-        Upgrade {
-            from: 1,
-            rewrite: one_to_two,
-        },
-        Upgrade {
-            from: 2,
-            rewrite: two_to_three,
-        },
-    ];
-    assert_eq!(
-        upgrade_text("format = 1\nframe_mass = \"23 g\"\n", 1, 3, &steps).unwrap(),
-        "format = 3\ndry_mass = \"23 g\"\n# upgraded\n"
-    );
-    assert_eq!(
-        upgrade_text("format = 0\n", 0, 3, &steps).unwrap_err(),
-        "this file is format 0, and this OpenDrone has no step that upgrades it"
-    );
-    // Format 1 is the first, so today nothing is older than what this
-    // OpenDrone reads.
-    assert_eq!(FORMAT, 1);
 }
 
 // Fingerprints

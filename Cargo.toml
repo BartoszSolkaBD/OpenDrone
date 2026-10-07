@@ -34,6 +34,10 @@ libm = "=0.2.16"
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 serde_json = "=1.0.151"
 toml = "=1.1.6"
+# The format migration steps rewrite Scenario and Pack files with it, keeping
+# every comment and the layout (#60). opendrone-pack holds the steps, because
+# the Pack reader upgrades an older file in memory with them.
+toml_edit = "=0.25.15"
 
 # Every crate takes these lints with `[lints] workspace = true`, except
 # opendrone-input and the game, which may use `unsafe` to talk to SDL and the

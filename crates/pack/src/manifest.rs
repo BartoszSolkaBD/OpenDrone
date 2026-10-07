@@ -1,6 +1,7 @@
 //! A Pack's manifest, `pack.toml` (#16 §1 and §12, ADR-0011).
 
-use crate::document::{self, Document, Problems};
+use crate::document::{Document, Problems};
+use crate::migration::{self, FileKind};
 
 /// What a Pack says about itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,7 +48,7 @@ const TEST: &str = "test";
 /// Reads `pack.toml`. A broken manifest skips the whole Pack, so every
 /// problem is returned at once.
 pub fn read_manifest(file: &str, text: &str) -> Result<Manifest, Problems> {
-    let text = document::upgraded(file, text, document::PACK_UPGRADES)?;
+    let text = migration::upgraded(file, text, FileKind::Manifest)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
