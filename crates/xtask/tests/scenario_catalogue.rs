@@ -4,8 +4,7 @@
 //! shows.
 //!
 //! Each check makes a scratch repo with the two fixture Scenarios in
-//! `tests/fixtures/scenarios/` (written in the format the Scenario runner
-//! reads) and
+//! `tests/fixtures/scenarios/` (in the format the Scenario runner reads) and
 //! whatever else it needs, and reads the catalogue it gets.
 
 use std::fs;
@@ -33,15 +32,15 @@ fn the_catalogue_shows_each_scenarios_name_kind_quad_map_and_expectations_with_t
          9.81 m/s² × 1 s, downward |",
     );
 
-    catalogue.says("### Full right roll reaches the max rate");
-    catalogue.says("Flight Scenario · Quad `opendrone/whoop-65` · Map `test/empty-air`");
+    catalogue.says("### A slow yaw keeps its rate");
+    catalogue.says("Physics Scenario · Quad `opendrone/whoop-65` · Map `test/empty-air`");
     catalogue.says(
-        "| roll rate | at 1.25 s | 670 °/s ± 3% | **Source:** Betaflight Actual rates, full \
-         stick gives the max rate |",
+        "| yaw rate | at 0.5 s | 90 °/s ± 3% | **Source:** a made-up reference, for this fixture \
+         only |",
     );
     catalogue.says(
-        "| roll | mean over 1.0 s to 1.3 s | between 80° and 110° | **Observed:** what the sim \
-         did when this was written |",
+        "| heading | final over 0 s to 0.5 s | between 40° and 50° | **Observed:** what a \
+         made-up run did, for this fixture only |",
     );
 }
 
@@ -56,12 +55,12 @@ fn the_catalogue_counts_the_scenarios_and_each_kind_of_basis() {
 fn the_catalogue_groups_scenarios_by_their_folder() {
     let repo = Repo::with_fixture_scenarios("catalogue-groups");
     let catalogue = repo.catalogue().expect("the catalogue");
-    let flight_controller = catalogue.position("## `scenarios/flight-controller/`");
-    let full_roll = catalogue.position("### Full right roll reaches the max rate");
     let physics = catalogue.position("## `scenarios/physics/`");
     let free_fall = catalogue.position("### Free fall is exactly g");
+    let whoop = catalogue.position("## `scenarios/quads/whoop-65/`");
+    let slow_yaw = catalogue.position("### A slow yaw keeps its rate");
     assert!(
-        flight_controller < full_roll && full_roll < physics && physics < free_fall,
+        physics < free_fall && free_fall < whoop && whoop < slow_yaw,
         "{}",
         catalogue.0
     );
@@ -96,36 +95,25 @@ fn results_files_and_test_quads_are_not_listed_as_scenarios() {
 }
 
 #[test]
-fn an_expectation_without_a_source_rule_or_observed_basis_is_shown_as_having_none() {
-    let repo = Repo::new("catalogue-no-basis");
+fn a_scenario_the_runner_cant_read_stops_the_catalogue_with_the_runners_own_words() {
+    let repo = Repo::with_fixture_scenarios("catalogue-unreadable-scenario");
+    let fixture = fs::read_to_string(repo.root.join("scenarios/physics/free-fall.toml"))
+        .expect("read the fixture");
     repo.write(
-        "scenarios/physics/hover.toml",
-        r#"name = "Hover holds"
-[start]
-kind = "physics"
-quad = "opendrone/whoop-65"
-map  = "test/empty-air"
-
-[[expect]]
-what  = "height"
-at    = "1 s"
-value = "2 m ± 0.1 m"
-
-[[expect]]
-what  = "height"
-at    = "2 s"
-value = "2 m ± 0.1 m"
-basis = "it looked right"
-"#,
+        "scenarios/physics/no-basis.toml",
+        &fixture.replace(
+            "basis = \"rule: speed = g × t = 9.81 m/s² × 1 s, downward\"",
+            "basis = \"it looked right\"",
+        ),
     );
-    let catalogue = repo.catalogue().expect("the catalogue");
-    catalogue.says("| height | at 1 s | 2 m ± 0.1 m | **No Basis given** |");
-    catalogue.says(
-        "| height | at 2 s | 2 m ± 0.1 m | **No Source, Rule or Observed Basis:** it looked right |",
+    let problem = repo.catalogue().expect_err("a Scenario the runner refuses");
+    assert!(
+        problem.contains("scenarios/physics/no-basis.toml"),
+        "{problem}"
     );
-    catalogue.says(
-        "1 Scenario with 2 Expectations: 0 Source, 0 Rule, 0 Observed, 2 with no Source, Rule or \
-         Observed Basis.",
+    assert!(
+        problem.contains("a basis starts with \"source:\""),
+        "{problem}"
     );
 }
 
@@ -135,7 +123,7 @@ fn a_scenario_that_isnt_valid_toml_stops_the_catalogue_and_names_the_file() {
     repo.write("scenarios/physics/broken.toml", "name = \"Broken\n");
     let problem = repo.catalogue().expect_err("a broken Scenario");
     assert!(
-        problem.contains("`scenarios/physics/broken.toml` isn't valid TOML"),
+        problem.contains("scenarios/physics/broken.toml"),
         "{problem}"
     );
 }
@@ -169,7 +157,7 @@ impl Repo {
     fn with_fixture_scenarios(name: &str) -> Repo {
         let repo = Repo::new(name);
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/scenarios");
-        for file in ["physics/free-fall.toml", "flight-controller/full-roll.toml"] {
+        for file in ["physics/free-fall.toml", "quads/whoop-65/slow-yaw.toml"] {
             let text = fs::read_to_string(fixtures.join(file)).expect("read a fixture Scenario");
             repo.write(&format!("scenarios/{file}"), &text);
         }

@@ -58,6 +58,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 # Proving the physics
 
 - [Proving the physics](book/proving-the-physics.md)
+- [Reading a Scenario and its Results](verification/reading-a-scenario.md)
 - [The Scenario catalogue](book/scenario-catalogue.md)
 - [The Feel Test checklist](feel-test-checklist.md)
 - [Feel Test logs](book/feel-test-logs.md)

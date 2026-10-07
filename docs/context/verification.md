@@ -2,7 +2,7 @@
 
 How we prove the simulation behaves correctly, and keeps behaving correctly. Back to the [map](../../CONTEXT.md).
 
-How to read a Scenario file and the Results beside it, with the shared unit list: [Reading a Scenario and its Results](../verification/reading-a-scenario.md).
+How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). How every number is written: [the unit list](../units.md).
 
 ## Language
 
@@ -61,7 +61,7 @@ _Avoid_: Playtest, vibe check
 
 ## Rules
 
-- A Scenario is readable by a non-programmer. Every number carries its unit ([the unit list](../units.md)), sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.
+- A Scenario is readable by a non-programmer. Every number carries its unit, sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.
 - The whole simulation is bit-exact on every platform. The same starting state and the same inputs give exactly the same flight, to the last bit, on every OS ([ADR-0001](../adr/0001-bit-exact-determinism-with-ordinary-floats.md)). Picture, camera, sound and Breakup are outside it.
 - A Scenario's starting state spells out everything, every time, with no hidden defaults ([ADR-0002](../adr/0002-scenario-starting-state-spells-out-everything.md)). That includes the active Rates, every Assist and the Packet Rate, because all are part of the simulation. State nobody can write by hand is named in one word: "settled" motors and a "fresh" Flight Controller.
 - Motors may also start "stopped": at rest, with their ESCs already powered up and ready (start-up tones and ready beep done), so a motor starts on its first command as Bluejay starts any stopped motor. Only Physics and Thrust Stand Scenarios, which script their motors, may start "stopped": the Flight Controller doesn't run there, so its "fresh" start never makes it Reset. Where the Flight Controller runs, a landed "fresh" start is exactly Reset, so its ESCs play their start-up first; the runner refuses "stopped" there.

@@ -8,4 +8,4 @@ OpenDrone's behaviour can be reviewed without reading its code. Each behaviour i
 - **The same flight everywhere.** The Simulation is bit-exact on every computer ([ADR-0001](../adr/0001-bit-exact-determinism-with-ordinary-floats.md)), and CI runs every Scenario on macOS, Windows and Linux and checks that all three agree.
 - **Feel Tests** judge what numbers can't. The maintainer flies the Whoop 65 against the real quad it's modelled on, following [the checklist](../feel-test-checklist.md), and moves only Estimates, inside their ranges, logging every change.
 
-This part holds [the catalogue of every Scenario](scenario-catalogue.md), [the Feel Test checklist](../feel-test-checklist.md) and [each Quad's Feel Test log](feel-test-logs.md). How numbers and tolerances are written is in [the unit list](../units.md).
+This part holds [how to read a Scenario and its Results](../verification/reading-a-scenario.md), [the catalogue of every Scenario](scenario-catalogue.md), [the Feel Test checklist](../feel-test-checklist.md) and [each Quad's Feel Test log](feel-test-logs.md). How numbers and tolerances are written is in [the unit list](../units.md).

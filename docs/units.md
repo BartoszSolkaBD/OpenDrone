@@ -1,6 +1,6 @@
 # The unit list
 
-Every number in a Scenario or a Pack file is written as short text with its unit, such as `"9.81 m/s²"`, `"23.0 g"` or `"670 °/s ± 3%"`. This one list of units is shared by Scenarios and Packs, so a number means the same thing in both, and the Scenario runner and the Pack reader read numbers the same way ([#11 §2](https://github.com/BartoszSolkaBD/OpenDrone/issues/11), [#16 §3](https://github.com/BartoszSolkaBD/OpenDrone/issues/16)).
+Every number in a Scenario or a Pack file is written as short text with its unit, such as `"9.81 m/s²"`, `"23.0 g"` or `"670 °/s ± 3%"`. This one list of units is shared by Scenarios and Packs, so a number means the same thing in both ([#11 §2](https://github.com/BartoszSolkaBD/OpenDrone/issues/11), [#16 §3](https://github.com/BartoszSolkaBD/OpenDrone/issues/16)). The Scenario runner and the Pack reader both read numbers through the same code, [`crates/pack/src/units.rs`](../crates/pack/src/units.rs), so the two kinds of file always agree.
 
 The one exception is a Quad's Tune, which keeps Betaflight's own CLI form and units, with no unit text ([ADR-0015](adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). Counts and choices, such as a prop's blade count or its direction, are plain values with no unit.
 
@@ -12,7 +12,7 @@ The one exception is a Quad's Tune, which keeps Betaflight's own CLI form and un
 - **Everyday prefixes,** so a number stays ordinary: `"140 g·cm²"`, not `"1.4 × 10⁻⁵ kg·m²"`.
 - **Never radians.** Angles are in degrees, and spin speeds in degrees per second or RPM.
 - **Percent** is its own kind of number, written with `%`. In Scenarios, sticks are in percent: roll, pitch and yaw from −100% to +100%, and throttle from 0% to 100%.
-- **Several parts carry their labels inline,** with the unit written once at the end if you like: `"roll 70, pitch 90, yaw 140 g·cm²"`.
+- **Several parts carry their labels inline.** When every part has the same unit, it may be written once, at the end: `"roll 70, pitch 90, yaw 140 g·cm²"`. If any other part has a unit of its own, each part keeps the unit it was written with.
 - **A curve is one line of points:** `"4.35 V at 100 %, 4.10 V at 80 %, 3.85 V at 50 %"`.
 - **Prop coefficients are plain numbers,** the unitless thrust and power coefficients that propeller test data publishes, so a Map's air density can change thrust.
 
@@ -49,7 +49,7 @@ Other symbols and their plain-keyboard spellings: `µ` or `u` for micro, `±` or
 An Expectation in a Scenario gives its value with a tolerance, always with units:
 
 - **± an amount:** `"3.71 V ± 0.02 V"`
-- **± a percentage:** `"670 °/s ± 3%"`
+- **± a percentage:** `"670 °/s ± 3%"`, a share of the value (for a value in percent, percentage points)
 - **between two values:** `"between 40% and 50%"`
 
 ## Ranges
@@ -58,7 +58,7 @@ An Estimate in a Quad definition carries the range a Feel Test may move it withi
 
 ## What is refused
 
-A number that breaks these rules is refused with a plain sentence naming the file and the line, such as `quads/whoop-x/quad.toml line 12: "31,2 g" isn't a number; write "31.2 g"`:
+A number that breaks these rules is refused with a plain sentence naming the file and the line, with the fix when there's only one: `"31,2 g" isn't a number OpenDrone can read: numbers take a decimal point, so write "31.2 g"`. Refused are:
 
 - radians, in any spelling;
 - decimal commas and thousands separators;
