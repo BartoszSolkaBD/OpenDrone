@@ -4,7 +4,7 @@ This file will list every outside asset and dataset in OpenDrone, each with its 
 
 - textures, from CC0 sources such as Poly Haven and ambientCG;
 - sound files: the CC0 hit and menu clips, and each Map's Background Sound;
-- fonts, such as the OSD's CC0 fonts;
+- outside fonts (OFL-1.1), if any are used (the OSD fonts are OpenDrone's own, under CC0);
 - reference datasets under CC BY.
 
 It will be generated from the texture manifest once the asset pipeline exists. Only CC0 assets and CC BY data enter the repo.

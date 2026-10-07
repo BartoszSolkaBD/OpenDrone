@@ -7,14 +7,15 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
 ## In short
 
 - One pull request per ticket, described with the [pull request template](.github/pull_request_template.md).
-- Every required check must pass on macOS, Windows and Linux. You can run the same checks locally:
+- Every required check must pass on macOS, Windows and Linux. You can run the same checks locally. Two of them need tools that don't come with Rust: install them once with `cargo install --locked cargo-nextest cargo-deny` (or from their prebuilt downloads).
 
   ```sh
   cargo fmt --all --check
   cargo clippy --workspace --all-targets -- -D warnings
-  cargo nextest run --workspace
+  cargo nextest run --workspace     # needs cargo-nextest
+  cargo test --workspace --doc      # the examples in the docs, which nextest skips
   cargo xtask walls
-  cargo deny check
+  cargo deny check                  # needs cargo-deny
   ```
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
@@ -27,8 +28,8 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 
 | Check | What it proves |
 |---|---|
-| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system. |
+| Rust on macOS, Rust on Windows, Rust on Linux | The code is formatted; Clippy finds nothing, with warnings as errors and the house rules in the five core crates; everything builds, with `unsafe` forbidden outside `opendrone-input` and the game; every test and every example in the docs passes; and the walls between crates hold (`cargo xtask walls`, rules in [`crates/xtask/walls.toml`](crates/xtask/walls.toml)), so the core never reaches Bevy or anything that touches the operating system. |
 | Core builds for iOS, Core builds for Android | The five core crates build for phones, which keeps the mobile door open. |
-| Licences and sources | cargo-deny finds only allowed licences and crates.io sources, and, when a PR changes `Cargo.lock`, no library with a known security advisory. |
+| Licences and sources | cargo-deny finds only allowed licences and crates.io sources, and, when a PR changes `Cargo.lock` or `deny.toml`, no library with a known security advisory. |
 
-A pull request that changes only Markdown files skips the Rust work inside these checks, and they still report as passed.
+A pull request that changes only Markdown files skips the Rust work inside these checks, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them.

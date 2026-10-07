@@ -83,6 +83,10 @@ jobs:
         if: steps.changes.outputs.rust == 'true'
         run: cargo nextest run --workspace --locked --profile ci
 
+      - name: Examples in the docs (doctests, which cargo-nextest doesn't run)
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo test --workspace --doc --locked
+
       - name: The core is free of Bevy and the operating system (crate walls)
         if: steps.changes.outputs.rust == 'true'
         run: cargo xtask walls

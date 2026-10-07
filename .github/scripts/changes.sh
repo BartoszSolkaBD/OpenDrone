@@ -11,7 +11,10 @@
 #
 # Pushes to main always run the Rust checks. A pull request is checked out as
 # GitHub's merge commit with fetch-depth 2, so HEAD^1 is the base branch and
-# the difference between them is exactly what the PR changes.
+# the difference between them is exactly what the PR changes. Renames count as
+# a deletion plus an addition, so renaming code to `.md` still runs the checks.
+#
+# Readable checks for this script: crates/xtask/tests/ci_changes.rs.
 set -euo pipefail
 
 if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
@@ -21,7 +24,7 @@ if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
   exit 0
 fi
 
-changed="$(git diff --name-only HEAD^1 HEAD)"
+changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
 echo "Files this pull request changes:"
 sed 's/^/  /' <<< "$changed"
 
