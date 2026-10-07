@@ -133,8 +133,8 @@ hit_level             = "0.8"       # the hit clip at a 5 m/s impact
 [sources]
 iflight         = "docs/research/flight-dynamics.md §8.2: iFlight's Nazgul Evoque F5 V2 weighs 419 g dry, with a 225 mm diagonal [S52]"
 tmotor          = "T-Motor Velox V2207 V3 1750KV, T-Motor's store page: 12N14P, 1.2 A no-load at 10 V, and the T5147 thrust table, up to 1,591 g at 29,447 RPM and 34.6 A at 23.5 V (read 2026-10-07)"
-tmotor-fit      = "docs/research/quad-definitions.md: C_T fitted to T-Motor's T5147 thrust table (it holds within 10% from 20% to 100% throttle); C_P from the same table through the motor model, which spreads it from 0.07 to 0.11; the motor ticket (#41) fits 0.105 to the table's full-throttle row"
-motor-model     = "docs/research/quad-definitions.md: about 0.2 Ω makes the motor model meet T-Motor's table from 60% to 100% throttle; the motor ticket (#41) fits 0.19 Ω, with C_P 0.105, to the table's full-throttle row; #10 fits it to the TII logs"
+tmotor-fit      = "docs/research/quad-definitions.md: C_T fitted to T-Motor's T5147 thrust table (it holds within 10% from 20% to 100% throttle); C_P from the same table through the motor model, which spreads it from 0.07 to 0.11"
+motor-model     = "docs/research/quad-definitions.md: about 0.2 Ω makes the motor model meet T-Motor's table from 60% to 100% throttle; #10 fits it to the TII logs"
 motor-lag       = "docs/research/flight-dynamics.md §3.2 and §8.2: a 33 ms motor time constant, measured on NeuroBEM's 752 g 5″ racing quad [S6], the research's generic 5″ reference; #10 §5 lists it as Measured (Agilicious measured 39 ms on another [S26])"
 rotor-drag      = "docs/research/flight-dynamics.md §4.2: 0.24–0.54 s⁻¹ measured on a 610 g quad with six-inch props (Faessler et al. [S5]); #10 refines it against the TII logs"
 rotor-inertia   = "docs/research/quad-definitions.md: a 4.5 g T5147 prop plus a 2207 motor's bell; it gives a spin-up of about 30 ms, inside the measured motor lag"
