@@ -11,7 +11,7 @@ disallowed-methods = [
     # std's maths functions call the platform's maths library, so their
     # results differ between Windows, macOS and Linux. Use the `libm` crate.
     # The exact operations stay allowed: + - * / %, sqrt, mul_add, abs,
-    # floor, ceil, round, trunc and div_euclid.
+    # floor, ceil, round, trunc, div_euclid and clamp.
     { path = "f64::sin", reason = "use libm::sin: std maths gives different results on different platforms (ADR-0001)" },
     { path = "f64::cos", reason = "use libm::cos: std maths gives different results on different platforms (ADR-0001)" },
     { path = "f64::tan", reason = "use libm::tan: std maths gives different results on different platforms (ADR-0001)" },
@@ -80,6 +80,15 @@ disallowed-methods = [
     { path = "f32::algebraic_mul", reason = "use *: the algebraic operations may give different results from run to run (ADR-0001)" },
     { path = "f32::algebraic_div", reason = "use /: the algebraic operations may give different results from run to run (ADR-0001)" },
     { path = "f32::algebraic_rem", reason = "use %: the algebraic operations may give different results from run to run (ADR-0001)" },
+
+    # std's min and max may return either zero when given +0 and -0, and the
+    # two kinds of processor pick differently. Use opendrone-maths' own, which
+    # always pick the same one. clamp stays allowed: std writes it as two
+    # comparisons, which give the same answer everywhere.
+    { path = "f64::min", reason = "use opendrone_maths::functions::min: std's may return either zero when given +0 and -0, and ARM and x86 pick differently (ADR-0001)" },
+    { path = "f64::max", reason = "use opendrone_maths::functions::max: std's may return either zero when given +0 and -0, and ARM and x86 pick differently (ADR-0001)" },
+    { path = "f32::min", reason = "use opendrone_maths::functions::min: std's may return either zero when given +0 and -0, and ARM and x86 pick differently (ADR-0001)" },
+    { path = "f32::max", reason = "use opendrone_maths::functions::max: std's may return either zero when given +0 and -0, and ARM and x86 pick differently (ADR-0001)" },
 
     # The core never opens a file, starts a thread, waits, reads the
     # environment, or starts or stops a program (ADR-0003). The crate walls

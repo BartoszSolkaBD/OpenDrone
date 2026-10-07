@@ -17,12 +17,21 @@ pub fn std_maths_f64(x: f64) -> f64 {
     let logarithm = x.ln() + x.log(3.0) + x.log2() + x.log10() + x.ln_1p();
     let powers = x.powf(1.5) + x.powi(3) + x.cbrt() + x.hypot(2.0) + x.abs_sub(1.0);
     let angles = x.to_degrees() + x.to_radians();
+    let either_zero = x.min(0.0) + x.max(0.0);
     let algebraic = x.algebraic_add(1.0)
         + x.algebraic_sub(1.0)
         + x.algebraic_mul(2.0)
         + x.algebraic_div(2.0)
         + x.algebraic_rem(2.0);
-    trigonometry + inverse + hyperbolic + exponential + logarithm + powers + angles + algebraic
+    trigonometry
+        + inverse
+        + hyperbolic
+        + exponential
+        + logarithm
+        + powers
+        + angles
+        + either_zero
+        + algebraic
 }
 
 pub fn std_maths_f32(x: f32) -> f32 {
@@ -33,12 +42,21 @@ pub fn std_maths_f32(x: f32) -> f32 {
     let logarithm = x.ln() + x.log(3.0) + x.log2() + x.log10() + x.ln_1p();
     let powers = x.powf(1.5) + x.powi(3) + x.cbrt() + x.hypot(2.0) + x.abs_sub(1.0);
     let angles = x.to_degrees() + x.to_radians();
+    let either_zero = x.min(0.0) + x.max(0.0);
     let algebraic = x.algebraic_add(1.0)
         + x.algebraic_sub(1.0)
         + x.algebraic_mul(2.0)
         + x.algebraic_div(2.0)
         + x.algebraic_rem(2.0);
-    trigonometry + inverse + hyperbolic + exponential + logarithm + powers + angles + algebraic
+    trigonometry
+        + inverse
+        + hyperbolic
+        + exponential
+        + logarithm
+        + powers
+        + angles
+        + either_zero
+        + algebraic
 }
 
 pub fn order_changes_from_run_to_run() -> usize {

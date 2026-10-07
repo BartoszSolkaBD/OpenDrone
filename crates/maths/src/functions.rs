@@ -7,7 +7,10 @@
 //! the core.
 //!
 //! The exact operations need nothing from here: `+ - * / %`, `f64::sqrt`,
-//! `f64::abs`, `floor`, `ceil`, `round` and `trunc` are the same everywhere.
+//! `f64::abs`, `floor`, `ceil`, `round`, `trunc` and `clamp` are the same
+//! everywhere. std's `f64::min` and `f64::max` are not: given +0 and -0 they
+//! may return either, and ARM and x86 pick differently, so use [`min`] and
+//! [`max`] here instead.
 
 /// The sine of `x` radians.
 pub fn sin(x: f64) -> f64 {
@@ -39,4 +42,30 @@ pub fn asin(x: f64) -> f64 {
 /// (C's `fmod`).
 pub fn fmod(x: f64, y: f64) -> f64 {
     libm::fmod(x, y)
+}
+
+/// The smaller of `a` and `b`, always picking the same one: when they are
+/// equal, such as +0 and -0, it is `a`, and when either is "not a number", so
+/// is the answer.
+pub fn min(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if b < a {
+        b
+    } else {
+        a
+    }
+}
+
+/// The larger of `a` and `b`, always picking the same one: when they are
+/// equal, such as +0 and -0, it is `a`, and when either is "not a number", so
+/// is the answer.
+pub fn max(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if b > a {
+        b
+    } else {
+        a
+    }
 }

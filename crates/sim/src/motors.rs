@@ -68,19 +68,19 @@ pub trait FlightControllerSeam {
 /// commands set at given moments, each holding until the next.
 #[derive(Clone, Debug)]
 pub struct ScriptedMotors {
-    script: Vec<(SimulationTime, MotorCommands)>,
+    timeline: Vec<(SimulationTime, MotorCommands)>,
     next: usize,
     current: MotorCommands,
 }
 
 impl ScriptedMotors {
-    /// A script of moments and the commands that start then. Before the first
-    /// moment every motor is stopped. Moments are taken in time order; two
-    /// at the same moment keep their order, so the later one wins.
-    pub fn new(mut script: Vec<(SimulationTime, MotorCommands)>) -> ScriptedMotors {
-        script.sort_by_key(|(time, _)| *time);
+    /// A Timeline of moments and the commands that start then. Before the
+    /// first moment every motor is stopped. Moments are taken in time order;
+    /// two at the same moment keep their order, so the later one wins.
+    pub fn new(mut timeline: Vec<(SimulationTime, MotorCommands)>) -> ScriptedMotors {
+        timeline.sort_by_key(|(time, _)| *time);
         ScriptedMotors {
-            script,
+            timeline,
             next: 0,
             current: MotorCommands::STOPPED,
         }
@@ -89,7 +89,7 @@ impl ScriptedMotors {
 
 impl FlightControllerSeam for ScriptedMotors {
     fn step(&mut self, time: SimulationTime) -> MotorCommands {
-        while let Some((at, commands)) = self.script.get(self.next) {
+        while let Some((at, commands)) = self.timeline.get(self.next) {
             if *at > time {
                 break;
             }

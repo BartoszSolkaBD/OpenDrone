@@ -3,7 +3,7 @@
 
 use core::f64::consts::PI;
 
-use opendrone_maths::functions::cos;
+use opendrone_maths::functions::{cos, max, min};
 use opendrone_maths::{
     Attitude, DEGREE, Fingerprint, Fingerprinter, Mat3, PilotAngles, PilotRates, Vec3,
 };
@@ -205,4 +205,24 @@ fn a_fingerprint_is_the_same_on_every_computer() {
         Fingerprinter::new().finish().to_string(),
         "cbf29ce484222325"
     );
+}
+
+#[test]
+fn min_and_max_pick_the_same_zero_on_every_computer() {
+    // Given +0 and -0, std's f64::min and f64::max may return either, and ARM
+    // and x86 differ. Ours return the first.
+    assert_eq!(min(0.0, -0.0).to_bits(), 0.0_f64.to_bits());
+    assert_eq!(min(-0.0, 0.0).to_bits(), (-0.0_f64).to_bits());
+    assert_eq!(max(0.0, -0.0).to_bits(), 0.0_f64.to_bits());
+    assert_eq!(max(-0.0, 0.0).to_bits(), (-0.0_f64).to_bits());
+}
+
+#[test]
+fn min_and_max_pick_the_smaller_and_larger_and_pass_on_not_a_number() {
+    assert_eq!(min(1.0, 2.0), 1.0);
+    assert_eq!(min(2.0, -3.0), -3.0);
+    assert_eq!(max(1.0, 2.0), 2.0);
+    assert_eq!(max(2.0, -3.0), 2.0);
+    assert!(min(f64::NAN, 1.0).is_nan() && min(1.0, f64::NAN).is_nan());
+    assert!(max(f64::NAN, 1.0).is_nan() && max(1.0, f64::NAN).is_nan());
 }
