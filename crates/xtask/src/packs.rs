@@ -10,9 +10,11 @@
 //!   name, so moving a folder changes nothing. An Estimate that moved needs a
 //!   new row in its Quad's `feel-tests.md` and must stay inside its range,
 //!   and a Measured, Manufacturer or Derived number that changed needs a new
-//!   source. Every number that passed only because its source changed is
-//!   listed, for the Reviewer. The rules themselves live in
-//!   `opendrone_pack::feel_tests`; this only reads both versions' files.
+//!   source. Every number that passed on its source alone, every count or
+//!   choice the Simulation receives that changed, and every new Quad are
+//!   listed, for the Reviewer, and so is how many Quads were compared. The
+//!   rules themselves live in `opendrone_pack::feel_tests`; this only reads
+//!   both versions' files.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -97,18 +99,18 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
         git.check_base()?;
         let before = quads_at_base(&git)?;
         let after = quads_now(&root);
-        Ok((after.len(), compare_packs(&before, &after)))
+        Ok(compare_packs(&before, &after))
     });
-    let (quads, report) = match checked {
+    let report = match checked {
         Err(message) => {
             eprintln!("The Feel Test log rules can't be checked: {message}");
             return ExitCode::from(2);
         }
-        Ok(found) => found,
+        Ok(report) => report,
     };
     if !report.passed_on_a_new_source.is_empty() {
         println!(
-            "These changed and passed only because their source changed too; the Reviewer judges whether each new source is real:"
+            "These passed on their source alone (changed with a new source, re-sourced, taken out, or added); the Reviewer judges whether each source is real:"
         );
         for line in &report.passed_on_a_new_source {
             println!("- {line}");
@@ -116,15 +118,27 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
     }
     if !report.changed_without_a_confidence.is_empty() {
         println!(
-            "These changed and carry no Confidence (counts and choices), so the rules can't judge them; the Reviewer checks them:"
+            "These changed and carry no Confidence (counts and choices the Simulation receives), so the rules can't judge them; the Reviewer checks them:"
         );
         for line in &report.changed_without_a_confidence {
             println!("- {line}");
         }
     }
-    if report.problems.is_empty() {
+    if !report.new_quads.is_empty() {
         println!(
-            "The Feel Test log rules hold for all {quads} Quad(s), compared with {base}: every Estimate that moved has its log row and stays inside its range, and every locked number that changed has a new source."
+            "New Quads, with no version at {base} to compare: {}",
+            report.new_quads.join(", ")
+        );
+    }
+    if report.problems.is_empty() {
+        let compared = if report.compared.is_empty() {
+            "none".to_string()
+        } else {
+            report.compared.join(", ")
+        };
+        println!(
+            "The Feel Test log rules hold for the {} Quad(s) compared with their version at {base} ({compared}): every Estimate that moved has its log row and stays inside its range, and every locked number that changed has a new source.",
+            report.compared.len(),
         );
         return ExitCode::SUCCESS;
     }
@@ -241,7 +255,19 @@ impl Git<'_> {
     /// Every file under `folder` in the base revision, with `/` between
     /// folders.
     fn list(&self, folder: &str) -> Result<Vec<String>, String> {
-        let listed = self.run(&["ls-tree", "-r", "--name-only", self.base, "--", folder])?;
+        // `-z` gives each path as it is, ended by a NUL byte. Without it, git
+        // quotes a path that isn't plain ASCII, such as
+        // "packs/opendrone-\305\202\303\263d\305\272/…", which then matches no
+        // Quad, so the rules would compare nothing.
+        let listed = self.run(&[
+            "ls-tree",
+            "-r",
+            "-z",
+            "--name-only",
+            self.base,
+            "--",
+            folder,
+        ])?;
         if !listed.status.success() {
             return Err(format!(
                 "git can't list {folder} at {}: {}",
@@ -249,10 +275,20 @@ impl Git<'_> {
                 String::from_utf8_lossy(&listed.stderr).trim()
             ));
         }
-        Ok(String::from_utf8_lossy(&listed.stdout)
-            .lines()
-            .map(str::to_string)
-            .collect())
+        listed
+            .stdout
+            .split(|byte| *byte == 0)
+            .filter(|path| !path.is_empty())
+            .map(|path| {
+                String::from_utf8(path.to_vec()).map_err(|_| {
+                    format!(
+                        "{} at {} has a name that isn't UTF-8 text, so it can't be compared; rename it",
+                        String::from_utf8_lossy(path),
+                        self.base
+                    )
+                })
+            })
+            .collect()
     }
 
     /// The file at `path` in the base revision, or `None` when it wasn't

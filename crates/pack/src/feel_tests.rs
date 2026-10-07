@@ -26,8 +26,11 @@
 //!
 //! "A new source" means the number names a different `[sources]` key, or the
 //! line of its `[sources]` key says something different. That is easy to do,
-//! so CI lists every number that passed only because its source changed, and
-//! the Reviewer judges whether each new source is real.
+//! so CI lists every number that passed on its source alone: changed with a
+//! new source, re-sourced with a "New source" row (even one that keeps its
+//! value, as it still moves where the range is measured from), taken out, or
+//! added to a Quad that already existed. The Reviewer judges whether each
+//! source is real.
 //!
 //! The log is a Markdown table, oldest row first:
 //!
@@ -269,13 +272,22 @@ pub struct QuadVersion<'a> {
 pub struct FeelTestReport {
     /// Every break of the Feel Test log rules.
     pub problems: Problems,
-    /// Every number that changed and passed only because its source changed
-    /// too, as a sentence each. The Reviewer judges whether each new source is
-    /// real, so CI lists them.
+    /// Every number that passed on its source alone, as a sentence each: one
+    /// that changed with a new source, one re-sourced with a "New source"
+    /// row (which moves where its range is measured from, even when its value
+    /// stays put), one taken out, and one added to a Quad that already
+    /// existed. The Reviewer judges whether each source is real, so CI lists
+    /// them.
     pub passed_on_a_new_source: Vec<String>,
-    /// Every count or choice that changed. They carry no Confidence, so the
-    /// rules can't judge them, and CI lists them for the Reviewer too.
+    /// Every count or choice the Simulation receives that changed. They carry
+    /// no Confidence, so the rules can't judge them, and CI lists them for the
+    /// Reviewer too. Camera defaults and the sound block don't reach the
+    /// Simulation, so they aren't listed.
     pub changed_without_a_confidence: Vec<String>,
+    /// The id of every Quad compared with its version before the change.
+    pub compared: Vec<String>,
+    /// The id of every Quad the change adds, with nothing before it to compare.
+    pub new_quads: Vec<String>,
 }
 
 impl FeelTestReport {
@@ -285,6 +297,8 @@ impl FeelTestReport {
             .extend(other.passed_on_a_new_source);
         self.changed_without_a_confidence
             .extend(other.changed_without_a_confidence);
+        self.compared.extend(other.compared);
+        self.new_quads.extend(other.new_quads);
     }
 }
 
@@ -331,11 +345,13 @@ impl QuadFiles {
 /// renamed or moved (to a new folder, another Pack, or a Pack with a new id),
 /// so it must be a pure rename: every setting the same as a removed Quad's. A
 /// rename that also moves a number would compare it with nothing, so it's
-/// refused. Adding a Quad in a change that removes none is a new Quad.
+/// refused. Adding a Quad in a change that removes none is a new Quad, so
+/// retiring a Quad and adding a different one takes two changes.
 pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestReport {
     let mut report = FeelTestReport::default();
-    let compare = |was: &QuadFiles, is: &QuadFiles| {
-        compare_quad(&is.quad_file, &is.log_file, was.version(), is.version())
+    let compare = |was: &QuadFiles, is: &QuadFiles| FeelTestReport {
+        compared: vec![is.id.clone()],
+        ..compare_quad(&is.quad_file, &is.log_file, was.version(), is.version())
     };
     let removed: Vec<&QuadFiles> = before
         .iter()
@@ -348,6 +364,7 @@ pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestRepor
             continue;
         }
         if removed.is_empty() {
+            report.new_quads.push(is.id.clone());
             continue;
         }
         let pure_rename = removed
@@ -363,7 +380,7 @@ pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestRepor
                 &is.quad_file,
                 0,
                 format!(
-                    "this change adds the Quad {} and removes {}, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another",
+                    "this change adds the Quad {} and removes {}, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another. To retire a Quad and add a different one, take it out in one change and add the new one in another",
                     is.id,
                     removed
                         .iter()
@@ -562,6 +579,18 @@ fn compare_quad(
                 "this row records {row_label} moving from {} to {}, but this change moves it from {old_value} to {new_value}",
                 row.old, row.new
             )));
+        } else if is_new_source(row) {
+            // A re-sourcing moves where a relative range is measured from,
+            // even when the value stays put, so it's listed either way.
+            let from_there = match is.range {
+                Some(Range::Relative { .. }) => ", so its range is measured from there from now on",
+                _ => "",
+            };
+            report.passed_on_a_new_source.push(format!(
+                "{log_file} line {}: {row_label} was re-sourced at {new_value} ({}){from_there}",
+                row.line,
+                what_is_known(&after_quad, is)
+            ));
         }
     }
 
@@ -597,11 +626,24 @@ fn compare_quad(
 
     for (name, after) in &after_quad.settings {
         let Some(before) = before_quad.settings.get(name) else {
+            // A number put in (an optional section, such as [ducts], added)
+            // passes on its source alone, as one taken out does, so it's
+            // listed with what's known about it.
+            if after.confidence.is_some() {
+                report.passed_on_a_new_source.push(format!(
+                    "{quad_file} line {}: {} was added as {} ({})",
+                    after.line,
+                    label(name),
+                    plain(&after.value.text()),
+                    what_is_known(&after_quad, after)
+                ));
+            }
             continue;
         };
         let (Some(was), Some(is)) = (before.confidence, after.confidence) else {
             if after.confidence.is_none()
                 && before.confidence.is_none()
+                && schema::reaches_the_simulation(name)
                 && plain(&before.value.text()) != plain(&after.value.text())
             {
                 report.changed_without_a_confidence.push(format!(
@@ -720,6 +762,26 @@ fn compare_quad(
         }
     }
     report
+}
+
+/// A number's Confidence, its range and its source, with that source's line
+/// in `[sources]`, such as `Estimate, range ×0.5–×2, from the source guess:
+/// "a guess"`.
+fn what_is_known(quad: &QuadFile, setting: &Setting) -> String {
+    let mut parts = Vec::new();
+    if let Some(confidence) = setting.confidence {
+        parts.push(confidence.word().to_string());
+    }
+    if let Some(range) = &setting.range {
+        parts.push(format!("range {}", range.text()));
+    }
+    if let Some(key) = &setting.source {
+        parts.push(match quad.sources.get(key) {
+            Some(line) => format!("from the source {key}: \"{}\"", plain(line)),
+            None => format!("from the source {key}"),
+        });
+    }
+    parts.join(", ")
 }
 
 fn source_changed(

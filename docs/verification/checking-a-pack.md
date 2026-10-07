@@ -146,19 +146,26 @@ Each Quad keeps a log of every Estimate a Feel Test moves, oldest first:
 
 The values are written with their units, as `quad.toml` writes them; they're compared as numbers, so "300 ms" matches "0.3 s". The Pack checker refuses a row whose values don't read as its number.
 
-`cargo xtask feel-tests` compares each Quad with the same Quad before the change. Quads are paired by id (the Pack's id from its `pack.toml`, and the Quad's folder), so moving a Pack's folder changes nothing. It refuses:
+`cargo xtask feel-tests` compares each Quad with the same Quad before the change. Quads are paired by id (the Pack's id from its `pack.toml`, and the Quad's folder), so moving or renaming a Pack's folder changes nothing, whatever its new name (accents and all). It refuses:
 
 - an Estimate that moved without a new row naming it, its old value and its new one, even when its range was re-sourced in the same change;
 - a new row that doesn't record a move this change makes: the same Estimate, its value before the change as the old value, and its value after as the new one;
 - an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the new value of its latest "New source" row already in the log, or else the old value of its earliest row there, or else its value before this change. A row added in the same change never sets the start, so a made-up earlier row can't stretch a range.
 - a Measured, Manufacturer or Derived number that changed without a new source, meaning a different source key, or a changed line for its key in `[sources]`;
 - a change to what's known about a number without a new source: its Confidence, its range, or where its numbers hold (a curve's places or number of points, or the condition of a value written "at" one, such as the 4 V in "0.3 A at 4 V"). So a Feel Test can't widen its own range, or move a curve's points sideways instead of up and down;
-- an Estimate moved with a new source whose row's why doesn't start with "New source", and a "New source" row with no real new source. A "New source" row starts the range afresh from its new value. One may also record a re-sourced range whose value stayed put, with the same old and new value;
+- an Estimate moved with a new source whose row's why doesn't start with "New source", and a "New source" row with no real new source. A "New source" row starts the range afresh from its new value. One may also record a re-sourced range whose value stayed put, with the same old and new value; it still moves where the range is measured from, so CI lists it;
 - a number taken out, such as a whoop's `[ducts]` section, without a new source;
-- a change that removes a Quad and adds one, unless the added Quad keeps every setting of a removed one: a pure rename or move. Rename or move a Quad in a change of its own, and change its numbers in another;
+- a change that removes a Quad and adds one, unless the added Quad keeps every setting of a removed one: a pure rename or move. Rename or move a Quad in a change of its own, and change its numbers in another. **Retiring a Quad and adding a different one takes two changes:** take the old one out in one, and add the new one in the next;
 - an earlier row changed or removed: the log only grows.
 
-"A new source" is easy to write, so CI lists every number that passed only because its source changed, and the Reviewer judges whether each new source is real. Counts, choices, camera defaults and the sound block carry no Confidence and move freely; CI lists the counts and choices that changed too. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
+"A new source" is easy to write, so CI lists every number that passes on its source alone, and the Reviewer judges whether each source is real:
+
+- a number that changed with a new source;
+- a "New source" row, even one whose value stayed put, with the number's Confidence, range and source: from then on its range is measured from there;
+- a number taken out;
+- a number added to a Quad that already existed, such as a 5″ given `[ducts]`, with its Confidence and source.
+
+Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, and names every new Quad, so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
 
 ## Fingerprints
 

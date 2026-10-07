@@ -58,6 +58,30 @@ fn a_pull_request_that_only_changes_a_quads_feel_test_log_runs_the_rust_checks()
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_only_changes_markdown_with_a_non_ascii_name_skips_the_rust_checks() {
+    // Git quotes a path that isn't plain ASCII unless it's read raw, and a
+    // quoted path ends in a quote mark, not ".md".
+    let repo = Repo::new("non-ascii-markdown");
+    repo.write("docs/research/łódź.md", "Notes from Łódź.\n");
+    let outputs = repo.commit_and_check("pull_request");
+    assert_eq!(outputs["rust"], "false", "{outputs:?}");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_only_changes_a_feel_test_log_in_a_non_ascii_pack_folder_runs_the_rust_checks()
+ {
+    let repo = Repo::new("non-ascii-feel-test-log");
+    repo.write(
+        "packs/opendrone-łódź/quads/whoop-65/feel-tests.md",
+        "# Feel Test log: Whoop 65\n\n| Date | Number | Old → new | Why |\n|---|---|---|---|\n",
+    );
+    let outputs = repo.commit_and_check("pull_request");
+    assert_eq!(outputs["rust"], "true", "{outputs:?}");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
 fn a_pull_request_that_changes_a_text_file_under_docs_runs_the_rust_checks() {
     let repo = Repo::new("docs-text-file");
     repo.write(
@@ -160,6 +184,9 @@ impl Repo {
             .current_dir(&self.path)
             .env("GITHUB_EVENT_NAME", event)
             .env("GITHUB_OUTPUT", &outputs_file)
+            // Git's own settings, as on a fresh CI runner.
+            .env("GIT_CONFIG_GLOBAL", self.path.join("no-global-gitconfig"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
             .output()
             .expect("bash runs");
         assert!(
