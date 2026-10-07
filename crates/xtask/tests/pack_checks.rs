@@ -14,9 +14,13 @@ const LOG: &str = "packs/fixture/quads/ducted/feel-tests.md";
 /// Runs `cargo xtask <args>` in `folder`, and returns whether it passed and
 /// what it printed.
 fn xtask(folder: &Path, args: &[&str]) -> (bool, String) {
+    // Git's own settings, as on a fresh CI runner: it quotes any path that
+    // isn't plain ASCII unless asked otherwise.
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(args)
         .current_dir(folder)
+        .env("GIT_CONFIG_GLOBAL", folder.join("no-global-gitconfig"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
         .env_remove("GIT_DIR")
         .env_remove("GIT_WORK_TREE")
         .env_remove("GIT_INDEX_FILE")
@@ -257,11 +261,167 @@ fn a_number_that_passes_on_a_new_source_is_listed_for_the_reviewer() {
     let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
     assert!(passed, "{text}");
     assert!(
-        text.contains("These changed and passed only because their source changed too; the Reviewer judges whether each new source is real:"),
+        text.contains("These passed on their source alone (changed with a new source, re-sourced, taken out, or added); the Reviewer judges whether each source is real:"),
         "{text}"
     );
     assert!(
         text.contains("[frame] dry_mass changed (23.0 g → 24.0 g) with a new source"),
+        "{text}"
+    );
+}
+
+#[test]
+fn an_estimate_moved_without_a_row_blocks_in_a_pack_folder_with_a_non_ascii_name() {
+    // Reviewer's round-3 case: git quotes a path that isn't plain ASCII, so
+    // the base read as having no Quads, every Quad as new, and nothing was
+    // compared.
+    let scratch = Scratch::new("feel-tests-non-ascii-pack-folder").with_base();
+    fs::rename(
+        scratch.root.join("packs/fixture"),
+        scratch.root.join("packs/fixture-łódź"),
+    )
+    .unwrap();
+    scratch.commit("step 1: rename the Pack's folder, and nothing else");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("The Feel Test log rules hold for the 1 Quad(s) compared with their version at HEAD^1 (fixture/ducted)"),
+        "{text}"
+    );
+    scratch.change(
+        "packs/fixture-łódź/quads/ducted/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("step 2: move the inertia 20×, with no row");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains("- packs/fixture-łódź/quads/ducted/quad.toml line 22: [frame] inertia is an Estimate that moved from roll 70, pitch 90, yaw 140 g·cm² to roll 1400, pitch 1800, yaw 2800 g·cm²"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_new_source_row_that_keeps_its_value_is_listed_because_it_moves_where_the_range_is_measured_from()
+ {
+    // Reviewer's round-3 case: three changes take the inertia ×4 against a
+    // range of ×0.5–×2. Each passes, as the rules allow, so the re-sourcing in
+    // the middle one must be listed for the Reviewer.
+    const DOUBLED: &str = "roll 140, pitch 180, yaw 280 g·cm²";
+    const DOUBLED_AGAIN: &str = "roll 280, pitch 360, yaw 560 g·cm²";
+    let scratch = Scratch::new("feel-tests-re-sourced-in-place").with_base();
+    scratch.change(QUAD, INERTIA, DOUBLED);
+    scratch.append(
+        LOG,
+        &format!("| 2026-11-02 | [frame] inertia | {INERTIA} → {DOUBLED} | step 1 |"),
+    );
+    scratch.commit("step 1: ×2, with its row");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+
+    scratch.change(
+        QUAD,
+        "guess      = \"a guess\"",
+        "guess      = \"a guess; re-read\"",
+    );
+    scratch.append(
+        LOG,
+        &format!("| 2026-11-03 | [frame] inertia | {DOUBLED} → {DOUBLED} | New source: re-read |"),
+    );
+    scratch.commit("step 2: a new source, and a \"New source\" row that keeps the value");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains(&format!("- {LOG} line 7: [frame] inertia was re-sourced at {DOUBLED} (Estimate, range ×0.5–×2, from the source guess: \"a guess; re-read\"), so its range is measured from there from now on")),
+        "{text}"
+    );
+
+    scratch.change(QUAD, DOUBLED, DOUBLED_AGAIN);
+    scratch.append(
+        LOG,
+        &format!("| 2026-11-04 | [frame] inertia | {DOUBLED} → {DOUBLED_AGAIN} | step 3 |"),
+    );
+    scratch.commit("step 3: ×2 again, with its row");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+}
+
+/// The fixture Quad's ducts: its `[ducts]` section and its duct rings.
+const DUCTS: &str = "[ducts]\nram_drag       = { value = \"1.2 s⁻¹\", confidence = \"Estimate\", range = \"0.6–2.4 s⁻¹\", source = \"guess\" }\nnose_up_offset = { value = \"13 mm\", confidence = \"Estimate\", range = \"9–18 mm\", source = \"guess\" }\n\n";
+const DUCT_RINGS: &str = "duct_rings  = { value = \"37 mm inside, 1.5 mm wall, 14 mm tall\", confidence = \"Estimate\", range = \"×0.9–×1.1\", source = \"guess\" }\n";
+
+#[test]
+fn a_number_added_to_a_quad_that_already_existed_is_listed_with_its_confidence_and_source() {
+    // Reviewer's round-3 case: ducts added to a Quad that had none, claimed
+    // as Measured from a made-up source. Taking a number out needs a new
+    // source, so adding one is listed too, and the Reviewer judges the source.
+    let scratch = Scratch::new("feel-tests-number-added");
+    scratch.change(QUAD, DUCTS, "");
+    scratch.change(QUAD, DUCT_RINGS, "");
+    let scratch = scratch.with_base();
+    scratch.change(
+        QUAD,
+        "[feel]",
+        "[ducts]\nram_drag       = { value = \"5 s⁻¹\", confidence = \"Measured\", source = \"ducts\" }\nnose_up_offset = { value = \"40 mm\", confidence = \"Measured\", source = \"ducts\" }\n\n[feel]",
+    );
+    scratch.change(
+        QUAD,
+        "bounce      =",
+        "duct_rings  = { value = \"130 mm inside, 2 mm wall, 30 mm tall\", confidence = \"Measured\", source = \"ducts\" }\nbounce      =",
+    );
+    scratch.change(QUAD, "[sources]\n", "[sources]\nducts      = \"made up\"\n");
+    scratch.commit("add ducts");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    for line in [
+        "line 30: [collision] duct_rings was added as 130 mm inside, 2 mm wall, 30 mm tall (Measured, from the source ducts: \"made up\")",
+        "line 70: [ducts] ram_drag was added as 5 s⁻¹ (Measured, from the source ducts: \"made up\")",
+        "line 71: [ducts] nose_up_offset was added as 40 mm (Measured, from the source ducts: \"made up\")",
+    ] {
+        assert!(text.contains(&format!("- {QUAD} {line}")), "{line}\n{text}");
+    }
+}
+
+#[test]
+fn removing_one_quad_and_adding_a_different_one_takes_two_changes() {
+    // Reviewer's round-3 case: a change that removes a Quad reads any Quad it
+    // adds as that one renamed, so a genuinely new Quad waits for a change of
+    // its own.
+    let add_a_different_quad = |scratch: &Scratch| {
+        copy(
+            &repo_root().join("crates/pack/tests/fixtures/good/packs/fixture/quads/ducted"),
+            &scratch.root.join("packs/fixture/quads/ducted-75"),
+        );
+        scratch.change(
+            "packs/fixture/quads/ducted-75/quad.toml",
+            "\"66 mm\"",
+            "\"75 mm\"",
+        );
+    };
+
+    let scratch = Scratch::new("feel-tests-retire-and-add-at-once").with_base();
+    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    add_a_different_quad(&scratch);
+    scratch.commit("retire the Quad and add a different one");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains("- packs/fixture/quads/ducted-75/quad.toml: this change adds the Quad fixture/ducted-75 and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another. To retire a Quad and add a different one, take it out in one change and add the new one in another"),
+        "{text}"
+    );
+
+    let scratch = Scratch::new("feel-tests-retire-then-add").with_base();
+    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    scratch.commit("retire the Quad");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    add_a_different_quad(&scratch);
+    scratch.commit("add a different Quad");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("New Quads, with no version at HEAD^1 to compare: fixture/ducted-75"),
         "{text}"
     );
 }

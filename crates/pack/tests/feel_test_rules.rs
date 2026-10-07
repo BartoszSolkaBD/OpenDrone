@@ -447,7 +447,8 @@ fn a_value_whose_condition_changes_needs_a_new_source() {
 #[test]
 fn an_estimate_re_sourced_with_a_new_source_row_starts_its_range_afresh() {
     // Rotor inertia, ×0.5–×2, moved ×4 with a new source and a "New source"
-    // row: it passes, and CI lists it for the Reviewer.
+    // row: it passes, and CI lists both the move and where its range is
+    // measured from now, for the Reviewer.
     let quad = changed(
         "\"0.25 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"guess\"",
         "\"1 g·cm²\", confidence = \"Estimate\", range = \"×0.5–×2\", source = \"worked-out\"",
@@ -459,10 +460,16 @@ fn an_estimate_re_sourced_with_a_new_source_row_starts_its_range_afresh() {
     assert_eq!(sentences(&found.problems), Vec::<String>::new());
     assert_eq!(
         found.passed_on_a_new_source,
-        [format!(
-            "{QUAD} line {}: [props] rotor_inertia changed (0.25 g·cm² → 1 g·cm²) with a new source",
-            line_of(&quad, "1 g·cm²")
-        )]
+        [
+            format!(
+                "{LOG} line {}: [props] rotor_inertia was re-sourced at 1 g·cm² (Estimate, range ×0.5–×2, from the source worked-out: \"worked out from the maker's numbers\"), so its range is measured from there from now on",
+                line_of(&log, "weighed the props")
+            ),
+            format!(
+                "{QUAD} line {}: [props] rotor_inertia changed (0.25 g·cm² → 1 g·cm²) with a new source",
+                line_of(&quad, "1 g·cm²")
+            ),
+        ]
     );
     // The next change is measured from 1 g·cm², the value the new source
     // gave: ×1.5 from there passes, though it is ×6 from where it started.
@@ -571,7 +578,7 @@ fn a_rename_that_also_moves_a_number_is_refused() {
         assert_eq!(
             sentences(&found.problems),
             [format!(
-                "{folder}/quad.toml: this change adds the Quad {new_id} and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another"
+                "{folder}/quad.toml: this change adds the Quad {new_id} and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another. To retire a Quad and add a different one, take it out in one change and add the new one in another"
             )]
         );
     }
@@ -617,8 +624,18 @@ fn taking_a_number_out_needs_a_new_source() {
 }
 
 #[test]
-fn a_count_or_choice_that_changes_is_listed_for_the_reviewer() {
-    let quad = changed("blades             = 3", "blades             = 4");
+fn a_count_or_choice_the_simulation_receives_is_listed_for_the_reviewer_but_not_camera_defaults_or_sound()
+ {
+    // Only what the Simulation receives is listed: the blade count here, but
+    // not the camera's FOV, the sound block's harmonics count or its hit
+    // level.
+    let quad = changed("blades             = 3", "blades             = 4")
+        .replace("fov         = \"160°\"", "fov         = \"150°\"")
+        .replace("harmonics             = 8", "harmonics             = 6")
+        .replace(
+            "hit_level             = \"0.5\"",
+            "hit_level             = \"0.7\"",
+        );
     let found = report(&quad, &before().1);
     assert_eq!(sentences(&found.problems), Vec::<String>::new());
     assert_eq!(
