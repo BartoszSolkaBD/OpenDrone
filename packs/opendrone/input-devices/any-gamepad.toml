@@ -1,0 +1,28 @@
+# The fallback for every gamepad without a profile of its own: the
+# DualSense's layout, named by SDL's button positions, so it also fits Xbox,
+# Switch Pro and 8BitDo pads (#19 §1). It carries no Report Rate: setup
+# measures it.
+format = 1
+name   = "Any Gamepad"
+kind   = "Gamepad"
+match  = "any"
+
+[channels]            # Mode 2
+throttle = { stick = "left_y", zero = "at rest" }
+yaw      = { stick = "left_x" }
+pitch    = { stick = "right_y" }
+roll     = { stick = "right_x" }
+
+[switches]
+arm        = { button = "right_shoulder", press = "toggle" }
+crash_flip = { button = "left_shoulder", press = "hold" }
+
+[actions]
+pause = { button = "start" }
+reset = { button = "back" }
+
+[calibration]
+left_x  = { centre = "0 %", deadband = "5 %" }
+left_y  = { centre = "0 %", deadband = "5 %" }
+right_x = { centre = "0 %", deadband = "5 %" }
+right_y = { centre = "0 %", deadband = "5 %" }

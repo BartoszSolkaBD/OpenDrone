@@ -1,0 +1,49 @@
+# The DualSense, over USB, from #19 §8. A starting point: setup always
+# calibrates the pilot's own pad, and their copy is kept with their settings.
+format = 1
+name   = "DualSense"
+kind   = "Gamepad"
+match  = { usb_vendor = "054C", usb_product = "0CE6", product_name = "DualSense Wireless Controller" }
+report_rate     = { usb = "250 Hz" }    # Bluetooth not measured yet (#18)
+reports_at_rest = { usb = true }        # motion sensors as heartbeat: lost after 1 s of silence (#27)
+
+[labels]              # the DualSense's own names for SDL's positions
+Cross    = "south"
+Circle   = "east"
+Square   = "west"
+Triangle = "north"
+Create   = "back"
+PS       = "guide"
+Options  = "start"
+L3       = "left_stick"
+R3       = "right_stick"
+L1       = "left_shoulder"
+R1       = "right_shoulder"
+Up       = "dpad_up"
+Down     = "dpad_down"
+Left     = "dpad_left"
+Right    = "dpad_right"
+Mute     = "misc1"
+Touchpad = "touchpad"
+L2       = "left_trigger"
+R2       = "right_trigger"
+
+[channels]            # Mode 2
+throttle = { stick = "left_y", zero = "at rest" }    # or "at bottom", or { trigger = "R2" }
+yaw      = { stick = "left_x" }
+pitch    = { stick = "right_y" }
+roll     = { stick = "right_x" }
+
+[switches]            # buttons drive Virtual Switches
+arm        = { button = "R1", press = "toggle" }     # turns itself off whenever the Quad disarms
+crash_flip = { button = "L1", press = "hold" }
+
+[actions]
+pause = { button = "Options" }
+reset = { button = "Create" }
+
+[calibration]         # starting values; setup measures the pilot's own pad
+left_x  = { centre = "0 %", deadband = "5 %" }
+left_y  = { centre = "0 %", deadband = "5 %" }
+right_x = { centre = "0 %", deadband = "5 %" }
+right_y = { centre = "0 %", deadband = "5 %" }
