@@ -31,7 +31,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
 | `rotation` | `"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s"` | Rolling right, pitching nose up and yawing nose right are positive, as in Betaflight. |
 | `armed` | `false` | Whether the Quad is armed. |
-| `motors` | `"stopped"` | `"stopped"`: the props aren't turning. Or `"settled"`: spinning at the speed that holds the stated motion, with the ESCs running (needs the motor model, which comes later). |
+| `motors` | `"stopped"` | `"stopped"`: at rest, with the ESCs already powered up and ready, so a motor starts on its first command; for Scenarios that script their motors. Or `"settled"`: spinning at the speed that holds the stated motion, with the ESCs running (needs the motor model, which comes later). Neither is Reset: a landed start with a "fresh" Flight Controller is exactly Reset, so its ESCs play their start-up first, about 1.7 s. |
 | `flight_controller` | `"fresh"` | As right after Reset powers it up. |
 | `battery` | `"100%"` | The charge. |
 | `flight_mode` | `"Acro"` | `"Acro"`, `"Angle"` or `"Horizon"`. |
@@ -39,9 +39,42 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `radio_link` | `"250 Hz"` | The Packet Rate: 50, 100, 150, 250, 333, 500 or 1000 Hz. |
 | `physics_rate` | `"8 kHz"` | Physics steps a second. |
 | `random_seed` | `1` | The seed for the Simulation's random numbers. |
-| `[start.rates]` | `type = "Actual"`, `roll = "70 / 670 / 0"`, … | Every field of a Betaflight 2026.6 rate profile: the type; each axis's three numbers as the rate profile holds them (for Actual: centre °/s, max °/s, expo); the rate limit, once for all axes or `"roll 1998, pitch 1998, yaw 1998 °/s"`; the throttle curve, `"mid 50%, hover 50%, expo 0, limit off"` (the limit is `off`, `scale 80%` or `clip 80%`); and `quickrates_rc_expo`, `"on"` or `"off"`. |
+| `[start.rates]` | `type = "Actual"`, `roll = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"`, … | Every field of a Betaflight 2026.6 rate profile, written as the Betaflight App shows it: see [The Rates](#the-rates) below. |
 
 In a Physics Scenario the Flight Controller doesn't run, so `armed` down to the Rates change nothing. They are written down all the same, so the format never needs them added later.
+
+### The Rates
+
+`[start.rates]` holds every field of a Betaflight 2026.6 rate profile, each written as the Betaflight App's Rates tab shows it. The runner keeps each as Betaflight's CLI stores it, so the Flight Controller reads exactly what Betaflight would. A number between two stored steps is refused.
+
+```toml
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+```
+
+Each axis's three numbers depend on `type` (`rates_type`). The CLI names for roll are `roll_rc_rate`, `roll_srate` and `roll_expo`; pitch and yaw are the same.
+
+| `type` | First: `rc_rate` | Second: `srate` | Third: `expo` |
+|---|---|---|---|
+| `"Betaflight"` | `rc rate 1.00` (CLI 100: App ÷ 100, steps of 0.01) | `rate 0.70` (CLI 70) | `rc expo 0.00` (CLI 0) |
+| `"Raceflight"` | `rate 370 °/s` (CLI 37: App ÷ 10, steps of 10 °/s) | `acro+ 80%` (CLI 80) | `expo 50%` (CLI 50) |
+| `"KISS"` | `rc rate 1.00` (CLI 100) | `rate 0.70` (CLI 70) | `rc curve 0.00` (CLI 0) |
+| `"Actual"` | `center sensitivity 70 °/s` (CLI 7: App ÷ 10) | `max rate 670 °/s` (CLI 67: App ÷ 10) | `expo 0.54` (CLI 54: App × 100) |
+| `"Quick"` | `rc rate 1.00` (CLI 100) | `max rate 670 °/s` (CLI 67) | `expo 0.00` (CLI 0) |
+
+The rest:
+
+- `rate_limit`: `roll_rate_limit`, `pitch_rate_limit` and `yaw_rate_limit`, in whole °/s from 200 to 1998. Write one for all three axes, or `"roll 1998, pitch 1998, yaw 1998 °/s"`.
+- `throttle`: the App's Throttle MID, Hover Point and Throttle EXPO, from 0.00 to 1.00 (CLI `thr_mid`, `thr_hover` and `thr_expo`, × 100), and the Throttle Limit: `limit off`, `limit scale 80%` or `limit clip 80%` (CLI `throttle_limit_type` and `throttle_limit_percent`, 25% to 100%).
+- `quickrates_rc_expo`: `"on"` or `"off"`, as in the CLI.
+
+Angle and Horizon strengths, and the other Flight Mode settings, aren't Rates: in Betaflight 2026.6 they are part of the Tune.
 
 ### The inputs, `[inputs]`
 
@@ -73,7 +106,7 @@ basis  = "rule: ..."
 
 - **`what`** is one of: height, distance east, distance north, vertical speed, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
-- **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`. Angles are compared the short way round, so 359.9° and 0.1° are 0.2° apart.
+- **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`. Angles are compared the short way round, so 359.9° and 0.1° are 0.2° apart. Over a stretch, each angle is taken the short way round from the expected value before the lowest, highest, mean or final is worked out, so a heading that passes north or a roll that passes upside down still reads right ([`slow-turn-through-north.toml`](../../scenarios/physics/slow-turn-through-north.toml) shows it).
 - **`basis`** says where the number comes from: `source:` a cited outside reference, `rule:` worked out from physics with the working shown, or `observed:` what the Simulation did when the Expectation was written. Source and Rule Expectations are locked: if the Simulation disagrees, the Simulation is fixed.
 
 Times are Simulation Time, counted in whole physics steps: at 8 kHz, `"1 s"` is the state after step 8000, and a moment between two steps is refused. The run lasts until the last moment the file mentions.
@@ -124,4 +157,4 @@ Every number in a Scenario or Pack file is text with its unit, read by one share
 - Use whichever everyday prefix keeps the number ordinary: "140 g·cm²", not "0.000014 kg·m²".
 - A decimal point only: "31,2 g" and "2,000 °/s" are refused, with the fix.
 - Never radians: angles are degrees and spin speeds are °/s or RPM.
-- A value with labelled parts writes its unit once at the end, if it likes: "roll 70, pitch 90, yaw 140 g·cm²".
+- A value with labelled parts may write its unit once, at the end, when every part has the same unit: "roll 70, pitch 90, yaw 140 g·cm²". If any other part has a unit of its own, each part keeps the unit it was written with.

@@ -7,6 +7,7 @@ use opendrone_pack::units::{self, Dimension, Expected, Quantity};
 use opendrone_sim::{MotorCommands, PhysicsRate, SimulationTime};
 
 use crate::measure::Measure;
+use crate::rates::{self, Rates};
 
 /// A Scenario, read and checked.
 #[derive(Clone, Debug)]
@@ -71,7 +72,13 @@ pub struct Named {
 /// How the motors start.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StartingMotors {
-    /// The props aren't turning.
+    /// At rest: the props aren't turning, and the ESCs are already powered up
+    /// and ready (their start-up tones and ready beep are done), so a motor
+    /// starts on its first command as Bluejay starts any stopped motor. For
+    /// Scenarios that script their motors (Physics and Thrust Stand). It is
+    /// not Reset: a landed start with a "fresh" Flight Controller is exactly
+    /// Reset, whose ESCs play their start-up first, about 1.7 s, once the
+    /// ESCs are simulated (#41).
     Stopped,
     /// Spinning at the speed that holds the stated motion, with the ESCs
     /// already running (ADR-0002). Needs the motor model (#41).
@@ -99,53 +106,6 @@ pub struct Assists {
     pub input_smoothing: bool,
     pub endless_battery: bool,
     pub auto_arm: bool,
-}
-
-/// The active Rates, field for field from a Betaflight rate profile.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Rates {
-    pub kind: RatesType,
-    /// Each axis's three numbers, as Betaflight's rate profile holds them for
-    /// this Rates type (for Actual: centre °/s, max °/s, expo).
-    pub roll: [f64; 3],
-    pub pitch: [f64; 3],
-    pub yaw: [f64; 3],
-    /// The rate limit for roll, pitch and yaw, in degrees per second.
-    pub limit: [f64; 3],
-    pub throttle: ThrottleCurve,
-    /// Betaflight's `quickrates_rc_expo`: whether Quick rates apply their expo
-    /// to the stick, as RC expo.
-    pub quick_rates_rc_expo: bool,
-}
-
-/// Betaflight's five Rates types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RatesType {
-    Betaflight,
-    Raceflight,
-    Kiss,
-    Actual,
-    Quick,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ThrottleCurve {
-    /// Where on the stick the hover point sits, from 0 to 1 (`thr_mid`).
-    pub mid: f64,
-    /// The throttle output at the hover point, from 0 to 1 (`thr_hover`).
-    pub hover: f64,
-    /// `thr_expo`, from 0 to 1.
-    pub expo: f64,
-    pub limit: ThrottleLimit,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ThrottleLimit {
-    Off,
-    /// Scales the whole throttle range down to this share (0 to 1).
-    Scale(f64),
-    /// Cuts the throttle off at this share (0 to 1).
-    Clip(f64),
 }
 
 /// One Expectation.
@@ -245,15 +205,6 @@ const START: &[&str] = &[
     "physics_rate",
     "random_seed",
     "rates",
-];
-const RATES: &[&str] = &[
-    "type",
-    "roll",
-    "pitch",
-    "yaw",
-    "limit",
-    "throttle",
-    "quickrates_rc_expo",
 ];
 const ASSISTS: &[&str] = &["input_smoothing", "endless_battery", "auto_arm"];
 const PACKET_RATES: [u32; 7] = [50, 100, 150, 250, 333, 500, 1000];
@@ -444,7 +395,7 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
     });
     let rates = start
         .table("rates", problems)
-        .and_then(|rates| read_rates(&rates, problems));
+        .and_then(|rates| rates::read_rates(&rates, problems));
     Some(Start {
         kind: kind?,
         quad: quad?,
@@ -653,152 +604,6 @@ fn attitude(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Attitude> 
         pitch,
         heading,
     }))
-}
-
-fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rates> {
-    rates.refuse_unknown(RATES, problems);
-    let kind = choice(
-        rates,
-        "type",
-        &[
-            ("Betaflight", RatesType::Betaflight),
-            ("Raceflight", RatesType::Raceflight),
-            ("KISS", RatesType::Kiss),
-            ("Actual", RatesType::Actual),
-            ("Quick", RatesType::Quick),
-        ],
-        problems,
-    );
-    let mut axis = |key: &str| -> Option<[f64; 3]> {
-        let (text, item) = rates.text(key, problems)?;
-        // Read through the shared unit list, as plain numbers: Betaflight's
-        // rate profile gives each its meaning for the Rates type.
-        let numbers: Vec<Option<f64>> = text
-            .split('/')
-            .map(|n| {
-                units::parse_quantity(n)
-                    .and_then(|q| q.as_a(Dimension::NONE))
-                    .ok()
-            })
-            .collect();
-        match numbers.as_slice() {
-            [Some(a), Some(b), Some(c)] => Some([*a, *b, *c]),
-            _ => {
-                problems.push(item.problem(format!(
-                    "`{key}` must be the rate profile's three numbers for this axis, separated by \"/\", such as \"70 / 670 / 0\""
-                )));
-                None
-            }
-        }
-    };
-    let roll = axis("roll");
-    let pitch = axis("pitch");
-    let yaw = axis("yaw");
-    let limit = rates.text("limit", problems).and_then(|(text, item)| {
-        let read = units::parse_quantity(text)
-            .and_then(|q| q.as_a(Dimension::ROTATION_SPEED))
-            .map(|v| [v; 3])
-            .or_else(|_| {
-                units::parse_parts(text, &["roll", "pitch", "yaw"]).and_then(|parts| {
-                    let mut values = [0.0; 3];
-                    for (value, label) in values.iter_mut().zip(["roll", "pitch", "yaw"]) {
-                        let part = parts.iter().find(|p| p.label == label).ok_or_else(|| {
-                            units::UnitProblem(format!("\"{text}\" is missing {label}"))
-                        })?;
-                        *value = part.quantity.as_a(Dimension::ROTATION_SPEED)?;
-                    }
-                    Ok(values)
-                })
-            });
-        match read {
-            Ok(values) => Some(values.map(|v| v / DEGREE)),
-            Err(p) => {
-                problems.push(item.problem(format!(
-                    "{}; write one rate limit, such as \"1998 °/s\", or one per axis, such as \"roll 1998, pitch 1998, yaw 1998 °/s\"",
-                    p.0
-                )));
-                None
-            }
-        }
-    });
-    let throttle =
-        rates
-            .text("throttle", problems)
-            .and_then(|(text, item)| match throttle_curve(text) {
-                Ok(curve) => Some(curve),
-                Err(sentence) => {
-                    problems.push(item.problem(sentence));
-                    None
-                }
-            });
-    let quick_rates_rc_expo = choice(
-        rates,
-        "quickrates_rc_expo",
-        &[("on", true), ("off", false)],
-        problems,
-    );
-    Some(Rates {
-        kind: kind?,
-        roll: roll?,
-        pitch: pitch?,
-        yaw: yaw?,
-        limit: limit?,
-        throttle: throttle?,
-        quick_rates_rc_expo: quick_rates_rc_expo?,
-    })
-}
-
-/// "mid 50%, hover 50%, expo 0, limit off" (or "limit scale 80%",
-/// "limit clip 80%"): Betaflight's `thr_mid`, `thr_hover`, `thr_expo`,
-/// `throttle_limit_type` and `throttle_limit_percent`.
-fn throttle_curve(text: &str) -> Result<ThrottleCurve, String> {
-    let help = "write the throttle curve like \"mid 50%, hover 50%, expo 0, limit off\"; the limit is \"off\", \"scale 80%\" or \"clip 80%\"";
-    let mut mid = None;
-    let mut hover = None;
-    let mut expo = None;
-    let mut limit = None;
-    for part in text.split(',').map(str::trim) {
-        let (word, value) = part
-            .split_once(' ')
-            .ok_or_else(|| format!("\"{part}\" can't be read; {help}"))?;
-        let value = value.trim();
-        let percent = |text: &str| {
-            units::parse_quantity(text)
-                .and_then(|q| q.as_a(Dimension::PERCENT))
-                .map_err(|p| format!("{}; {help}", p.0))
-        };
-        match word {
-            "mid" => mid = Some(percent(value)?),
-            "hover" => hover = Some(percent(value)?),
-            "expo" => {
-                expo = Some(
-                    units::parse_quantity(value)
-                        .and_then(|q| q.as_a(Dimension::NONE))
-                        .map_err(|p| format!("{}; {help}", p.0))?,
-                );
-            }
-            "limit" => {
-                limit = Some(match value.split_once(' ') {
-                    None if value == "off" => ThrottleLimit::Off,
-                    Some(("scale", share)) => ThrottleLimit::Scale(percent(share)?),
-                    Some(("clip", share)) => ThrottleLimit::Clip(percent(share)?),
-                    _ => return Err(format!("\"{part}\" can't be read; {help}")),
-                });
-            }
-            _ => return Err(format!("\"{part}\" can't be read; {help}")),
-        }
-    }
-    match (mid, hover, expo, limit) {
-        (Some(mid), Some(hover), Some(expo), Some(limit)) => Ok(ThrottleCurve {
-            mid,
-            hover,
-            expo,
-            limit,
-        }),
-        _ => Err(format!(
-            "\"{text}\" needs mid, hover, expo and limit; {help}"
-        )),
-    }
 }
 
 struct Reader<'p> {

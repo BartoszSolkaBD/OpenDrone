@@ -28,12 +28,13 @@ physics_rate      = "8 kHz"
 random_seed       = 1
 
 [start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
 type               = "Actual"
-roll               = "70 / 670 / 0"     # centre °/s, max °/s, expo
-pitch              = "70 / 670 / 0"
-yaw                = "70 / 670 / 0"
-limit              = "1998 °/s"
-throttle           = "mid 50%, hover 50%, expo 0, limit off"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
 quickrates_rc_expo = "off"
 
 [inputs]

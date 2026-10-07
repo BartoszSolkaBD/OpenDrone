@@ -631,24 +631,36 @@ pub struct Part {
 }
 
 /// Reads labelled parts, separated by commas. A label may come before its
-/// number (`"roll 70"`) or after it (`"2 m up"`). A number written without a
-/// unit takes the unit of the next part that has one, so the unit can be
-/// written once at the end: `"front 9, side 9, top 25 cm²"`.
+/// number (`"roll 70"`) or after it (`"2 m up"`), and may be several words
+/// (`"max rate 670 °/s"`). A unit may be written once, at the end, for every
+/// part: `"front 9, side 9, top 25 cm²"`. That happens only when the last part
+/// is the only one with a unit, so in `"rc rate 1.00, max rate 670 °/s, expo
+/// 0.10"` each number keeps its own.
 pub fn parse_parts(text: &str, labels: &[&str]) -> Result<Vec<Part>, UnitProblem> {
     refuse_commas_in_numbers(text)?;
     let mut parts: Vec<Part> = Vec::new();
     for piece in text.split(',').map(str::trim) {
-        let words: Vec<&str> = piece.split_whitespace().collect();
-        let (label, number) = match (words.first(), words.last()) {
-            (Some(first), _) if labels.contains(first) => (*first, words[1..].join(" ")),
-            (_, Some(last)) if labels.contains(last) => (*last, words[..words.len() - 1].join(" ")),
-            _ => {
-                return Err(problem(format!(
-                    "\"{piece}\" in \"{}\" needs one of these labels: {}",
-                    text.trim(),
-                    labels.join(", ")
-                )));
-            }
+        let words = piece.split_whitespace().collect::<Vec<_>>().join(" ");
+        // A label may be several words, such as "center sensitivity"; the
+        // longest label that fits wins, so "max rate" isn't read as "rate".
+        let found = labels
+            .iter()
+            .filter_map(|label| {
+                let before = words
+                    .strip_prefix(label)
+                    .and_then(|rest| rest.strip_prefix(' '));
+                let after = words
+                    .strip_suffix(label)
+                    .and_then(|rest| rest.strip_suffix(' '));
+                before.or(after).map(|number| (*label, number.to_string()))
+            })
+            .max_by_key(|(label, _)| label.len());
+        let Some((label, number)) = found else {
+            return Err(problem(format!(
+                "\"{piece}\" in \"{}\" needs one of these labels: {}",
+                text.trim(),
+                labels.join(", ")
+            )));
         };
         if parts.iter().any(|part| part.label == label) {
             return Err(problem(format!("\"{}\" gives {label} twice", text.trim())));
@@ -660,18 +672,16 @@ pub fn parse_parts(text: &str, labels: &[&str]) -> Result<Vec<Part>, UnitProblem
             quantity,
         });
     }
-    // Bare numbers take the unit of the next part that has one.
-    for i in (0..parts.len()).rev() {
-        if parts[i].quantity.unit.factors.is_empty()
-            && let Some(unit) = parts[i + 1..]
-                .iter()
-                .map(|part| &part.quantity.unit)
-                .find(|unit| !unit.factors.is_empty())
-                .cloned()
-        {
-            let quantity = &mut parts[i].quantity;
-            quantity.value *= unit.in_si;
-            quantity.unit = unit;
+    // A unit written once, on the last part only, is every part's unit.
+    if let Some((last, others)) = parts.split_last_mut()
+        && !last.quantity.unit.factors.is_empty()
+        && others
+            .iter()
+            .all(|part| part.quantity.unit.factors.is_empty())
+    {
+        for part in others {
+            part.quantity.value *= last.quantity.unit.in_si;
+            part.quantity.unit = last.quantity.unit.clone();
         }
     }
     Ok(parts)

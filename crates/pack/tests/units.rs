@@ -271,6 +271,36 @@ fn labelled_parts_read_with_the_label_before_or_after_and_the_unit_once() {
 }
 
 #[test]
+fn a_unit_written_once_at_the_end_is_every_parts_only_when_no_other_part_has_one() {
+    let quick = parse_parts(
+        "rc rate 1.00, max rate 670 °/s, expo 0.10",
+        &["rc rate", "max rate", "expo"],
+    )
+    .unwrap();
+    assert_eq!(quick[0].quantity.dimension(), Dimension::NONE);
+    assert_eq!(quick[1].quantity.dimension(), Dimension::ROTATION_SPEED);
+    assert_eq!(quick[2].quantity.dimension(), Dimension::NONE);
+    let mixed = parse_parts("roll 70, pitch 90 °/s, yaw 140", &["roll", "pitch", "yaw"]).unwrap();
+    assert_eq!(mixed[0].quantity.dimension(), Dimension::NONE);
+}
+
+#[test]
+fn a_label_may_be_several_words_and_the_longest_that_fits_wins() {
+    let actual = parse_parts(
+        "center sensitivity 70 °/s, max rate 670 °/s, expo 0.54",
+        &["center sensitivity", "max rate", "expo"],
+    )
+    .unwrap();
+    let labels: Vec<&str> = actual.iter().map(|p| p.label.as_str()).collect();
+    assert_eq!(labels, ["center sensitivity", "max rate", "expo"]);
+    assert!(close(actual[1].quantity.value, value("670 °/s")));
+    let betaflight = parse_parts("rc rate 1.00, rate 0.70", &["rate", "rc rate"]).unwrap();
+    assert_eq!(betaflight[0].label, "rc rate");
+    assert_eq!(betaflight[1].label, "rate");
+    assert!(parse_parts("max rate 670 °/s", &["rate", "rc rate"]).is_err());
+}
+
+#[test]
 fn a_part_without_a_known_label_or_given_twice_is_refused() {
     assert!(
         parse_parts("roll 70, wobble 3 °/s", &["roll", "pitch", "yaw"])

@@ -13,7 +13,7 @@
 //! 2. builds the Simulation from the starting state and the Packs, and steps
 //!    it at the physics rate up to the last moment the file mentions,
 //!    measuring every Expectation at its moment or over its stretch, plus the
-//!    automatic "no broken numbers" check ([`run`]);
+//!    automatic "no broken numbers" check ([`run()`]);
 //! 3. runs it a second time, and checks the whole state's fingerprint agrees
 //!    after every step (the repeat check);
 //! 4. writes, or checks, `<name>.results.toml` beside the Scenario
@@ -27,6 +27,7 @@
 
 pub mod agreement;
 mod measure;
+mod rates;
 mod read;
 mod results;
 mod run;
@@ -37,10 +38,10 @@ use std::path::{Path, PathBuf};
 use opendrone_pack::{Packs, Problems};
 
 pub use measure::Measure;
+pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
-    Assists, Basis, BasisKind, Expectation, FlightMode, Kind, Named, Rates, RatesType, Scenario,
-    Start, StartingFlightController, StartingMotors, Statistic, ThrottleCurve, ThrottleLimit, When,
-    read_scenario,
+    Assists, Basis, BasisKind, Expectation, FlightMode, Kind, Named, Scenario, Start,
+    StartingFlightController, StartingMotors, Statistic, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, run};
