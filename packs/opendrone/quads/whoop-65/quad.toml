@@ -1,0 +1,34 @@
+# The Whoop 65, modelled on the BetaFPV Meteor65 Pro.    id: opendrone/whoop-65
+#
+# This file holds only the numbers the Simulation uses so far: the mass, the
+# inertia and the drag. The Pack checker ticket (#40) fills in the rest of the
+# Quad definition from #16's sample: props, motors, the rest of the battery,
+# the ducts' nose-up moment, collision shapes, the camera and the sound.
+#
+# Every physics number is { value, confidence, source }. Only Estimates may move
+# in a Feel Test, and only inside their range.
+format = 1
+
+name        = "Whoop 65"
+description = "65 mm whoop, modelled on the BetaFPV Meteor65 Pro"
+
+[frame]
+dry_mass  = { value = "23.0 g", confidence = "Manufacturer", source = "betafpv" }
+inertia   = { value = "roll 70, pitch 90, yaw 140 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "dynamics" }
+drag_area = { value = "front 9, side 9, top 25 cm²", confidence = "Estimate", range = "×0.5–×2", source = "not-yet-sourced" }
+
+[props]
+rotor_drag = { value = "0.3 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "not-yet-sourced" }
+
+[battery]
+# Stored apart from the dry mass; the reader adds the two.
+mass = { value = "8.2 g", confidence = "Manufacturer", source = "lava" }
+
+[ducts]
+ram_drag = { value = "1.2 s⁻¹", confidence = "Estimate", range = "0.6–2.4 s⁻¹", source = "dynamics" }
+
+[sources]
+betafpv         = "BetaFPV, Meteor65 Pro product page (read 2026-10-03)"
+lava            = "BetaFPV LAVA II 320 mAh battery, product page"
+dynamics        = "docs/research/flight-dynamics.md, section 9.1, and #10's resolution"
+not-yet-sourced = "the placeholder from #16's sample Quad file; the air ticket (#42) works out the real value"
