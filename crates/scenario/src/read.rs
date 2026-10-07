@@ -834,6 +834,15 @@ impl Reader<'_> {
             )));
             return None;
         }
+        // Angles are compared the short way round, so no two are more than
+        // half a turn apart: a range a whole turn wide accepts every angle.
+        if measure.is_an_angle() && expected.width() >= 2.0 * core::f64::consts::PI - 1e-9 {
+            self.problems.push(expected_item.problem(format!(
+                "\"{}\" accepts every angle, since angles are compared the short way round, so this Expectation checks nothing; give a tolerance of less than half a turn each way",
+                expected.text()
+            )));
+            return None;
+        }
         if measure.needs_a_step_before() && when == When::At(0) {
             self.problems.push(expected_item.problem(format!(
                 "{} needs a step before it, so it can't be measured at 0 s",

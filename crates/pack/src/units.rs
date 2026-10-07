@@ -760,6 +760,18 @@ impl Expected {
         }
     }
 
+    /// How wide the accepted range is, in SI units: twice the tolerance, or
+    /// from the lower end to the higher.
+    pub fn width(&self) -> f64 {
+        match self {
+            Expected::Around { value, tolerance } => match tolerance {
+                Tolerance::Amount(amount) => 2.0 * amount.value.abs(),
+                Tolerance::Share(share) => 2.0 * (value.value * share.value).abs(),
+            },
+            Expected::Between { low, high } => high.value - low.value,
+        }
+    }
+
     /// Whether a measured value (in SI units) is close enough.
     pub fn accepts(&self, measured: f64) -> bool {
         match self {

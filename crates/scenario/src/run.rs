@@ -154,6 +154,10 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     })
 }
 
+/// How close to the far side, or to a whole turn, an angle counts as there:
+/// rounding, in radians.
+const ROUNDING: f64 = 1e-9;
+
 /// One Expectation's measurement, built up step by step.
 struct Tally<'s> {
     expectation: &'s Expectation,
@@ -162,9 +166,9 @@ struct Tally<'s> {
     lowest: f64,
     highest: f64,
     last: Option<f64>,
-    /// True once an angle jumped between two steps during the stretch (see
-    /// `see`).
-    jumped: bool,
+    /// True once an angle jumped, or reached half a turn from the expected
+    /// value, during the stretch (see `see`).
+    no_single_answer: bool,
 }
 
 impl<'s> Tally<'s> {
@@ -176,7 +180,7 @@ impl<'s> Tally<'s> {
             lowest: f64::INFINITY,
             highest: f64::NEG_INFINITY,
             last: None,
-            jumped: false,
+            no_single_answer: false,
         }
     }
 
@@ -196,26 +200,33 @@ impl<'s> Tally<'s> {
         // or a roll that crosses upside down (179.5° to -178.5°) has the
         // right lowest, highest, mean and final value.
         //
-        // That only works while the angle moves smoothly near the expected
-        // value. Two things break it, and both show as a jump between two
-        // steps:
+        // That only works while the angle stays strictly within half a turn
+        // of the expected value and moves smoothly. Otherwise the lowest,
+        // highest and mean would come out near whatever was expected, so
+        // those three then fail (`final` and values at a moment don't). Three
+        // things break it:
         //
         // - The angle sweeps past the side opposite the expected value, as in
         //   a flip or a pirouette: the taken-round values jump by a whole
-        //   turn.
+        //   turn between two steps.
         // - The nose passes straight up or down: roll and heading jump by
         //   half a turn, because pitch only reads from -90° to 90°.
+        // - The angle reaches the far side exactly, so the turn round to it
+        //   is as long one way as the other: a whole turn can then end
+        //   there without a jump.
         //
-        // Either way the lowest, highest and mean would come out near
-        // whatever was expected, so those three then fail. A jump of a
-        // quarter turn or more counts: a real turn that fast in one step
-        // would be 720,000 °/s at 8 kHz.
+        // A jump of a quarter turn or more counts: a real turn that fast in
+        // one step would be 720,000 °/s at 8 kHz. The far side counts to
+        // within rounding.
         if self.expectation.measure.is_an_angle() {
-            value = angle_near(value, self.expectation.expected.centre());
-            if let Some(last) = self.last
-                && (value - last).abs() >= core::f64::consts::FRAC_PI_2
-            {
-                self.jumped = true;
+            let centre = self.expectation.expected.centre();
+            value = angle_near(value, centre);
+            let jumped = self
+                .last
+                .is_some_and(|last| (value - last).abs() >= core::f64::consts::FRAC_PI_2);
+            let at_the_far_side = (value - centre).abs() >= core::f64::consts::PI - ROUNDING;
+            if jumped || at_the_far_side {
+                self.no_single_answer = true;
             }
         }
         self.count += 1;
@@ -229,16 +240,21 @@ impl<'s> Tally<'s> {
 
     fn finish(self) -> Measured {
         let e = self.expectation;
+        // A whole turn between the lowest and the highest can only happen if
+        // the angle reached the far side, which `see` already caught; it is
+        // checked again here so no way round it is left.
+        let whole_turn = e.measure.is_an_angle()
+            && self.highest - self.lowest >= 2.0 * core::f64::consts::PI - ROUNDING;
         if let When::Over { statistic, .. } = e.when
             && statistic != Statistic::Final
-            && self.jumped
+            && (self.no_single_answer || whole_turn)
         {
             return Measured {
                 description: e.description.clone(),
                 basis: e.basis.kind,
                 expected: e.expected.text(),
                 measured: format!(
-                    "none: the {} jumped, or went more than half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
+                    "none: the {} jumped, or reached half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
                     e.measure.name(),
                     statistic.word()
                 ),

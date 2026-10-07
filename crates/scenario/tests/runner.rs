@@ -427,7 +427,7 @@ fn a_roll_crossing_upside_down_has_the_right_lowest_highest_mean_and_final_value
 
 /// What a stretch's lowest, highest or mean measures when the angle jumped.
 fn none(what: &str, statistic: &str) -> String {
-    "none: the {} jumped, or went more than half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+    "none: the {} jumped, or reached half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate"
         .replacen("{}", what, 1)
         .replacen("{}", statistic, 1)
 }
@@ -454,13 +454,7 @@ fn tumble_over_the_run(expectations: &[(&str, &str)]) -> String {
 fn a_roll_mean_lowest_or_highest_over_whole_rolls_fails_whatever_is_expected() {
     // The roll sweeps round six times, so it goes more than half a turn from
     // any expected value: its mean, lowest and highest have no single answer.
-    for expected in [
-        "0° ± 8°",
-        "90° ± 8°",
-        "123° ± 8°",
-        "-150° ± 8°",
-        "180° ± 180°",
-    ] {
+    for expected in ["0° ± 8°", "90° ± 8°", "123° ± 8°", "-150° ± 8°"] {
         let text = tumble_over_the_run(&[
             ("mean", expected),
             ("lowest", expected),
@@ -483,6 +477,22 @@ fn a_roll_mean_lowest_or_highest_over_whole_rolls_fails_whatever_is_expected() {
 /// One pitch flip, nose up first, in 1 s at 360 °/s, starting level with the
 /// nose at `heading`, with `expectations` over the whole flip.
 fn pitch_flip(heading: &str, expectations: &[(&str, &str, &str)]) -> String {
+    turning(
+        &format!("level, heading {heading}"),
+        "roll 0 °/s, pitch 360 °/s, yaw 0 °/s",
+        "1 s",
+        expectations,
+    )
+}
+
+/// The free tumble's set-up with another start `attitude` and `rotation`,
+/// and `expectations` over 0 s to `until`.
+fn turning(
+    attitude: &str,
+    rotation: &str,
+    until: &str,
+    expectations: &[(&str, &str, &str)],
+) -> String {
     let text = fs::read_to_string(
         repo()
             .root
@@ -492,18 +502,23 @@ fn pitch_flip(heading: &str, expectations: &[(&str, &str, &str)]) -> String {
     let mut text = text[..text.find("[[expect]]").unwrap()]
         .replacen(
             "attitude          = \"roll 0°, pitch 30°, heading 45°\"",
-            &format!("attitude          = \"level, heading {heading}\""),
+            &format!("attitude          = \"{attitude}\""),
             1,
         )
         .replacen(
             "rotation          = \"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s\"",
-            "rotation          = \"roll 0 °/s, pitch 360 °/s, yaw 0 °/s\"",
+            &format!("rotation          = \"{rotation}\""),
             1,
         );
-    assert!(text.contains("pitch 360 °/s") && text.contains(heading));
+    assert!(text.contains(attitude) && text.contains(rotation));
     for (what, statistic, value) in expectations {
+        let when = if *statistic == "at" {
+            format!("at = \"{until}\"\nvalue")
+        } else {
+            format!("over = \"0 s to {until}\"\n{statistic}")
+        };
         text += &format!(
-            "[[expect]]\nwhat = \"{what}\"\nover = \"0 s to 1 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
+            "[[expect]]\nwhat = \"{what}\"\n{when} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
         );
     }
     text
@@ -567,6 +582,104 @@ fn a_roll_and_heading_still_have_a_final_value_after_a_pitch_flip() {
             failures(&report)
         );
     }
+}
+
+#[test]
+fn a_whole_turn_that_ends_exactly_opposite_the_expected_value_has_no_mean() {
+    // A pitch flip passing just off vertical turns the heading a whole turn,
+    // from 90° back to 90°, exactly opposite -90° at both ends.
+    for roll in ["0.5°", "0.01°", "3°"] {
+        let text = turning(
+            &format!("roll {roll}, pitch 0°, heading 90°"),
+            "roll 0 °/s, pitch 360 °/s, yaw 0 °/s",
+            "1 s",
+            &[("heading", "mean", "-90° ± 7°")],
+        );
+        let found = failures(&report(
+            &fixture("whole-turn-mean", &text),
+            ResultsFile::Write,
+        ));
+        assert_eq!(found.len(), 1, "roll {roll}: {found:#?}");
+        assert!(
+            found[0].starts_with(&format!(
+                "heading, mean over 0 s to 1 s: measured {}",
+                none("heading", "mean")
+            )),
+            "roll {roll}: {found:?}"
+        );
+    }
+    // Five fast flips from heading 45°, ending opposite -135°.
+    let text = turning(
+        "roll 0.2°, pitch 0°, heading 45°",
+        "roll 0 °/s, pitch 2000 °/s, yaw 0 °/s",
+        "0.9 s",
+        &[("heading", "mean", "-135° ± 7°")],
+    );
+    let found = failures(&report(
+        &fixture("whole-turn-mean-fast", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].contains(&none("heading", "mean")), "{found:?}");
+}
+
+#[test]
+fn a_quad_dropped_nose_first_keeps_its_heading() {
+    // Nose straight down, not turning: the heading it was given stays.
+    let text = turning(
+        "roll 0°, pitch -90°, heading 30°",
+        "roll 0 °/s, pitch 0 °/s, yaw 0 °/s",
+        "1 s",
+        &[
+            ("heading", "at", "30° ± 0.001°"),
+            ("heading", "mean", "30° ± 0.001°"),
+            ("heading", "final", "30° ± 0.001°"),
+            ("roll", "final", "0° ± 0.001°"),
+            ("pitch", "final", "-90° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("nose-first", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn with_the_nose_straight_up_roll_reads_0_and_heading_carries_the_turn() {
+    // Roll 30° then nose straight up at heading 45° is the same attitude as
+    // roll 0°, heading 15°: with the nose up, heading minus roll.
+    let text = turning(
+        "roll 30°, pitch 90°, heading 45°",
+        "roll 0 °/s, pitch 0 °/s, yaw 0 °/s",
+        "1 s",
+        &[
+            ("heading", "at", "15° ± 0.001°"),
+            ("roll", "at", "0° ± 0.001°"),
+            ("heading", "mean", "15° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("nose-up-rolled", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn an_angle_tolerance_that_accepts_every_angle_is_refused_as_checking_nothing() {
+    for expected in [
+        "between 0° and 360°",
+        "0° ± 180°",
+        "0° ± 200°",
+        "90° ± 200%",
+    ] {
+        let text = slow_turn(&[], &[("heading", "mean", expected)]);
+        let found = failures(&report(&fixture("whole-circle", &text), ResultsFile::Write));
+        assert_eq!(found.len(), 1, "{expected}: {found:#?}");
+        assert!(
+            found[0].contains("accepts every angle, since angles are compared the short way round, so this Expectation checks nothing; give a tolerance of less than half a turn each way"),
+            "{expected}: {found:?}"
+        );
+    }
+    // Just short of the whole circle still checks something.
+    let text = slow_turn(&[], &[("heading", "mean", "0° ± 179°")]);
+    let report = report(&fixture("nearly-whole-circle", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
 }
 
 #[test]
