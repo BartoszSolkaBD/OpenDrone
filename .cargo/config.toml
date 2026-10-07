@@ -1,3 +1,6 @@
 [alias]
 # `cargo xtask <command>` runs the developer tools in crates/xtask.
 xtask = "run --quiet --package xtask --"
+# `cargo scenarios <command>` runs the Scenario runner in crates/scenario:
+# `run` writes Results, `check` is what CI runs, `agree` compares OSes.
+scenarios = "run --quiet --package opendrone-scenario --"

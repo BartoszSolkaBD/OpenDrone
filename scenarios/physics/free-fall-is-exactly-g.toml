@@ -1,0 +1,70 @@
+# With every kind of drag set to zero and the motors stopped, gravity is the
+# only force on the Quad, so it must fall with exactly the Map's gravity.
+# Proves rigid-body motion at a fixed step (E1–E3 in #10).
+format = 1
+name   = "Free fall is exactly g"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type     = "Actual"
+roll     = "70 / 670 / 0"       # centre °/s, max °/s, expo
+pitch    = "70 / 670 / 0"
+yaw      = "70 / 670 / 0"
+limit    = "1998 °/s"
+throttle = "mid 50%, expo 0, limit off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what   = "vertical acceleration"
+over   = "0 s to 1 s"
+lowest = "-9.81 m/s² ± 0.00001 m/s²"
+basis  = "rule: with no drag and no thrust, gravity is the only force, so the acceleration is the Map's gravity, 9.81 m/s² downward, at every step"
+
+[[expect]]
+what    = "vertical acceleration"
+over    = "0 s to 1 s"
+highest = "-9.81 m/s² ± 0.00001 m/s²"
+basis   = "rule: as above; the lowest and the highest together show it never changes"
+
+[[expect]]
+what  = "vertical speed"
+at    = "1 s"
+value = "-9.81 m/s ± 0.00001 m/s"
+basis = "rule: speed = g × t = 9.81 m/s² × 1 s, downward"
+
+[[expect]]
+what  = "height"
+at    = "1 s"
+value = "-4.905 m ± 0.001 m"
+basis = "rule: distance fallen = ½ × g × t² = ½ × 9.81 m/s² × (1 s)² = 4.905 m. Moving in fixed steps adds ½ × g × t × (one step) = 0.6 mm at 8 kHz, inside the tolerance"
+
+[[expect]]
+what    = "horizontal speed"
+over    = "0 s to 1 s"
+highest = "0 m/s ± 0.000001 m/s"
+basis   = "rule: gravity pulls straight down, so nothing moves the Quad sideways"

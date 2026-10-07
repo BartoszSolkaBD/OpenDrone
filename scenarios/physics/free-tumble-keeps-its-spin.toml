@@ -1,0 +1,96 @@
+# A Quad spinning about its roll axis, with nothing to slow it, keeps spinning
+# at the same rate forever, and its attitude turns by exactly rate × time.
+# Starting pitched up and turned to the north-east means the roll axis points
+# neither along a world axis nor level, so turning in the wrong axes would show.
+# Proves exact attitude maths at a fixed step (E1–E3 in #10).
+format = 1
+name   = "A free tumble at 2,000 °/s keeps its spin and ends at the exact attitude"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "roll 0°, pitch 30°, heading 45°"
+speed             = "0 m/s"
+rotation          = "roll 2000 °/s, pitch 0 °/s, yaw 0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type     = "Actual"
+roll     = "70 / 670 / 0"       # centre °/s, max °/s, expo
+pitch    = "70 / 670 / 0"
+yaw      = "70 / 670 / 0"
+limit    = "1998 °/s"
+throttle = "mid 50%, expo 0, limit off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 1.125 s"
+lowest = "2000 °/s ± 0.001 °/s"
+basis  = "rule: with no torque, a spin about one of the body's main axes of inertia never changes (Euler's equations for a rigid body)"
+
+[[expect]]
+what    = "roll rate"
+over    = "0 s to 1.125 s"
+highest = "2000 °/s ± 0.001 °/s"
+basis   = "rule: as above; the lowest and the highest together show it never changes"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 1.125 s"
+highest = "0 °/s ± 0.001 °/s"
+basis   = "rule: a spin about the roll axis alone never leaks into the other axes"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 1.125 s"
+lowest = "0 °/s ± 0.001 °/s"
+basis  = "rule: as above"
+
+[[expect]]
+what    = "yaw rate"
+over    = "0 s to 1.125 s"
+highest = "0 °/s ± 0.001 °/s"
+basis   = "rule: as above"
+
+[[expect]]
+what   = "yaw rate"
+over   = "0 s to 1.125 s"
+lowest = "0 °/s ± 0.001 °/s"
+basis  = "rule: as above"
+
+[[expect]]
+what  = "roll"
+at    = "1.125 s"
+value = "90° ± 0.001°"
+basis = "rule: 2000 °/s × 1.125 s = 2250°, which is six full rolls and a quarter, so the Quad ends on its right side"
+
+[[expect]]
+what  = "pitch"
+at    = "1.125 s"
+value = "30° ± 0.001°"
+basis = "rule: rolling turns the Quad about its own nose, so the nose keeps pointing the same way: still 30° up"
+
+[[expect]]
+what  = "heading"
+at    = "1.125 s"
+value = "45° ± 0.001°"
+basis = "rule: as above, the nose still points north-east"
