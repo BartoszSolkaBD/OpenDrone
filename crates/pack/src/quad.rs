@@ -96,11 +96,7 @@ pub struct Setting {
 
 impl Setting {
     pub fn problem(&self, sentence: impl Into<String>) -> Problem {
-        Problem {
-            file: self.file.clone(),
-            line: self.line,
-            sentence: sentence.into(),
-        }
+        Problem::of(&self.file, self.line, sentence)
     }
 }
 
@@ -148,6 +144,9 @@ pub fn read_quad_file_as_far_as_it_goes(
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
+    if doc.is_newer() {
+        return Err(problems);
+    }
     let root = doc.root();
 
     let mut sources = BTreeMap::new();
@@ -167,13 +166,11 @@ pub fn read_quad_file_as_far_as_it_goes(
                 }
             }
         }
-        None => problems.push(Problem {
-            file: file.to_string(),
-            line: 0,
-            sentence:
-                "a Quad definition ends with a [sources] list saying where its numbers come from"
-                    .into(),
-        }),
+        None => problems.push(Problem::of(
+            file,
+            0,
+            "a Quad definition ends with a [sources] list saying where its numbers come from",
+        )),
     }
 
     let mut texts = BTreeMap::new();
@@ -219,14 +216,14 @@ pub fn read_quad_file_as_far_as_it_goes(
     }
     for section in SECTIONS {
         if !section.optional && root.get(section.name).is_none() {
-            problems.push(Problem {
-                file: file.to_string(),
-                line: 0,
-                sentence: format!(
+            problems.push(Problem::of(
+                file,
+                0,
+                format!(
                     "the Quad definition is missing its [{}] section",
                     section.name
                 ),
-            });
+            ));
         }
     }
     let text = |key: &str| texts.get(key).cloned().unwrap_or_default();
@@ -427,6 +424,9 @@ pub fn read_test_quad(
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
+    if doc.is_newer() {
+        return Err(problems);
+    }
     let root = doc.root();
     let based_on = root.text("based_on", &mut problems);
     root.text("why", &mut problems);
@@ -659,6 +659,25 @@ pub enum PropDirection {
     PropsOut,
 }
 
+impl PropDirection {
+    /// The direction a checked `[props] direction` names.
+    fn from_word(word: &str) -> PropDirection {
+        if word == "props-out" {
+            PropDirection::PropsOut
+        } else {
+            PropDirection::PropsIn
+        }
+    }
+
+    /// The Tune's `yaw_motors_reversed` this direction needs.
+    fn yaw_motors_reversed(self) -> &'static str {
+        match self {
+            PropDirection::PropsIn => "OFF",
+            PropDirection::PropsOut => "ON",
+        }
+    }
+}
+
 /// A checked Quad definition: what the Simulation receives from it, plus its
 /// on-screen text, camera and sound. Every number is in SI units: metres,
 /// kilograms, seconds, radians, volts, amps, ohms, coulombs; a percentage is
@@ -779,6 +798,18 @@ pub enum Chemistry {
     LiIon,
 }
 
+impl Chemistry {
+    /// The chemistry a checked `[battery] chemistry` names: `"LiPo"`,
+    /// `"LiHV"` or `"Li-ion"`.
+    fn from_word(word: &str) -> Chemistry {
+        match word {
+            "LiHV" => Chemistry::LiHv,
+            "Li-ion" => Chemistry::LiIon,
+            _ => Chemistry::LiPo,
+        }
+    }
+}
+
 /// `[battery]`. Voltages are per cell.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Battery {
@@ -849,12 +880,18 @@ pub struct Sound {
     pub block: BTreeMap<String, f64>,
 }
 
-/// Every setting's reading, by `section.key`.
+/// Every setting's reading, by `section.key`. Asking for a key the schema
+/// doesn't have is a mistake in this file, so tests catch it.
 struct Readings(BTreeMap<String, Reading>);
 
 impl Readings {
+    fn get(&self, name: &str) -> Option<&Reading> {
+        debug_assert!(schema::find(name).is_some(), "{name} isn't in the schema");
+        self.0.get(name)
+    }
+
     fn numbers(&self, name: &str) -> &[f64] {
-        match self.0.get(name) {
+        match self.get(name) {
             Some(Reading::Numbers(values)) => values,
             _ => &[],
         }
@@ -871,27 +908,46 @@ impl Readings {
         }
     }
 
+    /// A curve's points, as (where it holds, value): for the voltage curve,
+    /// (charge left, volts).
+    fn curve(&self, name: &str) -> Vec<(f64, f64)> {
+        self.numbers(name)
+            .chunks(2)
+            .map(|point| (point[1], point[0]))
+            .collect()
+    }
+
     fn whole(&self, name: &str) -> u32 {
-        match self.0.get(name) {
+        match self.get(name) {
             Some(Reading::Whole(n)) => u32::try_from(*n).unwrap_or(0),
             _ => 0,
         }
     }
 
     fn word(&self, name: &str) -> &str {
-        match self.0.get(name) {
+        match self.get(name) {
             Some(Reading::Word(word)) => word,
             _ => "",
         }
     }
 
     fn yes(&self, name: &str) -> bool {
-        matches!(self.0.get(name), Some(Reading::YesNo(true)))
+        matches!(self.get(name), Some(Reading::YesNo(true)))
     }
 
     fn has(&self, name: &str) -> bool {
-        self.0.contains_key(name)
+        self.get(name).is_some()
     }
+}
+
+/// Whether each file read in full. When a file had problems with its shape,
+/// the settings or Tune lines that failed are missing from what was read, so
+/// the checks that ask whether something is there wait until those problems
+/// are fixed, rather than adding a second sentence about the same line.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ReadInFull {
+    pub quad: bool,
+    pub tune: bool,
 }
 
 /// Checks a Quad's values and Tune, and turns them into what the Simulation
@@ -902,23 +958,37 @@ pub fn check_quad(
     quad: &QuadFile,
     tune: &Tune,
 ) -> Result<QuadDefinition, Problems> {
-    let mut problems = Problems::new();
-    let file_problem = |sentence: String| Problem {
-        file: quad.file.clone(),
-        line: 0,
-        sentence,
+    let read_in_full = ReadInFull {
+        quad: true,
+        tune: true,
     };
+    check_quad_as_read(id, based_on, quad, tune, read_in_full)
+}
+
+/// [`check_quad`] on files that may not have read in full, so every value
+/// that did read is checked too, and all of a Quad's problems are listed at
+/// once.
+pub(crate) fn check_quad_as_read(
+    id: &str,
+    based_on: Option<String>,
+    quad: &QuadFile,
+    tune: &Tune,
+    read_in_full: ReadInFull,
+) -> Result<QuadDefinition, Problems> {
+    let mut problems = Problems::new();
     let has_ducts = quad.settings.keys().any(|name| name.starts_with("ducts."));
     let mut readings = BTreeMap::new();
     for section in SECTIONS {
         for key in section.keys {
             let name = format!("{}.{}", section.name, key.name);
             let Some(setting) = quad.settings.get(&name) else {
-                if key.need == Need::Always && (!section.optional || has_ducts) {
-                    problems.push(file_problem(format!(
-                        "the Quad definition is missing {}",
-                        label(&name)
-                    )));
+                if read_in_full.quad && key.need == Need::Always && (!section.optional || has_ducts)
+                {
+                    problems.push(Problem::of(
+                        &quad.file,
+                        0,
+                        format!("the Quad definition is missing {}", label(&name)),
+                    ));
                 }
                 continue;
             };
@@ -931,7 +1001,14 @@ pub fn check_quad(
         }
     }
     let readings = Readings(readings);
-    cross_check(quad, tune, &readings, has_ducts, &mut problems);
+    cross_check(
+        quad,
+        tune,
+        &readings,
+        has_ducts,
+        read_in_full,
+        &mut problems,
+    );
     if !problems.is_empty() {
         return Err(problems);
     }
@@ -942,8 +1019,9 @@ pub fn check_quad(
 fn cross_check(
     quad: &QuadFile,
     tune: &Tune,
-    r: &Readings,
+    readings: &Readings,
     has_ducts: bool,
+    read_in_full: ReadInFull,
     problems: &mut Problems,
 ) {
     let file_of = |name: &str| {
@@ -953,68 +1031,76 @@ fn cross_check(
     };
     let at = |name: &str, sentence: String| match quad.settings.get(name) {
         Some(setting) => setting.problem(sentence),
-        None => Problem {
-            file: quad.file.clone(),
-            line: 0,
-            sentence,
-        },
+        None => Problem::of(&quad.file, 0, sentence),
     };
-    match (
-        has_ducts,
-        quad.settings.contains_key("collision.duct_rings"),
-    ) {
-        (true, false) => problems.push(at(
-            "ducts.ram_drag",
-            "a Quad with [ducts] needs [collision] duct_rings: the rings it collides with".into(),
-        )),
-        (false, true) => problems.push(at(
-            "collision.duct_rings",
-            "[collision] duct_rings describes the ducts' rings, so it goes with a [ducts] section"
-                .into(),
-        )),
-        _ => {}
-    }
-    if r.has("sound.buzzer") {
-        let buzzer = r.yes("sound.buzzer");
-        for name in ["sound_block.buzzer_pitch", "sound_block.buzzer_level"] {
-            match (buzzer, quad.settings.contains_key(name)) {
+    // The keys that go only with ducts, or only with a buzzer.
+    let only_with = |need: Need| {
+        SECTIONS.iter().flat_map(move |section| {
+            section
+                .keys
+                .iter()
+                .filter(move |key| key.need == need)
+                .map(move |key| format!("{}.{}", section.name, key.name))
+        })
+    };
+    if read_in_full.quad {
+        for name in only_with(Need::WithDucts) {
+            match (has_ducts, quad.settings.contains_key(&name)) {
                 (true, false) => problems.push(at(
-                    "sound.buzzer",
-                    format!(
-                        "a Quad with a buzzer needs {} in its sound block",
-                        label(name)
-                    ),
+                    "ducts.ram_drag",
+                    format!("a Quad with [ducts] needs {}", label(&name)),
                 )),
                 (false, true) => problems.push(at(
-                    name,
+                    &name,
                     format!(
-                        "{} is for the buzzer, but this Quad has none ([sound] buzzer = false)",
-                        label(name)
+                        "{} describes the ducts, so it goes with a [ducts] section",
+                        label(&name)
                     ),
                 )),
                 _ => {}
             }
         }
     }
-    if r.has("motors.poles") && r.whole("motors.poles") % 2 == 1 {
+    if read_in_full.quad && readings.has("sound.buzzer") {
+        let buzzer = readings.yes("sound.buzzer");
+        for name in only_with(Need::WithBuzzer) {
+            match (buzzer, quad.settings.contains_key(&name)) {
+                (true, false) => problems.push(at(
+                    "sound.buzzer",
+                    format!(
+                        "a Quad with a buzzer needs {} in its sound block",
+                        label(&name)
+                    ),
+                )),
+                (false, true) => problems.push(at(
+                    &name,
+                    format!(
+                        "{} is for the buzzer, but this Quad has none ([sound] buzzer = false)",
+                        label(&name)
+                    ),
+                )),
+                _ => {}
+            }
+        }
+    }
+    let poles = readings.whole("motors.poles");
+    if readings.has("motors.poles") && poles % 2 == 1 {
         problems.push(at(
             "motors.poles",
-            format!(
-                "[motors] poles is {}, but a motor has an even number of poles",
-                r.whole("motors.poles")
-            ),
+            format!("[motors] poles is {poles}, but a motor has an even number of poles"),
         ));
     }
-    let (full, empty) = (r.one("battery.full"), r.one("battery.empty"));
-    if r.has("battery.full") && r.has("battery.empty") && empty >= full {
+    let full = readings.one("battery.full");
+    let empty = readings.one("battery.empty");
+    let both_ends = readings.has("battery.full") && readings.has("battery.empty");
+    if both_ends && empty >= full {
         problems.push(at(
             "battery.empty",
             "[battery] empty must be below [battery] full".into(),
         ));
     }
-    if r.has("battery.voltage_curve") && r.has("battery.full") && r.has("battery.empty") {
-        let curve = r.numbers("battery.voltage_curve");
-        let points: Vec<(f64, f64)> = curve.chunks(2).map(|p| (p[1], p[0])).collect();
+    if both_ends && readings.has("battery.voltage_curve") {
+        let points = readings.curve("battery.voltage_curve");
         let falling = points
             .windows(2)
             .all(|pair| pair[1].0 < pair[0].0 && pair[1].1 <= pair[0].1);
@@ -1026,10 +1112,9 @@ fn cross_check(
             ));
         }
     }
-    if r.has("motors.poles") {
-        let poles = r.whole("motors.poles");
+    if readings.has("motors.poles") {
         match tune.settings.get("motor_poles") {
-            None => problems.push(tune.problem(
+            None if read_in_full.tune => problems.push(tune.problem(
                 "motor_poles",
                 format!(
                     "the Tune must set motor_poles, which must match the Quad's {poles} motor poles"
@@ -1045,18 +1130,14 @@ fn cross_check(
                     ),
                 ));
             }
-            Some(_) => {}
+            _ => {}
         }
     }
-    if r.has("props.direction") {
-        let direction = r.word("props.direction");
-        let expected = if direction == "props-out" {
-            "ON"
-        } else {
-            "OFF"
-        };
+    if readings.has("props.direction") {
+        let direction = readings.word("props.direction");
+        let expected = PropDirection::from_word(direction).yaw_motors_reversed();
         match tune.settings.get("yaw_motors_reversed") {
-            None => problems.push(tune.problem(
+            None if read_in_full.tune => problems.push(tune.problem(
                 "yaw_motors_reversed",
                 format!(
                     "the Tune must set yaw_motors_reversed, which must be {expected} for {direction}"
@@ -1070,7 +1151,7 @@ fn cross_check(
                     file_of("props.direction")
                 ),
             )),
-            Some(_) => {}
+            _ => {}
         }
     }
 }
@@ -1092,20 +1173,12 @@ fn definition(
     };
     let battery = Battery {
         cells: r.whole("battery.cells"),
-        chemistry: match r.word("battery.chemistry") {
-            "LiHV" => Chemistry::LiHv,
-            "Li-ion" => Chemistry::LiIon,
-            _ => Chemistry::LiPo,
-        },
+        chemistry: Chemistry::from_word(r.word("battery.chemistry")),
         full: r.one("battery.full"),
         empty: r.one("battery.empty"),
         capacity: r.one("battery.capacity"),
         mass: r.one("battery.mass"),
-        voltage_curve: r
-            .numbers("battery.voltage_curve")
-            .chunks(2)
-            .map(|p| (p[1], p[0]))
-            .collect(),
+        voltage_curve: r.curve("battery.voltage_curve"),
         resistance: r.one("battery.resistance"),
         recovery: r.one("battery.recovery"),
         connector: r.one("battery.connector"),
@@ -1117,11 +1190,7 @@ fn definition(
     let props = Props {
         diameter: r.one("props.diameter"),
         blades: r.whole("props.blades"),
-        direction: if r.word("props.direction") == "props-out" {
-            PropDirection::PropsOut
-        } else {
-            PropDirection::PropsIn
-        },
+        direction: PropDirection::from_word(r.word("props.direction")),
         thrust_coefficient: r.one("props.thrust_coefficient"),
         power_coefficient: r.one("props.power_coefficient"),
         rotor_drag: r.one("props.rotor_drag"),
@@ -1156,7 +1225,7 @@ fn definition(
                 .iter()
                 .filter_map(|key| {
                     let name = format!("sound_block.{}", key.name);
-                    match r.0.get(&name)? {
+                    match r.get(&name)? {
                         Reading::Numbers(values) => Some((key.name.to_string(), values[0])),
                         Reading::Whole(n) => Some((key.name.to_string(), *n as f64)),
                         _ => None,
@@ -1228,7 +1297,7 @@ fn definition(
 
 /// Every value the Simulation receives, in a fixed order: the schema's, then
 /// the Tune's settings by name.
-fn fingerprint(r: &Readings, tune: &Tune) -> Fingerprint {
+fn fingerprint(readings: &Readings, tune: &Tune) -> Fingerprint {
     let mut f = Fingerprinter::new();
     for section in SECTIONS {
         for key in section.keys {
@@ -1240,7 +1309,7 @@ fn fingerprint(r: &Readings, tune: &Tune) -> Fingerprint {
             if !simulated {
                 continue;
             }
-            match r.0.get(&name) {
+            match readings.get(&name) {
                 None => f.write_u64(0),
                 Some(Reading::Numbers(values)) => {
                     f.write_u64(1);

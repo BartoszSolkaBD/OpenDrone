@@ -1,8 +1,10 @@
-//! Readable checks for the Pack checker (Seam 2): a Pack folder goes in, and
-//! checked Quads with their fingerprints come out, or every problem with its
-//! file, line and a plain sentence. Each broken case is the good fixture Pack
-//! with one line changed (see `common/mod.rs`). Basis: Rule, from #16 and
-//! ADR-0011, ADR-0015.
+//! Readable checks for the Pack checker, the spec's second place where tests
+//! meet the code: a Pack folder goes in, and checked Quads with their
+//! fingerprints come out, or every problem with its file, line and a plain
+//! sentence. The committed broken fixture shows every kind of problem at
+//! once; each other broken case is the good fixture Pack with one line
+//! changed (see `common/mod.rs`). Basis: Rule, from #16 and ADR-0011,
+//! ADR-0015.
 
 mod common;
 
@@ -77,6 +79,39 @@ fn every_section_of_the_quad_definition_reaches_the_checked_quad_in_si_units() {
     assert_eq!(q.sound.block["harmonics"], 8.0);
     assert!((q.camera.fov - 160f64.to_radians()).abs() < 1e-12);
     assert_eq!(q.tune.settings["motor_poles"].value, "12");
+}
+
+// The broken fixture
+
+#[test]
+fn the_broken_fixture_packs_list_every_problem_at_once_and_load_what_passes() {
+    // crates/pack/tests/fixtures/broken: one Pack with a fine Quad, a Quad
+    // with a problem on each line marked BROKEN, and a Quad in a newer format;
+    // and a Pack whose manifest is broken.
+    let root = common::good_fixture().join("../broken");
+    let packs = opendrone_pack::Packs::open(&root.join("packs"), "packs").unwrap();
+    let quad = "packs/broken/quads/many-problems/quad.toml";
+    let text = std::fs::read_to_string(root.join(quad)).unwrap();
+    let line = |needle: &str| common::line_of(&text, needle);
+    assert_eq!(
+        packs.problems().0.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        [
+            "packs/broken/quads/from-a-newer-opendrone/quad.toml line 2: this file is format 2, so it needs a newer OpenDrone: this one reads format 1".to_string(),
+            at(quad, line("no Confidence"), "[frame] inertia needs a Confidence: add confidence = \"Measured\", \"Manufacturer\", \"Derived\" or \"Estimate\""),
+            at(quad, line("without a range"), "[frame] rotor_height is an Estimate, so it needs the `range` it may move within, such as range = \"×0.5–×2\""),
+            at(quad, line("4.7 in"), "`pitch` isn't something OpenDrone reads in [props]; it reads `diameter`, `blades`, `direction`, `thrust_coefficient`, `power_coefficient`, `rotor_drag`, `rotor_inertia`, `reverse_thrust`, `reverse_torque`, `grip`"),
+            at(quad, line("in metres"), "\"23 m\" is a length, but this needs a mass, such as \"23.0 g\""),
+            at(quad, line("decimal comma"), "\"66,5 mm\" isn't a number OpenDrone can read: numbers take a decimal point, so write \"66.5 mm\""),
+            at(quad, line("outside its range"), "\"0.9 s⁻¹\" is outside its range, 0.1–0.6 s⁻¹"),
+            at("packs/broken/quads/many-problems/tune.txt", 4, "motor_poles is 14, but the Quad's motors have 12 poles ([motors] poles in packs/broken/quads/many-problems/quad.toml); they must match"),
+            "packs/broken-manifest/pack.toml line 1: the top of the file is missing `licence`".to_string(),
+            "packs/broken-manifest/pack.toml line 3: the Pack's id \"Broken Manifest\" must be lowercase words joined by dashes, such as \"opendrone\"".to_string(),
+            "packs/broken-manifest: its manifest (pack.toml) is broken, so the whole Pack is skipped".to_string(),
+        ]
+    );
+    let loaded: Vec<&str> = packs.quads().iter().map(|q| q.id.as_str()).collect();
+    assert_eq!(loaded, ["broken/fine"]);
+    assert_eq!(packs.manifests().len(), 1);
 }
 
 // The manifest
@@ -387,24 +422,12 @@ fn a_confidence_or_source_that_isnt_known_is_refused_and_every_problem_is_listed
                 21,
                 "the source \"the shop\" isn't in this file's [sources] list"
             ),
+            at(
+                QUAD,
+                fixture.line_of(QUAD, "0.9 s⁻¹"),
+                "\"0.9 s⁻¹\" is outside its range, 0.1–0.6 s⁻¹"
+            ),
         ]
-    );
-    // The shape is checked first: a file whose shape is wrong isn't read for
-    // its values, so fixing those two then shows the range problem.
-    let fixture = fixture
-        .change(
-            QUAD,
-            "confidence = \"Sure\"",
-            "confidence = \"Manufacturer\"",
-        )
-        .change(QUAD, "source = \"the shop\"", "source = \"maker\"");
-    assert_eq!(
-        fixture.quad_problems(),
-        [at(
-            QUAD,
-            fixture.line_of(QUAD, "0.9 s⁻¹"),
-            "\"0.9 s⁻¹\" is outside its range, 0.1–0.6 s⁻¹"
-        )]
     );
 }
 
@@ -476,18 +499,12 @@ fn counts_choices_camera_defaults_and_the_sound_block_carry_no_confidence() {
                 fixture.line_of(QUAD, "hit_level"),
                 "[sound_block] hit_level is a sound-block value, so it carries no Confidence or source: write just the value"
             ),
+            at(
+                QUAD,
+                fixture.line_of(QUAD, "blades"),
+                "[props] blades is a count: write a whole number without quotes, such as blades = 3"
+            ),
         ]
-    );
-    let fixture = fixture
-        .change(QUAD, "fov         = { value = \"160°\", confidence = \"Manufacturer\", source = \"maker\" }", "fov         = \"160°\"")
-        .change(QUAD, "hit_level             = { value = \"0.5\", confidence = \"Estimate\", range = \"0–1\", source = \"guess\" }", "hit_level             = \"0.5\"");
-    assert_eq!(
-        fixture.quad_problems(),
-        [at(
-            QUAD,
-            fixture.line_of(QUAD, "blades"),
-            "[props] blades is a count: write a whole number without quotes, such as blades = 3"
-        )]
     );
 }
 
@@ -532,7 +549,7 @@ fn ducts_need_their_rings_and_buzzer_values_need_a_buzzer() {
             at(
                 QUAD,
                 fixture.line_of(QUAD, "ram_drag"),
-                "a Quad with [ducts] needs [collision] duct_rings: the rings it collides with"
+                "a Quad with [ducts] needs [collision] duct_rings"
             ),
             at(
                 QUAD,

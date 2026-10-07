@@ -36,11 +36,8 @@ impl Tune {
     /// A problem on the line of `setting`, or on the whole file when the Tune
     /// doesn't set it.
     pub fn problem(&self, setting: &str, sentence: impl Into<String>) -> Problem {
-        Problem {
-            file: self.file.clone(),
-            line: self.settings.get(setting).map_or(0, |s| s.line),
-            sentence: sentence.into(),
-        }
+        let line = self.settings.get(setting).map_or(0, |s| s.line);
+        Problem::of(&self.file, line, sentence)
     }
 }
 
@@ -48,13 +45,15 @@ const MARKS: &str = "`diff`, a version's default such as `4.3 default`, `ADR-000
 
 /// Reads `tune.txt`, listing every problem at once.
 pub fn read_tune(file: &str, text: &str) -> Result<Tune, Problems> {
+    let (tune, problems) = read_tune_as_far_as_it_goes(file, text);
+    problems.or(tune)
+}
+
+/// Reads every `set` line that is fine, and lists the problems with the rest.
+pub(crate) fn read_tune_as_far_as_it_goes(file: &str, text: &str) -> (Tune, Problems) {
     let mut problems = Problems::new();
     let mut settings = BTreeMap::new();
-    let problem = |line: usize, sentence: String| Problem {
-        file: file.to_string(),
-        line,
-        sentence,
-    };
+    let problem = |line: usize, sentence: String| Problem::of(file, line, sentence);
     let mut seen_anything = false;
     for (index, raw) in text.lines().enumerate() {
         let line = index + 1;
@@ -141,10 +140,11 @@ pub fn read_tune(file: &str, text: &str) -> Result<Tune, Problems> {
             },
         );
     }
-    problems.or(Tune {
+    let tune = Tune {
         file: file.to_string(),
         settings,
-    })
+    };
+    (tune, problems)
 }
 
 /// `None` for a known mark (the text after `#`); otherwise what's wrong. A

@@ -8,7 +8,8 @@
 //! - A Measured, Manufacturer or Derived number is locked: it changes only
 //!   with a new source.
 //! - An Estimate's range, or any number's Confidence, also changes only with
-//!   a new source, so a Feel Test can't widen its own range.
+//!   a new source, so a Feel Test can't widen its own range. An Estimate that
+//!   moves in the same change still needs its row.
 //! - The log only grows: earlier rows stay as they were.
 //!
 //! "A new source" means the number names a different `[sources]` key, or the
@@ -32,7 +33,7 @@ use crate::units::Range;
 pub struct Row {
     pub date: String,
     /// The setting it moved, as `section.key`, such as `props.rotor_drag`.
-    pub number: String,
+    pub setting: String,
     pub old: String,
     pub new: String,
     pub why: String,
@@ -41,10 +42,10 @@ pub struct Row {
 
 impl Row {
     fn same_as(&self, other: &Row) -> bool {
-        (&self.date, &self.number, &self.old, &self.new, &self.why)
+        (&self.date, &self.setting, &self.old, &self.new, &self.why)
             == (
                 &other.date,
-                &other.number,
+                &other.setting,
                 &other.old,
                 &other.new,
                 &other.why,
@@ -58,11 +59,7 @@ const HEADER: [&str; 4] = ["Date", "Number", "Old → new", "Why"];
 /// such as headings and a few words on how it's kept.
 pub fn read_feel_tests(file: &str, text: &str) -> Result<Vec<Row>, Problems> {
     let mut problems = Problems::new();
-    let problem = |line: usize, sentence: String| Problem {
-        file: file.to_string(),
-        line,
-        sentence,
-    };
+    let problem = |line: usize, sentence: String| Problem::of(file, line, sentence);
     let lines: Vec<&str> = text.lines().collect();
     let Some(header) = lines.iter().position(|line| cells(line) == HEADER) else {
         return Err(Problems(vec![problem(
@@ -93,12 +90,12 @@ pub fn read_feel_tests(file: &str, text: &str) -> Result<Vec<Row>, Problems> {
             ));
             fine = false;
         }
-        let number = setting_name(number);
-        if schema::find(&number).is_none() {
+        let setting = setting_name(number);
+        if schema::find(&setting).is_none() {
             problems.push(problem(
                 line,
                 format!(
-                    "\"{number}\" isn't a setting of a Quad definition: name it as the file does, such as [props] rotor_drag"
+                    "\"{setting}\" isn't a setting of a Quad definition: name it as the file does, such as [props] rotor_drag"
                 ),
             ));
             fine = false;
@@ -121,7 +118,7 @@ pub fn read_feel_tests(file: &str, text: &str) -> Result<Vec<Row>, Problems> {
         if fine {
             rows.push(Row {
                 date: date.to_string(),
-                number,
+                setting,
                 old,
                 new,
                 why: why.to_string(),
@@ -192,24 +189,18 @@ pub fn check_feel_test_rules(
     let (Some(before_text), Some(after_text)) = (before.quad, after.quad) else {
         return Problems::new();
     };
-    let one = |sentence: String| {
-        Problems(vec![Problem {
-            file: quad_file.to_string(),
-            line: 0,
-            sentence,
-        }])
-    };
+    let whole_file = |sentence: &str| Problems(vec![Problem::of(quad_file, 0, sentence)]);
     let Ok(after_quad) = quad::read_quad_file(quad_file, after_text) else {
-        return one(
-            "the Feel Test log rules can't be checked until this file passes the Pack checker (`cargo xtask packs`)".into(),
+        return whole_file(
+            "the Feel Test log rules can't be checked until this file passes the Pack checker (`cargo xtask packs`)",
         );
     };
     // The version before may come from an older checker that read less, so
     // every setting of it that still reads is compared.
     let Ok((before_quad, _)) = quad::read_quad_file_as_far_as_it_goes(quad_file, before_text)
     else {
-        return one(
-            "the version before this change isn't readable TOML, so the Feel Test log rules can't compare it".into(),
+        return whole_file(
+            "the version before this change isn't readable TOML, so the Feel Test log rules can't compare it",
         );
     };
     let read_log = |text: Option<&str>| match text {
@@ -230,11 +221,11 @@ pub fn check_feel_test_rules(
             .zip(&after_rows)
             .all(|(before, after)| before.same_as(after));
     if !kept {
-        problems.push(Problem {
-            file: log_file.to_string(),
-            line: 0,
-            sentence: "the Feel Test log only grows: a row from before this change was changed or removed; put it back and add a new row instead".into(),
-        });
+        problems.push(Problem::of(
+            log_file,
+            0,
+            "the Feel Test log only grows: a row from before this change was changed or removed; put it back and add a new row instead",
+        ));
     }
     let new_rows: &[Row] = if kept {
         &after_rows[before_rows.len()..]
@@ -252,26 +243,24 @@ pub fn check_feel_test_rules(
         let range_text = |s: &Setting| s.range.as_ref().map(Range::text);
         let (old_value, new_value) = (plain(&before.value.text()), plain(&after.value.text()));
         let label = label(name);
-        if was != is || range_text(before) != range_text(after) {
-            if !new_source {
-                let what = if was != is {
-                    format!(
-                        "its Confidence changed from {} to {}",
-                        was.word(),
-                        is.word()
-                    )
-                } else {
-                    format!(
-                        "its range changed from {} to {}",
-                        range_text(before).unwrap_or_default(),
-                        range_text(after).unwrap_or_default()
-                    )
-                };
-                problems.push(after.problem(format!(
-                    "{label}: {what}, which changes what's known about it, so it needs a new source too"
-                )));
-            }
-            continue;
+        // What's known about the number changes only with a new source.
+        if (was != is || range_text(before) != range_text(after)) && !new_source {
+            let what = if was != is {
+                format!(
+                    "its Confidence changed from {} to {}",
+                    was.word(),
+                    is.word()
+                )
+            } else {
+                format!(
+                    "its range changed from {} to {}",
+                    range_text(before).unwrap_or_default(),
+                    range_text(after).unwrap_or_default()
+                )
+            };
+            problems.push(after.problem(format!(
+                "{label}: {what}, which changes what's known about it, so it needs a new source too"
+            )));
         }
         if old_value == new_value {
             continue;
@@ -285,9 +274,11 @@ pub fn check_feel_test_rules(
             }
             continue;
         }
+        // An Estimate that moves, whatever else changed with it, is logged
+        // and stays inside its range.
         let logged = new_rows
             .iter()
-            .any(|row| &row.number == name && row.old == old_value && row.new == new_value);
+            .any(|row| &row.setting == name && row.old == old_value && row.new == new_value);
         if !logged {
             problems.push(after.problem(format!(
                 "{label} is an Estimate that moved from {old_value} to {new_value}, so {log_file} needs a new row for it: the date, {label}, {old_value} → {new_value}, and why"
@@ -295,9 +286,9 @@ pub fn check_feel_test_rules(
         }
         let start = after_rows
             .iter()
-            .find(|row| &row.number == name)
+            .find(|row| &row.setting == name)
             .map_or(old_value.clone(), |row| row.old.clone());
-        if let Some(sentence) = outside(name, after, &new_value, &start) {
+        if let Some(sentence) = outside_its_range(name, after, &new_value, &start) {
             problems.push(after.problem(sentence));
         }
     }
@@ -321,7 +312,12 @@ fn source_changed(
 
 /// Whether an Estimate's new value is outside its range: an absolute range
 /// directly, a relative one measured from `start`.
-fn outside(name: &str, setting: &Setting, new_value: &str, start: &str) -> Option<String> {
+fn outside_its_range(
+    name: &str,
+    setting: &Setting,
+    new_value: &str,
+    start: &str,
+) -> Option<String> {
     let range = setting.range.as_ref()?;
     let (_, key) = schema::find(name)?;
     let form = key.kind.form()?;

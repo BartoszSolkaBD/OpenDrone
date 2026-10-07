@@ -1,5 +1,5 @@
 # Whoop 65 Tune: Betaflight 2026.6 names and units.
-# Imported from the Meteor65 Pro's diff all: Betaflight 4.3.0, config dated 2023-01-16
+# Imported from the Meteor65 Pro's diff all: Betaflight 4.3.0, dated 2023-01-16
 #   (docs/research/quad-settings/meteor65-pro.diff-all.txt)
 # Each line's mark says where its value came from:
 #   diff         set on the real quad

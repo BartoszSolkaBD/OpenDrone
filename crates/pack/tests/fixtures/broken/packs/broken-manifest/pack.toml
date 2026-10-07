@@ -1,0 +1,8 @@
+# A broken fixture manifest: the whole Pack is skipped.
+format      = 1
+id          = "Broken Manifest"   # BROKEN: an id is lowercase words joined by dashes
+name        = "Broken manifest"
+description = "A Pack whose manifest is broken."
+version     = "1"
+author      = "OpenDrone contributors"
+# BROKEN: no licence

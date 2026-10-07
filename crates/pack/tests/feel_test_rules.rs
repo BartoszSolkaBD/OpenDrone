@@ -170,6 +170,22 @@ fn an_estimates_range_changes_only_with_a_new_source() {
 }
 
 #[test]
+fn an_estimate_that_moves_with_a_new_range_and_source_still_needs_its_log_row() {
+    // Re-sourcing a range is allowed, but the move itself is still logged.
+    let quad = changed(
+        "\"0.3 s⁻¹\", confidence = \"Estimate\", range = \"0.1–0.6 s⁻¹\", source = \"guess\"",
+        "\"0.8 s⁻¹\", confidence = \"Estimate\", range = \"0.1–1 s⁻¹\", source = \"worked-out\"",
+    );
+    assert_eq!(
+        problems(&quad, &before().1),
+        [at(
+            line_of(&quad, "0.8 s⁻¹"),
+            "[props] rotor_drag is an Estimate that moved from 0.3 s⁻¹ to 0.8 s⁻¹, so packs/fixture/quads/ducted/feel-tests.md needs a new row for it: the date, [props] rotor_drag, 0.3 s⁻¹ → 0.8 s⁻¹, and why"
+        )]
+    );
+}
+
+#[test]
 fn a_confidence_changes_only_with_a_new_source() {
     let quad = changed(
         "\"0.3 s⁻¹\", confidence = \"Estimate\", range = \"0.1–0.6 s⁻¹\"",

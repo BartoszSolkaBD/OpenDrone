@@ -40,6 +40,10 @@ _Avoid_: Drifting contest
 A bundle of content made only of data and assets, never code: Quad definitions, Maps and Input Device profiles. The game's own content is a Pack too. A Pack can be added to the repository or dropped in by a pilot at runtime.
 _Avoid_: Mod, plugin, DLC
 
+**Pack checker**:
+The part of OpenDrone that reads a Pack and refuses anything that breaks the Pack rules, listing every problem with its file, its line and a plain sentence. It checks the game's own Pack in CI and a dropped Pack when the game loads it ([Checking a Pack](../verification/checking-a-pack.md)).
+_Avoid_: Validator, linter
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode

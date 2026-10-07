@@ -146,7 +146,7 @@ Each Quad keeps a log of every Estimate a Feel Test moves, oldest first:
 
 The values are written exactly as `quad.toml` writes them. `cargo xtask feel-tests` compares each Quad definition with the base of the change and refuses:
 
-- an Estimate that moved without a new row naming it, its old value and its new one;
+- an Estimate that moved without a new row naming it, its old value and its new one, even when its range was re-sourced in the same change;
 - an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the old value in its first row.
 - a Measured, Manufacturer or Derived number that changed without a new source, meaning a different source key, or a changed line for its key in `[sources]`;
 - an Estimate's range, or any number's Confidence, changed without a new source, so a Feel Test can't widen its own range;

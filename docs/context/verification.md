@@ -59,6 +59,10 @@ _Avoid_: Mock Quad, debug switch
 A session in which a pilot who flies the real Quad flies the simulated one against their memory of it, following a written checklist of manoeuvres. Whatever the pilot signs off is pinned in Scenarios.
 _Avoid_: Playtest, vibe check
 
+**Feel Test log**:
+A Quad's record, kept beside its definition as `feel-tests.md`, of every Estimate that moved: the date, the number, its old and new values, and why. It only grows, and CI checks every change to the Quad against it.
+_Avoid_: Changelog, tuning notes
+
 ## Rules
 
 - A Scenario is readable by a non-programmer. Every number carries its unit, sticks are written in percent, and Expectations are plain values with tolerances, for example battery voltage 3.71 V ± 0.02 V at 30 s.

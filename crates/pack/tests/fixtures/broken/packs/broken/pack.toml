@@ -1,0 +1,13 @@
+# A broken fixture Pack for the Pack checker's readable checks: its manifest is
+# fine, one Quad is fine, and the others are broken, so the checker skips them,
+# loads the rest, and lists every problem at once (crates/pack/tests/checker.rs).
+format      = 1
+id          = "broken"
+name        = "Fixture"
+description = "A Pack made for the readable checks."
+version     = "1"
+author      = "OpenDrone contributors"
+licence     = "CC0-1.0"
+
+[licences]
+"quads/ducted/picture.png" = { licence = "CC-BY-4.0", credit = "Picture by the OpenDrone contributors" }

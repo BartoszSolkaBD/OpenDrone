@@ -24,11 +24,16 @@ pub fn parse_box(text: &str) -> Result<[Quantity; 3], UnitProblem> {
     for side in &sides {
         quantities.push(units::parse_quantity(side)?);
     }
-    let last = quantities[2].unit.clone();
-    for quantity in &mut quantities[..2] {
-        if quantity.unit.dimension() == units::Dimension::NONE {
-            quantity.value *= last.in_si();
-            quantity.unit = last.clone();
+    // As with labelled parts, a unit written once, on the last size only, is
+    // every size's unit.
+    let unitless = |q: &Quantity| q.unit.dimension() == units::Dimension::NONE;
+    if let Some((last, others)) = quantities.split_last_mut()
+        && !unitless(last)
+        && others.iter().all(unitless)
+    {
+        for quantity in others {
+            quantity.value *= last.unit.in_si();
+            quantity.unit = last.unit.clone();
         }
     }
     let [a, b, c]: [Quantity; 3] = quantities

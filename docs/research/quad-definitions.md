@@ -52,9 +52,11 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 **Winding resistance: 0.20 Ω, Estimate, range 0.05–0.3 Ω.** With the drive at the throttle's share of 23.5 V, the lumped resistance that meets the table is 0.19 Ω at 100%, 0.22 Ω at 80% and 0.19 Ω at 60%. #10 fits it to the TII logs.
 
-**Rotor inertia: 55 g·cm², Estimate, range ×0.5–×2.** A T5147 weighs about 4.5 g (0.2·m·R² ≈ 38 g·cm²) and a 2207's bell adds roughly 15–25 g·cm². The spin-up time this gives in a hover, about 28 ms, sits just under the 33–39 ms measured on similar 5″ quads.
+**Rotor inertia: 55 g·cm², Estimate, range ×0.5–×2.** A T5147 weighs about 4.5 g (0.2·m·R² ≈ 38 g·cm²) and a 2207's bell adds roughly 15–25 g·cm². The spin-up time this gives in a hover, about 28 ms, sits just under the 33 ms measured on NeuroBEM's 5″.
 
-**Motor lag: 36 ms both ways, Estimate, range 33–39 ms.** #10 lists 33–39 ms as measured on similar 5″ quads (NeuroBEM 33 ms, Agilicious 39 ms). A number measured on another quad can't be locked for this one, and #10 refines it against the TII logs, so it is an Estimate whose range is the measured spread. The same goes for **rotor drag: 0.4 s⁻¹, Estimate, range 0.24–0.54 s⁻¹**, the span Faessler et al. measured on a 610 g quad.
+**Motor lag: 33 ms both ways, Measured.** #10 §5 lists the 5″'s motor lag as Measured on similar 5″ quads, 33–39 ms. The file takes 33 ms, NeuroBEM's time constant for its 752 g 5″ racing quad, which the research's §8.2 uses as the generic 5″ reference; Agilicious measured 39 ms on another quad. NeuroBEM fits one time constant both ways, so spin-up and slow-down share it. As a Measured number it is locked, and #10 §6's Thrust Stand Scenario checks it with a Source basis.
+
+**Rotor drag: 0.4 s⁻¹, Estimate, range 0.24–0.54 s⁻¹.** #10 §5 also calls this "Measured on a similar quad", but Faessler et al. measured two numbers on their 610 g quad, 0.49–0.54 s⁻¹ forward and 0.24–0.39 s⁻¹ sideways, and the Quad file holds one. No single measured value exists to lock, and #10 refines it against the TII logs, so it is an Estimate whose range is the measured span.
 
 **Reverse thrust: 48%, Measured.** #16 §4 and #26 §3 lock it: measured on a similar 5.1″ 3-blade prop.
 
@@ -66,7 +68,7 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 **Inertia: (14, 15, 25) kg·cm², Estimate, range ×0.7–×1.8:** #10's (1.4, 1.5, 2.5) × 10⁻³ kg·m². The range reaches NeuroBEM's heavier 6″ quad, (2.5, 2.1, 4.3) × 10⁻³ kg·m².
 
-**The gyro:** typical 5″ flight controllers carry an ICM-42688-P or a BMI270, both ±2000 °/s.
+**The gyro:** typical 5″ boards carry an ICM-42688-P or a BMI270, both ±2000 °/s.
 
 ## Both Quads
 
@@ -85,4 +87,5 @@ Every Estimate above may move in a Feel Test (the whoop) or a fit to the TII log
 - **The battery curves:** typical LiPo and LiHV curves, not these packs' own.
 - **The whoop's C_T and C_P,** until a Feel Test or the maintainer's recording settles the hover pitch.
 - **Prop Wash's flicker speed and the ground effect's body term,** which have no source for these Quads.
-- **Bluejay's start-up power cap** read as a share of full drive: the value is Bluejay's, the reading of what it does is ours, and the ESC ticket checks it.
+- **What Bluejay's start-up power cap does.** The number is locked, because it is Bluejay's own default (Startup Power Max, 5 of 255), stored as the share of full drive it caps a starting motor at. How that cap acts on a stalled motor is the ESC ticket's to check against Bluejay's code.
+- **The 5″'s pack box.** #26 §5 takes a pack's size from its product page, but #10 names no particular 6S 1400 mAh pack, so the box is a typical pack's size, as an Estimate.

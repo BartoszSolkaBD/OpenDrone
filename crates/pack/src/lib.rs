@@ -58,6 +58,9 @@ pub use quad::{
 };
 pub use tune::{Tune, TuneSetting, read_tune};
 
+use quad::{ReadInFull, check_quad_as_read, read_quad_file_as_far_as_it_goes};
+use tune::read_tune_as_far_as_it_goes;
+
 /// The kinds of item a Pack may hold, each in its own folder. Maps and Input
 /// Device profiles are known, but not read yet (#63, #19).
 const KINDS: &[&str] = &["quads", "maps", "input-devices"];
@@ -70,14 +73,20 @@ const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 #[derive(Clone, Debug)]
 pub struct Packs {
     packs: Vec<OpenPack>,
-    /// Every Quad by id: checked, or its problems.
-    quads: BTreeMap<String, Result<QuadDefinition, Problems>>,
-    /// The files of every Quad that read, for Test Quads to build on.
-    quad_files: BTreeMap<String, (QuadFile, Tune)>,
+    /// Every Quad by id.
+    quads: BTreeMap<String, QuadItem>,
     /// Packs skipped because their manifest is broken.
     skipped: Vec<String>,
     problems: Problems,
     test_quads: Option<TestQuads>,
+}
+
+/// One Quad of a Pack: the checked definition, or every problem with it, and
+/// its files, for Test Quads to build on.
+#[derive(Clone, Debug)]
+struct QuadItem {
+    checked: Result<QuadDefinition, Problems>,
+    files: Option<(QuadFile, Tune)>,
 }
 
 #[derive(Clone, Debug)]
@@ -140,7 +149,6 @@ impl Packs {
         let mut packs = Packs {
             packs: Vec::new(),
             quads: BTreeMap::new(),
-            quad_files: BTreeMap::new(),
             skipped: Vec::new(),
             problems: Problems::new(),
             test_quads: None,
@@ -243,14 +251,11 @@ impl Packs {
                 continue;
             }
             let id = format!("{pack}/{name}");
-            let (files, checked) = read_quad_folder(&folder, &id);
-            if let Some(files) = files {
-                self.quad_files.insert(id.clone(), files);
-            }
-            if let Err(found) = &checked {
+            let item = read_quad_folder(&folder, &id);
+            if let Err(found) = &item.checked {
                 self.problems.extend(found.clone());
             }
-            self.quads.insert(id, checked);
+            self.quads.insert(id, item);
         }
     }
 
@@ -308,16 +313,14 @@ impl Packs {
 
     fn read_test_quad(&self, file: &Folder, id: &str) -> Result<QuadDefinition, Problems> {
         let text = file.read()?;
-        let (based_on, quad) =
-            read_test_quad(&file.label, &text, |based_on| self.quad_file(based_on))?;
-        let tune = self
-            .quad_files
-            .get(&based_on)
-            .map(|(_, tune)| tune)
-            .ok_or_else(|| {
-                Problems::of_file(&file.label, format!("can't find {based_on}'s Tune"))
-            })?;
-        check_quad(id, Some(based_on), &quad, tune)
+        let mut base_tune = None;
+        let (based_on, quad) = read_test_quad(&file.label, &text, |based_on| {
+            let (quad, tune) = self.quad_files(based_on)?;
+            base_tune = Some(tune.clone());
+            Ok(quad.clone())
+        })?;
+        let tune = base_tune.expect("a Test Quad that read has its real Quad's Tune");
+        check_quad(id, Some(based_on), &quad, &tune)
     }
 
     /// Every problem in every Pack and Test Quad, in folder order, each once:
@@ -343,7 +346,7 @@ impl Packs {
     pub fn quads(&self) -> Vec<&QuadDefinition> {
         self.quads
             .values()
-            .filter_map(|q| q.as_ref().ok())
+            .filter_map(|item| item.checked.as_ref().ok())
             .collect()
     }
 
@@ -378,33 +381,31 @@ impl Packs {
                 )),
             };
         }
-        let (pack, name) = self.find(id)?;
-        match self.quads.get(id) {
-            Some(checked) => checked.clone(),
-            None => Err(Problems::of_file(
-                id,
-                format!(
-                    "there's no Quad here: {}/quads/{name}/quad.toml doesn't exist",
-                    pack.folder.label
-                ),
-            )),
+        self.quad_item(id).and_then(|item| item.checked.clone())
+    }
+
+    /// The files of the real Quad with this id, for a Test Quad to build on,
+    /// or the problems that kept it out.
+    fn quad_files(&self, id: &str) -> Result<&(QuadFile, Tune), Problems> {
+        let item = self.quad_item(id)?;
+        match (&item.checked, &item.files) {
+            (Ok(_), Some(files)) => Ok(files),
+            (Err(found), _) => Err(found.clone()),
+            (Ok(_), None) => Err(Problems::of_file(id, "its files weren't kept")),
         }
     }
 
-    /// The file of the real Quad with this id, for a Test Quad to build on.
-    fn quad_file(&self, id: &str) -> Result<QuadFile, Problems> {
+    fn quad_item(&self, id: &str) -> Result<&QuadItem, Problems> {
         let (pack, name) = self.find(id)?;
-        match (self.quads.get(id), self.quad_files.get(id)) {
-            (Some(Ok(_)), Some((file, _))) => Ok(file.clone()),
-            (Some(Err(found)), _) => Err(found.clone()),
-            _ => Err(Problems::of_file(
+        self.quads.get(id).ok_or_else(|| {
+            Problems::of_file(
                 id,
                 format!(
                     "there's no Quad here: {}/quads/{name}/quad.toml doesn't exist",
                     pack.folder.label
                 ),
-            )),
-        }
+            )
+        })
     }
 
     /// The open Pack an item id names, and the item's name.
@@ -447,12 +448,10 @@ impl Packs {
     }
 }
 
-/// What one Quad's folder holds: its files, if they read, and the checked Quad
-/// or every problem with it.
-type QuadFolder = (Option<(QuadFile, Tune)>, Result<QuadDefinition, Problems>);
-
-/// Reads one Quad's folder.
-fn read_quad_folder(folder: &Folder, id: &str) -> QuadFolder {
+/// Reads one Quad's folder. Every file is read as far as it goes, so all of
+/// the Quad's problems are listed at once: those with each file's shape, and
+/// those with every value that did read.
+fn read_quad_folder(folder: &Folder, id: &str) -> QuadItem {
     let mut problems = Problems::new();
     let required = |name: &str, problems: &mut Problems| {
         let file = folder.child(name);
@@ -466,17 +465,32 @@ fn read_quad_folder(folder: &Folder, id: &str) -> QuadFolder {
             None
         }
     };
+    let mut read_in_full = ReadInFull {
+        quad: true,
+        tune: true,
+    };
     let quad = required("quad.toml", &mut problems).and_then(|file| {
-        file.read()
-            .and_then(|text| read_quad_file(&file.label, &text))
-            .map_err(|found| problems.extend(found))
-            .ok()
+        let read = file
+            .read()
+            .and_then(|text| read_quad_file_as_far_as_it_goes(&file.label, &text));
+        match read {
+            Ok((quad, found)) => {
+                read_in_full.quad = found.is_empty();
+                problems.extend(found);
+                Some(quad)
+            }
+            Err(found) => {
+                problems.extend(found);
+                None
+            }
+        }
     });
     let tune = required("tune.txt", &mut problems).and_then(|file| {
-        file.read()
-            .and_then(|text| read_tune(&file.label, &text))
-            .map_err(|found| problems.extend(found))
-            .ok()
+        let text = file.read().map_err(|found| problems.extend(found)).ok()?;
+        let (tune, found) = read_tune_as_far_as_it_goes(&file.label, &text);
+        read_in_full.tune = found.is_empty();
+        problems.extend(found);
+        Some(tune)
     });
     let log = folder.child("feel-tests.md");
     if log.path.is_file()
@@ -491,20 +505,17 @@ fn read_quad_folder(folder: &Folder, id: &str) -> QuadFolder {
     }
     let files = quad.zip(tune);
     let checked = match &files {
-        Some((quad, tune)) => {
-            let checked = check_quad(id, None, quad, tune);
-            match checked {
-                Ok(definition) if problems.is_empty() => Ok(definition),
-                Ok(_) => Err(problems),
-                Err(found) => {
-                    problems.extend(found);
-                    Err(problems)
-                }
+        Some((quad, tune)) => match check_quad_as_read(id, None, quad, tune, read_in_full) {
+            Ok(definition) if problems.is_empty() => Ok(definition),
+            Ok(_) => Err(problems),
+            Err(found) => {
+                problems.extend(found);
+                Err(problems)
             }
-        }
+        },
         None => Err(problems),
     };
-    (files, checked)
+    QuadItem { checked, files }
 }
 
 /// The Quad picker's picture must be a PNG file in the Quad's own folder.

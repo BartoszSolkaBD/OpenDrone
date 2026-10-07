@@ -1,9 +1,15 @@
-//! The fixture Packs the readable checks use. The good fixture is committed
-//! in `crates/pack/tests/fixtures/good/`: a Pack called `fixture` holding one
-//! Quad, `fixture/ducted`, with every section, ducts and a buzzer, and a Test
-//! Quad, `test/ducted-no-drag`. Each broken fixture is a copy of it, in a
-//! scratch folder, with one line changed, so every check shows exactly what
-//! it broke.
+//! The fixture Packs the readable checks use, committed in
+//! `crates/pack/tests/fixtures/`:
+//!
+//! - `good/`: a Pack called `fixture` holding one Quad, `fixture/ducted`, with
+//!   every section, ducts and a buzzer, and a Test Quad,
+//!   `test/ducted-no-drag`.
+//! - `broken/`: a Pack with a fine Quad, a Quad with a problem on each line
+//!   marked BROKEN, and a Quad in a newer format, plus a Pack whose manifest
+//!   is broken.
+//!
+//! Most checks copy the good fixture into a scratch folder and change one
+//! line ([`Fixture::change`]), so each shows exactly what it broke.
 
 #![allow(dead_code)]
 

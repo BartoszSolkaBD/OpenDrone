@@ -51,6 +51,9 @@ pub fn read_manifest(file: &str, text: &str) -> Result<Manifest, Problems> {
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
+    if doc.is_newer() {
+        return Err(problems);
+    }
     let root = doc.root();
     root.refuse_unknown(KEYS, &mut problems);
     let mut field = |key: &str| {

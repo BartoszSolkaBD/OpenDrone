@@ -17,6 +17,17 @@ pub struct Problem {
     pub sentence: String,
 }
 
+impl Problem {
+    /// A problem on `line` of `file` (0 for the file as a whole).
+    pub fn of(file: impl Into<String>, line: usize, sentence: impl Into<String>) -> Problem {
+        Problem {
+            file: file.into(),
+            line,
+            sentence: sentence.into(),
+        }
+    }
+}
+
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.line == 0 {
@@ -210,6 +221,16 @@ impl<'t> Document<'t> {
                 "`format` must be a whole number from 1 to {FORMAT}"
             ))),
         }
+    }
+
+    /// Whether the file is written in a newer format than this OpenDrone
+    /// reads. Its other keys may mean something this one doesn't know, so a
+    /// reader stops after saying it needs a newer OpenDrone.
+    pub fn is_newer(&self) -> bool {
+        self.root()
+            .get("format")
+            .and_then(|item| item.integer())
+            .is_some_and(|n| n > FORMAT)
     }
 }
 
