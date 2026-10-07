@@ -777,6 +777,23 @@ fn a_newer_format_is_refused_as_needing_a_newer_opendrone() {
 }
 
 #[test]
+fn every_file_starts_with_its_format() {
+    let fixture = Fixture::new("format-not-first").change(
+        QUAD,
+        "format = 1\n\nname        = \"Ducted\"",
+        "name        = \"Ducted\"\nformat = 1",
+    );
+    assert_eq!(
+        fixture.quad_problems(),
+        [at(
+            QUAD,
+            fixture.line_of(QUAD, "format = 1"),
+            "every file starts with `format = 1`, before anything else but comments"
+        )]
+    );
+}
+
+#[test]
 fn an_older_format_is_upgraded_in_memory_one_step_at_a_time() {
     fn one_to_two(text: &str) -> Result<String, String> {
         Ok(text

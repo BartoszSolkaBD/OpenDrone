@@ -48,6 +48,10 @@ fn at(line: usize, sentence: &str) -> String {
     format!("{QUAD} line {line}: {sentence}")
 }
 
+fn log_at(line: usize, sentence: &str) -> String {
+    format!("{LOG} line {line}: {sentence}")
+}
+
 #[test]
 fn an_estimate_that_moves_inside_its_range_with_a_new_log_row_passes() {
     let quad = changed("\"0.3 s⁻¹\"", "\"0.35 s⁻¹\"");
@@ -74,7 +78,114 @@ fn a_log_row_must_name_the_move_that_was_made() {
     let quad = changed("\"0.3 s⁻¹\"", "\"0.35 s⁻¹\"");
     let log =
         log_with("| 2026-11-09 | [props] rotor_drag | 0.3 s⁻¹ → 0.4 s⁻¹ | a typo in the log |");
-    assert_eq!(problems(&quad, &log).len(), 1);
+    assert_eq!(
+        problems(&quad, &log),
+        [
+            log_at(
+                line_of(&log, "a typo"),
+                "this row records [props] rotor_drag moving from 0.3 s⁻¹ to 0.4 s⁻¹, but this change moves it from 0.3 s⁻¹ to 0.35 s⁻¹"
+            ),
+            at(
+                line_of(&quad, "0.35 s⁻¹"),
+                "[props] rotor_drag is an Estimate that moved from 0.3 s⁻¹ to 0.35 s⁻¹, so packs/fixture/quads/ducted/feel-tests.md needs a new row for it: the date, [props] rotor_drag, 0.3 s⁻¹ → 0.35 s⁻¹, and why"
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_log_row_and_the_quad_are_compared_as_numbers_with_their_units() {
+    let quad = changed(
+        "\"35 ms\", confidence = \"Estimate\", range = \"20–50 ms\", source = \"guess\" }\nslow_down",
+        "\"40 ms\", confidence = \"Estimate\", range = \"20–50 ms\", source = \"guess\" }\nslow_down",
+    );
+    let log = log_with("| 2026-11-09 | [motors] spin_up | 0.035 s → 0.04 s | punches felt soft |");
+    assert_eq!(problems(&quad, &log), Vec::<String>::new());
+}
+
+#[test]
+fn an_invented_earlier_row_doesnt_widen_a_relative_range() {
+    // Reviewer's first case: inertia moved 20×, with an invented row ahead of
+    // the real one that would make the move look small.
+    let quad = changed(
+        "roll 70, pitch 90, yaw 140 g·cm²",
+        "roll 1400, pitch 1800, yaw 2800 g·cm²",
+    );
+    let log = log_with(
+        "| 2026-11-09 | [frame] inertia | roll 700, pitch 900, yaw 1400 g·cm² → roll 70, pitch 90, yaw 140 g·cm² | made up |\n| 2026-11-09 | [frame] inertia | roll 70, pitch 90, yaw 140 g·cm² → roll 1400, pitch 1800, yaw 2800 g·cm² | the real move |",
+    );
+    assert_eq!(
+        problems(&quad, &log),
+        [
+            log_at(
+                line_of(&log, "made up"),
+                "this row records [frame] inertia moving from roll 700, pitch 900, yaw 1400 g·cm² to roll 70, pitch 90, yaw 140 g·cm², but this change moves it from roll 70, pitch 90, yaw 140 g·cm² to roll 1400, pitch 1800, yaw 2800 g·cm²"
+            ),
+            log_at(
+                line_of(&log, "the real move"),
+                "this change already has a row for [frame] inertia; one move, one row"
+            ),
+            at(
+                line_of(&quad, "roll 1400"),
+                "[frame] inertia moved to roll 1400, pitch 1800, yaw 2800 g·cm², outside its range, ×0.5–×2, measured from roll 70, pitch 90, yaw 140 g·cm², the value it started at"
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_row_for_a_move_that_didnt_happen_is_refused() {
+    // Reviewer's second case: nothing in the Quad changes, but a row claims a
+    // move, which would become the start for later moves.
+    let (quad, _) = before();
+    let log = log_with(
+        "| 2026-11-09 | [frame] inertia | roll 7, pitch 9, yaw 14 g·cm² → roll 70, pitch 90, yaw 140 g·cm² | never happened |",
+    );
+    assert_eq!(
+        problems(&quad, &log),
+        [log_at(
+            line_of(&log, "never happened"),
+            "this row records [frame] inertia moving from roll 7, pitch 9, yaw 14 g·cm² to roll 70, pitch 90, yaw 140 g·cm², but this change doesn't move it"
+        )]
+    );
+}
+
+#[test]
+fn a_row_whose_value_cant_be_read_is_refused() {
+    // Reviewer's third case: an unreadable old value can't excuse a 100× move.
+    let quad = changed(
+        "roll 70, pitch 90, yaw 140 g·cm²",
+        "roll 7000, pitch 9000, yaw 14000 g·cm²",
+    );
+    let log = log_with(
+        "| 2026-11-09 | [frame] inertia | n/a → roll 7000, pitch 9000, yaw 14000 g·cm² | unknown before |",
+    );
+    let found = problems(&quad, &log);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].starts_with(&log_at(
+            line_of(&log, "unknown before"),
+            "the old value, \"n/a\", doesn't read as [frame] inertia:"
+        )),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_curve_that_changes_its_number_of_points_needs_a_new_source() {
+    let old = "4.35 V at 100%, 3.92 V at 50%, 3.30 V at 0%";
+    let new = "4.35 V at 100%, 4.10 V at 75%, 3.92 V at 50%, 3.30 V at 0%";
+    let quad = changed(old, new);
+    let log = log_with(&format!(
+        "| 2026-11-09 | [battery] voltage_curve | {old} → {new} | more detail |"
+    ));
+    assert_eq!(
+        problems(&quad, &log),
+        [at(
+            line_of(&quad, "4.10 V at 75%"),
+            "[battery] voltage_curve now has 4 points and started with 3; a change in its points changes what's known about it, so it needs a new source"
+        )]
+    );
 }
 
 #[test]
@@ -250,7 +361,7 @@ fn a_version_an_older_checker_passed_is_still_compared_number_by_number() {
         LOG,
         QuadVersion {
             quad: Some(older),
-            feel_tests: None,
+            feel_tests: Some(&log),
         },
         QuadVersion {
             quad: Some(&quad),

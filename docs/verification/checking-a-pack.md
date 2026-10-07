@@ -144,10 +144,12 @@ Each Quad keeps a log of every Estimate a Feel Test moves, oldest first:
 | 2026-11-02 | [props] rotor_drag | 0.3 s⁻¹ → 0.35 s⁻¹ | carved too wide after a sprint |
 ```
 
-The values are written exactly as `quad.toml` writes them. `cargo xtask feel-tests` compares each Quad definition with the base of the change and refuses:
+The values are written with their units, as `quad.toml` writes them; they're compared as numbers, so "300 ms" matches "0.3 s". The Pack checker refuses a row whose values don't read as its number. `cargo xtask feel-tests` compares each Quad definition with the base of the change and refuses:
 
 - an Estimate that moved without a new row naming it, its old value and its new one, even when its range was re-sourced in the same change;
-- an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the old value in its first row.
+- a new row that doesn't record a move this change makes: the same Estimate, its value before the change as the old value, and its value after as the new one;
+- an Estimate that moved outside its range. A relative range is measured from the value the Estimate started at: the old value of its earliest row already in the log, or, with none, its value before this change. A row added in the same change never sets the start, so a made-up earlier row can't stretch a range.
+- a curve that changes its number of points without a new source;
 - a Measured, Manufacturer or Derived number that changed without a new source, meaning a different source key, or a changed line for its key in `[sources]`;
 - an Estimate's range, or any number's Confidence, changed without a new source, so a Feel Test can't widen its own range;
 - an earlier row changed or removed: the log only grows.
@@ -160,4 +162,4 @@ The checker gives each Quad a fingerprint of what the Simulation receives from i
 
 ## File formats
 
-Every Pack data file starts with `format = N`. A newer format than this OpenDrone knows is refused as needing a newer OpenDrone. An older one is upgraded in memory, one format at a time, by the same steps the format migration tool runs over the repo's own files. Format 1 is the first, so there are no steps yet.
+Every Pack data file starts with `format = N`, before anything else but comments. A newer format than this OpenDrone knows is refused as needing a newer OpenDrone. An older one is upgraded in memory, one format at a time, by the same steps the format migration tool runs over the repo's own files. Format 1 is the first, so there are no steps yet.

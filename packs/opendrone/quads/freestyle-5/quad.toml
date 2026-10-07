@@ -39,7 +39,7 @@ drag_area    = { value = "front 45, side 45, top 100 cm²", confidence = "Estima
 
 [collision]   # simple shapes (#16 §4, #26 §1); each box is front to back × side to side × top to bottom
 body        = { value = "box 80 × 45 × 35 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "layout" }   # plates and stack; the prop discs cover the arms
-pack        = { value = "box 75 × 35 × 40 mm", confidence = "Estimate", range = "×0.9–×1.1", source = "pack-6s" }
+pack        = { value = "box 80 × 38 × 40 mm", confidence = "Manufacturer", source = "gnb" }
 pack_height = { value = "26 mm", confidence = "Estimate", range = "15–40 mm", source = "layout" }   # on top of the frame
 bounce      = { value = "0.3", confidence = "Estimate", range = "0.1–0.6", source = "feel" }
 friction    = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "feel" }
@@ -67,13 +67,13 @@ start_wait          = { value = "0.1 s", confidence = "Manufacturer", source = "
 restart_tries       = 3
 startup_power_limit = { value = "1.96%", confidence = "Manufacturer", source = "bluejay" }
 
-[battery]   # a typical 6S 1400 mAh LiPo
+[battery]   # a typical 6S 1400 mAh LiPo: GNB (Gaoneng) 1400 mAh 6S 160C
 cells         = 6
 chemistry     = "LiPo"
-full          = { value = "4.20 V", confidence = "Manufacturer", source = "lipo" }
+full          = { value = "4.20 V", confidence = "Manufacturer", source = "gnb" }
 empty         = { value = "3.50 V", confidence = "Estimate", range = "3.3–3.6 V", source = "battery-window" }
-capacity      = { value = "1400 mAh", confidence = "Manufacturer", source = "lipo" }
-mass          = { value = "225 g", confidence = "Derived", source = "iflight" }   # stored apart from the dry mass; the checker adds the two
+capacity      = { value = "1400 mAh", confidence = "Manufacturer", source = "gnb" }
+mass          = { value = "233 g", confidence = "Manufacturer", source = "gnb" }   # stored apart from the dry mass; the checker adds the two
 voltage_curve = { value = "4.20 V at 100%, 4.02 V at 80%, 3.84 V at 50%, 3.73 V at 20%, 3.50 V at 0%",
                   confidence = "Estimate", range = "×0.97–×1.03", source = "typical-curve" }
 resistance    = { value = "28 mΩ", confidence = "Estimate", range = "15–45 mΩ", source = "pack-resistance" }
@@ -131,7 +131,7 @@ where_you_stand_level = "0 dB"      # how loud this Quad is from the Launch Spot
 hit_level             = "0.8"       # the hit clip at a 5 m/s impact
 
 [sources]
-iflight         = "docs/research/flight-dynamics.md §8.2: iFlight's Nazgul Evoque F5 V2 weighs 419 g dry and about 644 g with a 6S 1400 mAh pack (so the pack is 225 g), with a 225 mm diagonal [S52]"
+iflight         = "docs/research/flight-dynamics.md §8.2: iFlight's Nazgul Evoque F5 V2 weighs 419 g dry, with a 225 mm diagonal [S52]"
 tmotor          = "T-Motor Velox V2207 V3 1750KV, T-Motor's store page: 12N14P, 1.2 A no-load at 10 V, and the T5147 thrust table, up to 1,591 g at 29,447 RPM and 34.6 A at 23.5 V (read 2026-10-07)"
 tmotor-fit      = "docs/research/quad-definitions.md: C_T fitted to T-Motor's T5147 thrust table (it holds within 10% from 20% to 100% throttle); C_P from the same table through the motor model, which spreads it from 0.07 to 0.11"
 motor-model     = "docs/research/quad-definitions.md: about 0.2 Ω makes the motor model meet T-Motor's table from 60% to 100% throttle; #10 fits it to the TII logs"
@@ -143,9 +143,8 @@ crashes         = "#26's resolution §3 and §5: reverse torque and prop grip"
 dynamics        = "docs/research/flight-dynamics.md §9.1 and #10's resolution §5: inertia about (1.4, 1.5, 2.5) × 10⁻³ kg·m², checked against NeuroBEM's 6″ quad, (2.5, 2.1, 4.3) × 10⁻³ kg·m² [S6]"
 layout          = "docs/research/quad-definitions.md: estimated from a 225 mm frame's layout with the pack on top; nothing measured"
 first-guess     = "docs/research/quad-definitions.md: a first guess from the frame's size, with a drag coefficient of 1; the air ticket (#42) fits it to the TII logs"
-pack-6s         = "docs/research/quad-definitions.md: the size of a typical 6S 1400 mAh LiPo; #10 names no particular pack"
 pack-resistance = "#10's resolution §5: about 30 mΩ for a 6S pack with its leads, an Estimate; split here into the pack and its XT60"
-lipo            = "#10's resolution §5: a 6S 1400 mAh LiPo, charged to 4.20 V a cell, as every LiPo maker rates them"
+gnb             = "GNB (Gaoneng) 1400 mAh 6S 160C LiPo, the maker's specification as Rotorvillage lists it: 1400 mAh, 6S1P, nominal 22.2 V (a standard LiPo, not HV, so charged to 4.20 V a cell), 40 × 38 × 80 mm, 233 g ± 7 g, XT60 (read 2026-10-07); #10 §5 asks for a typical 6S 1400 mAh LiPo, and this one is"
 battery-window  = "docs/research/flight-dynamics.md §5.3: a LiPo cell runs from 4.2 V down to about 3.5 V"
 typical-curve   = "docs/research/quad-definitions.md: a typical LiPo open-circuit voltage curve"
 battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]"

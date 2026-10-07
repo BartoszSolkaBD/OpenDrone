@@ -60,9 +60,9 @@ fn the_whoop_65_weighs_its_dry_mass_plus_its_lava_ii_pack() {
 #[test]
 fn the_freestyle_5_weighs_about_650_g_with_its_pack() {
     // Basis: Source (#10 §5: about 650 g, no action camera; iFlight's 419 g
-    // dry and about 644 g with a 6S 1400 mAh pack).
+    // dry, and GNB's 233 g 6S 1400 mAh pack).
     let five = quad("opendrone/freestyle-5");
-    assert!((five.parameters.mass - 0.644).abs() < 1e-12);
+    assert!((five.parameters.mass - 0.652).abs() < 1e-12);
     assert!(five.ducts.is_none());
     assert_eq!(five.parameters.drag.duct_ram, 0.0);
 }

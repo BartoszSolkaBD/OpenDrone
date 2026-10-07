@@ -23,7 +23,13 @@ Sea-level air (1.225 kg/m³) and g = 9.81 m/s² throughout. The prop coefficient
 **Shapes (Estimates from the layout):** the frame and canopy as a box of 35 × 30 × 20 mm, the props' plane about 8 mm above the centre of mass, the pack's centre about 6 mm below it (the 8.2 g pack hangs under the 23 g frame), and duct rings 37 mm inside (a 1 mm tip gap round a 35 mm prop), 1.5 mm thick and 14 mm tall. Nothing here was measured; photos and the sizes above set them. The camera position (15 mm forward, 12 mm up) is placed the same way; as a camera default it carries no Confidence.
 
 **Battery:**
-- Resistance 29 mΩ, Derived: the research's §5.3 worked it out from BetaFPV's LAVA II discharge curves.
+- **Resistance 29 mΩ, Derived** from BetaFPV's discharge curve for this pack, "Discharge at Current 18A" on the LAVA II product page:
+  - At rest the pack sits at about 4.33 V.
+  - With 18 A drawn it falls at once to about 3.80 V, where the curve turns, about 2 s in. After that it falls slowly as charge is used.
+  - So the resistance is (4.33 V − 3.80 V) ÷ 18 A = 0.53 V ÷ 18 A ≈ 29 mΩ.
+  - Those 2 s use about 10 mAh, 3% of the pack, which lowers the open-circuit voltage by a few hundredths of a volt at most, so the figure is good to about ±2 mΩ.
+  - The same chart's LAVA 300 mAh falls from about 4.33 V to 3.70 V, about 35 mΩ, which matches the research's §5.3 figure for that pack.
+  - The voltages are read off the chart by eye; BetaFPV states no resistance.
 - The open-circuit voltage curve is a typical LiHV curve, an Estimate within ×0.97–×1.03. Its ends must equal `full` (4.35 V, Manufacturer) and `empty` (3.30 V, Estimate 3.2–3.5 V), which the checker cross-checks.
 - Recovery 3.3 s, Estimate 1–30 s: the one RC pair Bauersfeld & Scaramuzza fitted to 4S–6S packs (research §5.3). No whoop pack has been fitted.
 - The BT2.0 connector's 10 mΩ is #10's Estimate.
@@ -60,11 +66,13 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 **Reverse thrust: 48%, Measured.** #16 §4 and #26 §3 lock it: measured on a similar 5.1″ 3-blade prop.
 
-**Mass:** 419 g dry (Manufacturer, iFlight) and a 225 g pack (Derived: iFlight's about 644 g with a 6S 1400 mAh pack, less 419 g), so 644 g in all, near #10's "about 650 g".
+**The pack: a GNB (Gaoneng) 1400 mAh 6S 160C LiPo.** #10 §5 asks for a typical 6S 1400 mAh LiPo and names none, so the file names a common one, which lets the pack's size and mass be the maker's own, as #26 §5 asks for the pack box. The maker's specification, as Rotorvillage lists it: 1400 mAh, 6S1P, nominal 22.2 V, 40 × 38 × 80 mm (height × width × length), 233 g ± 7 g, XT60. (RaceDayQuads lists the same pack at 269 g; the maker's sheet is the one cited.) It is a standard LiPo, not an HV one, so a cell is full at 4.20 V.
 
-**Battery:** 6S, LiPo, charged to 4.20 V a cell, 1400 mAh. The pack's resistance is #10's "about 30 mΩ with leads", an Estimate, split here into 28 mΩ for the pack (range 15–45 mΩ) and 2 mΩ for the XT60 (range 1–5 mΩ). The curve is a typical LiPo curve ending at `full` and `empty` (3.50 V, Estimate 3.3–3.6 V); recovery is 3.3 s as for the whoop.
+**Mass:** 419 g dry (Manufacturer, iFlight) and the 233 g pack (Manufacturer, GNB), so 652 g in all, as #10's "about 650 g" (iFlight's own figure with a 6S 1400 mAh pack is about 644 g).
 
-**Shapes and drag (Estimates from the layout):** the plates and stack as a box of 80 × 45 × 35 mm; the pack as a typical 6S 1400 mAh box of 75 × 35 × 40 mm, its centre 26 mm above the centre of mass (the 225 g pack on top lifts the centre of mass about 14 mm above the frame's); the props' plane about 5 mm below the centre of mass; body drag areas front 45, side 45 and top 100 cm² (each silhouette with a drag coefficient of 1). The air ticket fits the drag to the TII logs.
+**Battery:** 6S, LiPo, charged to 4.20 V a cell, 1400 mAh (all from GNB). The pack's resistance is #10's "about 30 mΩ with leads", an Estimate, split here into 28 mΩ for the pack (range 15–45 mΩ) and 2 mΩ for the XT60 (range 1–5 mΩ); GNB publishes none. The curve is a typical LiPo curve ending at `full` and `empty` (3.50 V, Estimate 3.3–3.6 V); recovery is 3.3 s as for the whoop.
+
+**Shapes and drag (Estimates from the layout):** the plates and stack as a box of 80 × 45 × 35 mm; the pack's box (GNB's 80 × 38 × 40 mm, Manufacturer) with its centre 26 mm above the centre of mass (the 233 g pack on top lifts the centre of mass about 14 mm above the frame's); the props' plane about 5 mm below the centre of mass; body drag areas front 45, side 45 and top 100 cm² (each silhouette with a drag coefficient of 1). The air ticket fits the drag to the TII logs.
 
 **Inertia: (14, 15, 25) kg·cm², Estimate, range ×0.7–×1.8:** #10's (1.4, 1.5, 2.5) × 10⁻³ kg·m². The range reaches NeuroBEM's heavier 6″ quad, (2.5, 2.1, 4.3) × 10⁻³ kg·m².
 
@@ -83,9 +91,8 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 Every Estimate above may move in a Feel Test (the whoop) or a fit to the TII logs (the 5″), inside its range. These rest on the least:
 
 - **Placeholders from #16's sample:** both Quads' body drag areas, the whoop's rotor drag and the whoop's no-load current.
-- **Made from photos and frame sizes, with nothing measured:** every collision shape except the whoop's pack box, both props' heights, both packs' heights, the duct rings, and both camera positions.
+- **Made from photos and frame sizes, with nothing measured:** every collision shape except the two pack boxes (each from its maker), both props' heights, both packs' heights, the duct rings, and both camera positions.
 - **The battery curves:** typical LiPo and LiHV curves, not these packs' own.
 - **The whoop's C_T and C_P,** until a Feel Test or the maintainer's recording settles the hover pitch.
 - **Prop Wash's flicker speed and the ground effect's body term,** which have no source for these Quads.
 - **What Bluejay's start-up power cap does.** The number is locked, because it is Bluejay's own default (Startup Power Max, 5 of 255), stored as the share of full drive it caps a starting motor at. How that cap acts on a stalled motor is the ESC ticket's to check against Bluejay's code.
-- **The 5″'s pack box.** #26 §5 takes a pack's size from its product page, but #10 names no particular 6S 1400 mAh pack, so the box is a typical pack's size, as an Estimate.

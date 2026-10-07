@@ -212,6 +212,15 @@ impl<'t> Document<'t> {
             });
             return;
         };
+        if root
+            .entries()
+            .first()
+            .is_some_and(|(key, _)| key != "format")
+        {
+            problems.push(item.problem(format!(
+                "every file starts with `format = {FORMAT}`, before anything else but comments"
+            )));
+        }
         match item.integer() {
             Some(n) if n == FORMAT => {}
             Some(n) if n > FORMAT => problems.push(item.problem(format!(
