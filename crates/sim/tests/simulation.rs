@@ -4,8 +4,10 @@
 
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
-    Drag, FlightControllerSeam, MotorCommands, PhysicsRate, QuadParameters, QuadSetUp, QuadState,
-    ScriptedMotors, SetUp, SetUpProblem, Simulation, SimulationTime, World,
+    BatteryParameters, Drag, EscParameters, EscState, FlightControllerSeam, MotorCommands,
+    MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadSetUp,
+    QuadState, RotorLayout, ScriptedMotors, SetUp, SetUpProblem, Simulation, SimulationTime,
+    StartingMotors, World,
 };
 
 const WORLD: World = World {
@@ -13,7 +15,9 @@ const WORLD: World = World {
     air_density: 1.225,
 };
 
+/// A whoop-sized Quad: the Whoop 65's numbers in SI units.
 fn parameters() -> QuadParameters {
+    let kv = 19500.0 * 2.0 * core::f64::consts::PI / 60.0;
     QuadParameters {
         mass: 0.0312,
         inertia: Mat3::diagonal(Vec3::new(7.0e-6, 9.0e-6, 14.0e-6)),
@@ -21,6 +25,41 @@ fn parameters() -> QuadParameters {
             body_area: Vec3::ZERO,
             rotor: 0.0,
             duct_ram: 0.0,
+        },
+        rotors: RotorLayout {
+            diagonal: 0.066,
+            rotor_height: 0.008,
+            direction: PropDirection::PropsIn,
+        },
+        props: PropParameters {
+            diameter: 0.035,
+            thrust_coefficient: 0.29,
+            power_coefficient: 0.26,
+            rotor_inertia: 0.25e-7,
+            reverse_thrust: 0.5,
+            reverse_torque: 1.0,
+        },
+        motors: MotorParameters {
+            kv,
+            poles: 12,
+            winding_resistance: 0.5,
+            no_load_current: 0.3,
+            no_load_voltage: 4.0,
+            spin_up: 0.035,
+            slow_down: 0.035,
+        },
+        esc: EscParameters {
+            start_wait: 0.1,
+            startup_power_limit: 0.0196,
+            restart_tries: 3,
+        },
+        battery: BatteryParameters {
+            cells: 1,
+            capacity: 0.320 * 3600.0,
+            voltage_curve: vec![(1.0, 4.35), (0.5, 3.92), (0.0, 3.30)],
+            resistance: 0.029,
+            connector: 0.010,
+            recovery: 3.3,
         },
     }
 }
@@ -34,6 +73,9 @@ fn quad_at(height: f64) -> QuadSetUp {
             attitude: Attitude::BODY_IS_WORLD,
             rotation: Vec3::ZERO,
         },
+        motors: StartingMotors::Stopped,
+        battery: 1.0,
+        mount: Mount::Free,
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }
@@ -149,4 +191,30 @@ fn a_set_up_with_a_quad_the_physics_cant_move_is_refused_naming_the_quad() {
         .expect("a Quad without mass can't be set up");
     assert_eq!(error.quad, 1);
     assert_eq!(error.problem, SetUpProblem::MassNotAboveZero);
+}
+
+#[test]
+fn each_tick_reports_every_motor_and_its_esc_and_the_battery() {
+    let mut quad = quad_at(0.0);
+    quad.mount = Mount::ThrustStand;
+    quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+        SimulationTime::START,
+        MotorCommands::all(0.5),
+    )]));
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    let before = sim.quad_output(0);
+    assert!(before.motors.iter().all(|m| m.esc == EscState::Ready));
+    assert_eq!(before.battery.charge, 1.0);
+    for _ in 0..8000 {
+        sim.step();
+    }
+    let after = sim.quad_output(0);
+    assert_eq!(after.state, before.state, "the thrust stand holds it still");
+    for motor in after.motors {
+        assert_eq!(motor.esc, EscState::Running);
+        assert!(motor.speed > 0.0 && motor.thrust > 0.0 && motor.torque > 0.0);
+        assert!(motor.current > 0.0 && motor.supply_current > 0.0);
+    }
+    assert!(after.battery.voltage < before.battery.voltage);
+    assert!(after.battery.charge_used > 0.0 && after.battery.charge < 1.0);
 }

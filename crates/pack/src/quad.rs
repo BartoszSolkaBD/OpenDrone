@@ -17,7 +17,10 @@
 use std::collections::BTreeMap;
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
-use opendrone_physics::{Drag, QuadParameters};
+use opendrone_physics::{
+    BatteryParameters, Drag, EscParameters, MotorParameters, PropParameters, QuadParameters,
+    RotorLayout,
+};
 
 use crate::document::{self, Document, Item, Problem, Problems, Table};
 use crate::schema::{self, Bounds, Form, Key, Kind, Need, SECTIONS, Section, TOP_TEXT};
@@ -694,8 +697,9 @@ pub struct QuadDefinition {
     pub picture: String,
     /// The real Quad a Test Quad builds on.
     pub based_on: Option<String>,
-    /// What the physics receives so far: the mass (dry mass plus the battery,
-    /// stored apart and added here), the inertia and the drag.
+    /// What the physics receives: the mass (dry mass plus the battery, stored
+    /// apart and added here), the inertia, the drag, the rotors' layout, the
+    /// props, motors and ESCs, and the battery.
     pub parameters: QuadParameters,
     pub frame: Frame,
     pub collision: Collision,
@@ -1199,6 +1203,19 @@ fn definition(
         reverse_torque: r.one("props.reverse_torque"),
         grip: r.one("props.grip"),
     };
+    let no_load = r.numbers("motors.no_load_current");
+    let motors = Motors {
+        kv: r.one("motors.kv"),
+        poles: r.whole("motors.poles"),
+        winding_resistance: r.one("motors.winding_resistance"),
+        no_load_current: no_load.first().copied().unwrap_or(0.0),
+        no_load_voltage: no_load.get(1).copied().unwrap_or(0.0),
+        spin_up: r.one("motors.spin_up"),
+        slow_down: r.one("motors.slow_down"),
+        start_wait: r.one("motors.start_wait"),
+        restart_tries: r.whole("motors.restart_tries"),
+        startup_power_limit: r.one("motors.startup_power_limit"),
+    };
     let [roll, pitch, yaw] = frame.inertia;
     let [front, side, top] = frame.drag_area;
     let parameters = QuadParameters {
@@ -1214,8 +1231,45 @@ fn definition(
             // A Quad without ducts has no duct drag.
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
         },
+        rotors: RotorLayout {
+            diagonal: frame.diagonal,
+            rotor_height: frame.rotor_height,
+            direction: match props.direction {
+                PropDirection::PropsIn => opendrone_physics::PropDirection::PropsIn,
+                PropDirection::PropsOut => opendrone_physics::PropDirection::PropsOut,
+            },
+        },
+        props: PropParameters {
+            diameter: props.diameter,
+            thrust_coefficient: props.thrust_coefficient,
+            power_coefficient: props.power_coefficient,
+            rotor_inertia: props.rotor_inertia,
+            reverse_thrust: props.reverse_thrust,
+            reverse_torque: props.reverse_torque,
+        },
+        motors: MotorParameters {
+            kv: motors.kv,
+            poles: motors.poles,
+            winding_resistance: motors.winding_resistance,
+            no_load_current: motors.no_load_current,
+            no_load_voltage: motors.no_load_voltage,
+            spin_up: motors.spin_up,
+            slow_down: motors.slow_down,
+        },
+        esc: EscParameters {
+            start_wait: motors.start_wait,
+            startup_power_limit: motors.startup_power_limit,
+            restart_tries: motors.restart_tries,
+        },
+        battery: BatteryParameters {
+            cells: battery.cells,
+            capacity: battery.capacity,
+            voltage_curve: battery.voltage_curve.clone(),
+            resistance: battery.resistance,
+            connector: battery.connector,
+            recovery: battery.recovery,
+        },
     };
-    let no_load = r.numbers("motors.no_load_current");
     let block = SECTIONS
         .iter()
         .find(|s| s.name == "sound_block")
@@ -1254,18 +1308,7 @@ fn definition(
             friction: r.one("collision.friction"),
         },
         props,
-        motors: Motors {
-            kv: r.one("motors.kv"),
-            poles: r.whole("motors.poles"),
-            winding_resistance: r.one("motors.winding_resistance"),
-            no_load_current: no_load.first().copied().unwrap_or(0.0),
-            no_load_voltage: no_load.get(1).copied().unwrap_or(0.0),
-            spin_up: r.one("motors.spin_up"),
-            slow_down: r.one("motors.slow_down"),
-            start_wait: r.one("motors.start_wait"),
-            restart_tries: r.whole("motors.restart_tries"),
-            startup_power_limit: r.one("motors.startup_power_limit"),
-        },
+        motors,
         battery,
         ducts,
         feel: Feel {

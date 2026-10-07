@@ -1,11 +1,17 @@
 //! Running a Scenario through the Simulation and measuring its Expectations.
 
 use opendrone_maths::{Fingerprint, Fingerprinter, functions};
+use opendrone_pack::{MapDefinition, QuadDefinition};
 use opendrone_pack::{Packs, Problem, Problems};
-use opendrone_sim::{QuadSetUp, QuadState, ScriptedMotors, SetUp, SetUpProblem, Simulation};
+use opendrone_sim::{
+    MotorCommands, Mount, PhysicsRate, QuadOutput, QuadSetUp, QuadState, ScriptedMotors, SetUp,
+    SetUpProblem, Simulation, SimulationTime,
+};
 
 use crate::measure::angle_near;
-use crate::read::{BasisKind, Expectation, Named, Scenario, Statistic, When};
+use crate::read::{
+    BasisKind, Comparison, Expectation, Kind, Named, Scenario, Start, Statistic, When,
+};
 
 /// What one run of a Scenario measured.
 #[derive(Clone, Debug)]
@@ -88,58 +94,51 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         return Err(problems);
     };
 
-    let set_up = SetUp {
+    // This run, measuring every Expectation.
+    let mut tallies: Vec<Tally> = scenario
+        .expectations
+        .iter()
+        .map(|e| Tally::new(e, e.when))
+        .collect();
+    let this_run = Plan {
         physics_rate: start.physics_rate,
-        world: map.world,
-        random_seed: start.random_seed,
-        quads: vec![QuadSetUp {
-            parameters: quad.parameters,
-            start: QuadState {
-                position: start.position,
-                velocity: start.velocity,
-                attitude: start.attitude,
-                rotation: start.rotation,
-            },
-            flight_controller: Box::new(ScriptedMotors::new(scenario.timeline.clone())),
-        }],
+        battery: start.battery,
+        timeline: &scenario.timeline,
+        length: scenario.length,
     };
-    let mut sim = Simulation::new(set_up).map_err(|error| {
-        let sentence = match error.problem {
-            SetUpProblem::MassNotAboveZero => "its mass must be above zero",
-            SetUpProblem::InertiaHasNoInverse => "its inertia can't be turned around (no inverse)",
-        };
-        Problems(vec![Problem {
-            file: scenario.file.clone(),
-            line: start.quad.line,
-            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.id),
-        }])
-    })?;
+    let (step_fingerprints, first_broken_number) =
+        simulate(scenario, &quad, &map, &this_run, &mut tallies)?;
 
-    let step = start.physics_rate.step_length();
-    let mut tallies: Vec<Tally> = scenario.expectations.iter().map(Tally::new).collect();
-    let mut step_fingerprints = Vec::with_capacity(scenario.length.ticks() as usize + 1);
-    let mut first_broken_number = None;
-    let mut before: Option<QuadState> = None;
-    for tick in 0..=scenario.length.ticks() {
-        if tick > 0 {
-            sim.step();
+    // Each other run, measuring the Expectations that compare with it.
+    let mut others: Vec<Option<Result<f64, String>>> = vec![None; tallies.len()];
+    for (index, other) in scenario.other_runs.iter().enumerate() {
+        let (numbers, mut other_tallies): (Vec<usize>, Vec<Tally>) = scenario
+            .expectations
+            .iter()
+            .enumerate()
+            .filter_map(|(n, e)| {
+                let compared = e.compared.filter(|c| c.run == index)?;
+                Some((n, Tally::new(e, compared.when)))
+            })
+            .unzip();
+        let plan = Plan {
+            physics_rate: other.physics_rate,
+            battery: other.battery.unwrap_or(start.battery),
+            timeline: &other.timeline,
+            length: other.length,
+        };
+        simulate(scenario, &quad, &map, &plan, &mut other_tallies)?;
+        for (n, tally) in numbers.into_iter().zip(&other_tallies) {
+            others[n] = Some(tally.value());
         }
-        let now = *sim.quad_state(0);
-        step_fingerprints.push(sim.fingerprint());
-        if first_broken_number.is_none() && !sim.is_finite() {
-            first_broken_number = Some(format!(
-                "first at {} s (step {tick}): the Quad's state holds a number that isn't a real number",
-                sim.time().seconds(start.physics_rate)
-            ));
-        }
-        for tally in &mut tallies {
-            tally.see(tick, before.as_ref(), &now, step);
-        }
-        before = Some(now);
     }
 
     Ok(Outcome {
-        expectations: tallies.into_iter().map(Tally::finish).collect(),
+        expectations: tallies
+            .into_iter()
+            .zip(others)
+            .map(|(tally, other)| tally.finish(other))
+            .collect(),
         first_broken_number,
         step_fingerprints,
         quad: Received {
@@ -154,6 +153,92 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     })
 }
 
+/// One run of a Scenario: its physics rate, battery and Timeline.
+struct Plan<'s> {
+    physics_rate: PhysicsRate,
+    battery: f64,
+    timeline: &'s [(SimulationTime, MotorCommands)],
+    length: SimulationTime,
+}
+
+/// Builds the Simulation for one run and steps it to the run's end, showing
+/// every tally the output after each step. Gives back the whole state's
+/// fingerprint after every step, and where a broken number first appeared.
+fn simulate(
+    scenario: &Scenario,
+    quad: &QuadDefinition,
+    map: &MapDefinition,
+    plan: &Plan<'_>,
+    tallies: &mut [Tally<'_>],
+) -> Result<(Vec<Fingerprint>, Option<String>), Problems> {
+    let start = &scenario.start;
+    let set_up = SetUp {
+        physics_rate: plan.physics_rate,
+        world: map.world,
+        random_seed: start.random_seed,
+        quads: vec![QuadSetUp {
+            parameters: quad.parameters.clone(),
+            start: QuadState {
+                position: start.position,
+                velocity: start.velocity,
+                attitude: start.attitude,
+                rotation: start.rotation,
+            },
+            motors: start.motors,
+            battery: plan.battery,
+            mount: mount(start),
+            flight_controller: Box::new(ScriptedMotors::new(plan.timeline.to_vec())),
+        }],
+    };
+    let mut sim = Simulation::new(set_up).map_err(|error| {
+        let sentence = match error.problem {
+            SetUpProblem::MassNotAboveZero => "its mass must be above zero".to_string(),
+            SetUpProblem::InertiaHasNoInverse => {
+                "its inertia can't be turned around (no inverse)".to_string()
+            }
+            SetUpProblem::NotAboveZero(what) => format!("{what} must be above zero"),
+            SetUpProblem::NoVoltageCurve => "its battery's voltage curve has no points".to_string(),
+        };
+        Problems(vec![Problem {
+            file: scenario.file.clone(),
+            line: start.quad.line,
+            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.id),
+        }])
+    })?;
+
+    let step = plan.physics_rate.step_length();
+    let mut step_fingerprints = Vec::with_capacity(plan.length.ticks() as usize + 1);
+    let mut first_broken_number = None;
+    let mut before: Option<QuadOutput> = None;
+    for tick in 0..=plan.length.ticks() {
+        if tick > 0 {
+            sim.step();
+        }
+        let now = sim.quad_output(0);
+        step_fingerprints.push(sim.fingerprint());
+        if first_broken_number.is_none() && !sim.is_finite() {
+            first_broken_number = Some(format!(
+                "first at {} s (step {tick}): the Quad's state holds a number that isn't a real number",
+                sim.time().seconds(plan.physics_rate)
+            ));
+        }
+        for tally in tallies.iter_mut() {
+            tally.see(tick, before.as_ref(), &now, step);
+        }
+        before = Some(now);
+    }
+    Ok((step_fingerprints, first_broken_number))
+}
+
+/// A Thrust Stand Scenario holds the Quad still; every other kind lets it
+/// fly.
+fn mount(start: &Start) -> Mount {
+    match start.kind {
+        Kind::ThrustStand => Mount::ThrustStand,
+        Kind::Flight | Kind::FlightController | Kind::Physics => Mount::Free,
+    }
+}
+
 /// How close to the far side, or to a whole turn, an angle counts as there:
 /// rounding, in radians.
 const ROUNDING: f64 = 1e-9;
@@ -161,6 +246,8 @@ const ROUNDING: f64 = 1e-9;
 /// One Expectation's measurement, built up step by step.
 struct Tally<'s> {
     expectation: &'s Expectation,
+    /// When to measure, in this run's steps.
+    when: When,
     count: u64,
     sum: f64,
     lowest: f64,
@@ -175,9 +262,10 @@ struct Tally<'s> {
 }
 
 impl<'s> Tally<'s> {
-    fn new(expectation: &'s Expectation) -> Tally<'s> {
+    fn new(expectation: &'s Expectation, when: When) -> Tally<'s> {
         Tally {
             expectation,
+            when,
             count: 0,
             sum: 0.0,
             lowest: f64::INFINITY,
@@ -188,8 +276,8 @@ impl<'s> Tally<'s> {
         }
     }
 
-    fn see(&mut self, tick: u64, before: Option<&QuadState>, now: &QuadState, step: f64) {
-        let wanted = match self.expectation.when {
+    fn see(&mut self, tick: u64, before: Option<&QuadOutput>, now: &QuadOutput, step: f64) {
+        let wanted = match self.when {
             When::At(at) => tick == at,
             When::Over { from, to, .. } => from < tick && tick <= to,
         };
@@ -252,7 +340,8 @@ impl<'s> Tally<'s> {
         self.last = Some(value);
     }
 
-    fn finish(self) -> Measured {
+    /// The value measured, in SI units, or why there is none.
+    fn value(&self) -> Result<f64, String> {
         let e = self.expectation;
         // A whole turn between the lowest and the highest can only happen if
         // the angle reached the far side, which `see` already caught; it is
@@ -261,7 +350,7 @@ impl<'s> Tally<'s> {
             && self.highest - self.lowest >= 2.0 * core::f64::consts::PI - ROUNDING;
         let partly_straight_up_or_down =
             self.straight_up_or_down > 0 && self.straight_up_or_down < self.count;
-        if let When::Over { statistic, .. } = e.when
+        if let When::Over { statistic, .. } = self.when
             && statistic != Statistic::Final
         {
             let (what, word) = (e.measure.name(), statistic.word());
@@ -277,19 +366,12 @@ impl<'s> Tally<'s> {
                 None
             };
             if let Some(why) = why {
-                return Measured {
-                    description: e.description.clone(),
-                    basis: e.basis.kind,
-                    expected: e.expected.text(),
-                    measured: format!(
-                        "none: {why} has no single answer; check it at moments, over a shorter stretch, or check its rate"
-                    ),
-                    passed: false,
-                    line: e.line,
-                };
+                return Err(format!(
+                    "none: {why} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+                ));
             }
         }
-        let value = match e.when {
+        let value = match self.when {
             When::At(_) => self.last,
             When::Over { statistic, .. } if self.count > 0 => Some(match statistic {
                 Statistic::Mean => self.sum / self.count as f64,
@@ -299,12 +381,33 @@ impl<'s> Tally<'s> {
             }),
             When::Over { .. } => None,
         };
+        value.ok_or_else(|| "nothing measured".to_string())
+    }
+
+    /// The Expectation's measured value and verdict. `other` is the other
+    /// run's value, for an Expectation that compares with one.
+    fn finish(self, other: Option<Result<f64, String>>) -> Measured {
+        let e = self.expectation;
+        let value = match (e.compared, self.value(), other) {
+            (None, value, _) => value,
+            (Some(_), Err(why), _) => Err(why),
+            (Some(_), Ok(_), None) => Err("nothing measured in the other run".to_string()),
+            (Some(_), Ok(_), Some(Err(why))) => Err(format!("in the other run, {why}")),
+            (Some(compared), Ok(this), Some(Ok(that))) => match compared.how {
+                Comparison::Difference => Ok(this - that),
+                Comparison::Ratio if that != 0.0 => Ok(this / that),
+                Comparison::Ratio => Err(format!(
+                    "none: the other run measured {}, and a share of nothing has no answer",
+                    e.expected.unit().write(that)
+                )),
+            },
+        };
         let (measured, passed) = match value {
-            Some(value) => (
+            Ok(value) => (
                 e.expected.unit().write(value),
                 value.is_finite() && e.expected.accepts(value),
             ),
-            None => ("nothing measured".to_string(), false),
+            Err(why) => (why, false),
         };
         Measured {
             description: e.description.clone(),

@@ -1,0 +1,80 @@
+# A Whoop 65, with drag set to zero, starting mid-air with its motors
+# "settled": already spinning, with their ESCs running, at the speed whose
+# thrust carries its weight (ADR-0002, #11 §2). Proves mid-air starts with
+# settled motors (#10 §1): the Quad neither falls nor climbs at the start.
+#
+# The Whoop 65's props make k_f·ω² of thrust each, with k_f = C_T·ρ·D⁴/4π² =
+# 0.29 × 1.225 kg/m³ × (0.035 m)⁴ / 4π² = 1.3503 × 10⁻⁸ N/(rad/s)². A quarter
+# of its weight, 0.0312 kg × 9.81 m/s² / 4 = 0.076518 N, takes
+# √(0.076518 / 1.3503 × 10⁻⁸) = 2,380.5 rad/s: 22,733 RPM.
+format = 1
+name   = "Settled motors hold a Whoop 65 in a hover from the first step"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# 37.3%: the drive that holds a hover on this pack once it has sagged under
+# the hover's load.
+timeline = [
+  { at = "0 s", motors = "37.3%" },
+]
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "22733 RPM ± 0.01%"
+basis = "rule: settled motors turn at the speed whose thrust carries a quarter of the weight: √(0.076518 N / 1.3503 × 10⁻⁸ N/(rad/s)²) = 2,380.5 rad/s = 22,733 RPM"
+
+[[expect]]
+what  = "total thrust"
+at    = "0 s"
+value = "31.211 gf ± 0.01%"
+basis = "rule: the four motors' thrust carries the Quad's weight, 0.0312 kg × 9.81 m/s² = 0.30607 N, which is 31.211 grams of thrust (1 gf is 9.80665 mN)"
+
+[[expect]]
+what  = "vertical acceleration"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.01 m/s²"
+basis = "rule: on the first step the thrust still equals the weight; a motor moves only 1/280 of the way towards a new command in one step (0.125 ms of its 35 ms spin-up time)"
+
+[[expect]]
+what   = "height"
+over   = "0 s to 1 s"
+lowest = "2 m ± 0.002 m"
+basis  = "observed: at 37.3% drive the Quad holds within a centimetre of its height for a second"
+
+[[expect]]
+what    = "height"
+over    = "0 s to 1 s"
+highest = "2.01 m ± 0.005 m"
+basis   = "observed: at 37.3% drive the Quad holds within a centimetre of its height for a second"

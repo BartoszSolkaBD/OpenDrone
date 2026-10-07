@@ -1,10 +1,10 @@
 //! Reading a Scenario file (#11 §2 and §3, ADR-0002).
 
 use opendrone_maths::{Attitude, DEGREE, PilotAngles, PilotRates, Vec3};
-use opendrone_pack::Problems;
 use opendrone_pack::document::{Document, Item, Table};
 use opendrone_pack::units::{self, Dimension, Expected, Quantity};
-use opendrone_sim::{MotorCommands, PhysicsRate, SimulationTime};
+use opendrone_pack::{Problem, Problems};
+use opendrone_sim::{MotorCommands, PhysicsRate, SimulationTime, StartingMotors};
 
 use crate::measure::Measure;
 use crate::rates::{self, Rates};
@@ -16,11 +16,30 @@ pub struct Scenario {
     pub file: String,
     pub name: String,
     pub start: Start,
-    /// The Timeline of a Physics Scenario: motor commands and the moments
-    /// they start, in time order.
+    /// The Timeline of a Physics or Thrust Stand Scenario: motor commands and
+    /// the moments they start, in time order.
     pub timeline: Vec<(SimulationTime, MotorCommands)>,
     pub expectations: Vec<Expectation>,
     /// The run lasts until the last moment the file mentions.
+    pub length: SimulationTime,
+    /// The other runs its Expectations compare with: the same Scenario with
+    /// a starting-state item or two changed.
+    pub other_runs: Vec<OtherRun>,
+}
+
+/// Another run of the same Scenario, for Expectations that compare with it.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OtherRun {
+    /// What differs, in words, such as "at 4 kHz" or "with the battery at
+    /// 100%".
+    pub words: String,
+    pub physics_rate: PhysicsRate,
+    /// The battery's charge, from 0 to 1, or `None` for the same as this
+    /// run's.
+    pub battery: Option<f64>,
+    /// The Timeline, in that run's steps.
+    pub timeline: Vec<(SimulationTime, MotorCommands)>,
+    /// It lasts until the last moment its Expectations need.
     pub length: SimulationTime,
 }
 
@@ -69,22 +88,6 @@ pub struct Named {
     pub line: usize,
 }
 
-/// How the motors start.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StartingMotors {
-    /// At rest: the props aren't turning, and the ESCs are already powered up
-    /// and ready (their start-up tones and ready beep are done), so a motor
-    /// starts on its first command as Bluejay starts any stopped motor. For
-    /// Scenarios that script their motors (Physics and Thrust Stand). It is
-    /// not Reset: a landed start with a "fresh" Flight Controller is exactly
-    /// Reset, whose ESCs play their start-up first, about 1.7 s, once the
-    /// ESCs are simulated (#41).
-    Stopped,
-    /// Spinning at the speed that holds the stated motion, with the ESCs
-    /// already running (ADR-0002). Needs the motor model (#41).
-    Settled,
-}
-
 /// How the Flight Controller starts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StartingFlightController {
@@ -119,6 +122,27 @@ pub struct Expectation {
     pub line: usize,
     /// What it checks in words, such as "vertical speed at 1 s".
     pub description: String,
+    /// Set when it compares this run with another.
+    pub compared: Option<Compared>,
+}
+
+/// An Expectation that compares this run with another run of the Scenario.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Compared {
+    /// Which of the Scenario's other runs.
+    pub run: usize,
+    /// The same moment or stretch, in that run's steps.
+    pub when: When,
+    pub how: Comparison,
+}
+
+/// How two runs' values are compared.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Comparison {
+    /// This run's value minus the other's.
+    Difference,
+    /// This run's value as a share of the other's.
+    Ratio,
 }
 
 /// When an Expectation is measured, in steps.
@@ -234,11 +258,15 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
     };
     let kind = start.as_ref().map_or(Kind::Physics, |start| start.kind);
     let mut reader = Reader {
+        file: file.to_string(),
         problems: &mut problems,
         rate,
+        moments: Vec::new(),
+        other_runs: Vec::new(),
     };
     let timeline = reader.inputs(&root, kind);
     let expectations = reader.expectations(&root);
+    let other_runs = reader.other_runs;
     let length = timeline
         .iter()
         .map(|(time, _)| time.ticks())
@@ -258,6 +286,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         timeline,
         expectations,
         length: SimulationTime::from_ticks(length),
+        other_runs,
     })
 }
 
@@ -275,10 +304,10 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         problems,
     );
     if let (Some(kind), Some(item)) = (kind, start.get("kind"))
-        && kind != Kind::Physics
+        && matches!(kind, Kind::Flight | Kind::FlightController)
     {
         problems.push(item.problem(
-            "only Physics Scenarios can run so far: Flight, Thrust Stand and Flight Controller Scenarios arrive with the Flight Controller and the motor model (#41, #48)",
+            "only Physics and Thrust Stand Scenarios can run so far: Flight and Flight Controller Scenarios arrive with the Flight Controller (#48)",
         ));
     }
     let id = |key: &str, problems: &mut Problems| {
@@ -323,28 +352,35 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         start,
         "motors",
         &[
+            ("powering up", StartingMotors::PoweringUp),
             ("stopped", StartingMotors::Stopped),
             ("settled", StartingMotors::Settled),
         ],
         problems,
     );
+    // A Quad on the thrust stand is held still, so there is no motion for
+    // "settled" motors to hold.
     if motors == Some(StartingMotors::Settled)
+        && kind == Some(Kind::ThrustStand)
         && let Some(item) = start.get("motors")
     {
         problems.push(item.problem(
-            "motors \"settled\" need the motor model, which arrives with the Thrust Stand ticket (#41); write \"stopped\" until then",
+            "a Quad on the thrust stand is held still, so there is no motion for \"settled\" motors to hold; start them \"stopped\" (ESCs ready) or \"powering up\" (ESCs just powered)",
         ));
     }
-    // "Stopped" means the ESCs are already powered up and ready. Where our
-    // Flight Controller runs, a landed "fresh" start is exactly Reset, whose
-    // ESCs start up first, so the two would clash: "stopped" is only for
+    // "Stopped" means the ESCs are already powered up and ready, and
+    // "powering up" that they were just powered. Where our Flight Controller
+    // runs, a landed "fresh" start is exactly Reset, so how its motors start
+    // is the arming and power-up ticket's to name: both are only for
     // Scenarios whose motors are scripted.
-    if motors == Some(StartingMotors::Stopped)
-        && matches!(kind, Some(Kind::Flight | Kind::FlightController))
+    if matches!(
+        motors,
+        Some(StartingMotors::Stopped | StartingMotors::PoweringUp)
+    ) && matches!(kind, Some(Kind::Flight | Kind::FlightController))
         && let Some(item) = start.get("motors")
     {
         problems.push(item.problem(
-            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start",
+            "motors \"stopped\" (at rest, with the ESCs already ready) and \"powering up\" (with the ESCs just powered) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start",
         ));
     }
     let flight_controller = choice(
@@ -408,6 +444,18 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
     let rates = start
         .table("rates", problems)
         .and_then(|rates| rates::read_rates(&rates, problems));
+    if kind == Some(Kind::ThrustStand) {
+        for (key, moving) in [
+            ("speed", velocity.is_some_and(|v| v != [0.0; 3])),
+            ("rotation", rotation.is_some_and(|r| r != Vec3::ZERO)),
+        ] {
+            if moving && let Some(item) = start.get(key) {
+                problems.push(item.problem(format!(
+                    "a Quad on the thrust stand is held still: its `{key}` must be zero"
+                )));
+            }
+        }
+    }
     Some(Start {
         kind: kind?,
         quad: quad?,
@@ -619,8 +667,13 @@ fn attitude(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Attitude> 
 }
 
 struct Reader<'p> {
+    file: String,
     problems: &'p mut Problems,
     rate: PhysicsRate,
+    /// Every Timeline moment, in seconds, with its line and its text, so
+    /// another run can count it in its own steps.
+    moments: Vec<(f64, usize, String, MotorCommands)>,
+    other_runs: Vec<OtherRun>,
 }
 
 impl Reader<'_> {
@@ -668,10 +721,11 @@ impl Reader<'_> {
             return moments;
         };
         for entry in timeline {
+            let line = entry.line();
             let Some(entry) = entry.table(self.problems) else {
                 continue;
             };
-            if kind == Kind::Physics {
+            if matches!(kind, Kind::Physics | Kind::ThrustStand) {
                 entry.refuse_unknown(&["at", "motors"], self.problems);
             }
             let at = entry
@@ -680,8 +734,10 @@ impl Reader<'_> {
             let motors = entry
                 .text("motors", self.problems)
                 .and_then(|(text, item)| self.motor_commands(text, &item));
-            if let (Some((tick, _)), Some(motors)) = (at, motors) {
+            if let (Some((tick, quantity)), Some(motors)) = (at, motors) {
                 moments.push((SimulationTime::from_ticks(tick), motors));
+                self.moments
+                    .push((quantity.value, line, quantity.text(), motors));
             }
         }
         moments
@@ -719,12 +775,6 @@ impl Reader<'_> {
                 return None;
             }
         };
-        if all.iter().any(|share| *share > 0.0) {
-            self.problems.push(item.problem(
-                "motor commands above 0% need the motor model, which arrives with the Thrust Stand ticket (#41)",
-            ));
-            return None;
-        }
         let mut motors = MotorCommands::STOPPED;
         for (motor, share) in motors.0.iter_mut().zip(all) {
             motor.throttle = share;
@@ -754,7 +804,8 @@ impl Reader<'_> {
     fn expectation(&mut self, table: &Table<'_, '_>, line: usize) -> Option<Expectation> {
         table.refuse_unknown(
             &[
-                "what", "at", "value", "over", "mean", "lowest", "highest", "final", "basis",
+                "what", "at", "value", "over", "mean", "lowest", "highest", "final", "against",
+                "compare", "basis",
             ],
             self.problems,
         );
@@ -771,11 +822,17 @@ impl Reader<'_> {
         let basis = table
             .text("basis", self.problems)
             .and_then(|(text, item)| self.basis(text, &item));
-        let (when, expected_text, description_time) = match (table.get("at"), table.get("over")) {
+        let compared = self.comparison(table);
+        // When, in seconds: a moment, or a stretch's start and end, with the
+        // line that says it.
+        let (when, seconds, expected_text, description_time) = match (
+            table.get("at"),
+            table.get("over"),
+        ) {
             (Some(_), Some(_)) | (None, None) => {
                 self.problems.push(table.problem(
-                    "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final`",
-                ));
+                        "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final`",
+                    ));
                 return None;
             }
             (Some(at), None) => {
@@ -785,7 +842,12 @@ impl Reader<'_> {
                 let value = table.text("value", self.problems);
                 let (tick, time) = tick?;
                 let (value, item) = value?;
-                (When::At(tick), (value, item), format!("at {}", time.text()))
+                (
+                    When::At(tick),
+                    (time.value, None, at.line()),
+                    (value, item),
+                    format!("at {}", time.text()),
+                )
             }
             (None, Some(over)) => {
                 let stretch = over
@@ -800,20 +862,21 @@ impl Reader<'_> {
                     .collect();
                 let [(statistic, word, item)] = statistics.as_slice() else {
                     self.problems.push(table.problem(
-                        "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final`",
-                    ));
+                            "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final`",
+                        ));
                     return None;
                 };
                 let text = item.text(self.problems)?;
-                let ((from, to), (from_text, to_text)) = stretch?;
+                let ((from, to), (from_time, to_time)) = stretch?;
                 (
                     When::Over {
                         from,
                         to,
                         statistic: *statistic,
                     },
+                    (from_time.value, Some(to_time.value), over.line()),
                     (text, item.clone()),
-                    format!("{word} over {from_text} to {to_text}"),
+                    format!("{word} over {} to {}", from_time.text(), to_time.text()),
                 )
             }
         };
@@ -826,11 +889,28 @@ impl Reader<'_> {
             }
         };
         let (measure, basis, expected) = (measure?, basis?, expected?);
-        if expected.dimension() != measure.dimension() {
-            self.problems.push(expected_item.problem(format!(
-                "{} is {}",
-                measure.name(),
-                measure.dimension().described()
+        let compared = match compared {
+            Some(found) => Some(found?),
+            None => None,
+        };
+        let wanted = match compared {
+            Some((Comparison::Ratio, _)) => Dimension::PERCENT,
+            _ => measure.dimension(),
+        };
+        if expected.dimension() != wanted {
+            self.problems.push(expected_item.problem(match compared {
+                Some((Comparison::Ratio, _)) => format!(
+                    "a ratio is a share of the other run's value, such as \"75% ± 3%\", not {}",
+                    expected.dimension().described()
+                ),
+                _ => format!("{} is {}", measure.name(), measure.dimension().described()),
+            }));
+            return None;
+        }
+        if compared.is_some() && measure.is_an_angle() {
+            self.problems.push(table.problem(format!(
+                "{} can't be compared with another run yet, because angles wrap round; compare a rate or a position instead",
+                measure.name()
             )));
             return None;
         }
@@ -850,9 +930,21 @@ impl Reader<'_> {
             )));
             return None;
         }
-        let description = match when {
+        let mut description = match when {
             When::At(_) => format!("{} {description_time}", measure.name()),
             When::Over { .. } => format!("{}, {description_time}", measure.name()),
+        };
+        let compared = match compared {
+            None => None,
+            Some((how, run)) => {
+                let when = self.in_other_run(run, when, seconds)?;
+                let words = &self.other_runs[run].words;
+                description.push_str(&match how {
+                    Comparison::Difference => format!(", minus the same run {words}"),
+                    Comparison::Ratio => format!(", as a share of the same run {words}"),
+                });
+                Some(Compared { run, when, how })
+            }
         };
         Some(Expectation {
             measure,
@@ -861,7 +953,174 @@ impl Reader<'_> {
             basis,
             line,
             description,
+            compared,
         })
+    }
+
+    /// `against` and `compare`: the other run an Expectation compares with,
+    /// and how. `None` when it compares with nothing; `Some(None)` when it
+    /// tries to and can't.
+    fn comparison(&mut self, table: &Table<'_, '_>) -> Option<Option<(Comparison, usize)>> {
+        let help = "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's)";
+        match (table.get("against"), table.get("compare")) {
+            (None, None) => None,
+            (None, Some(compare)) => {
+                self.problems.push(compare.problem(
+                    "`compare` needs `against`: the other run to compare with, such as `against = { physics_rate = \"4 kHz\" }`",
+                ));
+                Some(None)
+            }
+            (Some(against), compare) => {
+                let how = match compare {
+                    None => {
+                        self.problems.push(against.problem(format!(
+                            "an Expectation `against` another run needs `compare`: {help}"
+                        )));
+                        None
+                    }
+                    Some(item) => match item.text(self.problems) {
+                        Some("difference") => Some(Comparison::Difference),
+                        Some("ratio") => Some(Comparison::Ratio),
+                        Some(other) => {
+                            self.problems
+                                .push(item.problem(format!("{help}, not \"{other}\"")));
+                            None
+                        }
+                        None => None,
+                    },
+                };
+                let run = self.other_run(&against);
+                Some(how.zip(run))
+            }
+        }
+    }
+
+    /// The other run `against` names, added to the Scenario's other runs
+    /// unless an earlier Expectation named the same one.
+    fn other_run(&mut self, against: &Item<'_, '_>) -> Option<usize> {
+        let table = against.table(self.problems)?;
+        table.refuse_unknown(&["physics_rate", "battery"], self.problems);
+        let mut problems = Problems::new();
+        let rate = table
+            .get("physics_rate")
+            .map(|_| physics_rate(&table, &mut problems));
+        let battery = table.get("battery").map(|_| {
+            quantity(&table, "battery", Dimension::PERCENT, &mut problems).and_then(
+                |(value, item)| {
+                    if (0.0..=1.0).contains(&value) {
+                        Some((value, item.as_str().unwrap_or_default().to_string()))
+                    } else {
+                        problems.push(item.problem("the battery's charge must be from 0% to 100%"));
+                        None
+                    }
+                },
+            )
+        });
+        let failed = !problems.is_empty();
+        self.problems.extend(problems);
+        if failed {
+            return None;
+        }
+        if rate.is_none() && battery.is_none() {
+            self.problems.push(against.problem(
+                "`against` names what the other run changes: `physics_rate`, `battery`, or both, written as in [start]",
+            ));
+            return None;
+        }
+        let rate = rate.flatten().unwrap_or(self.rate);
+        let battery = battery.flatten();
+        let mut words = Vec::new();
+        if rate != self.rate {
+            words.push(format!("at {}", rate_words(rate)));
+        }
+        if let Some((_, text)) = &battery {
+            words.push(format!("with the battery at {text}"));
+        }
+        let words = if words.is_empty() {
+            "with the same starting state".to_string()
+        } else {
+            words.join(" ")
+        };
+        let battery = battery.map(|(value, _)| value);
+        if let Some(found) = self
+            .other_runs
+            .iter()
+            .position(|run| run.physics_rate == rate && run.battery == battery)
+        {
+            return Some(found);
+        }
+        let hz = f64::from(rate.hz());
+        let mut timeline = Vec::new();
+        for (seconds, line, text, motors) in &self.moments {
+            match whole_steps(*seconds, hz) {
+                Some(tick) => timeline.push((SimulationTime::from_ticks(tick), *motors)),
+                None => self.problems.push(Problem::of(
+                    self.file.clone(),
+                    *line,
+                    format!(
+                        "\"{text}\" isn't a whole number of physics steps at {} Hz, the rate of the run compared with on line {}: there one step is {} s",
+                        rate.hz(),
+                        against.line(),
+                        1.0 / hz
+                    ),
+                )),
+            }
+        }
+        let length = timeline.iter().map(|(t, _)| t.ticks()).max().unwrap_or(0);
+        self.other_runs.push(OtherRun {
+            words,
+            physics_rate: rate,
+            battery,
+            timeline,
+            length: SimulationTime::from_ticks(length),
+        });
+        Some(self.other_runs.len() - 1)
+    }
+
+    /// The same moment or stretch in another run's steps; its length grows
+    /// to cover it.
+    fn in_other_run(
+        &mut self,
+        run: usize,
+        when: When,
+        (from, to, line): (f64, Option<f64>, usize),
+    ) -> Option<When> {
+        let rate = self.other_runs[run].physics_rate;
+        let hz = f64::from(rate.hz());
+        let mut steps = |seconds: f64| {
+            let tick = whole_steps(seconds, hz);
+            if tick.is_none() {
+                self.problems.push(Problem::of(
+                    self.file.clone(),
+                    line,
+                    format!(
+                        "this moment isn't a whole number of physics steps at {} Hz, the rate of the run it's compared with: there one step is {} s",
+                        rate.hz(),
+                        1.0 / hz
+                    ),
+                ));
+            }
+            tick
+        };
+        let other = match (when, to) {
+            (When::At(_), _) => When::At(steps(from)?),
+            (When::Over { statistic, .. }, Some(to)) => {
+                let (from, to) = (steps(from), steps(to));
+                When::Over {
+                    from: from?,
+                    to: to?,
+                    statistic,
+                }
+            }
+            (When::Over { .. }, None) => return None,
+        };
+        let end = match other {
+            When::At(tick) => tick,
+            When::Over { to, .. } => to,
+        };
+        let length = &mut self.other_runs[run].length;
+        *length = SimulationTime::from_ticks(length.ticks().max(end));
+        Some(other)
     }
 
     /// "0 s to 1 s".
@@ -869,7 +1128,7 @@ impl Reader<'_> {
         &mut self,
         text: &str,
         item: &Item<'_, '_>,
-    ) -> Option<((u64, u64), (String, String))> {
+    ) -> Option<((u64, u64), (Quantity, Quantity))> {
         let Some((from, to)) = text.split_once(" to ") else {
             self.problems.push(item.problem(format!(
                 "\"{text}\" isn't a stretch of time: write it like \"0 s to 1 s\""
@@ -878,13 +1137,13 @@ impl Reader<'_> {
         };
         let from = self.moment(from, item);
         let to = self.moment(to, item);
-        let ((from, from_text), (to, to_text)) = (from?, to?);
+        let ((from, from_time), (to, to_time)) = (from?, to?);
         if from >= to {
             self.problems
                 .push(item.problem(format!("\"{text}\" must end after it starts")));
             return None;
         }
-        Some(((from, to), (from_text.text(), to_text.text())))
+        Some(((from, to), (from_time, to_time)))
     }
 
     /// "rule: …", "source: …" or "observed: …".
@@ -911,5 +1170,23 @@ impl Reader<'_> {
             kind,
             text: rest.trim().to_string(),
         })
+    }
+}
+
+/// `seconds` as a whole number of steps at `hz` steps a second, or `None`
+/// when it falls between two steps.
+fn whole_steps(seconds: f64, hz: f64) -> Option<u64> {
+    let steps = seconds * hz;
+    let whole = steps.round();
+    (seconds >= 0.0 && (steps - whole).abs() <= 1e-6).then_some(whole as u64)
+}
+
+/// A physics rate as our tools write it, such as "4 kHz" or "8 kHz".
+fn rate_words(rate: PhysicsRate) -> String {
+    let hz = rate.hz();
+    if hz.is_multiple_of(1000) {
+        format!("{} kHz", hz / 1000)
+    } else {
+        format!("{hz} Hz")
     }
 }

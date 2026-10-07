@@ -1,0 +1,52 @@
+# Results of tired-pack.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "On a tired pack, the Whoop 65's thrust drops roughly with voltage squared and its idle speed falls"
+
+[[expect]]
+what     = "battery voltage at 0.9 s, as a share of the same run with the battery at 100%"
+basis    = "Rule"
+expected = "86.7% ± 0.5%"
+measured = "86.7%"
+
+[[expect]]
+what     = "motor 1 speed at 0.9 s, as a share of the same run with the battery at 100%"
+basis    = "Rule"
+expected = "86.7% ± 2%"
+measured = "87.3%"
+
+[[expect]]
+what     = "battery voltage at 1.9 s, as a share of the same run with the battery at 100%"
+basis    = "Rule"
+expected = "86.7% ± 1%"
+measured = "86.8%"
+
+[[expect]]
+what     = "total thrust at 1.9 s, as a share of the same run with the battery at 100%"
+basis    = "Rule"
+expected = "between 75.2% and 86.7%"
+measured = "80.1%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "7d5c4ccb6951a4ae"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "ee9bae4a5e09f690"   # the whole state after each of 15200 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.19 s" = "09a2ff2335b3769b"
+"0.38 s" = "a3306ac7cbf08899"
+"0.57 s" = "982acaef3ba21b84"
+"0.76 s" = "be846301f36bfb3f"
+"0.95 s" = "7562a21502e52bcd"
+"1.14 s" = "2314e4913e5a3877"
+"1.33 s" = "5a651e782488f3a5"
+"1.52 s" = "579e38222542e602"
+"1.71 s" = "83a8c43aedfaaa4a"
+"1.9 s" = "3c0ba8fcc27d25e3"

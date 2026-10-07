@@ -1,0 +1,23 @@
+# The Freestyle 5″ on T-Motor's bench supply.    id: test/freestyle-5-bench-supply
+#
+# T-Motor measured the Velox V2207 V3's T5147 thrust table on a supply that
+# gives 24.0 V with little current drawn and 23.5 V at the full-throttle row's
+# 34.6 A: 24.0 V behind (24.0 − 23.5) V ÷ 34.6 A = 14.5 mΩ of leads. So its
+# Thrust Stand Scenarios run from one like it: started at 50% charge, the
+# voltage curve gives 4.00 V a cell, 24.0 V for six; the leads are the
+# connector; the pack itself has no resistance, and with a capacity this large
+# it never runs down. Everything else is the Freestyle 5″'s.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "T-Motor's bench supply in place of the pack: 24.0 V behind 14.5 mΩ of leads, as the T5147 thrust table was measured on"
+
+# Deliberate test values: no Confidence or source.
+[battery]
+voltage_curve = "4.20 V at 100%, 4.00 V at 50%, 3.50 V at 0%"
+capacity      = "1000 Ah"
+resistance    = "0 mΩ"
+connector     = "14.5 mΩ"

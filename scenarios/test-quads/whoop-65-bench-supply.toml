@@ -1,0 +1,20 @@
+# The Whoop 65 on a bench supply at 4.0 V.    id: test/whoop-65-bench-supply
+#
+# BetaFPV measured its 0802SE motor's thrust table on a 4.0 V supply, so its
+# Thrust Stand Scenarios run from one too: started at 50% charge, the voltage
+# curve gives 4.00 V; with no resistance it never sags, and with a capacity
+# this large it never runs down. Everything else is the Whoop 65's.
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "A 4.0 V bench supply in place of the pack, as BetaFPV's thrust table was measured on"
+
+# Deliberate test values: no Confidence or source.
+[battery]
+voltage_curve = "4.35 V at 100%, 4.00 V at 50%, 3.30 V at 0%"
+capacity      = "1000 Ah"
+resistance    = "0 mΩ"
+connector     = "0 mΩ"

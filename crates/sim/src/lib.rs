@@ -15,8 +15,13 @@
 //!   (8 kHz in the alpha), never with the computer's clock.
 //! - [`FlightControllerSeam`]: what turns readings into the four motor
 //!   commands each tick. So far only the [`ScriptedMotors`] stand-in plugs in,
-//!   for Physics Scenarios; our Flight Controller follows (#48), and later
-//!   perhaps a SITL bridge in its own crate.
+//!   for Physics and Thrust Stand Scenarios; our Flight Controller follows
+//!   (#48), and later perhaps a SITL bridge in its own crate.
+//! - The thrust-stand set-up: a Quad set up with [`Mount::ThrustStand`] is
+//!   held still while its motors, ESCs and battery work as in flight.
+//! - [`Simulation::quad_output`]: each tick's output per Quad: where it is and
+//!   how it moves, each motor's speed, thrust, torque and current, each ESC's
+//!   state, and the battery's voltage, current and charge.
 //! - [`Simulation::fingerprint`]: a fingerprint of the whole state, the same on
 //!   every computer, for the repeat and agreement checks.
 //!
@@ -48,12 +53,14 @@ mod motors;
 mod time;
 
 use opendrone_maths::{Fingerprint, Fingerprinter};
-use opendrone_physics::QuadBody;
+use opendrone_physics::{QuadBody, QuadStart};
 
-pub use motors::{
-    FlightControllerSeam, MotorCommand, MotorCommands, ScriptedMotors, SpinDirection,
+pub use motors::{FlightControllerSeam, ScriptedMotors};
+pub use opendrone_physics::{
+    BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
+    MotorOutput, MotorParameters, Mount, PropDirection, PropParameters, QuadParameters, QuadState,
+    RotorLayout, SetUpProblem, SpinDirection, StartUpStep, StartingMotors, World,
 };
-pub use opendrone_physics::{Drag, QuadParameters, QuadState, SetUpProblem, World};
 pub use time::{PhysicsRate, SimulationTime};
 
 /// What a Simulation starts from.
@@ -73,8 +80,24 @@ pub struct SetUp {
 pub struct QuadSetUp {
     pub parameters: QuadParameters,
     pub start: QuadState,
+    /// How its motors and their ESCs start.
+    pub motors: StartingMotors,
+    /// The battery's charge, as a share of its capacity (0 to 1).
+    pub battery: f64,
+    /// Free to fly, or held on the thrust stand.
+    pub mount: Mount,
     /// What plugs into the Flight Controller seam for this Quad.
     pub flight_controller: Box<dyn FlightControllerSeam>,
+}
+
+/// One Quad's output after a tick.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct QuadOutput {
+    /// Where it is and how it moves.
+    pub state: QuadState,
+    /// Each motor, in Betaflight's motor order, with its ESC's state.
+    pub motors: [MotorOutput; 4],
+    pub battery: BatteryOutput,
 }
 
 /// A set-up the Simulation can't start from.
@@ -104,11 +127,18 @@ impl Simulation {
     pub fn new(set_up: SetUp) -> Result<Simulation, SetUpError> {
         let mut quads = Vec::with_capacity(set_up.quads.len());
         for (index, quad) in set_up.quads.into_iter().enumerate() {
-            let body =
-                QuadBody::new(quad.parameters, quad.start).map_err(|problem| SetUpError {
+            let start = QuadStart {
+                state: quad.start,
+                motors: quad.motors,
+                battery: quad.battery,
+                mount: quad.mount,
+            };
+            let body = QuadBody::new(quad.parameters, start, &set_up.world).map_err(|problem| {
+                SetUpError {
                     quad: index,
                     problem,
-                })?;
+                }
+            })?;
             quads.push(SimulatedQuad {
                 body,
                 flight_controller: quad.flight_controller,
@@ -125,13 +155,13 @@ impl Simulation {
     }
 
     /// One tick: for every Quad in order, the Flight Controller seam gives the
-    /// motor commands, then the physics moves the Quad on by one step. Then
-    /// Simulation Time moves on by one step.
+    /// motor commands, then the physics moves the Quad on by one step with
+    /// them. Then Simulation Time moves on by one step.
     pub fn step(&mut self) {
         let dt = self.physics_rate.step_length();
         for quad in &mut self.quads {
             quad.motor_commands = quad.flight_controller.step(self.time);
-            quad.body.step(&self.world, dt);
+            quad.body.step(&self.world, &quad.motor_commands, dt);
         }
         self.time = self.time.next();
     }
@@ -159,6 +189,17 @@ impl Simulation {
         self.quads[quad].body.state()
     }
 
+    /// A Quad's output after the last tick (at the start before the first):
+    /// where it is and how it moves, each motor and its ESC, and the battery.
+    pub fn quad_output(&self, quad: usize) -> QuadOutput {
+        let body = &self.quads[quad].body;
+        QuadOutput {
+            state: *body.state(),
+            motors: body.motors(),
+            battery: body.battery(),
+        }
+    }
+
     /// The motor commands the Flight Controller seam gave a Quad on the last
     /// tick (all stopped before the first).
     pub fn motor_commands(&self, quad: usize) -> MotorCommands {
@@ -169,12 +210,13 @@ impl Simulation {
     pub fn is_finite(&self) -> bool {
         self.quads
             .iter()
-            .all(|quad| quad.body.state().is_finite() && quad.motor_commands.is_finite())
+            .all(|quad| quad.body.is_finite() && quad.motor_commands.is_finite())
     }
 
     /// A fingerprint of the whole state, in a fixed order: Simulation Time,
-    /// the physics rate, the world, the random seed, then every Quad's state,
-    /// motor commands and Flight Controller seam. Two runs, or two computers,
+    /// the physics rate, the world, the random seed, then every Quad's state
+    /// (with its motors, ESCs and battery), motor commands and Flight
+    /// Controller seam. Two runs, or two computers,
     /// that give the same fingerprint are in exactly the same state.
     pub fn fingerprint(&self) -> Fingerprint {
         let mut f = Fingerprinter::new();

@@ -1,0 +1,82 @@
+# The Whoop 65 on the thrust stand, on its own LAVA II pack at 20% charge,
+# compared with the same run on a full pack. Proves the motor model's speed
+# following the battery's voltage (E6 in #10, ADR-0006): a tired pack gives
+# less thrust at the same command, and a slower idle.
+#
+# All four motors run: first at 6%, the Meteor65 Pro's idle
+# (`dshot_idle_value = 600` in its diff all), then at 50%.
+#
+# The pack's resting voltage is 4.35 V full and 3.77 V at 20% (its voltage
+# curve), 86.7% of full.
+format = 1
+name   = "On a tired pack, the Whoop 65's thrust drops roughly with voltage squared and its idle speed falls"
+
+[start]
+kind              = "thrust stand"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "20%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "6%" },
+  { at = "1 s", motors = "50%" },
+]
+
+[[expect]]
+what    = "battery voltage"
+at      = "0.9 s"
+against = { battery = "100%" }
+compare = "ratio"
+value   = "86.7% ± 0.5%"
+basis   = "rule: at idle the pack hardly sags, so its voltage is its resting voltage, 3.77 V ÷ 4.35 V = 86.7% of a full pack's"
+
+[[expect]]
+what    = "motor 1 speed"
+at      = "0.9 s"
+against = { battery = "100%" }
+compare = "ratio"
+value   = "86.7% ± 2%"
+basis   = "rule: at a fixed drive a motor's speed follows the voltage across it, the drive times the pack's voltage, so the idle speed falls with the voltage: 86.7%. The prop and the motor's losses barely load it at idle"
+
+[[expect]]
+what    = "battery voltage"
+at      = "1.9 s"
+against = { battery = "100%" }
+compare = "ratio"
+value   = "86.7% ± 1%"
+basis   = "rule: under the same load both packs sag by about the same share, so the ratio stays near the resting voltages', 86.7%"
+
+[[expect]]
+what    = "total thrust"
+at      = "1.9 s"
+against = { battery = "100%" }
+compare = "ratio"
+value   = "between 75.2% and 86.7%"
+basis   = "rule: thrust grows with the motor's speed squared, and the speed follows the voltage, so thrust falls roughly with the voltage squared: 0.867² = 75.2%. Under load the windings' resistance takes some of the voltage, so the speed falls a little less than the voltage does, and the thrust a little less than its square, but never less than the voltage itself: 86.7%"

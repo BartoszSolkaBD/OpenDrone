@@ -1,0 +1,70 @@
+# Results of motor-step.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65 motor stepped 0 → 100 → 0% follows its spin-up and slow-down times"
+
+[[expect]]
+what     = "motor 1 speed, highest over 0.5 s to 0.6 s"
+basis    = "Source"
+expected = "0 RPM ± 0 RPM"
+measured = "0 RPM"
+
+[[expect]]
+what     = "motor 1 drive, highest over 0.6 s to 0.66 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 1 speed at 0.66325 s"
+basis    = "Observed"
+expected = "1207 RPM ± 1%"
+measured = "1210 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 0.69825 s"
+basis    = "Observed"
+expected = "29300 RPM ± 2%"
+measured = "29300 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 1.5 s"
+basis    = "Observed"
+expected = "45600 RPM ± 1%"
+measured = "45600 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 1.535 s"
+basis    = "Observed"
+expected = "17500 RPM ± 2%"
+measured = "17500 RPM"
+
+[[expect]]
+what     = "motor 1 drive, highest over 1.75 s to 2 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "40606a858aa411f4"   # test/whoop-65-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "fcdd170bdb1bb6e8"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "769440019991d25d"
+"0.4 s" = "7dcb5185afb7db0f"
+"0.6 s" = "55763c174c939573"
+"0.8 s" = "850487926cca1403"
+"1 s" = "67e4514135b5064c"
+"1.2 s" = "50e2e6815124c76d"
+"1.4 s" = "e2aaf8a2678482c2"
+"1.6 s" = "d89da678f78ce9ca"
+"1.8 s" = "f038380ac85715d5"
+"2 s" = "b6a10aa310273e41"

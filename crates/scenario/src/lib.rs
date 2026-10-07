@@ -38,10 +38,11 @@ use std::path::{Path, PathBuf};
 use opendrone_pack::{Packs, Problems};
 
 pub use measure::Measure;
+pub use opendrone_sim::StartingMotors;
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
-    Assists, Basis, BasisKind, Expectation, FlightMode, Kind, Named, Scenario, Start,
-    StartingFlightController, StartingMotors, Statistic, When, read_scenario,
+    Assists, Basis, BasisKind, Compared, Comparison, Expectation, FlightMode, Kind, Named,
+    OtherRun, Scenario, Start, StartingFlightController, Statistic, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, run};

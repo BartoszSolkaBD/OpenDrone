@@ -1,0 +1,46 @@
+# Results of motors-wait-for-the-ready-beep.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Whoop 65's motors ignore commands until their ESCs' ready beep"
+
+[[expect]]
+what     = "motor 1 speed, highest over 0 s to 1.8 s"
+basis    = "Source"
+expected = "0 RPM ± 0 RPM"
+measured = "0 RPM"
+
+[[expect]]
+what     = "motor 1 drive at 1.800125 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 1 speed at 2.5 s"
+basis    = "Observed"
+expected = "16500 RPM ± 2%"
+measured = "16500 RPM"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "7d5c4ccb6951a4ae"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "35ce6aa79ede26e3"   # the whole state after each of 20000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.25 s" = "2b425c2a0a1e5e8f"
+"0.5 s" = "903d71ddbff7c98f"
+"0.75 s" = "3e46c8534cf0df14"
+"1 s" = "3513102f91044dd4"
+"1.25 s" = "30e0d6a33918c50d"
+"1.5 s" = "00460d9d4dcd0282"
+"1.75 s" = "eef378b3ab44d23d"
+"2 s" = "beb6c4c7fc4f8a89"
+"2.25 s" = "00ad3c2bcd1dd5f9"
+"2.5 s" = "3bdb4503fd82dcdc"

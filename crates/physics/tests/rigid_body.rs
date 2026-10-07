@@ -2,29 +2,28 @@
 //! `scenarios/physics/` show. Basis: Rule (Euler's equations for a rigid
 //! body).
 
-use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
-use opendrone_physics::{Drag, QuadBody, QuadParameters, QuadState, SetUpProblem, World};
+mod common;
 
-const NO_DRAG: Drag = Drag {
-    body_area: Vec3::ZERO,
-    rotor: 0.0,
-    duct_ram: 0.0,
+use common::{STEP, WORLD, still_at, whoop};
+use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
+use opendrone_physics::{
+    MotorCommands, Mount, QuadBody, QuadParameters, QuadStart, QuadState, SetUpProblem,
+    StartingMotors,
 };
 
-fn whoop_sized(inertia: Vec3) -> QuadParameters {
+fn with_inertia(inertia: Vec3) -> QuadParameters {
     QuadParameters {
-        mass: 0.0312,
         inertia: Mat3::diagonal(inertia),
-        drag: NO_DRAG,
+        ..whoop()
     }
 }
 
-fn still_at(attitude: Attitude, rotation: Vec3) -> QuadState {
-    QuadState {
-        position: Vec3::ZERO,
-        velocity: Vec3::ZERO,
-        attitude,
-        rotation,
+fn start(state: QuadState) -> QuadStart {
+    QuadStart {
+        state,
+        motors: StartingMotors::Stopped,
+        battery: 1.0,
+        mount: Mount::Free,
     }
 }
 
@@ -35,7 +34,7 @@ fn a_tumble_about_a_tilted_axis_keeps_its_angular_momentum() {
     // axes, which only the gyroscopic part of Euler's equation explains, so a
     // sign slip there breaks this.
     let inertia = Vec3::new(7.0e-6, 9.0e-6, 14.0e-6);
-    let start = still_at(
+    let first = still_at(
         Attitude::from_pilot_angles(PilotAngles {
             roll: 10.0 * DEGREE,
             pitch: 20.0 * DEGREE,
@@ -43,18 +42,14 @@ fn a_tumble_about_a_tilted_axis_keeps_its_angular_momentum() {
         }),
         Vec3::new(20.0, 3.0, 5.0),
     );
-    let mut quad = QuadBody::new(whoop_sized(inertia), start).unwrap();
+    let mut quad = QuadBody::new(with_inertia(inertia), start(first), &WORLD).unwrap();
     let momentum = |state: &QuadState| {
         let body = Mat3::diagonal(inertia) * state.rotation;
         state.attitude.body_to_world(body)
     };
     let before = momentum(quad.state());
-    let world = World {
-        gravity: 9.81,
-        air_density: 1.225,
-    };
     for _ in 0..8000 {
-        quad.step(&world, 1.0 / 8000.0);
+        quad.step(&WORLD, &MotorCommands::STOPPED, STEP);
     }
     let after = momentum(quad.state());
     let drift = (after - before).length() / before.length();
@@ -64,28 +59,28 @@ fn a_tumble_about_a_tilted_axis_keeps_its_angular_momentum() {
         drift * 100.0
     );
     assert!(
-        (quad.state().rotation - start.rotation).length() > 1.0,
+        (quad.state().rotation - first.rotation).length() > 1.0,
         "the rotation should have wandered between the axes"
     );
 }
 
 #[test]
 fn a_quad_without_mass_cant_be_set_up() {
-    let mut parameters = whoop_sized(Vec3::new(1.0, 1.0, 1.0));
+    let mut parameters = with_inertia(Vec3::new(1.0, 1.0, 1.0));
     parameters.mass = 0.0;
-    let start = still_at(Attitude::BODY_IS_WORLD, Vec3::ZERO);
+    let first = still_at(Attitude::BODY_IS_WORLD, Vec3::ZERO);
     assert_eq!(
-        QuadBody::new(parameters, start).unwrap_err(),
+        QuadBody::new(parameters, start(first), &WORLD).unwrap_err(),
         SetUpProblem::MassNotAboveZero
     );
 }
 
 #[test]
 fn a_quad_whose_inertia_has_no_inverse_cant_be_set_up() {
-    let parameters = whoop_sized(Vec3::new(1.0, 0.0, 1.0));
-    let start = still_at(Attitude::BODY_IS_WORLD, Vec3::ZERO);
+    let parameters = with_inertia(Vec3::new(1.0, 0.0, 1.0));
+    let first = still_at(Attitude::BODY_IS_WORLD, Vec3::ZERO);
     assert_eq!(
-        QuadBody::new(parameters, start).unwrap_err(),
+        QuadBody::new(parameters, start(first), &WORLD).unwrap_err(),
         SetUpProblem::InertiaHasNoInverse
     );
 }

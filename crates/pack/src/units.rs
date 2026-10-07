@@ -21,8 +21,9 @@
 //!
 //! The list, as [`BASE_UNITS`]: metres, grams, seconds, minutes, hours,
 //! hertz, degrees, RPM, volts, amps, ohms, amp-hours, watts, watt-hours, KV
-//! (RPM per volt), newtons, percent, decibels, stops, lines and TVL, and any
-//! product or quotient of them, such as `m/s²`, `kg·m²`, `kg/m³` or `s⁻¹`.
+//! (RPM per volt), newtons, grams-force (thrust as makers' tables give it),
+//! percent, decibels, stops, lines and TVL, and any product or quotient of
+//! them, such as `m/s²`, `kg·m²`, `kg/m³`, `N·m` or `s⁻¹`.
 //!
 //! Values are kept in SI units (metres, kilograms, seconds, radians, volts,
 //! amps), because that is what the Simulation works in. The conversions use
@@ -89,6 +90,7 @@ impl Dimension {
     pub const INERTIA: Dimension = Dimension::MASS.times(Dimension::AREA);
     pub const DENSITY: Dimension = Dimension::MASS.per(Dimension::VOLUME);
     pub const FORCE: Dimension = Dimension::MASS.times(Dimension::ACCELERATION);
+    pub const TORQUE: Dimension = Dimension::FORCE.times(Dimension::LENGTH);
     pub const RESISTANCE: Dimension = Dimension::VOLTAGE.per(Dimension::CURRENT);
     pub const CHARGE: Dimension = Dimension::CURRENT.times(Dimension::TIME);
     pub const POWER: Dimension = Dimension::VOLTAGE.times(Dimension::CURRENT);
@@ -170,6 +172,7 @@ const DESCRIPTIONS: &[(Dimension, &str, &str)] = &[
     (Dimension::INERTIA, "an inertia", "140 g·cm²"),
     (Dimension::DENSITY, "a density", "1.225 kg/m³"),
     (Dimension::FORCE, "a force", "0.3 N"),
+    (Dimension::TORQUE, "a torque", "0.2 N·m"),
     (Dimension::RESISTANCE, "a resistance", "29 mΩ"),
     (Dimension::CHARGE, "a charge", "320 mAh"),
     (Dimension::POWER, "a power", "25 mW"),
@@ -264,6 +267,9 @@ pub const BASE_UNITS: &[BaseUnit] = &[
     unit("Wh", &[], Dimension::ENERGY, 3600.0, &[]),
     unit("KV", &["kv", "Kv"], Dimension::KV, 2.0 * PI / 60.0, &[]),
     unit("N", &[], Dimension::FORCE, 1.0, &[Milli]),
+    // Gram-force: what makers' thrust tables mean by "g" of thrust. Standard
+    // gravity, 9.80665 m/s², by definition.
+    unit("gf", &[], Dimension::FORCE, 9.806_65e-3, &[Kilo]),
     unit("%", &["percent"], Dimension::PERCENT, 0.01, &[]),
     unit("dB", &["db"], Dimension::DECIBELS, 1.0, &[]),
     unit("stops", &["stop"], Dimension::STOPS, 1.0, &[]),
