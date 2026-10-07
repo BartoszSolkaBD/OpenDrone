@@ -8,7 +8,7 @@
 //! - **Sag.** Under load the voltage drops at once by the current times the
 //!   pack's resistance and its connector's. A slower part builds up and dies
 //!   away with the pack's recovery time: one resistor–capacitor pair, as
-//!   Bauersfeld & Scaramuzza fitted to ten 4S–6S packs (research §5.3, [S7]).
+//!   Bauersfeld & Scaramuzza fitted to ten 4S–6S packs (flight-dynamics research §5.3, its source S7).
 //!   Their pair's voltage settles at `k` times the power each cell gives per
 //!   amp-hour of its capacity, with `k` = 0.00104846 V per W/Ah (their
 //!   Table I); the Quad definition holds only the time it takes, `recovery`.

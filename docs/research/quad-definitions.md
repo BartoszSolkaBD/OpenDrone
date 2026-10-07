@@ -18,7 +18,7 @@ Sea-level air (1.225 kg/m³) and g = 9.81 m/s² throughout. The prop coefficient
 
 **Rotor inertia: 0.25 g·cm², Estimate, range ×0.5–×2.** A 35 mm 3-blade prop weighs about 0.25 g; with most of its mass near the hub, I ≈ 0.2·m·R² ≈ 0.15 g·cm². An 0802 motor's bell adds about 0.1 g·cm². As a check, the motor model's spin-up time, τ ≈ J / (1/(R·K_V²) + 2·k_m·ω), comes out at about 30 ms in a hover, inside the 20–50 ms motor lag #10 estimated.
 
-**No-load current: 0.3 A at 4 V, Estimate, range 0.1–0.6 A.** BetaFPV doesn't publish it (research §8.5). It is #16's sample value, so its source says "first guess"; the motor ticket (#41) works it out.
+**No-load current: 0.3 A at 4 V, Estimate, range 0.1–0.6 A.** BetaFPV doesn't publish it (research §8.5). It is #16's sample value, so its source says "first guess". The motor ticket (#41) kept it: with it, the motor model meets BetaFPV's thrust table within 7% at every row (see [The motor model against the makers' tables](#the-motor-model-against-the-makers-tables-41) below), and a Feel Test settles it.
 
 **Shapes (Estimates from the layout):** the frame and canopy as a box of 35 × 30 × 20 mm, the props' plane about 8 mm above the centre of mass, the pack's centre about 6 mm below it (the 8.2 g pack hangs under the 23 g frame), and duct rings 37 mm inside (a 1 mm tip gap round a 35 mm prop), 1.5 mm thick and 14 mm tall. Nothing here was measured; photos and the sizes above set them. The camera position (15 mm forward, 12 mm up) is placed the same way; as a camera default it carries no Confidence.
 
@@ -54,9 +54,9 @@ Sea-level air (1.225 kg/m³) and g = 9.81 m/s² throughout. The prop coefficient
 
 A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f ≈ 1.63 × 10⁻⁶ N/(rad/s)², inside the research's 1.5–1.65 × 10⁻⁶. A readable check pins the table at 100% and 60% within 3%.
 
-**Power coefficient: C_P 0.09, Estimate, range 0.07–0.11.** Through the motor model (torque = (current − no-load current) ÷ K_V in SI), the table gives C_P 0.073 at 60%, 0.088 at 80% and 0.106 at 100%: it doesn't hold still, because the model's torque constant and constant no-load current are only first-order. The middle value stands, with the spread as its range; the motor ticket fits it.
+**Power coefficient: C_P 0.105, Estimate, range 0.07–0.11.** Through the motor model (torque = (current − no-load current) ÷ K_V in SI), the table gives C_P 0.073 at 60%, 0.088 at 80% and 0.106 at 100%: it doesn't hold still, because the model's torque constant and constant no-load current are only first-order. The middle value, 0.09, stood at first, with the spread as its range. The motor ticket (#41) fitted 0.105 to the full-throttle row, since that row's command is the only one whose drive is known (see below); the Feel Test log records the move.
 
-**Winding resistance: 0.20 Ω, Estimate, range 0.05–0.3 Ω.** With the drive at the throttle's share of 23.5 V, the lumped resistance that meets the table is 0.19 Ω at 100%, 0.22 Ω at 80% and 0.19 Ω at 60%. #10 fits it to the TII logs.
+**Winding resistance: 0.19 Ω, Estimate, range 0.05–0.3 Ω.** With the drive at the throttle's share of 23.5 V, the lumped resistance that meets the table is 0.19 Ω at 100%, 0.22 Ω at 80% and 0.19 Ω at 60%. It was 0.20 Ω at first; the motor ticket (#41) fitted 0.19 Ω with C_P to the full-throttle row. #10 fits it to the TII logs.
 
 **Rotor inertia: 55 g·cm², Estimate, range ×0.5–×2.** A T5147 weighs about 4.5 g (0.2·m·R² ≈ 38 g·cm²) and a 2207's bell adds roughly 15–25 g·cm². The spin-up time this gives in a hover, about 28 ms, sits just under the 33 ms measured on NeuroBEM's 5″.
 
@@ -78,6 +78,22 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 **The gyro:** typical 5″ boards carry an ICM-42688-P or a BMI270, both ±2000 °/s.
 
+## The motor model against the makers' tables (#41)
+
+The motor ticket checks both Quads' motor numbers against their makers' tables with Thrust Stand Scenarios (`scenarios/quads/<quad>/thrust-table.toml`), each on a bench supply like the maker's (`scenarios/test-quads/*-bench-supply.toml`). How the motor model works is in `crates/physics/src/motor.rs`.
+
+**The no-load current grows with speed.** A Quad definition gives the no-load current at one voltage. The model takes it as a loss that grows in step with the motor's speed, from nothing at a standstill to the given current at that voltage's no-load speed. A constant one would act at a standstill too, and on the whoop 0.3 A is more than Bluejay's start-up power limit can push through the windings (1.96% of 4.2 V across 0.5 Ω is 0.16 A), so its motors could never start, which real ones do.
+
+**T-Motor's "throttle" isn't the ESC's drive.** The 20% row turns 11,294 RPM, but a 1750 KV motor on 20% of 24.0 V can turn at most 8,400 RPM. Working each row back through the motor model, the rows sit at about 30%, 50%, 64%, 82% and 100% drive: T-Motor's throttle is a share of its stand's own signal. So the Scenario commands each row's thrust and checks the row's speed and current; only the full-throttle row is commanded as it stands. Fitted to that row, C_P 0.105 and 0.19 Ω give, at full drive from the 24.0 V supply, 1,580 g at 29,500 RPM and 35.0 A (the table: 1,591.1 g, 29,447 RPM, 34.6 A). At the lower rows the model draws 0% (80%), 10% (60%), 13% (40%) and 31% (20%) less current than the table: a small prop needs more power for its thrust at low speed (the table's own C_P rises from 0.106 at full throttle to about 0.12 at 20%), which one fixed C_P can't follow.
+
+**BetaFPV's current is the motor's own.** BetaFPV's 0802SE table gives thrust against current, about 9 g per amp from 0.5 A to 3.4 A. Thrust in step with current is how the current through a motor behaves: its torque, and its prop's thrust, both follow it. The current an ESC draws from the battery at part throttle is smaller, about its drive times the motor's, and grows faster than thrust. So the Scenario checks BetaFPV's line against the motor's own current, as #34 did, and the Whoop 65's numbers meet it within 7% at 25%, 50%, 75% and 100% drive, unchanged. One consequence to settle with the hover-time check (#57): at hover the model's four ESCs draw about 1.6 A from the pack, which would last about 10 minutes, where the maintainer remembers 4–6 minutes (#10 §6). The board, camera and video transmitter draw some too, and a whoop's ESC loses more at part throttle than the model's ideal one (its motor's tiny inductance lets the current ripple), so the gap may be real losses the model lacks, or BetaFPV's current may be the pack's after all.
+
+**Spin-up and slow-down.** A motor approaches the speed its drive holds as a first lag, with the spin-up time while speeding up and the slow-down time while its ESC brakes it. Its rotor inertia sets how much current that takes, and the drive caps it: an ESC gives no more than its command while speeding up, and no less than none (full braking) while slowing. The 5″'s 33 ms both ways fit inside those caps. The whoop's rotor, 0.25 g·cm² through 0.5 Ω windings, can't be braked faster than its inertia × resistance × KV² = 52 ms (less the prop's drag), so its 35 ms slow-down time is the lag it asks for, and the braking it gets is a little slower: 38% of full speed is left after 35 ms, against 37% for a true 35 ms lag.
+
+**The battery's slow sag.** The Quad definition gives the pack's resistance and its recovery time, but not how big the slow part of its sag is. The model takes it from Bauersfeld & Scaramuzza's fit (research §5.3, [S7]): it settles at 0.00104846 V per cell for each watt the cell gives per amp-hour of its capacity. On the Whoop 65 a full-throttle punch builds it to about 0.17 V; on the 5″ at hover to about 0.3 V. The resistance itself acts at once: BetaFPV's LAVA II curve gives it as the drop on loading.
+
+**Bluejay's start-up power limit.** Read in Bluejay's code (`crates/physics/src/esc.rs` has the file and line for each step): for the start-up phase, 24 commutations, four electrical turns of the motor, the drive is capped at Startup Power Max, 5 of 255, the 1.96% in the Quad definition. After that the motor runs as commanded. Bluejay also limits power at low speed after the start-up phase (`Pgm_Rpm_Power_Slope`); the model leaves that out, since the measured spin-up times already include whatever a real ESC does. Stalled motors' restarts come with the Prop Strike ticket (#45).
+
 ## Both Quads
 
 - **ESC numbers** (#26 §5, from Bluejay v0.21.0's source): a 100 ms wait before a restart (`wait100ms` between stall restarts), at most 3 restarts (the stall count is checked against 3), and start-up power capped at the default Startup Power Max, 5 on Bluejay's 0–255 scale, which is 1.96% of full drive while the motor starts. They are Manufacturer numbers: Bluejay's own defaults.
@@ -90,9 +106,9 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 Every Estimate above may move in a Feel Test (the whoop) or a fit to the TII logs (the 5″), inside its range. These rest on the least:
 
-- **Placeholders from #16's sample:** both Quads' body drag areas, the whoop's rotor drag and the whoop's no-load current.
+- **Placeholders from #16's sample:** both Quads' body drag areas, the whoop's rotor drag and the whoop's no-load current (which meets BetaFPV's table as it is).
 - **Made from photos and frame sizes, with nothing measured:** every collision shape except the two pack boxes (each from its maker), both props' heights, both packs' heights, the duct rings, and both camera positions.
 - **The battery curves:** typical LiPo and LiHV curves, not these packs' own.
 - **The whoop's C_T and C_P,** until a Feel Test or the maintainer's recording settles the hover pitch.
 - **Prop Wash's flicker speed and the ground effect's body term,** which have no source for these Quads.
-- **What Bluejay's start-up power cap does.** The number is locked, because it is Bluejay's own default (Startup Power Max, 5 of 255), stored as the share of full drive it caps a starting motor at. How that cap acts on a stalled motor is the ESC ticket's to check against Bluejay's code.
+- **The whoop's current at hover.** BetaFPV's table is read as the motor's own current, which the model meets; the pack's current at hover then looks low against the maintainer's 4–6 minutes (see the motor model section above). The hover-time check (#57) settles it.
