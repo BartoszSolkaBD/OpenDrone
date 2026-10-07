@@ -1,0 +1,98 @@
+# The Review Report and the Red Flag gate, worked out on every pull request
+# (#77; #15 §5 and §10; how to read it: docs/review-report.md).
+#
+# Security: this workflow has a read-only token and no secrets, like every
+# pull_request workflow from a fork, because it runs code from the pull
+# request: `cargo metadata`, and, until main has a Red Flag gate of its own,
+# the gate itself. Never give it write access. It reads the pull request's
+# files as data (`git show`), and leaves the Report as a download; the
+# privileged workflow, review.yml, posts it and adds the labels.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Review Report
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a PR cancels that PR's older run.
+  group: review-report-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    # A required check. It always runs, docs-only PRs included: editing an
+    # ADR is a docs-only change.
+    name: Red Flag gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # GitHub's merge commit and main: HEAD^1 is main, so the difference
+          # between them is exactly what the PR changes.
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build the Red Flag gate from main's code
+        # Built from main, so a PR can't change how the gate judges it. A PR
+        # that changes the gate is proved by its readable checks instead. Only
+        # while main has no gate yet does the PR's own run.
+        id: tool
+        shell: bash
+        run: |
+          if git cat-file -e 'HEAD^1:crates/xtask/src/review.rs' 2>/dev/null; then
+            git worktree add --detach "$RUNNER_TEMP/main" HEAD^1
+            cd "$RUNNER_TEMP/main"
+            rustup toolchain install
+            cargo build --locked --quiet --package xtask --target-dir "$RUNNER_TEMP/main-target"
+            echo "xtask=$RUNNER_TEMP/main-target/debug/xtask" >> "$GITHUB_OUTPUT"
+            echo "The Red Flag gate comes from main's code."
+          else
+            cargo build --locked --quiet --package xtask
+            echo "xtask=$PWD/target/debug/xtask" >> "$GITHUB_OUTPUT"
+            echo "main has no Red Flag gate yet, so this PR's own one runs."
+          fi
+
+      - name: Note which pull request and commit the Report is for
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/review"
+          jq -n --argjson number "$PR_NUMBER" --arg head_sha "$HEAD_SHA" \
+            '{number: $number, head_sha: $head_sha}' > "$RUNNER_TEMP/review/pr.json"
+
+      - name: Look up the libraries' licences (cargo metadata)
+        shell: bash
+        run: |
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/metadata.json" \
+            || echo '{}' > "$RUNNER_TEMP/metadata.json"
+
+      - name: Red Flags, What moved and Areas touched (fails if a Red Flag waits for the maintainer)
+        shell: bash
+        env:
+          XTASK: ${{ steps.tool.outputs.xtask }}
+        run: >-
+          "$XTASK" review-report --base HEAD^1 --head HEAD
+          --metadata "$RUNNER_TEMP/metadata.json" --out "$RUNNER_TEMP/review"
+
+      - name: Keep the Report for review.yml to post
+        # Kept even when the gate failed, so the Report says why.
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: review-report
+          path: ${{ runner.temp }}/review/
+          if-no-files-found: warn
+          retention-days: 30

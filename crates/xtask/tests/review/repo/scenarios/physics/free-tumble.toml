@@ -1,0 +1,15 @@
+# A fixture: a second Scenario, with Rule Expectations only.
+format = 1
+name   = "A free tumble keeps its spin"
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 1.125 s"
+lowest = "2000 °/s ± 0.001 °/s"
+basis  = "rule: with no torque, a spin about a main axis never changes"
+
+[[expect]]
+what  = "roll"
+at    = "1.125 s"
+value = "90° ± 0.001°"
+basis = "rule: 2000 °/s × 1.125 s = 2250°, six rolls and a quarter"

@@ -1,0 +1,119 @@
+# Posts the Review Report comment, the PR's labels and the Review check
+# (#77; #15 §3 and §10; ADR-0010), and names any merge that skipped a check.
+#
+# Security: this workflow can write to PRs, so it never runs code from a pull
+# request. Its three triggers (workflow_run, issue_comment and push to main)
+# always run this file as it is on main. It checks out main only, builds
+# main's xtask, and reads pull requests through GitHub's API, as data. The one
+# thing a pull request can shape is the Review Report workflow's download, so
+# that is only ever text: xtask checks it is for the PR's latest commit, keeps
+# it short, strips anything that could pass for the Report's marker, and
+# turns only the Areas in main's CODEOWNERS into labels. Text from an event
+# never reaches a shell command except through an environment variable.
+#
+# The Review check is a commit status that this workflow sets on the PR's
+# latest commit, because a check run from issue_comment would land on main's
+# commit instead. That is also why no job here is named "Review check": a job
+# with that name could pass for the status.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Review
+
+on:
+  # After the Review Report workflow finishes for a push to a PR.
+  workflow_run:
+    workflows: [Review Report]
+    types: [completed]
+  # A Verdict posted, edited or deleted.
+  issue_comment:
+    types: [created, edited, deleted]
+  # A merge, to check it passed every required check.
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  # One run at a time per PR, so two never edit the Report at once. Each run
+  # works everything out afresh, so a run that waits behind a newer one can
+  # be dropped.
+  group: review-${{ github.event.issue.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Post the Review Report and set the Review check
+    # Only the maintainer's account posts Verdicts (agents work under it), so
+    # nobody else's comment starts a run.
+    if: >-
+      github.event_name == 'workflow_run'
+      || (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && github.event.comment.user.login == 'BartoszSolkaBD')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read # the Review Report workflow's download
+      issues: write # labels
+      pull-requests: write # the Review Report comment
+      statuses: write # the Review check
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build main's xtask
+        shell: bash
+        run: cargo build --locked --quiet --package xtask
+
+      - name: Post the Review Report, the labels and the Review check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.workflow_run.pull_requests[0].number }}
+          RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          XTASK: target/debug/xtask
+        run: bash .github/scripts/review.sh update
+
+  merged:
+    name: Name a merge that skipped a check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: read # the merged PR's check runs
+      statuses: read # and its commit statuses
+      issues: write # the skipped-a-check label
+      pull-requests: write # the comment on the merged PR
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build main's xtask
+        shell: bash
+        run: cargo build --locked --quiet --package xtask
+
+      - name: Check the merged PR passed every required check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+          XTASK: target/debug/xtask
+        run: bash .github/scripts/review.sh merged

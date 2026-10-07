@@ -1,0 +1,21 @@
+# A fixture Cargo.lock: Bevy moves to 0.21, with wgpu 28.
+version = 4
+
+[[package]]
+name = "bevy"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "opendrone-physics"
+version = "0.1.0-alpha.0"
+
+[[package]]
+name = "wgpu"
+version = "28.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"

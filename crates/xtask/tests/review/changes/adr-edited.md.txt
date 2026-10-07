@@ -1,0 +1,4 @@
+# Bit-exact determinism with ordinary floats
+
+A fixture ADR: the whole Simulation gives the same bits on every OS, except
+Windows.

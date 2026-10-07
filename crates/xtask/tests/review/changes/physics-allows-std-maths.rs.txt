@@ -1,0 +1,12 @@
+//! A fixture core crate.
+
+/// Half of a number.
+pub fn half(x: f64) -> f64 {
+    x * 0.5
+}
+
+/// The sine of an angle, from std's maths.
+#[allow(clippy::disallowed_methods)]
+pub fn sine(x: f64) -> f64 {
+    x.sin()
+}

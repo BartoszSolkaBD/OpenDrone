@@ -2,6 +2,8 @@
 
 How changes reach the main branch, and how they're checked when nobody reads the Rust. Back to the [map](../../CONTEXT.md).
 
+How to read the Review Report and its Red Flags: [Reading the Review Report](../review-report.md). What the Reviewer reads and checks, and the Verdict format: [The Reviewer and the Verdict](../agents/reviewer.md).
+
 ## Language
 
 **Phase 1**:

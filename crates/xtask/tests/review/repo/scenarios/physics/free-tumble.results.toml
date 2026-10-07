@@ -1,0 +1,24 @@
+# Results of free-tumble.toml, written by the Scenario runner (`cargo scenarios run`).
+format   = 1
+scenario = "A free tumble keeps its spin"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0.001 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "roll at 1.125 s"
+basis    = "Rule"
+expected = "90° ± 0.001°"
+measured = "90.0°"
+
+[fingerprints]
+quad = "00640ff54c5b9b2d"
+map  = "f720a5ecea6336f3"
+run  = "48dd4b7f52b96f14"
+
+[fingerprints.checkpoints]
+"0.5625 s" = "6454cebbcf1f09eb"
+"1.125 s" = "dbe41d667ebbafb6"
