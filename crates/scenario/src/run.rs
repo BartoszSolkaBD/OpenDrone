@@ -162,6 +162,9 @@ struct Tally<'s> {
     lowest: f64,
     highest: f64,
     last: Option<f64>,
+    /// True once an angle went more than half a turn from the expected value
+    /// during the stretch (see `see`).
+    swept_past_the_far_side: bool,
 }
 
 impl<'s> Tally<'s> {
@@ -173,6 +176,7 @@ impl<'s> Tally<'s> {
             lowest: f64::INFINITY,
             highest: f64::NEG_INFINITY,
             last: None,
+            swept_past_the_far_side: false,
         }
     }
 
@@ -191,8 +195,19 @@ impl<'s> Tally<'s> {
         // before it counts, so a heading that crosses north (359.5° to 1.5°)
         // or a roll that crosses upside down (179.5° to -178.5°) has the
         // right lowest, highest, mean and final value.
+        //
+        // That only works while the angle stays within half a turn of the
+        // expected value. If it sweeps past the far side, as in a flip or a
+        // pirouette, the taken-round values jump by a whole turn between two
+        // steps, and the lowest, highest and mean would fold around whatever
+        // was expected. So that jump is noticed, and those three then fail.
         if self.expectation.measure.is_an_angle() {
             value = angle_near(value, self.expectation.expected.centre());
+            if let Some(last) = self.last
+                && (value - last).abs() > core::f64::consts::PI
+            {
+                self.swept_past_the_far_side = true;
+            }
         }
         self.count += 1;
         self.sum += value;
@@ -205,6 +220,23 @@ impl<'s> Tally<'s> {
 
     fn finish(self) -> Measured {
         let e = self.expectation;
+        if let When::Over { statistic, .. } = e.when
+            && statistic != Statistic::Final
+            && self.swept_past_the_far_side
+        {
+            return Measured {
+                description: e.description.clone(),
+                basis: e.basis.kind,
+                expected: e.expected.text(),
+                measured: format!(
+                    "none: the {} went more than half a turn from the expected value during the stretch, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
+                    e.measure.name(),
+                    statistic.word()
+                ),
+                passed: false,
+                line: e.line,
+            };
+        }
         let value = match e.when {
             When::At(_) => self.last,
             When::Over { statistic, .. } if self.count > 0 => Some(match statistic {

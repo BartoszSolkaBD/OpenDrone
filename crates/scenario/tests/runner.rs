@@ -272,11 +272,42 @@ fn motor_commands_above_0_percent_wait_for_the_motor_model() {
 }
 
 #[test]
-fn only_physics_scenarios_run_so_far() {
+fn a_decimal_comma_in_the_motor_commands_is_refused_with_the_fix() {
+    let file = changed("motors-comma", "motors = \"0%\"", "motors = \"0,0%\"");
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert_eq!(found.len(), 1);
+    assert!(
+        found[0].ends_with(
+            "\"0,0%\" isn't a number OpenDrone can read: numbers take a decimal point, so write \"0.0%\""
+        ),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn stopped_motors_are_only_for_scenarios_that_script_their_motors() {
+    // Where the Flight Controller runs, a landed "fresh" start is Reset, whose
+    // ESCs start up first; "stopped" says they are already ready.
     let file = changed(
-        "flight",
+        "flight-stopped",
         "kind              = \"physics\"",
         "kind              = \"flight\"",
+    );
+    let found = failures(&report(&file, ResultsFile::Write));
+    assert!(
+        found.iter().any(|line| line.ends_with(
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start"
+        )),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn only_physics_scenarios_run_so_far() {
+    let file = changed(
+        "thrust-stand",
+        "kind              = \"physics\"",
+        "kind              = \"thrust stand\"",
     );
     let found = failures(&report(&file, ResultsFile::Write));
     assert_eq!(found.len(), 1);
@@ -391,6 +422,61 @@ fn a_roll_crossing_upside_down_has_the_right_lowest_highest_mean_and_final_value
         &fixture("roll-across-upside-down", &text),
         ResultsFile::Write,
     );
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+/// The free tumble (2000 °/s of roll for 1.125 s, six and a quarter rolls),
+/// with its Expectations replaced by `expectations` over the whole run.
+fn tumble_over_the_run(expectations: &[(&str, &str)]) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-tumble-keeps-its-spin.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()].to_string();
+    for (statistic, value) in expectations {
+        text += &format!(
+            "[[expect]]\nwhat = \"roll\"\nover = \"0 s to 1.125 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_roll_mean_lowest_or_highest_over_whole_rolls_fails_whatever_is_expected() {
+    // The roll sweeps round six times, so it goes more than half a turn from
+    // any expected value: its mean, lowest and highest have no single answer.
+    for expected in [
+        "0° ± 8°",
+        "90° ± 8°",
+        "123° ± 8°",
+        "-150° ± 8°",
+        "180° ± 180°",
+    ] {
+        let text = tumble_over_the_run(&[
+            ("mean", expected),
+            ("lowest", expected),
+            ("highest", expected),
+        ]);
+        let found = failures(&report(&fixture("roll-sweeps", &text), ResultsFile::Write));
+        assert_eq!(found.len(), 3, "{expected}: {found:#?}");
+        for (line, statistic) in found.iter().zip(["mean", "lowest", "highest"]) {
+            assert!(
+                line.starts_with(&format!(
+                    "roll, {statistic} over 0 s to 1.125 s: measured none: the roll went more than half a turn from the expected value during the stretch, so its {statistic} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+                )),
+                "{expected}: {line}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_roll_still_has_a_final_value_after_whole_rolls() {
+    // Six and a quarter rolls end on the right side: 90°.
+    let text = tumble_over_the_run(&[("final", "90° ± 0.001°")]);
+    let report = report(&fixture("roll-sweeps-final", &text), ResultsFile::Write);
     assert!(report.passed(), "{:#?}", failures(&report));
 }
 
