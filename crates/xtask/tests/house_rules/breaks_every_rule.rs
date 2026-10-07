@@ -62,20 +62,39 @@ pub fn touches_files_threads_and_the_environment() -> std::io::Result<usize> {
     let text = std::fs::read_to_string("settings.toml")?;
     let entries = std::fs::read_dir(".")?.count();
     let size = std::fs::metadata("settings.toml")?.len() as usize;
+    let full = std::fs::canonicalize("settings.toml")?.components().count();
     std::fs::write("results.toml", "")?;
+    std::fs::create_dir("results")?;
     std::fs::create_dir_all("results")?;
     std::fs::copy("results.toml", "results/copy.toml")?;
     std::fs::rename("results/copy.toml", "results/moved.toml")?;
     std::fs::remove_file("results/moved.toml")?;
+    std::fs::remove_dir("results")?;
+    std::fs::remove_dir_all("results")?;
     let worker = std::thread::spawn(|| 1);
     let joined = worker.join().unwrap_or(0);
     let built = std::thread::Builder::new().spawn(|| 2)?.join().unwrap_or(0);
+    let scoped = std::thread::scope(|scope| scope.spawn(|| 3).join().unwrap_or(0));
     std::thread::sleep(std::time::Duration::from_millis(1));
     let variable = std::env::var("OPENDRONE").map_or(0, |value| value.len());
     let raw = std::env::var_os("OPENDRONE").map_or(0, |value| value.len());
-    let all = std::env::vars().count() + std::env::args().count();
+    let all = std::env::vars().count()
+        + std::env::vars_os().count()
+        + std::env::args().count()
+        + std::env::args_os().count();
     let here = std::env::current_dir()?.components().count();
-    Ok(bytes.len() + text.len() + entries + size + joined + built + variable + raw + all + here)
+    Ok(bytes.len()
+        + text.len()
+        + entries
+        + size
+        + full
+        + joined
+        + built
+        + scoped
+        + variable
+        + raw
+        + all
+        + here)
 }
 
 pub fn starts_and_stops_programs() -> std::io::Result<u32> {
