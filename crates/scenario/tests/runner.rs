@@ -660,6 +660,96 @@ fn with_the_nose_straight_up_roll_reads_0_and_heading_carries_the_turn() {
     assert!(report.passed(), "{:#?}", failures(&report));
 }
 
+/// What a stretch's lowest, highest or mean measures when the nose was
+/// straight up or down for only part of it.
+fn none_part_straight_up_or_down(what: &str, statistic: &str) -> String {
+    "none: for part of the stretch, and not all of it, the nose was within 0.00000006° of straight up or down, where roll reads 0° and heading carries the whole turn, so the {}'s {} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+        .replacen("{}", what, 1)
+        .replacen("{}", statistic, 1)
+}
+
+#[test]
+fn a_quad_that_slowly_leaves_straight_up_has_no_single_lowest_highest_or_mean_roll_or_heading() {
+    // Round 5 of #89's review: 0.00000001° off vertical, inside the band
+    // where roll reads 0° and heading carries the turn (45° − 30° = 15°),
+    // yawing out of it at 0.0001 °/s. After four steps the nose is out, and
+    // roll reads about -81°, a step under the quarter-turn jump check. So
+    // the highest roll measured 0°, and "highest roll 0° ± 0.001°" passed,
+    // though the roll then read -81° to -90° for the rest of the stretch.
+    let mut checks = vec![("roll", "highest", "0° ± 0.001°")];
+    for (what, expected) in [("roll", "-85° ± 10°"), ("heading", "300° ± 10°")] {
+        for statistic in ["lowest", "highest", "mean"] {
+            checks.push((what, statistic, expected));
+        }
+    }
+    let text = turning(
+        "roll 30°, pitch 89.99999999°, heading 45°",
+        "roll 0 °/s, pitch 0 °/s, yaw -0.0001 °/s",
+        "0.01 s",
+        &checks,
+    );
+    let found = failures(&report(
+        &fixture("leaving-straight-up", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), checks.len(), "{found:#?}");
+    for (line, (what, statistic, _)) in found.iter().zip(&checks) {
+        assert!(
+            line.starts_with(&format!(
+                "{what}, {statistic} over 0 s to 0.01 s: measured {}",
+                none_part_straight_up_or_down(what, statistic)
+            )),
+            "{line}"
+        );
+    }
+}
+
+#[test]
+fn a_quad_that_slowly_leaves_straight_up_still_has_a_final_roll_and_heading() {
+    // The same flight. A final value and a value at a moment are single
+    // readings, so they still read. By 0.01 s the nose has moved 0.000001°
+    // sideways, a hundred times further than it started from vertical, and
+    // heading minus roll is still the 15° it read inside the band.
+    let text = turning(
+        "roll 30°, pitch 89.99999999°, heading 45°",
+        "roll 0 °/s, pitch 0 °/s, yaw -0.0001 °/s",
+        "0.01 s",
+        &[
+            ("roll", "final", "-89.5° ± 0.1°"),
+            ("heading", "final", "285.5° ± 0.1°"),
+            ("roll", "at", "-89.5° ± 0.1°"),
+            ("heading", "at", "285.5° ± 0.1°"),
+            ("pitch", "mean", "90° ± 0.001°"),
+        ],
+    );
+    let report = report(
+        &fixture("leaving-straight-up-final", &text),
+        ResultsFile::Write,
+    );
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
+#[test]
+fn a_quad_that_stays_within_the_band_around_straight_up_keeps_its_lowest_highest_and_mean() {
+    // 0.00000001° off vertical and not turning: every reading is inside the
+    // band, roll 0° and heading 45° − 30° = 15°.
+    let text = turning(
+        "roll 30°, pitch 89.99999999°, heading 45°",
+        "roll 0 °/s, pitch 0 °/s, yaw 0 °/s",
+        "1 s",
+        &[
+            ("roll", "lowest", "0° ± 0.001°"),
+            ("roll", "highest", "0° ± 0.001°"),
+            ("roll", "mean", "0° ± 0.001°"),
+            ("heading", "lowest", "15° ± 0.001°"),
+            ("heading", "highest", "15° ± 0.001°"),
+            ("heading", "mean", "15° ± 0.001°"),
+        ],
+    );
+    let report = report(&fixture("within-the-band", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+}
+
 #[test]
 fn an_angle_tolerance_that_accepts_every_angle_is_refused_as_checking_nothing() {
     for expected in [

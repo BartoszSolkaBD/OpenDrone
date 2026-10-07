@@ -237,6 +237,21 @@ fn assert_same_attitude(actual: Attitude, expected: Attitude, within: f64) {
     }
 }
 
+/// How far apart two attitudes are: the largest distance between where they
+/// point the same body direction.
+fn apart(one: Attitude, other: Attitude) -> f64 {
+    [FORWARD, LEFT, UP]
+        .into_iter()
+        .map(|axis| (one.body_to_world(axis) - other.body_to_world(axis)).length())
+        .fold(0.0, max)
+}
+
+/// An attitude with the nose `off` radians from straight up (or down, for
+/// `sign` -1).
+fn off_vertical(roll_degrees: f64, sign: f64, off: f64, heading_degrees: f64) -> Attitude {
+    attitude(roll_degrees, sign * (90.0 - off / DEGREE), heading_degrees)
+}
+
 fn wrapped_degrees(angle: f64) -> f64 {
     let degrees = angle / DEGREE;
     degrees - 360.0 * (degrees / 360.0).floor()
@@ -269,9 +284,12 @@ fn with_the_nose_straight_up_or_down_roll_reads_0_and_heading_carries_the_turn()
 
 #[test]
 fn just_short_of_straight_up_the_angles_still_give_back_the_same_attitude() {
+    // Just outside the band around straight up or down (0.00000006°, or 1e-9
+    // radians), roll and heading are read the ordinary way, to 1e-12.
     for pitch in [89.9999999, -89.9999999, 89.99999, -89.999] {
-        for (roll, heading) in [(0.0, 45.0), (30.0, 45.0), (-120.0, 300.0)] {
+        for (roll, heading) in [(0.0, 45.0), (30.0, 45.0), (-120.0, 300.0), (180.0, 10.0)] {
             let start = attitude(roll, pitch, heading);
+            assert!(!start.is_straight_up_or_down(), "pitch {pitch}");
             assert_same_attitude(
                 Attitude::from_pilot_angles(start.pilot_angles()),
                 start,
@@ -279,6 +297,47 @@ fn just_short_of_straight_up_the_angles_still_give_back_the_same_attitude() {
             );
         }
     }
+    for sign in [1.0, -1.0] {
+        for (roll, heading) in [(30.0, 45.0), (180.0, 10.0)] {
+            let start = off_vertical(roll, sign, 1.001e-9, heading);
+            assert!(!start.is_straight_up_or_down(), "just outside the band");
+            assert_same_attitude(
+                Attitude::from_pilot_angles(start.pilot_angles()),
+                start,
+                1e-12,
+            );
+        }
+    }
+}
+
+#[test]
+fn inside_the_band_around_straight_up_or_down_the_angles_give_back_the_attitude_to_2e_9() {
+    // Within 1e-9 radians (about 0.00000006°) of straight up or down, roll
+    // reads 0 though the nose is a hair off vertical. So the attitude comes
+    // back off by up to twice the nose's distance from vertical: just under
+    // 2e-9 (0.0000001°) at the band's edge, with a half-turn roll.
+    let mut furthest: f64 = 0.0;
+    for off in [1e-10, 5e-10, 0.999e-9] {
+        for sign in [1.0, -1.0] {
+            for roll in [-150.0, -90.0, 0.0, 30.0, 90.0, 179.0, 180.0] {
+                for heading in [0.0, 45.0, 300.0] {
+                    let start = off_vertical(roll, sign, off, heading);
+                    assert!(start.is_straight_up_or_down(), "{off} radians off vertical");
+                    let back = Attitude::from_pilot_angles(start.pilot_angles());
+                    let found = apart(back, start);
+                    assert!(
+                        found <= 2.0 * off + 1e-15,
+                        "{off} radians off, roll {roll}: {found}"
+                    );
+                    furthest = max(furthest, found);
+                }
+            }
+        }
+    }
+    assert!(
+        1.99e-9 < furthest && furthest < 2e-9,
+        "the furthest was {furthest}"
+    );
 }
 
 #[test]

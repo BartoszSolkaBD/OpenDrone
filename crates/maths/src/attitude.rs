@@ -28,8 +28,9 @@ pub struct Attitude {
 /// They are applied in that order: heading, then pitch, then roll, as in
 /// aviation.
 ///
-/// With the nose straight up or down, roll and heading turn about the same
-/// line, so only their sum or difference says anything. Then
+/// With the nose straight up or down (within about 0.00000006°, see
+/// [`Attitude::is_straight_up_or_down`]), roll and heading turn about the
+/// same line, so only their sum or difference says anything. Then
 /// [`Attitude::pilot_angles`] reads roll as 0 and gives heading the whole
 /// turn: with the nose up, heading minus roll; with the nose down, heading
 /// plus roll.
@@ -92,27 +93,30 @@ impl Attitude {
 
     /// The roll, pitch and heading a pilot would read off this attitude.
     ///
-    /// With the nose straight up or down (to within rounding), roll reads 0
-    /// and heading carries the whole turn about the vertical (see
-    /// [`PilotAngles`]). Turning these angles back into an attitude gives
-    /// this attitude again either way.
+    /// With the nose straight up or down (within about 0.00000006°, see
+    /// [`Attitude::is_straight_up_or_down`]), roll reads 0 and heading
+    /// carries the whole turn about the vertical (see [`PilotAngles`]).
+    ///
+    /// Turning these angles back into an attitude gives this attitude again,
+    /// every body direction to within 1e-12, exactly straight up or down
+    /// included. Inside that band but not exactly vertical, roll still reads
+    /// 0, so the attitude comes back off by up to twice the nose's distance
+    /// from vertical: at most about 2e-9 (0.0000001°), at the band's edge.
     pub fn pilot_angles(self) -> PilotAngles {
-        let Attitude { w, x, y, z } = self;
-        // Bernardes and Viollet's direct method ("Quaternion to Euler angles
-        // conversion: a direct, general and computationally efficient
-        // method", PLOS ONE, 2022), for turns about up, then left, then
-        // forward. Each angle comes from an atan2 of numbers that aren't all
-        // tiny, so the angles stay precise right up to straight up or down,
-        // where the usual formulas read rounding errors.
-        let (a, b, c, d) = (w - y, x + z, y + w, z - x);
-        let toward_level = (a * a + b * b).sqrt();
-        let toward_vertical = (c * c + d * d).sqrt();
+        let method = self.direct_method();
+        let DirectMethod {
+            a,
+            b,
+            c,
+            d,
+            toward_level,
+            toward_vertical,
+        } = method;
         // The turn about the left axis: minus the pitch.
         let about_left = 2.0 * atan2(toward_vertical, toward_level) - FRAC_PI_2;
         let plus = atan2(b, a);
         let minus = atan2(d, c);
-        // Their product is the cosine of the pitch.
-        let (roll, about_up) = if toward_level * toward_vertical < STRAIGHT_UP_OR_DOWN {
+        let (roll, about_up) = if method.is_straight_up_or_down() {
             // Nose straight up or down: roll and heading turn about the same
             // line, and one of `plus` and `minus` is read from rounding
             // errors. Roll reads 0, and the heading takes the whole turn from
@@ -137,6 +141,33 @@ impl Attitude {
             roll,
             pitch,
             heading,
+        }
+    }
+
+    /// True when the nose is so close to straight up or down (within about
+    /// 0.00000006°, where the cosine of the pitch is below 1e-9) that roll
+    /// and heading can't be told apart: [`Attitude::pilot_angles`] then reads
+    /// roll as 0 and gives heading the whole turn.
+    pub fn is_straight_up_or_down(self) -> bool {
+        self.direct_method().is_straight_up_or_down()
+    }
+
+    /// Bernardes and Viollet's direct method ("Quaternion to Euler angles
+    /// conversion: a direct, general and computationally efficient method",
+    /// PLOS ONE, 2022), for turns about up, then left, then forward. Each
+    /// angle comes from an atan2 of numbers that aren't all tiny, so the
+    /// angles stay precise right up to straight up or down, where the usual
+    /// formulas read rounding errors.
+    fn direct_method(self) -> DirectMethod {
+        let Attitude { w, x, y, z } = self;
+        let (a, b, c, d) = (w - y, x + z, y + w, z - x);
+        DirectMethod {
+            a,
+            b,
+            c,
+            d,
+            toward_level: (a * a + b * b).sqrt(),
+            toward_vertical: (c * c + d * d).sqrt(),
         }
     }
 
@@ -227,6 +258,28 @@ fn half_turn_either_way(angle: f64) -> f64 {
         wrapped + TAU
     } else {
         wrapped
+    }
+}
+
+/// The terms of Bernardes and Viollet's method (see
+/// [`Attitude::direct_method`]).
+#[derive(Clone, Copy)]
+struct DirectMethod {
+    a: f64,
+    b: f64,
+    c: f64,
+    d: f64,
+    toward_level: f64,
+    toward_vertical: f64,
+}
+
+impl DirectMethod {
+    /// The one test of straight up or down, shared by
+    /// [`Attitude::pilot_angles`] and [`Attitude::is_straight_up_or_down`]
+    /// so they always agree. The product of the two lengths is the cosine of
+    /// the pitch.
+    fn is_straight_up_or_down(self) -> bool {
+        self.toward_level * self.toward_vertical < STRAIGHT_UP_OR_DOWN
     }
 }
 

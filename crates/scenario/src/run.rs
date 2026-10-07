@@ -169,6 +169,9 @@ struct Tally<'s> {
     /// True once an angle jumped, or reached half a turn from the expected
     /// value, during the stretch (see `see`).
     no_single_answer: bool,
+    /// How many of the samples were roll or heading read with the nose
+    /// straight up or down (see `see`).
+    straight_up_or_down: u64,
 }
 
 impl<'s> Tally<'s> {
@@ -181,6 +184,7 @@ impl<'s> Tally<'s> {
             highest: f64::NEG_INFINITY,
             last: None,
             no_single_answer: false,
+            straight_up_or_down: 0,
         }
     }
 
@@ -229,6 +233,16 @@ impl<'s> Tally<'s> {
                 self.no_single_answer = true;
             }
         }
+        // Within about 0.00000006° of straight up or down, roll reads 0° and
+        // heading carries the whole turn. A Quad that leaves that band slowly
+        // and sideways can step from one reading to the other by less than a
+        // quarter turn, so the jump check misses it, yet the two readings
+        // don't belong in one lowest, highest or mean. So a stretch that
+        // mixes them has none of the three. A stretch wholly inside the band,
+        // like a spin about the nose pointing straight up, keeps them.
+        if self.expectation.measure.read_straight_up_or_down(now) {
+            self.straight_up_or_down += 1;
+        }
         self.count += 1;
         self.sum += value;
         // Not std's f64::min and f64::max, which may pick either zero when
@@ -245,22 +259,35 @@ impl<'s> Tally<'s> {
         // checked again here so no way round it is left.
         let whole_turn = e.measure.is_an_angle()
             && self.highest - self.lowest >= 2.0 * core::f64::consts::PI - ROUNDING;
+        let partly_straight_up_or_down =
+            self.straight_up_or_down > 0 && self.straight_up_or_down < self.count;
         if let When::Over { statistic, .. } = e.when
             && statistic != Statistic::Final
-            && (self.no_single_answer || whole_turn)
         {
-            return Measured {
-                description: e.description.clone(),
-                basis: e.basis.kind,
-                expected: e.expected.text(),
-                measured: format!(
-                    "none: the {} jumped, or reached half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
-                    e.measure.name(),
-                    statistic.word()
-                ),
-                passed: false,
-                line: e.line,
+            let (what, word) = (e.measure.name(), statistic.word());
+            let why = if self.no_single_answer || whole_turn {
+                Some(format!(
+                    "the {what} jumped, or reached half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {word}"
+                ))
+            } else if partly_straight_up_or_down {
+                Some(format!(
+                    "for part of the stretch, and not all of it, the nose was within 0.00000006° of straight up or down, where roll reads 0° and heading carries the whole turn, so the {what}'s {word}"
+                ))
+            } else {
+                None
             };
+            if let Some(why) = why {
+                return Measured {
+                    description: e.description.clone(),
+                    basis: e.basis.kind,
+                    expected: e.expected.text(),
+                    measured: format!(
+                        "none: {why} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+                    ),
+                    passed: false,
+                    line: e.line,
+                };
+            }
         }
         let value = match e.when {
             When::At(_) => self.last,
