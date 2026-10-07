@@ -14,6 +14,7 @@
 //! - `check-links`: the book's link check alone, on a book that's built.
 //! - `scenario-catalogue`: prints the catalogue of every Scenario, the page the
 //!   book shows ([`scenario_catalogue`]).
+//! - `migrate [<step>]`: the format migration tool ([`migrate`]).
 //! - `packs`: the Pack checker, over every Pack in `packs/` and every Test
 //!   Quad in `scenarios/test-quads/`.
 //! - `feel-tests --base <revision>`: the Feel Test log rules, comparing every
@@ -24,6 +25,7 @@
 use std::process::ExitCode;
 
 mod book;
+mod migrate;
 mod packs;
 mod scenario_catalogue;
 mod walls;
@@ -47,6 +49,9 @@ Commands:
   scenario-catalogue [<folder>]
       Print the catalogue of every Scenario in a folder (default scenarios),
       as the book shows it.
+  migrate [<step>]
+      Run a named format migration step over every Scenario, or every Pack
+      file and Test Quad, keeping comments and layout. Alone, list the steps.
   packs
       Check every Pack in packs/ and every Test Quad in scenarios/test-quads/
       with the Pack checker, listing every problem with its file and line.
@@ -69,6 +74,7 @@ fn main() -> ExitCode {
         "book-preprocessor" => book::preprocessor::run(rest),
         "check-links" => book::run_link_check(rest),
         "scenario-catalogue" => scenario_catalogue::run(rest),
+        "migrate" => migrate::run(rest),
         "packs" => packs::run_packs(rest),
         "feel-tests" => packs::run_feel_tests(rest),
         _ => {

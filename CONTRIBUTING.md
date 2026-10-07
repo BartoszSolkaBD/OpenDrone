@@ -23,6 +23,7 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   ```
 
 - A change that moves a flight updates the Scenarios' Results files: run `cargo scenarios run` and commit them. [Reading a Scenario and its Results](docs/verification/reading-a-scenario.md) explains both.
+- A change that adds a starting-state item, or changes how a Pack file is written, adds a format migration step and runs it over every file with `cargo xtask migrate <step>`: see [Changing a file format](docs/format-migration.md).
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
 - The docs in [`docs/`](docs/README.md) also make the docs site, an mdBook ([`book.toml`](book.toml)). Every page under `docs/` must be listed in [`docs/SUMMARY.md`](docs/SUMMARY.md), its table of contents. `cargo xtask book` builds it into `target/book`, and `mdbook serve` shows it while you edit, without rustdoc.
