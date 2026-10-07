@@ -1,0 +1,51 @@
+# A small fixture Scenario for the readable checks of the Scenario catalogue
+# (crates/xtask/tests/scenario_catalogue.rs): #11's sample, in the format the
+# Scenario runner reads. Nothing runs it.
+format = 1
+name   = "Full right roll reaches the max rate"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "70 / 670 / 0"     # centre °/s, max °/s, expo
+pitch              = "70 / 670 / 0"
+yaw                = "70 / 670 / 0"
+limit              = "1998 °/s"
+throttle           = "mid 50%, hover 50%, expo 0, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   throttle = "50%" },
+  { at = "1.0 s", roll = "+100%" },
+  { at = "1.3 s", roll = "0%" },
+]
+
+[[expect]]
+what  = "roll rate"
+at    = "1.25 s"
+value = "670 °/s ± 3%"
+basis = "source: Betaflight Actual rates, full stick gives the max rate"
+
+[[expect]]
+what = "roll"
+over = "1.0 s to 1.3 s"
+mean = "between 80° and 110°"
+basis = "observed: what the sim did when this was written"
