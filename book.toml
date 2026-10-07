@@ -1,0 +1,42 @@
+# The docs site: one mdBook made from docs/, so every page has one copy and
+# agents keep reading the same files (#15 §11). docs/SUMMARY.md is its table
+# of contents.
+#
+# Build and check it with `cargo xtask book`, which also builds rustdoc for
+# every crate under api/ and checks every link. CI runs that on every PR, and
+# the Pages workflow publishes it from main. `mdbook serve` shows the book
+# while you edit it, without rustdoc.
+
+[book]
+title = "OpenDrone"
+description = "An open-source FPV drone flight simulator with physics faithful to real quads."
+authors = ["OpenDrone contributors"]
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "target/book"
+# A page listed in SUMMARY.md that doesn't exist stops the build, rather than
+# being made empty.
+create-missing = false
+
+[preprocessor.opendrone]
+# Makes the docs' links work in the book, shows CONTEXT.md and the other files
+# from outside docs/, and makes the Scenario catalogue, the Feel Test logs and
+# the list of crates (crates/xtask/src/book/preprocessor.rs).
+command = "cargo xtask book-preprocessor"
+after = ["index", "links"]
+# The mdBook version the book is built with. CI installs exactly this one, and
+# `cargo xtask book` checks it.
+mdbook-version = "0.5.4"
+
+[output.html]
+git-repository-url = "https://github.com/BartoszSolkaBD/OpenDrone"
+site-url = "/OpenDrone/"
+# ADRs and research notes carry their own names, so mdBook's chapter numbers
+# would only get in the way.
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 0

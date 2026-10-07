@@ -1,0 +1,50 @@
+# A small fixture Scenario for the readable checks of the Scenario catalogue
+# (crates/xtask/tests/scenario_catalogue.rs), in the format the Scenario
+# runner reads, with a Source and an Observed Expectation. Its numbers are
+# made up for the check: the catalogue only reads it, and nothing runs it.
+format = 1
+name   = "A slow yaw keeps its rate"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "roll 0 °/s, pitch 0 °/s, yaw 90 °/s"
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.5 s"
+value = "90 °/s ± 3%"
+basis = "source: a made-up reference, for this fixture only"
+
+[[expect]]
+what    = "heading"
+over    = "0 s to 0.5 s"
+final   = "between 40° and 50°"
+basis   = "observed: what a made-up run did, for this fixture only"

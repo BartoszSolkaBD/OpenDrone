@@ -1,0 +1,50 @@
+# A small fixture Scenario for the readable checks of the Scenario catalogue
+# (crates/xtask/tests/scenario_catalogue.rs), in the format the Scenario
+# runner reads: two Expectations from scenarios/physics/free-fall-is-exactly-g.toml.
+# The catalogue only reads it; nothing runs it.
+format = 1
+name   = "Free fall is exactly g"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what   = "vertical acceleration"
+over   = "0 s to 1 s"
+lowest = "-9.81 m/s² ± 0.00001 m/s²"
+basis  = "rule: with no drag and no thrust, gravity is the only force, so the acceleration is the Map's gravity"
+
+[[expect]]
+what  = "vertical speed"
+at    = "1 s"
+value = "-9.81 m/s ± 0.00001 m/s"
+basis = "rule: speed = g × t = 9.81 m/s² × 1 s, downward"
