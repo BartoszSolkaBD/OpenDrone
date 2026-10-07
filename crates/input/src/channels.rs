@@ -5,8 +5,10 @@
 //! Controller. Calibrated full stick lands at 988 and 2012 µs and centre at
 //! 1500 µs, exactly where ELRS puts ±100 % and centre (#19 §3). They keep the
 //! device's full resolution: nothing is rounded here, so each of the
-//! Pocket's 2049 stick steps and the DualSense's 256 stays its own value. The
-//! Radio Link rounds them to the receiver's steps.
+//! Pocket's 2049 stick steps and the DualSense's 256 stays its own value.
+//! Flight Inputs enter the Simulation as exact whole numbers (#12,
+//! ADR-0003), so the game rounds these when it turns them into Flight Inputs
+//! (#62), in a unit finer than 1 µs: the Pocket's steps are 0.5 µs apart.
 
 use crate::controls::Position;
 use crate::profile::{

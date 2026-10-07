@@ -131,6 +131,7 @@ impl Trace {
                     usb_product: u16::from_str_radix(product, 16).unwrap(),
                     sdl_gamepad: field("sdl_gamepad") == "true",
                     connection: (field("bus") == "USB").then_some(Connection::Usb),
+                    heartbeat: field("heartbeat") == "true",
                 });
             } else if let Some(list) = line.strip_prefix("# axes at start: ") {
                 axes = list.split(',').map(|v| v.parse().unwrap()).collect();

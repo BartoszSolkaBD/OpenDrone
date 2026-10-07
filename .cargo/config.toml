@@ -4,3 +4,10 @@ xtask = "run --quiet --package xtask --"
 # `cargo scenarios <command>` runs the Scenario runner in crates/scenario:
 # `run` writes Results, `check` is what CI runs, `agree` compares OSes.
 scenarios = "run --quiet --package opendrone-scenario --"
+
+[env]
+# SDL's source build on Linux leaves out libusb and D-Bus, whatever headers
+# the machine has (crates/input/sdl-linux.cmake, ADR-0014). The cmake crate
+# that builds SDL reads this file's name for Linux targets only.
+CMAKE_TOOLCHAIN_FILE_x86_64_unknown_linux_gnu = { value = "crates/input/sdl-linux.cmake", relative = true }
+CMAKE_TOOLCHAIN_FILE_aarch64_unknown_linux_gnu = { value = "crates/input/sdl-linux.cmake", relative = true }

@@ -25,6 +25,7 @@ fn dualsense() -> DeviceInfo {
         usb_product: 0x0CE6,
         sdl_gamepad: true,
         connection: None,
+        heartbeat: false,
     }
 }
 
@@ -213,4 +214,49 @@ fn key_names_are_letters_digits_function_keys_and_a_few_named_keys() {
     for name in ["a", "F0", "F13", "F01", "Spacebar", ""] {
         assert!(Key::named(name).is_none(), "{name}");
     }
+}
+
+fn plugged_in_holding(button: PadButton) -> Inputs {
+    let mut inputs = Inputs::new(built_in_profiles());
+    let mut state = DeviceState::new(6, 13, true);
+    state.pad.as_mut().unwrap().buttons[button.index()] = true;
+    inputs.take(Batch {
+        at: Duration::ZERO,
+        events: vec![Raw::Added {
+            device: PAD,
+            info: dualsense(),
+            state,
+        }],
+    });
+    inputs
+}
+
+#[test]
+fn a_button_held_while_the_device_is_plugged_in_isnt_a_press() {
+    // A switch moves only when its button moves into the bound position.
+    let mut inputs = plugged_in_holding(PadButton::RightShoulder);
+    assert_eq!(now(&inputs).arm, Some(LOW_US));
+    button(&mut inputs, PadButton::RightShoulder, false, 10);
+    assert_eq!(now(&inputs).arm, Some(LOW_US));
+    button(&mut inputs, PadButton::RightShoulder, true, 20);
+    assert_eq!(now(&inputs).arm, Some(HIGH_US), "the first real press arms");
+}
+
+#[test]
+fn a_held_crash_flip_button_is_on_from_the_moment_it_is_plugged_in() {
+    let inputs = plugged_in_holding(PadButton::LeftShoulder);
+    assert_eq!(now(&inputs).crash_flip, Some(HIGH_US));
+}
+
+#[test]
+fn rebinding_arm_to_a_button_already_held_isnt_a_press() {
+    let mut inputs = plugged_in_holding(PadButton::South);
+    let copy = with_switches(|s| {
+        s.arm = Some(OnOffSwitch::Virtual {
+            source: Press::Button(PadButton::South),
+            style: PressStyle::Toggle,
+        });
+    });
+    inputs.set_copy(dualsense().model(), Some(copy), Duration::from_millis(5));
+    assert_eq!(now(&inputs).arm, Some(LOW_US));
 }

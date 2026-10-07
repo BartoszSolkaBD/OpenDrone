@@ -217,6 +217,20 @@ fn a_stick_sweeping_past_centre_isnt_a_rest() {
 }
 
 #[test]
+fn a_thumb_held_still_off_centre_between_flicks_isnt_a_rest() {
+    // Three flicks, each let go to 3212, then a thumb held still at 12000
+    // (about 37 % of travel) for 200 ms, then let go again. Only values
+    // within a quarter of the travel count as rests, so the centre stays
+    // where the stick really rests (#19 §3).
+    let mut values = flicks(3, 32767, 3212);
+    values.push((secs(0.9), 12000));
+    values.push((secs(1.1), 3212));
+    let rests = rests_after_flicks(&values, secs(1.4)).unwrap();
+    assert!(!rests.contains(&12000), "{rests:?}");
+    assert_eq!(centre_and_deadband(&rests), Some((3212.0, 257.0)));
+}
+
+#[test]
 fn gamepad_ends_that_stop_short_are_stretched_to_full_stick() {
     // A pad whose stick only reaches 90 % each way still gives full stick.
     let calibration = gamepad_stick(0.0, 0.0, Some((-29491, 29490)));

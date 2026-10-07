@@ -336,6 +336,7 @@ fn open(which: SDL_JoystickID) -> Option<(Opened, Raw)> {
         let axes = usize::try_from(SDL_GetNumJoystickAxes(joystick)).unwrap_or(0);
         let buttons = usize::try_from(SDL_GetNumJoystickButtons(joystick)).unwrap_or(0);
         let mut state = DeviceState::new(axes, buttons, !gamepad.is_null());
+        let mut heartbeat = false;
         for (i, value) in state.axes.iter_mut().enumerate() {
             *value = SDL_GetJoystickAxis(joystick, c_int::try_from(i).unwrap_or(0));
         }
@@ -355,10 +356,10 @@ fn open(which: SDL_JoystickID) -> Option<(Opened, Raw)> {
             }
             state.pad = Some(pad);
             // The motion sensors are the heartbeat of a pad that reports at
-            // rest (#27); their readings themselves aren't used.
-            if SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO) {
-                SDL_SetGamepadSensorEnabled(gamepad, SDL_SENSOR_GYRO, true);
-            }
+            // rest (#27); their readings themselves aren't used. Only a
+            // heartbeat that really switched on lets silence count as lost.
+            heartbeat = SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO)
+                && SDL_SetGamepadSensorEnabled(gamepad, SDL_SENSOR_GYRO, true);
         }
         let info = DeviceInfo {
             name: text(SDL_GetJoystickName(joystick)),
@@ -366,6 +367,7 @@ fn open(which: SDL_JoystickID) -> Option<(Opened, Raw)> {
             usb_product: SDL_GetJoystickProduct(joystick),
             sdl_gamepad: !gamepad.is_null(),
             connection: connection(joystick),
+            heartbeat,
         };
         Some((
             device,

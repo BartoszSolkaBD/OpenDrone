@@ -20,6 +20,12 @@ pub struct DeviceInfo {
     pub sdl_gamepad: bool,
     /// USB or Bluetooth, when SDL can tell.
     pub connection: Option<Connection>,
+    /// Whether the input thread switched on a heartbeat: a report that
+    /// arrives even while the sticks rest, such as a DualSense's motion
+    /// sensors (#27). Without one, a device counts as lost only when
+    /// unplugged, whatever its profile says, so a resting pad whose sensors
+    /// didn't start never trips Failsafe.
+    pub heartbeat: bool,
 }
 
 impl DeviceInfo {

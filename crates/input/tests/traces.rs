@@ -525,8 +525,12 @@ fn full_travel_throttle_reads_half_at_rest_and_none_at_the_bottom() {
 }
 
 /// The moments the Pocket's stick channels changed, through `Inputs`.
-fn stick_changes(batches: Vec<Batch>) -> Vec<Duration> {
+/// Plays a Pocket's batches through `Inputs`, and returns what the game
+/// would read from the device for its RF-on warning, after every batch, with
+/// the moments the Channels changed.
+fn transmitting(batches: Vec<Batch>) -> (Vec<Transmitting>, Vec<Duration>) {
     let mut inputs = Inputs::new(common::built_in_profiles());
+    let mut verdicts = Vec::new();
     let mut changes = Vec::new();
     for batch in batches {
         for event in inputs.take(batch) {
@@ -534,8 +538,9 @@ fn stick_changes(batches: Vec<Batch>) -> Vec<Duration> {
                 changes.push(at);
             }
         }
+        verdicts.push(inputs.devices()[0].transmitting());
     }
-    changes
+    (verdicts, changes)
 }
 
 #[test]
@@ -545,12 +550,25 @@ fn a_pocket_with_rf_off_isnt_transmitting_in_every_recording() {
         "pocket-adc-filter-off-30.csv",
         "pocket-adc-filter-on-30.csv",
     ] {
-        let changes = stick_changes(Trace::read(name).batches());
-        let verdict = still_transmitting(&changes);
+        // What the game reads: the device's own verdict, from its last 200
+        // stick changes, never says RF is on.
+        let (verdicts, changes) = transmitting(Trace::read(name).batches());
         assert!(
-            matches!(verdict, Transmitting::No { closest } if closest < Duration::from_millis(2)),
-            "{name}: {verdict:?}"
+            !verdicts
+                .iter()
+                .any(|v| matches!(v, Transmitting::Yes { .. })),
+            "{name}"
         );
+        let last = verdicts.last().unwrap();
+        assert!(
+            matches!(last, Transmitting::No { closest } if *closest < Duration::from_millis(2)),
+            "{name}: {last:?}"
+        );
+        // The plain function on every change agrees.
+        assert!(matches!(
+            still_transmitting(&changes),
+            Transmitting::No { .. }
+        ));
     }
 }
 
@@ -605,13 +623,24 @@ fn as_if_rf_on_at_250_hz(trace: &Trace) -> Vec<Batch> {
 #[test]
 fn a_pocket_sending_once_per_250_hz_packet_counts_as_still_transmitting() {
     let trace = Trace::read("pocket-adc-filter-off-30.csv");
-    let changes = stick_changes(as_if_rf_on_at_250_hz(&trace));
+    let (verdicts, changes) = transmitting(as_if_rf_on_at_250_hz(&trace));
     assert!(changes.len() > 300, "{} changes", changes.len());
-    let verdict = still_transmitting(&changes);
+    // What the game reads from the device for its RF-on warning: never "No",
+    // and "Yes" once the sticks have moved enough to tell.
     assert!(
-        matches!(verdict, Transmitting::Yes { closest } if closest > Duration::from_millis(3)),
-        "{verdict:?}"
+        !verdicts
+            .iter()
+            .any(|v| matches!(v, Transmitting::No { .. }))
     );
+    let last = verdicts.last().unwrap();
+    assert!(
+        matches!(last, Transmitting::Yes { closest } if *closest > Duration::from_millis(3)),
+        "{last:?}"
+    );
+    assert!(matches!(
+        still_transmitting(&changes),
+        Transmitting::Yes { .. }
+    ));
 }
 
 #[test]
@@ -621,4 +650,26 @@ fn the_dualsense_is_found_as_a_gamepad_with_its_own_profile() {
     assert_eq!(device.kind(), opendrone_input::Kind::Gamepad);
     assert_eq!(device.profile().unwrap().id, "opendrone/dualsense");
     assert!(!device.calibrated());
+}
+
+#[test]
+fn a_dualsense_whose_motion_sensors_didnt_start_is_never_lost_for_silence() {
+    // If SDL couldn't switch the gyro on, silence proves nothing: a resting
+    // pad must never trip Failsafe. It counts as reporting only changes.
+    let mut trace = Trace::read("dualsense-at-rest-27.csv");
+    trace.device.heartbeat = false;
+    let mut inputs = Inputs::new(common::built_in_profiles());
+    let batches = trace.batches();
+    let cut = batches[0].at + Duration::from_secs(2);
+    let before: Vec<Batch> = batches.into_iter().filter(|b| b.at < cut).collect();
+    let last_heard = before.last().unwrap().at;
+    replay(&mut inputs, before);
+    assert!(
+        inputs
+            .check_silence(last_heard + Duration::from_secs(5))
+            .is_empty()
+    );
+    let device = &inputs.devices()[0];
+    assert!(!device.lost_when_silent());
+    assert!(device.heartbeat_missing(), "the game can log it");
 }

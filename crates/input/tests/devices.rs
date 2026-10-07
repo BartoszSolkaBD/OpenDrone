@@ -24,6 +24,7 @@ fn device(name: &str, vendor: u16, product: u16, gamepad: bool) -> DeviceInfo {
         usb_product: product,
         sdl_gamepad: gamepad,
         connection: Some(Connection::Usb),
+        heartbeat: gamepad,
     }
 }
 

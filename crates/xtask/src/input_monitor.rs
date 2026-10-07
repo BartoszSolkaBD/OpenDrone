@@ -77,7 +77,9 @@ pub fn run(args: &[String]) -> ExitCode {
     let mut said_none = false;
     let mut last_shown = Instant::now();
     let mut polls_then = thread.polls();
-    let mut changes = vec![0u32; 0];
+    let mut changes: Vec<u32> = Vec::new();
+    // When each device's Channels last changed, on the input thread's clock.
+    let mut last_change: Vec<Option<Duration>> = Vec::new();
     loop {
         let mut events = Vec::new();
         for batch in thread.batches() {
@@ -86,12 +88,14 @@ pub fn run(args: &[String]) -> ExitCode {
         events.extend(inputs.check_silence(thread.now()));
         for event in &events {
             match event {
-                InputEvent::Channels { device, .. } => {
+                InputEvent::Channels { device, at, .. } => {
                     let index = device.0 as usize;
                     if changes.len() <= index {
                         changes.resize(index + 1, 0);
+                        last_change.resize(index + 1, None);
                     }
                     changes[index] += 1;
+                    last_change[index] = Some(*at);
                 }
                 other => println!("{}", happened(&inputs, other)),
             }
@@ -113,8 +117,10 @@ pub fn run(args: &[String]) -> ExitCode {
             let seconds = last_shown.elapsed().as_secs_f64();
             let polls = thread.polls();
             for device in &connected {
-                let count = changes.get(device.id().0 as usize).copied().unwrap_or(0);
-                println!("{}", live_line(device, f64::from(count) / seconds));
+                let index = device.id().0 as usize;
+                let count = changes.get(index).copied().unwrap_or(0);
+                let last = last_change.get(index).copied().flatten();
+                println!("{}", live_line(device, last, f64::from(count) / seconds));
             }
             if !connected.is_empty() {
                 println!(
@@ -167,8 +173,17 @@ fn happened(inputs: &Inputs, event: &InputEvent) -> String {
                     }
                 )
             });
+            let heartbeat = match inputs.device(*device) {
+                Some(d) if d.lost_when_silent() => {
+                    "; it reports at rest, so 1 s of silence counts as lost"
+                }
+                Some(d) if d.heartbeat_missing() => {
+                    "; its profile says it reports at rest, but its motion sensors didn't switch on, so it counts as lost only when unplugged"
+                }
+                _ => "",
+            };
             format!(
-                "[{:>9.3} s] Found {name}{ids}: a {}, on the profile {}",
+                "[{:>9.3} s] Found {name}{ids}: a {}, on the profile {}{heartbeat}",
                 at.as_secs_f64(),
                 kind.word(),
                 profile.as_deref().unwrap_or("(none fits)")
@@ -190,9 +205,9 @@ fn happened(inputs: &Inputs, event: &InputEvent) -> String {
     }
 }
 
-/// One device's Channels now, its raw sticks and buttons, and how often its
-/// Channels changed.
-fn live_line(device: &Device, changes_a_second: f64) -> String {
+/// One device's Channels now, when they last changed, its raw sticks and
+/// buttons, and how often its Channels changed.
+fn live_line(device: &Device, last_change: Option<Duration>, changes_a_second: f64) -> String {
     let c = device.channels();
     let state = device.state();
     let raw = match &state.pad {
@@ -228,8 +243,12 @@ fn live_line(device: &Device, changes_a_second: f64) -> String {
         (Kind::Radio, Transmitting::No { .. }) => "; not transmitting".to_string(),
         _ => String::new(),
     };
+    let stamp = last_change.map_or_else(
+        || "unchanged since it was found".to_string(),
+        |at| format!("last changed at {:.3} s", at.as_secs_f64()),
+    );
     format!(
-        "  {}{}: {}\n    {}; Channels changed {:.0} times a second{}{}",
+        "  {}{}: {}\n    Channels {stamp}; {}; Channels changed {:.0} times a second{}{}",
         device.info().name,
         if device.calibrated() {
             ""

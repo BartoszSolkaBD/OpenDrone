@@ -266,7 +266,8 @@ pub fn rests_after_flicks(
             let_go_since_flick = true;
         }
         let until = values.get(i + 1).map_or(end, |&(next, _)| next);
-        if let_go_since_flick && until.saturating_sub(at) >= REST_HOLD {
+        // A thumb held still further out isn't a rest, however long it holds.
+        if let_go_since_flick && v.abs() < LET_GO && until.saturating_sub(at) >= REST_HOLD {
             rests.push(value);
         }
     }

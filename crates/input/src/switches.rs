@@ -62,6 +62,29 @@ impl VirtualSwitches {
         before != (self.arm, self.crash_flip, self.flight_mode_step)
     }
 
+    /// Takes note of which bound buttons and keys are already held, without
+    /// counting them as presses: when a device is plugged in, or its switches
+    /// change. A switch moves only when its button moves into the bound
+    /// position, so a button held while plugging in arms nothing. A held
+    /// switch is on while its button is held, from the start.
+    pub fn seed(&mut self, switches: &Switches, is_held: impl Fn(&Press) -> bool) {
+        if let Some(OnOffSwitch::Virtual {
+            source,
+            style: PressStyle::Hold,
+        }) = &switches.arm
+        {
+            self.arm = is_held(source);
+        }
+        if let Some(OnOffSwitch::Virtual {
+            source,
+            style: PressStyle::Hold,
+        }) = &switches.crash_flip
+        {
+            self.crash_flip = is_held(source);
+        }
+        self.held = sources(switches).filter(|s| is_held(s)).collect();
+    }
+
     /// The game reports a disarm: an Arm toggle turns itself off. Returns
     /// whether it was on.
     pub fn disarmed(&mut self) -> bool {

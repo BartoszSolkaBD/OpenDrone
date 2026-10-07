@@ -2,12 +2,13 @@
 # Trimmed from the SDL3 input probe run dualsense-usb-sensors-20261004-165521 (#27), recorded by the
 # maintainer on the dev Mac (M4, macOS 26.6.2, SDL 3.4.18) on 2026-10-04: the
 # branch prototype/sdl3-input-probe, prototypes/sdl3-input-probe/results/.
-# Kept: 74.9 s to 84.2 s of the run; accelerometer readings
-# dropped; each gyro reading kept is a "report" (the device is still there).
+# Kept: 74.9 s to 84.2 s of the run.
+# Accelerometer readings dropped; each gyro reading kept is a "report": the
+# DualSense's heartbeat, proof it is still there.
 # Columns: when the input thread read it (ns since the probe started), the probe's
 # step, what changed (axis, button, hat, report, added, removed), its index, its value.
 # SDL joystick events: the DualSense's are in SDL's gamepad order (HIDAPI driver).
-# device: name = DualSense Wireless Controller; usb = 054C:0CE6; sdl_gamepad = true; bus = USB
+# device: name = DualSense Wireless Controller; usb = 054C:0CE6; sdl_gamepad = true; bus = USB; heartbeat = true
 # axes at start: 899,128,3212,-1157,-32768,-32768
 # buttons down at start: 
 # hat at start: 0

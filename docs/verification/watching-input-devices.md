@@ -20,9 +20,10 @@ No Input Device is connected. Plug in a Radio or a Gamepad; the monitor keeps wa
 
 ## What it shows
 
-- **When a device comes or goes**, one line each, stamped with the input thread's clock: found (its name, USB ids, kind and the profile it got), lost (unplugged, or silent for 1 s for a device that reports at rest) and back.
+- **When a device comes or goes**, one line each, stamped with the input thread's clock: found (its name, USB ids, kind and the profile it got), lost (unplugged, or silent for 1 s for a device that reports at rest) and back. The found line also says whether 1 s of silence counts as lost. A device whose profile says it reports at rest, but whose motion sensors didn't switch on, is lost only when unplugged, and the line says so.
 - **Every half second, each device:**
   - its Channels in µs: roll, pitch, throttle and yaw, then AUX1 (Arm), AUX2 (Flight Mode) and AUX3 (Crash Flip). Full stick is 988 and 2012 µs, centre 1500 µs; a switch with no source shows "none";
+  - when its Channels last changed, in seconds on the input thread's clock: the stamp the game turns into Simulation Time;
   - its raw values as SDL reports them: a Radio's axes and the button channels held (CH9 and up), or a Gamepad's sticks, triggers and buttons by SDL's position names;
   - how many times a second its Channels changed;
   - for a Radio, whether it seems to still transmit: no two value changes closer than 3 ms while the sticks move means RF is on ([#30](https://github.com/BartoszSolkaBD/OpenDrone/issues/30)).
@@ -45,7 +46,7 @@ The monitor flies on each profile's starting values: it doesn't calibrate, and i
 - It's found as a Gamepad on `opendrone/dualsense`.
 - R1 toggles AUX1 on and off; L1 holds AUX3 on only while held.
 - Left on the desk, the right stick's flicker shows in roll: about 1522–1526 µs, because the Pack's starting deadband of 5 % is narrower than how far its stick rests off centre. Setup's Calibration removes it.
-- It keeps reporting at rest through its motion sensors, so it's never lost while it rests. Its Channels change at most about 250 times a second.
+- It keeps reporting at rest through its motion sensors, so it's never lost while it rests, and its found line says 1 s of silence counts as lost. Its Channels change at most about 250 times a second.
 
 ## Recordings instead of devices
 

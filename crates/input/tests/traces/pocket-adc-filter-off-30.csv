@@ -2,15 +2,12 @@
 # Trimmed from the SDL3 input probe run pocket-sim-filter-off-20261004-194512 (#30), recorded by the
 # maintainer on the dev Mac (M4, macOS 26.6.2, SDL 3.4.18) on 2026-10-04: the
 # branch prototype/sdl3-input-probe, prototypes/sdl3-input-probe/results/.
-# Kept: 40.4 s to 42.5 s of the run, no motion-sensor readings; accelerometer readings
-# dropped; each gyro reading kept is a "report" (the device is still there).
+# Kept: 40.4 s to 42.5 s of the run.
 # Columns: when the input thread read it (ns since the probe started), the probe's
-# step, what changed (axis, button, hat, report, added, removed), its index, its value.
-# SDL joystick events: the DualSense's are in SDL's gamepad order (HIDAPI driver).
-# device: name = EdgeTX Radiomaster Pocket Joystick; usb = 1209:4F54; sdl_gamepad = false; bus = USB
+# step, what changed (axis, button, added, removed), its index, its value.
+# device: name = EdgeTX Radiomaster Pocket Joystick; usb = 1209:4F54; sdl_gamepad = false; bus = USB; heartbeat = false
 # axes at start: 15,15,-32703,15,-32768,-32768,-32768,-32768
 # buttons down at start: 
-# hat at start: 0
 t_rx_ns,step,kind,index,value
 40400745083,get-ready,axis,2,-32768
 40401831625,get-ready,axis,2,-32703

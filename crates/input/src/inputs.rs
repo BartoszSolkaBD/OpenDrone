@@ -127,8 +127,11 @@ impl Device {
         self.channels
     }
 
-    /// The Actions whose control is in its bound position right now. The
-    /// game fires an Action once, when its control moves into that position.
+    /// The Actions whose control is in its bound position right now: only a
+    /// lookup of the profile's `[actions]` against the device's values. Input
+    /// knows no Actions beyond that (ADR-0003): the game fires an Action once,
+    /// when its control moves into that position, and may take this lookup
+    /// over in #62.
     pub fn actions_held(&self) -> Vec<Action> {
         let Some(profile) = &self.profile else {
             return Vec::new();
@@ -156,6 +159,28 @@ impl Device {
     pub fn transmitting(&self) -> Transmitting {
         let changes: Vec<Duration> = self.stick_changes.iter().copied().collect();
         still_transmitting(&changes)
+    }
+
+    /// Whether silence for [`SILENT_FOR`] counts as lost: its profile says
+    /// it reports at rest over this connection, and its heartbeat really
+    /// switched on. A pad whose motion sensors didn't start counts as
+    /// reporting only changes, so it's lost only when unplugged.
+    pub fn lost_when_silent(&self) -> bool {
+        self.info.heartbeat
+            && self
+                .profile
+                .as_ref()
+                .is_some_and(|p| p.reports_at_rest(self.info.connection))
+    }
+
+    /// The profile says this device reports at rest, but its heartbeat didn't
+    /// switch on: the game should log it.
+    pub fn heartbeat_missing(&self) -> bool {
+        !self.info.heartbeat
+            && self
+                .profile
+                .as_ref()
+                .is_some_and(|p| p.reports_at_rest(self.info.connection))
     }
 
     fn connected(&self) -> bool {
@@ -225,6 +250,7 @@ impl Inputs {
             let device = &mut self.devices[id.0 as usize];
             device.profile = profile;
             device.calibrated = calibrated;
+            self.seed(id);
             self.refresh(id, at, &mut events);
         }
         events
@@ -298,13 +324,9 @@ impl Inputs {
     pub fn check_silence(&mut self, now: Duration) -> Vec<InputEvent> {
         let mut events = Vec::new();
         for device in &mut self.devices {
-            let reports_at_rest = device
-                .profile
-                .as_ref()
-                .is_some_and(|p| p.reports_at_rest(device.info.connection));
             if device.connected()
                 && device.lost.is_none()
-                && reports_at_rest
+                && device.lost_when_silent()
                 && now.saturating_sub(device.last_heard) >= SILENT_FOR
             {
                 device.lost = Some(Lost::Silent);
@@ -397,6 +419,7 @@ impl Inputs {
             device.state = state;
             device.lost = None;
             device.last_heard = at;
+            self.seed(id);
             events.push(InputEvent::Back { device: id, at });
             return id;
         }
@@ -410,7 +433,7 @@ impl Inputs {
                 .map_or_else(|| kind_of(&info), InputDeviceProfile::kind),
             profile: profile.as_ref().map(|p| p.id.clone()),
         });
-        let mut device = Device {
+        self.devices.push(Device {
             id,
             info,
             sdl: Some(sdl),
@@ -422,7 +445,9 @@ impl Inputs {
             lost: None,
             last_heard: at,
             stick_changes: VecDeque::new(),
-        };
+        });
+        self.seed(id);
+        let device = &mut self.devices[id.0 as usize];
         if let Some(profile) = &device.profile {
             device.channels = channels(&profile.setup, &device.state, &device.virtuals);
         }
@@ -431,8 +456,24 @@ impl Inputs {
             at,
             channels: device.channels,
         });
-        self.devices.push(device);
         id
+    }
+
+    /// Notes which of a device's bound buttons and keys are already held,
+    /// so they don't count as presses.
+    fn seed(&mut self, id: DeviceId) {
+        let flying = self.flying == Some(id);
+        let keys = &self.keys_held;
+        let Some(device) = self.devices.get_mut(id.0 as usize) else {
+            return;
+        };
+        let Some(profile) = &device.profile else {
+            return;
+        };
+        let state = &device.state;
+        device.virtuals.seed(profile.setup.switches(), |press| {
+            held(press, state, flying, keys)
+        });
     }
 
     /// Works a device's Channels out again, and hands them over if they
@@ -450,12 +491,9 @@ impl Inputs {
             return;
         };
         let state = &device.state;
-        device
-            .virtuals
-            .update(profile.setup.switches(), |press| match press {
-                Press::Button(button) => state.pad.as_ref().is_some_and(|pad| pad.button(*button)),
-                Press::Key(key) => flying && keys.contains(key),
-            });
+        device.virtuals.update(profile.setup.switches(), |press| {
+            held(press, state, flying, keys)
+        });
         let new = channels(&profile.setup, state, &device.virtuals);
         let old = device.channels;
         if new == old {
@@ -475,5 +513,14 @@ impl Inputs {
             at,
             channels: new,
         });
+    }
+}
+
+/// Whether a Virtual Switch's button or key is held: a button on this
+/// device, or a key while this is the Flying Input Device.
+fn held(press: &Press, state: &DeviceState, flying: bool, keys: &[Key]) -> bool {
+    match press {
+        Press::Button(button) => state.pad.as_ref().is_some_and(|pad| pad.button(*button)),
+        Press::Key(key) => flying && keys.contains(key),
     }
 }
