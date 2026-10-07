@@ -255,9 +255,10 @@ impl Solid {
                 {
                     return Err(MapShapeProblem::MeshCornerMissing);
                 }
-                // No pre-processing flags: parry3d's "pseudo-normals" for
-                // internal edges are worked out with std's `acos`, which can
-                // differ from one operating system to another (ADR-0001).
+                // No pre-processing flags. parry3d's fix for internal edges
+                // (smoother sliding over the seams between triangles) refuses
+                // a mesh that isn't closed and consistently wound, which a
+                // Map's `.glb` may not be; the Map ticket (#63) can decide.
                 let mesh = TriMesh::new(
                     corners.iter().map(|c| to_parry(*c)).collect(),
                     triangles.clone(),
