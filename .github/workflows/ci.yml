@@ -57,6 +57,14 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
+      - name: Install the Linux packages SDL's source build needs
+        # opendrone-input builds SDL 3.4 from source with CMake (preinstalled
+        # on every runner) as a no-window console build, so no X11 or Wayland
+        # headers (ADR-0018). libudev's headers let SDL notice Input Devices
+        # being plugged in and out through udev.
+        if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
       - name: Reuse the build cache
         if: steps.changes.outputs.rust == 'true'
         uses: Swatinem/rust-cache@v2
@@ -236,6 +244,11 @@ jobs:
       - name: Install the pinned Rust (rust-toolchain.toml)
         shell: bash
         run: rustup toolchain install
+
+      - name: Install the Linux packages SDL's source build needs
+        # rustdoc builds opendrone-input, which builds SDL 3.4 from source
+        # (ADR-0018), as the Rust job does.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
 
       - name: Reuse the build cache
         uses: Swatinem/rust-cache@v2
