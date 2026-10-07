@@ -1,0 +1,62 @@
+# The Freestyle 5″ flies level at 30 m/s straight at the 3 cm rebar stub on
+# the Thin rail Test Map, which stands 2 m tall at 3 m east, 10 m north. Its
+# front prop discs (solid until Prop Strikes, #45) meet it first: the stub is
+# just wider than the 29.5 mm gap between them. Proves the thin-rail half of
+# E29 in #10 with the 5″'s prop discs (#26 §6).
+format = 1
+name   = "A 5-inch at 30 m/s never passes through a 3 cm rebar stub"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "test/thin-rail"
+position          = "2 m east, 10 m north, 1 m up"
+attitude          = "level, heading 90°"
+speed             = "30 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 0.25 s"
+highest = "between 2 m and 2.985 m"
+basis   = "rule: the stub's near side is 3 m - 1.5 cm = 2.985 m east, and the 5-inch's centre of mass is inside its shape, so its centre can't reach 2.985 m without part of the Quad passing through the stub; in 0.25 s it can't go round the 2 m stub"
+
+[[expect]]
+what  = "speed east"
+at    = "0.1 s"
+value = "0 m/s ± 0.5 m/s"
+basis = "observed: its prop discs wedge on the stub and stop it dead, tipping it nose down"
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.05 s"
+value = "-980 °/s ± 50 °/s"
+basis = "observed: the stub stops it below its centre of mass, so it tips nose down over the stub at nearly 1,000 °/s"

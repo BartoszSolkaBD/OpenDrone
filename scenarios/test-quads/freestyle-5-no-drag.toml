@@ -1,0 +1,15 @@
+# The Freestyle 5″ with every kind of drag set to zero.    id: test/freestyle-5-no-drag
+#
+# A Test Quad lists only what it changes, so any other change to the
+# Freestyle 5″ carries into it. Only the Scenario runner reads Test Quads;
+# pilots never fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "No drag of any kind, so its crashes and landings follow the collision rules alone"
+
+# Deliberate test values: no Confidence or source.
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0 s⁻¹"

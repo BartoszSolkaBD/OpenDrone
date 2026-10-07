@@ -1,0 +1,67 @@
+# The Whoop 65 is thrown straight up at 8 m/s from 1 m up on the Floor and
+# ceiling Test Map, whose floor and ceiling are triangle meshes, as a Map's
+# `.glb` gives them. It hits the ceiling, 3.1 m up, falls back to the floor,
+# bounces and settles. Shows E29 in #10 against triangle meshes.
+format = 1
+name   = "A whoop thrown into a ceiling"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/floor-and-ceiling"
+position          = "0 m east, 0 m north, 1 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s east, 0 m/s north, 8 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what    = "height"
+over    = "0 s to 3 s"
+highest = "between 3 m and 3.0851 m"
+basis   = "rule: the ceiling is 3.1 m up and the whoop's duct rings reach 15 mm above its centre, so its centre can't rise above 3.085 m (the physics lets a part sit at most 0.1 mm inside a surface)"
+
+[[expect]]
+what    = "height"
+over    = "0 s to 3 s"
+lowest  = "between 0.0099 m and 1 m"
+basis   = "rule: nothing of the whoop reaches lower than its body box, 10 mm below its centre, so the floor keeps its centre at least 0.01 m up (the physics lets a part sit at most 0.1 mm inside a surface); the top of the range only says it came back down"
+
+[[expect]]
+what  = "vertical speed"
+at    = "0.4 s"
+value = "-2.17 m/s ± 0.05 m/s"
+basis = "observed: it hits the ceiling at 0.326 s at 4.81 m/s and comes off it at its bounce times that, 1.44 m/s, then falls for 0.074 s more: -1.44 - 9.81 × 0.074 = -2.17 m/s"
+
+[[expect]]
+what    = "speed"
+over    = "2.5 s to 3 s"
+highest = "0 m/s ± 0.000001 m/s"
+basis   = "observed: it has settled on the floor"

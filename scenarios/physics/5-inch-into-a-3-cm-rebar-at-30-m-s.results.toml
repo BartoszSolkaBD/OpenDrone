@@ -1,0 +1,46 @@
+# Results of 5-inch-into-a-3-cm-rebar-at-30-m-s.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch at 30 m/s never passes through a 3 cm rebar stub"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.25 s"
+basis    = "Rule"
+expected = "between 2 m and 2.985 m"
+measured = "2.92 m"
+
+[[expect]]
+what     = "speed east at 0.1 s"
+basis    = "Observed"
+expected = "0 m/s ± 0.5 m/s"
+measured = "-0.00171 m/s"
+
+[[expect]]
+what     = "pitch rate at 0.05 s"
+basis    = "Observed"
+expected = "-980 °/s ± 50 °/s"
+measured = "-978 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "ebe9d271e637992f"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "61249da54cc5d1fa"   # test/thin-rail
+run  = "0c1f86f31a25953a"   # the whole state after each of 2000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.025 s" = "ad7e5488136d1ee6"
+"0.05 s" = "70dc7b485e22e45e"
+"0.075 s" = "a4944e03356916c5"
+"0.1 s" = "6bc2e13eda4cf344"
+"0.125 s" = "a530cce7f8f41ac5"
+"0.15 s" = "57e6f95ca3a02686"
+"0.175 s" = "d0a1d93c4b68ccba"
+"0.2 s" = "635ae2ccb01683d1"
+"0.225 s" = "8574fd56e28b8265"
+"0.25 s" = "7618f226f70bbfd2"
