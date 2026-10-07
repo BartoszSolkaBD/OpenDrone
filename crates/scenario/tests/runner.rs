@@ -425,6 +425,13 @@ fn a_roll_crossing_upside_down_has_the_right_lowest_highest_mean_and_final_value
     assert!(report.passed(), "{:#?}", failures(&report));
 }
 
+/// What a stretch's lowest, highest or mean measures when the angle jumped.
+fn none(what: &str, statistic: &str) -> String {
+    "none: the {} jumped, or went more than half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+        .replacen("{}", what, 1)
+        .replacen("{}", statistic, 1)
+}
+
 /// The free tumble (2000 °/s of roll for 1.125 s, six and a quarter rolls),
 /// with its Expectations replaced by `expectations` over the whole run.
 fn tumble_over_the_run(expectations: &[(&str, &str)]) -> String {
@@ -464,11 +471,101 @@ fn a_roll_mean_lowest_or_highest_over_whole_rolls_fails_whatever_is_expected() {
         for (line, statistic) in found.iter().zip(["mean", "lowest", "highest"]) {
             assert!(
                 line.starts_with(&format!(
-                    "roll, {statistic} over 0 s to 1.125 s: measured none: the roll went more than half a turn from the expected value during the stretch, so its {statistic} has no single answer; check it at moments, over a shorter stretch, or check its rate"
+                    "roll, {statistic} over 0 s to 1.125 s: measured {}",
+                    none("roll", statistic)
                 )),
                 "{expected}: {line}"
             );
         }
+    }
+}
+
+/// One pitch flip, nose up first, in 1 s at 360 °/s, starting level with the
+/// nose at `heading`, with `expectations` over the whole flip.
+fn pitch_flip(heading: &str, expectations: &[(&str, &str, &str)]) -> String {
+    let text = fs::read_to_string(
+        repo()
+            .root
+            .join("scenarios/physics/free-tumble-keeps-its-spin.toml"),
+    )
+    .unwrap();
+    let mut text = text[..text.find("[[expect]]").unwrap()]
+        .replacen(
+            "attitude          = \"roll 0°, pitch 30°, heading 45°\"",
+            &format!("attitude          = \"level, heading {heading}\""),
+            1,
+        )
+        .replacen(
+            "rotation          = \"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s\"",
+            "rotation          = \"roll 0 °/s, pitch 360 °/s, yaw 0 °/s\"",
+            1,
+        );
+    assert!(text.contains("pitch 360 °/s") && text.contains(heading));
+    for (what, statistic, value) in expectations {
+        text += &format!(
+            "[[expect]]\nwhat = \"{what}\"\nover = \"0 s to 1 s\"\n{statistic} = \"{value}\"\nbasis = \"rule: a check of the runner\"\n\n"
+        );
+    }
+    text
+}
+
+#[test]
+fn a_roll_or_heading_mean_lowest_or_highest_over_a_pitch_flip_fails_whatever_is_expected() {
+    // As the nose passes straight up and then straight down, roll and heading
+    // jump by half a turn, so over the flip they have no single mean, lowest
+    // or highest.
+    for heading in ["90°", "45°"] {
+        for (what, expected) in [
+            ("roll", "90° ± 1°"),
+            ("roll", "-90° ± 1°"),
+            ("roll", "0° ± 1°"),
+            ("heading", "0° ± 1°"),
+            ("heading", "180° ± 1°"),
+            ("heading", "135° ± 2°"),
+            ("heading", "315° ± 2°"),
+        ] {
+            let checks: Vec<(&str, &str, &str)> = ["mean", "lowest", "highest"]
+                .iter()
+                .map(|statistic| (what, *statistic, expected))
+                .collect();
+            let text = pitch_flip(heading, &checks);
+            let found = failures(&report(&fixture("pitch-flip", &text), ResultsFile::Write));
+            assert_eq!(
+                found.len(),
+                3,
+                "from heading {heading}, {what} {expected}: {found:#?}"
+            );
+            for (line, statistic) in found.iter().zip(["mean", "lowest", "highest"]) {
+                assert!(
+                    line.starts_with(&format!(
+                        "{what}, {statistic} over 0 s to 1 s: measured {}",
+                        none(what, statistic)
+                    )),
+                    "from heading {heading}: {line}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_roll_and_heading_still_have_a_final_value_after_a_pitch_flip() {
+    // A whole flip ends where it started: level, nose at the start heading.
+    for (heading, final_heading) in [("90°", "90° ± 0.001°"), ("45°", "45° ± 0.001°")] {
+        let text = pitch_flip(
+            heading,
+            &[
+                ("roll", "final", "0° ± 0.001°"),
+                ("heading", "final", final_heading),
+                ("pitch", "final", "0° ± 0.001°"),
+            ],
+        );
+        let report = report(&fixture("pitch-flip-final", &text), ResultsFile::Write);
+        assert!(
+            report.passed(),
+            "from heading {heading}: {:#?}",
+            failures(&report)
+        );
     }
 }
 

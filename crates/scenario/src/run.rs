@@ -162,9 +162,9 @@ struct Tally<'s> {
     lowest: f64,
     highest: f64,
     last: Option<f64>,
-    /// True once an angle went more than half a turn from the expected value
-    /// during the stretch (see `see`).
-    swept_past_the_far_side: bool,
+    /// True once an angle jumped between two steps during the stretch (see
+    /// `see`).
+    jumped: bool,
 }
 
 impl<'s> Tally<'s> {
@@ -176,7 +176,7 @@ impl<'s> Tally<'s> {
             lowest: f64::INFINITY,
             highest: f64::NEG_INFINITY,
             last: None,
-            swept_past_the_far_side: false,
+            jumped: false,
         }
     }
 
@@ -196,17 +196,26 @@ impl<'s> Tally<'s> {
         // or a roll that crosses upside down (179.5° to -178.5°) has the
         // right lowest, highest, mean and final value.
         //
-        // That only works while the angle stays within half a turn of the
-        // expected value. If it sweeps past the far side, as in a flip or a
-        // pirouette, the taken-round values jump by a whole turn between two
-        // steps, and the lowest, highest and mean would fold around whatever
-        // was expected. So that jump is noticed, and those three then fail.
+        // That only works while the angle moves smoothly near the expected
+        // value. Two things break it, and both show as a jump between two
+        // steps:
+        //
+        // - The angle sweeps past the side opposite the expected value, as in
+        //   a flip or a pirouette: the taken-round values jump by a whole
+        //   turn.
+        // - The nose passes straight up or down: roll and heading jump by
+        //   half a turn, because pitch only reads from -90° to 90°.
+        //
+        // Either way the lowest, highest and mean would come out near
+        // whatever was expected, so those three then fail. A jump of a
+        // quarter turn or more counts: a real turn that fast in one step
+        // would be 720,000 °/s at 8 kHz.
         if self.expectation.measure.is_an_angle() {
             value = angle_near(value, self.expectation.expected.centre());
             if let Some(last) = self.last
-                && (value - last).abs() > core::f64::consts::PI
+                && (value - last).abs() >= core::f64::consts::FRAC_PI_2
             {
-                self.swept_past_the_far_side = true;
+                self.jumped = true;
             }
         }
         self.count += 1;
@@ -222,14 +231,14 @@ impl<'s> Tally<'s> {
         let e = self.expectation;
         if let When::Over { statistic, .. } = e.when
             && statistic != Statistic::Final
-            && self.swept_past_the_far_side
+            && self.jumped
         {
             return Measured {
                 description: e.description.clone(),
                 basis: e.basis.kind,
                 expected: e.expected.text(),
                 measured: format!(
-                    "none: the {} went more than half a turn from the expected value during the stretch, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
+                    "none: the {} jumped, or went more than half a turn from the expected value, during the stretch, as it does in flips and when the nose passes straight up or down, so its {} has no single answer; check it at moments, over a shorter stretch, or check its rate",
                     e.measure.name(),
                     statistic.word()
                 ),
