@@ -7,8 +7,7 @@ use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_physics::{
     BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters, Mount,
     PropDirection, PropParameters, PropWash, QuadParameters, QuadShape, QuadStart, QuadState,
-    RotorLayout,
-    StartingMotors, World,
+    RotorLayout, StartingMotors, World,
 };
 
 pub const WORLD: World = World {
