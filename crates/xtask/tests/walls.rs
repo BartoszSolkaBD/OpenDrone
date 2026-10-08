@@ -128,6 +128,23 @@ fn a_core_library_with_a_feature_the_core_must_never_have_breaks_the_walls() {
 }
 
 #[test]
+fn a_feature_that_would_put_std_among_glamxs_libraries_breaks_the_walls() {
+    // num-traits is one of glamx's libraries: its `std` feature would make
+    // glamx's maths resolve to std's.
+    let outcome = Fixture::new("core-library-num-traits-std")
+        .outside("num-traits", &[])
+        .features("num-traits", &["std"])
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths", "num-traits/std"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "The core reaches `num-traits` with its `std` feature turned on, which it must never \
+         have: it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths",
+    );
+}
+
+#[test]
 fn the_same_core_library_without_that_feature_passes() {
     let outcome = Fixture::new("core-library-without-std")
         .outside("glamx", &[])

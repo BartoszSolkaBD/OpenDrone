@@ -33,6 +33,10 @@ libm = "=0.2.16"
 # The physics' collision geometry, 64-bit, always in its determinism mode
 # (ADR-0004). Only opendrone-physics uses it.
 parry3d-f64 = { version = "=0.31.1", default-features = false, features = ["required-features", "alloc", "enhanced-determinism"] }
+# Only xtask uses these two, to read the core's compiled code and name its
+# functions (`cargo xtask core-maths`).
+object = { version = "=0.40.0", default-features = false, features = ["read_core", "archive", "elf", "macho", "coff", "std"] }
+rustc-demangle = "=0.1.28"
 # Only xtask uses it, to find the links in the docs when it builds the book.
 pulldown-cmark = { version = "=0.13.4", default-features = false }
 # SDL 3.4, built from source and statically linked with only its joystick and

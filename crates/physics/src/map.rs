@@ -255,10 +255,13 @@ impl Solid {
                 {
                     return Err(MapShapeProblem::MeshCornerMissing);
                 }
-                // No pre-processing flags. parry3d's fix for internal edges
-                // (smoother sliding over the seams between triangles) refuses
-                // a mesh that isn't closed and consistently wound, which a
-                // Map's `.glb` may not be; the Map ticket (#63) can decide.
+                // No flags, and never any: the ORIENTED and FIX_INTERNAL_EDGES
+                // flags (smoother sliding over the seams between triangles)
+                // make parry3d work out "pseudo-normals" with std's `acos`,
+                // whatever parry3d's features, and the operating systems'
+                // `acos` differ (ADR-0001). They stay off until parry3d
+                // computes them with libm (`cargo xtask core-maths` lists
+                // that call as allowed only while it can't run).
                 let mesh = TriMesh::new(
                     corners.iter().map(|c| to_parry(*c)).collect(),
                     triangles.clone(),
@@ -346,4 +349,28 @@ fn mesh_stretches(solid: &Solid, ray: &Ray, length: f64) -> Vec<(f64, f64)> {
     }
     stretches.retain(|(entry, exit)| exit > entry);
     stretches
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_map_mesh_is_built_without_pseudo_normals_so_std_acos_never_runs() {
+        // walls.toml allows parry3d's call to std's `acos` only because it
+        // runs nowhere but in a mesh's pseudo-normals.
+        let sheet = MapShape::TriangleMesh {
+            corners: vec![
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(1.0, 0.0, 0.0),
+                Vec3::new(1.0, 1.0, 0.0),
+                Vec3::new(0.0, 1.0, 0.0),
+            ],
+            triangles: vec![[0, 1, 2], [0, 2, 3]],
+        };
+        let map = MapCollision::new(&[sheet]).unwrap();
+        let mesh = map.solids()[0].shape.as_trimesh().unwrap();
+        assert!(mesh.flags().is_empty());
+        assert!(mesh.pseudo_normals().is_none());
+    }
 }

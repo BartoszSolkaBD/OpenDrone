@@ -23,7 +23,7 @@ use serde_json::Value;
 
 /// The rules, built into the program so the readable checks use the real ones.
 const RULES: &str = include_str!("../walls.toml");
-const RULES_FILE: &str = "crates/xtask/walls.toml";
+pub(crate) const RULES_FILE: &str = "crates/xtask/walls.toml";
 
 pub fn run(args: &[String]) -> ExitCode {
     let manifest_path = match args {
@@ -199,13 +199,23 @@ fn reached_from_core(workspace: &Workspace, rules: &Rules) -> Vec<(String, Vec<S
 }
 
 /// The rules in `walls.toml`.
-struct Rules {
-    core: Vec<String>,
+pub(crate) struct Rules {
+    pub(crate) core: Vec<String>,
     crates: BTreeMap<String, CrateRule>,
     core_libraries: BTreeMap<String, String>,
     never_in_core: BTreeMap<String, String>,
     /// By "library/feature".
     never_in_core_features: BTreeMap<String, String>,
+    /// Calls to the operating system's maths the core may keep, by
+    /// "library/function" (`cargo xtask core-maths`).
+    core_platform_maths: BTreeMap<String, PlatformMathsAllowance>,
+}
+
+/// One call to the operating system's maths the core may keep: only from
+/// these functions, for this reason.
+struct PlatformMathsAllowance {
+    from: Vec<String>,
+    reason: String,
 }
 
 struct CrateRule {
@@ -214,6 +224,26 @@ struct CrateRule {
 }
 
 impl Rules {
+    /// The rules in `walls.toml`, built into the program.
+    pub(crate) fn load() -> Result<Rules, String> {
+        Rules::parse(RULES)
+    }
+
+    /// Why the core may keep this call to the operating system's maths, if
+    /// `walls.toml` allows it: only when every function that makes it is one
+    /// the allowance names, so a new caller fails the check.
+    pub(crate) fn platform_maths_reason(&self, call: &crate::core_maths::Call) -> Option<&str> {
+        let allowance = self
+            .core_platform_maths
+            .get(&format!("{}/{}", call.library, call.function))?;
+        let all_named = !call.callers.is_empty()
+            && call
+                .callers
+                .iter()
+                .all(|caller| allowance.from.iter().any(|from| from == caller));
+        all_named.then_some(allowance.reason.as_str())
+    }
+
     fn parse(text: &str) -> Result<Rules, String> {
         let table: toml::Table = text
             .parse()
@@ -238,6 +268,7 @@ impl Rules {
             core_libraries: reasons(&table, "core-libraries")?,
             never_in_core: reasons(&table, "never-in-core")?,
             never_in_core_features: reasons(&table, "never-in-core-features")?,
+            core_platform_maths: platform_maths_allowances(&table)?,
         })
     }
 
@@ -268,6 +299,29 @@ fn strings(value: Option<&toml::Value>, key: &str) -> Result<Vec<String>, String
         .ok_or_else(wrong)?
         .iter()
         .map(|name| name.as_str().map(str::to_owned).ok_or_else(wrong))
+        .collect()
+}
+
+fn platform_maths_allowances(
+    table: &toml::Table,
+) -> Result<BTreeMap<String, PlatformMathsAllowance>, String> {
+    let key = "core-platform-maths";
+    section(table, key)?
+        .iter()
+        .map(|(name, allowance)| {
+            let wrong = || {
+                format!(
+                    "{RULES_FILE}: [{key}] {name} needs `{{ from = [\"<function>\", …], reason = \"…\" }}`"
+                )
+            };
+            let reason = allowance
+                .get("reason")
+                .and_then(toml::Value::as_str)
+                .ok_or_else(wrong)?
+                .to_owned();
+            let from = strings(allowance.get("from"), &format!("{key}.{name}.from"))?;
+            Ok((name.clone(), PlatformMathsAllowance { from, reason }))
+        })
         .collect()
 }
 
