@@ -1,5 +1,5 @@
 //! "Paste from Betaflight CLI…" for a Radio's switches (#19 §5): pasted
-//! `aux` lines become a Radio profile's `[switches]`.
+//! `aux` lines become the `[switches]` of a Radio's Input Device profile.
 //!
 //! The Flight Controller's Betaflight CLI translator reads the lines as
 //! Betaflight would (`opendrone_flight_controller::cli::AuxPaste`): for Arm,
@@ -29,7 +29,7 @@ pub struct PastedSwitches {
     pub ignored: Vec<String>,
 }
 
-/// Reads pasted `aux` lines as a Radio profile's switches, or says, a note
+/// Reads pasted `aux` lines as the switches of a Radio's Input Device profile, or says, a note
 /// each, why they can't be.
 pub fn switches_from_aux(text: &str) -> Result<PastedSwitches, Vec<String>> {
     let pasted = AuxPaste::read(text).map_err(|refusal| refusal.0)?;

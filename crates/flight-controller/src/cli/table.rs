@@ -129,7 +129,9 @@ pub enum Rule {
     /// `iterm_windup` from 4.3–4.5's `iterm_limit` and `pidsum_limit`: the I
     /// term's limit was `iterm_limit`; from 2025.12 it's `iterm_windup`
     /// percent of the PID-sum limit (the Betaflight research §3). 4.3–4.5's
-    /// own `iterm_windup` meant something else (see [`RETIRED`]).
+    /// own `iterm_windup` meant something else (see [`RETIRED`]). Yaw can't
+    /// follow exactly: its I limit was `iterm_limit` too, and is now the same
+    /// percentage of `pidsum_limit_yaw`, so 400 becomes 320 at the defaults.
     ItermWindup,
 }
 
@@ -484,7 +486,9 @@ pub const RETIRED: &[Retired] = &[
 
 /// Whether a setting only describes the board, its wiring or its other
 /// hardware (OSD, VTX, LEDs, ports, receiver protocol, sensors, beeper,
-/// `expresslrs_*`), or names the quad: the importer drops those (#21).
+/// `expresslrs_*`), or names the quad: the importer drops those (#21). The
+/// GPS, position and altitude settings go with them: OpenDrone has no GPS or
+/// barometer, and altitude and position hold aren't planned (#21).
 pub fn is_hardware_only(name: &str) -> bool {
     HARDWARE_ONLY.contains(&name)
         || HARDWARE_PREFIXES

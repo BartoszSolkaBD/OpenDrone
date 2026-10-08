@@ -307,7 +307,7 @@ fn on_off(conditions: &[Condition], mode: u8, notes: &mut Vec<String>) -> Option
     let on = on_at_positions(&mine);
     if on == [false; 3] {
         notes.push(format!(
-            "{} on AUX{} is on at none of 988, 1500 and 2012 µs, the positions a radio's switch sends.",
+            "{} on AUX{} is on at none of 988, 1500 and 2012 µs, the positions a Radio's switch sends.",
             mode_name(mode),
             aux + 1
         ));
@@ -349,7 +349,7 @@ fn flight_mode(conditions: &[Condition], notes: &mut Vec<String>) -> Option<AuxF
     });
     if modes == [FlightMode::Acro; 3] {
         notes.push(format!(
-            "Angle and Horizon on AUX{} are on at none of 988, 1500 and 2012 µs, the positions a radio's switch sends.",
+            "Angle and Horizon on AUX{} are on at none of 988, 1500 and 2012 µs, the positions a Radio's switch sends.",
             channels[0] + 1
         ));
         return None;

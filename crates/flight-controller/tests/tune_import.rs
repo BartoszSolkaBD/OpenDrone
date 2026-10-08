@@ -201,9 +201,8 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
         assert_eq!(got(&meteor, name), is(value, "ADR-0008"), "{name}");
     }
     // The Flight Controller already knows low-throttle TPA, so the Tune
-    // spells it out, flown as off (#50). It doesn't know the others yet, and
-    // the diff doesn't set them, so the Tune holds them once their Flight
-    // Controller tickets read them.
+    // spells it out, flown as off (#50). It doesn't know the others yet; the
+    // Tune spells them out all the same, under "Not simulated yet".
     let tpa_low = meteor.setting("tpa_low_rate").unwrap();
     assert_eq!(tpa_low.written, Where::FlownAsOff);
     assert_eq!(tpa_low.note, "not simulated yet (#50)");
@@ -212,7 +211,10 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
         "angle_earth_ref",
         "crashflip_rate",
     ] {
-        assert_eq!(meteor.setting(name).unwrap().written, Where::NotWritten);
+        assert_eq!(
+            meteor.setting(name).unwrap().written,
+            Where::NotSimulatedYet
+        );
     }
 }
 
@@ -407,9 +409,14 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
     let (_, after) = text
         .split_once("\n# Not simulated yet. ")
         .expect("a Not simulated yet heading");
-    let (known, others) = after
-        .split_once("\n# Not simulated yet either: the other settings the diff sets.\n")
-        .expect("a heading for the other settings the diff sets");
+    let (known, after) = after
+        .split_once("\n# Not simulated yet either: settings the Flight Controller doesn't know\n")
+        .expect("a heading for the settings the Flight Controller doesn't know");
+    let (rest, unknown) = after
+        .split_once(
+            "\n# Not simulated yet, and not known to OpenDrone: the other settings the diff sets.\n",
+        )
+        .expect("a heading for the settings the translator doesn't know");
     // Every setting the Flight Controller knows but flies as off, from the
     // diff, 4.3's defaults or ADR-0008, with its ticket, in its order.
     let later = Tune::not_simulated_yet();
@@ -432,16 +439,38 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
             "set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)"
         )
     );
-    // Then the other settings the diff sets that nothing reads yet.
+    // Then every other setting the translator knows, spelled out, ADR-0008's
+    // values among them.
     for line in [
-        "set dshot_bidir = ON",
-        "set feedforward_jitter_factor = 9",
-        "set blackbox_sample_rate = 1/2",
-        "set dyn_notch_q = 350",
+        "set feedforward_jitter_factor = 9      # diff",
+        "set feedforward_smooth_factor = 25     # 4.3 default",
+        "set feedforward_yaw_hold_gain = 0      # ADR-0008",
+        "set angle_earth_ref = 0                # ADR-0008; percent",
+        "set d_max_advance = 7                  # ADR-0008;",
+        "set crashflip_rate = 0                 # ADR-0008;",
+        "set failsafe_delay = 15                # 4.3 default; tenths of a second",
+        "set blackbox_sample_rate = 1/2         # diff",
+        "set dyn_notch_q = 350                  # diff",
     ] {
-        assert!(others.contains(line), "{line} not under Not simulated yet");
+        assert!(rest.contains(line), "{line} not under Not simulated yet");
     }
-    assert!(others.lines().all(|l| l.starts_with("set ")));
+    let known_rows = table::SETTINGS.len();
+    assert_eq!(
+        set_lines(&text).len(),
+        known_rows + 2,
+        "every row of the table, and the diff's two unknown settings"
+    );
+    // Last, the settings the diff sets that the translator doesn't know.
+    assert_eq!(
+        set_lines(unknown)
+            .iter()
+            .map(|(n, v, m)| format!("{n} = {v} # {m}"))
+            .collect::<Vec<_>>(),
+        [
+            "dshot_bidir = ON # diff",
+            "vbat_max_cell_voltage = 435 # diff"
+        ]
+    );
     // A setting 2026.6 has no counterpart for is left out, with the reason.
     assert!(
         meteor
@@ -512,6 +541,8 @@ fn diff_diff_all_and_dump_from_4_3_or_newer_are_accepted() {
 
 #[test]
 fn betaflight_older_than_4_3_is_refused_with_a_clear_message() {
+    // Basis: Rule (ADR-0008: the importer accepts Betaflight 4.3 and newer
+    // only).
     let old = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 4.2.11 Jun");
     assert_eq!(
         refusal(&old),
@@ -626,7 +657,9 @@ fn an_export_without_its_version_line_or_pid_profile_or_from_another_firmware_is
         master_only.push_str(line);
         master_only.push('\n');
     }
-    assert!(refusal(&master_only).starts_with("There's no `profile` line"));
+    assert!(refusal(&master_only).starts_with(
+        "There's no `profile` line, so this export holds none of Betaflight's PID profiles"
+    ));
 }
 
 #[test]
@@ -655,6 +688,20 @@ fn the_cetus_xs_diff_all_from_betaflight_4_4_imports_too() {
             .map(|(n, v, _)| (n.as_str(), v.as_str())),
     );
     assert!(tune.is_ok(), "{tune:?}");
+}
+
+#[test]
+fn a_quad_with_no_craft_name_has_none_in_its_tune() {
+    // Basis: Rule. Betaflight writes "-" for a quad with no name.
+    let text = changed(METEOR, "# name: Meteor65 pro", "# name: -");
+    let text = changed(&text, "set name = Meteor65 pro", "set name = -");
+    let nameless = import(&text);
+    assert_eq!(nameless.craft_name, None);
+    assert!(
+        nameless
+            .tune_txt("Quad", "x")
+            .contains("# Imported from the diff all: Betaflight 4.3.0,\n")
+    );
 }
 
 #[test]
@@ -713,16 +760,18 @@ fn a_bare_2026_6_diff_gives_betaflight_2026_6_2s_defaults_as_the_freestyle_5s_tu
     let five = set_lines(FREESTYLE_5_TUNE);
     let tune = import.tune_txt("Freestyle 5″", "bare");
     let imported = set_lines(&tune);
+    assert!(
+        imported
+            .iter()
+            .all(|(_, _, mark)| mark.starts_with("2026.6 default"))
+    );
+    // The 5″ spells out what the Flight Controller reads and flies as off;
+    // the import writes those first, in the same order, then the rest.
     let values = |lines: &[(String, String, String)]| -> Vec<(String, String)> {
         lines
             .iter()
             .map(|(n, v, _)| (n.clone(), v.clone()))
             .collect()
     };
-    assert_eq!(values(&imported), values(&five));
-    assert!(
-        imported
-            .iter()
-            .all(|(_, _, mark)| mark.starts_with("2026.6 default"))
-    );
+    assert_eq!(values(&imported[..five.len()]), values(&five));
 }

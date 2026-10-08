@@ -81,11 +81,13 @@ pub enum Where {
     /// checks its value, but flies as if it were off until its ticket lands
     /// ([`Tune::not_simulated_yet`]).
     FlownAsOff,
-    /// Under "Not simulated yet", after those: the export sets it, and
-    /// nothing reads it yet.
+    /// Under "Not simulated yet", after those: a setting the translator
+    /// knows that the Flight Controller doesn't yet, spelled out all the
+    /// same, from the export, its version's default or ADR-0008.
     NotSimulatedYet,
-    /// Not written: nothing reads it yet, and the export doesn't set it.
-    NotWritten,
+    /// Last: a setting the export sets that the translator doesn't know,
+    /// kept as the real quad had it.
+    OnlyInTheExport,
 }
 
 /// A line of the export that doesn't reach the Tune.
@@ -148,7 +150,7 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
     let (version, family) = cli.family()?;
     let Some(profile) = cli.active_profile() else {
         return Err(Refusal::one(
-            "There's no `profile` line, so this export holds no PID profile: export the quad's settings with `diff all`.",
+            "There's no `profile` line, so this export holds none of Betaflight's PID profiles: export the quad's settings with `diff all`.",
         ));
     };
     let rate_profile = cli.active_rate_profile();
@@ -270,10 +272,8 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
             (Where::UnderItsTab, setting.note.to_string())
         } else if let Some((_, ticket)) = flown_as_off {
             (Where::FlownAsOff, format!("not simulated yet ({ticket})"))
-        } else if line.is_some() {
-            (Where::NotSimulatedYet, setting.note.to_string())
         } else {
-            (Where::NotWritten, setting.note.to_string())
+            (Where::NotSimulatedYet, setting.note.to_string())
         };
         if matches!(written, Where::UnderItsTab | Where::FlownAsOff)
             && let Err(sentence) = Tune::check(setting.name, &value)
@@ -304,7 +304,7 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
             note: String::new(),
             place: None,
             line: Some(line),
-            written: Where::NotSimulatedYet,
+            written: Where::OnlyInTheExport,
         });
     }
 
@@ -428,11 +428,7 @@ impl TuneImport {
         line(&format!("# {day}({source}),"));
         line("# by `cargo xtask import-tune`.");
         line("# Each line's mark says where its value came from:");
-        let written: Vec<&ImportedSetting> = self
-            .settings
-            .iter()
-            .filter(|s| s.written != Where::NotWritten)
-            .collect();
+        let written: Vec<&ImportedSetting> = self.settings.iter().collect();
         let uses = |test: &dyn Fn(&str) -> bool| written.iter().any(|s| test(&s.mark));
         let own_default = format!("{version} default");
         let newer_default = format!("{} default", Family::V2026_6.name());
@@ -484,10 +480,11 @@ impl TuneImport {
         line("#");
         line("# It spells out every setting the Flight Controller reads so far, grouped by");
         line("# the Betaflight App's tabs in their order, with each tab's CLI-only settings");
-        line("# after the ones the tab shows (ADR-0015). The settings it knows but doesn't");
-        line("# simulate yet come last, under their own heading, and then the other");
+        line("# after the ones the tab shows (ADR-0015). The settings it doesn't simulate");
+        line("# yet come last, under their own heading: first those it knows but flies as");
+        line("# off, then the rest OpenDrone's Betaflight CLI translator knows, then any");
         line(&format!(
-            "# settings the {export} sets. As the Flight Controller reads more settings, run"
+            "# others the {export} sets. As the Flight Controller reads more settings, run"
         ));
         line("# the importer again.");
 
@@ -527,16 +524,34 @@ impl TuneImport {
                 line(&set_line(setting));
             }
         }
-        let others: Vec<&&ImportedSetting> = written
+        let rest: Vec<&&ImportedSetting> = written
             .iter()
             .filter(|s| s.written == Where::NotSimulatedYet)
             .collect();
-        if !others.is_empty() {
+        if !rest.is_empty() {
+            line("");
+            line("# Not simulated yet either: settings the Flight Controller doesn't know");
+            line("# yet, which later tickets read or the alpha leaves out.");
+            let mut tab = None;
+            for setting in rest {
+                let this = setting.place.map(Place::tab);
+                if this != tab {
+                    line(&format!("# {}", this.unwrap_or("")));
+                    tab = this;
+                }
+                line(&set_line(setting));
+            }
+        }
+        let only_in_the_export: Vec<&&ImportedSetting> = written
+            .iter()
+            .filter(|s| s.written == Where::OnlyInTheExport)
+            .collect();
+        if !only_in_the_export.is_empty() {
             line("");
             line(&format!(
-                "# Not simulated yet either: the other settings the {export} sets."
+                "# Not simulated yet, and not known to OpenDrone: the other settings the {export} sets."
             ));
-            for setting in others {
+            for setting in only_in_the_export {
                 line(&set_line(setting));
             }
         }
@@ -551,7 +566,7 @@ impl TuneImport {
             None => String::new(),
         };
         out.push_str(&format!(
-            "Imported the {}{quad}: Betaflight {}, PID profile {}.\n",
+            "Imported the {}{quad}: Betaflight {}, its PID profile {}.\n",
             self.command.as_deref().unwrap_or("CLI export"),
             self.version,
             self.profile
@@ -568,7 +583,6 @@ impl TuneImport {
         let renamed: Vec<String> = self
             .settings
             .iter()
-            .filter(|s| s.written != Where::NotWritten)
             .filter_map(|s| {
                 let (_, was) = s.mark.split_once("(was ")?;
                 let was = was.split(')').next()?;
@@ -578,16 +592,20 @@ impl TuneImport {
         if !renamed.is_empty() {
             out.push_str(&format!("- Renamed: {}.\n", renamed.join(", ")));
         }
-        let not_simulated: Vec<&str> = self
+        out.push_str(&format!(
+            "- {} more settings the translator knows, spelled out under \"Not simulated yet\" until the Flight Controller reads them.\n",
+            count(Where::NotSimulatedYet)
+        ));
+        let unknown: Vec<&str> = self
             .settings
             .iter()
-            .filter(|s| s.written == Where::NotSimulatedYet)
+            .filter(|s| s.written == Where::OnlyInTheExport)
             .map(|s| s.name.as_str())
             .collect();
-        if !not_simulated.is_empty() {
+        if !unknown.is_empty() {
             out.push_str(&format!(
-                "- The other settings the export sets, kept as not simulated yet: {}.\n",
-                not_simulated.join(", ")
+                "- Settings the export sets that the translator doesn't know, kept as not simulated yet: {}.\n",
+                unknown.join(", ")
             ));
         }
         let names = |why: &dyn Fn(Why) -> bool| -> Vec<String> {
@@ -615,7 +633,10 @@ impl TuneImport {
                 out.push_str(&format!("- Left out, {label}: {}.\n", unique.join(", ")));
             }
         };
-        list("hardware only", names(&|w| w == Why::HardwareOnly));
+        list(
+            "hardware only (or GPS and altitude features)",
+            names(&|w| w == Why::HardwareOnly),
+        );
         list(
             "the simplified_* sliders (their numbers are read instead)",
             names(&|w| w == Why::Slider),

@@ -65,7 +65,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "b3f0ff8a114a33e6"   # test/whoop-65-bench-supply: what the Simulation receives from it
+quad = "f3410ae1509bc7be"   # test/whoop-65-bench-supply: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
 run  = "8023754b19600656"   # the whole state after each of 31200 steps at 8000 Hz, in order
 

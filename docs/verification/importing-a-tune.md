@@ -20,12 +20,12 @@ Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is
 
 ## What it accepts
 
-- `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find the PID profile. `diff all` is the best choice, because it lists only what the quad changed.
+- `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find Betaflight's PID profile (the part of Betaflight's settings that becomes most of a Tune). `diff all` is the best choice, because it lists only what the quad changed.
 - It knows the settings and defaults of every Betaflight release from 4.3 to 2026.6: **4.3, 4.4, 4.5, 2025.12 and 2026.6**, each read from its source (4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2). A version's patch releases share its defaults. Older than 4.3, and newer than 2026.6, are refused with a sentence saying so.
 
 ## What it reads
 
-- The settings before any profile, and the **active PID profile's**: the one the last `profile` line selects. Other PID profiles are left out.
+- The settings before any profile, and the **active Betaflight PID profile's**: the one the last `profile` line selects. Other PID profiles are left out.
 - **The final numbers**, never the `simplified_*` sliders. The firmware never re-applies the sliders at boot, and both of the maintainer's diffs match theirs ([#21](https://github.com/BartoszSolkaBD/OpenDrone/issues/21)).
 - **No rate profiles.** Rates belong to the pilot. The one exception is 4.3's TPA (`tpa_mode`, `tpa_rate`, `tpa_breakpoint`), which 4.3 kept in its rate profile and 4.4 moved to the PID profile: for 4.3 it's read from the active rate profile.
 
@@ -65,12 +65,13 @@ A setting the export doesn't set takes **its own version's** default, never 2026
 
 ## Not simulated yet
 
-The "Not simulated yet" part of a Tune comes last, in two halves:
+The "Not simulated yet" part of a Tune comes last, in three parts. Together with the settings under the tabs, they spell out every setting the translator knows, about 120 for the Whoop 65 (ADR-0015):
 
-- **What the Flight Controller knows but flies as off** until its ticket lands ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): feedforward, the low-pass filters and RC smoothing (#49), Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch, which waits for gyro noise (#21). These are always spelled out, from the export or the version's defaults, each mark ending `not simulated yet (#49)` or the like, in the order the Freestyle 5″'s Tune lists them.
-- **The other settings the export sets** that nothing reads yet: the RPM filter, the rest of the dynamic notch, thrust linearisation, the Blackbox rate and more.
+- **What the Flight Controller knows but flies as off** until its ticket lands ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): feedforward, the low-pass filters and RC smoothing (#49), Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch, which waits for gyro noise (#21). Each mark ends `not simulated yet (#49)` or the like, and they come in the order the Freestyle 5″'s Tune lists them.
+- **Every other setting the translator knows** that the Flight Controller doesn't read yet, by tab: what the next Flight Controller tickets read (Failsafe, the rest of feedforward and Dynamic D, Angle and Horizon, Crash Flip and yaw spin recovery), with ADR-0008's values where the old version lacked a setting, and the rest of the dynamic notch, RC smoothing and the Blackbox rate.
+- **The settings the export sets that the translator doesn't know**, as the real quad had them: for the Meteor, `dshot_bidir` (the RPM filter's motor speed) and `vbat_max_cell_voltage`.
 
-Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab, and a setting the export doesn't set starts being spelled out with its default.
+Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab.
 
 ## What still differs from the real quad
 
@@ -78,7 +79,7 @@ ADR-0008 lists them: 2026's Angle and Horizon are softer around the centre, 4.3'
 
 ## Pasting Rates and switches
 
-The same translator reads two pastes a pilot makes from their own quad's CLI. The settings screens show what each would change, Now and After, before the pilot applies it.
+The same translator reads two pastes a pilot makes from their own quad's CLI. The settings screens (#69, #71) will show what each would change, Now and After, before the pilot applies it.
 
 - **Rates** ([#13](https://github.com/BartoszSolkaBD/OpenDrone/issues/13)): from a pasted `diff`, `diff all` or `dump`, only the **active rate profile's** rate settings are read, the one the last `rateprofile` line selects. Every other line is ignored, and the paste says so. For the Cetus X's `diff all`: "Used rate profile 0 (3 rate settings); ignored 104 lines." A rate setting the profile doesn't set keeps Betaflight's default, which has been the same since 4.3: Actual, 70 °/s at centre and 670 °/s at full stick.
 - **Switches** ([#19](https://github.com/BartoszSolkaBD/OpenDrone/issues/19) §5): from pasted `aux` lines, ARM, ANGLE, HORIZON and FLIP OVER AFTER CRASH are read. AUX*n* is the radio's CH(*n*+4). Each switch position a radio sends (988, 1500 and 2012 µs) is tested against the pasted ranges as Betaflight does, so any ranges work. Angle beats Horizon, and Acro is wherever neither is on. Other modes, such as the Cetus X's BEEPER, are listed as ignored. AND logic and linked modes are refused with a note, as is anything a profile can't hold, such as Arm on two switches. The result is the Input Device profile's `[switches]`. The Meteor65 Pro's lines give exactly the Radiomaster Pocket's starting layout.

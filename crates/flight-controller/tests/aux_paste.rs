@@ -70,6 +70,8 @@ fn the_cetus_x_has_angle_at_the_bottom_and_its_beeper_is_ignored() {
 
 #[test]
 fn auxn_is_the_radios_ch_n_plus_4() {
+    // Basis: Source (Betaflight's AUX1 is its fifth channel, after roll,
+    // pitch, yaw and throttle; #19 §5).
     let arm = paste("aux 0 0 3 1700 2100 0 0").arm.unwrap();
     assert_eq!((arm.aux, arm.channel()), (4, 8));
     assert_eq!(paste("aux 0 0 0 1700 2100 0 0").arm.unwrap().channel(), 5);
@@ -137,7 +139,7 @@ fn a_switch_the_fixed_layout_cant_hold_is_refused_with_a_note() {
     );
     assert_eq!(
         refused("aux 0 0 0 1050 1400 0 0"),
-        "ARM on AUX1 is on at none of 988, 1500 and 2012 µs, the positions a radio's switch sends."
+        "ARM on AUX1 is on at none of 988, 1500 and 2012 µs, the positions a Radio's switch sends."
     );
 }
 

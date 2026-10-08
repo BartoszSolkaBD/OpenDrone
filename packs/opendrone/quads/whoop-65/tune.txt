@@ -12,9 +12,10 @@
 #
 # It spells out every setting the Flight Controller reads so far, grouped by
 # the Betaflight App's tabs in their order, with each tab's CLI-only settings
-# after the ones the tab shows (ADR-0015). The settings it knows but doesn't
-# simulate yet come last, under their own heading, and then the other
-# settings the diff sets. As the Flight Controller reads more settings, run
+# after the ones the tab shows (ADR-0015). The settings it doesn't simulate
+# yet come last, under their own heading: first those it knows but flies as
+# off, then the rest OpenDrone's Betaflight CLI translator knows, then any
+# others the diff sets. As the Flight Controller reads more settings, run
 # the importer again.
 
 # Configuration
@@ -80,13 +81,73 @@ set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
 
-# Not simulated yet either: the other settings the diff sets.
+# Not simulated yet either: settings the Flight Controller doesn't know
+# yet, which later tickets read or the alpha leaves out.
+# Configuration
+set yaw_spin_recovery = AUTO           # 4.3 default
+set yaw_spin_threshold = 1950          # 4.3 default; °/s
+# Failsafe
+set failsafe_delay = 15                # 4.3 default; tenths of a second
+set failsafe_procedure = DROP          # 4.3 default
+set failsafe_switch_mode = STAGE1      # 4.3 default
+set failsafe_throttle = 1000           # 4.3 default; µs
+set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
+set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
+set failsafe_stick_threshold = 30      # 4.3 default; percent
+# PID Tuning
+set feedforward_transition = 0         # 4.3 default
 set feedforward_averaging = 2_POINT    # diff
+set feedforward_smooth_factor = 25     # 4.3 default
 set feedforward_jitter_factor = 9      # diff
+set feedforward_boost = 15             # 4.3 default
+set feedforward_max_rate_limit = 90    # 4.3 default
+set d_max_gain = 37                    # 4.3 default
+set d_max_advance = 7                  # ADR-0008; 4.3's stick boost: d_max_gain 37 × d_max_advance 20 ÷ 100
+set iterm_relax_type = SETPOINT        # 4.3 default
+set iterm_relax_cutoff = 15            # 4.3 default; Hz
+set tpa_mode = D                       # 4.3 default
+set tpa_breakpoint = 1350              # 4.3 default; µs
+set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
+set angle_limit = 55                   # 4.3 default (was level_limit); degrees
+set horizon_level_strength = 50        # 4.3 default
+set feedforward_yaw_hold_gain = 0      # ADR-0008
+set feedforward_yaw_hold_time = 100    # 2026.6 default; ms
+set anti_gravity_cutoff_hz = 5         # 2026.6 default; Hz
+set anti_gravity_p_gain = 100          # 2026.6 default
+set tpa_low_breakpoint = 1050          # 2026.6 default; µs
+set tpa_low_always = OFF               # 2026.6 default
+set throttle_boost_cutoff = 15         # 4.3 default; Hz
+set angle_feedforward = 50             # 2026.6 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
+set angle_earth_ref = 0                # ADR-0008; percent
+set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
+set horizon_limit_degrees = 135        # 2026.6 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6 default
+set horizon_delay_ms = 500             # 2026.6 default; ms
+# PID Tuning, filters
+set gyro_lpf1_type = PT1               # 4.3 default
 set gyro_lpf1_dyn_max_hz = 575         # diff; Hz
+set gyro_lpf2_type = PT1               # 4.3 default
 set dyn_notch_q = 350                  # diff
 set dyn_notch_min_hz = 130             # diff; Hz
+set dyn_notch_max_hz = 600             # 4.3 default; Hz
+set dterm_lpf1_type = PT1              # 4.3 default
 set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
+set dterm_lpf2_type = PT1              # 4.3 default
+set gyro_lpf1_dyn_expo = 5             # 4.3 default
+set dterm_lpf1_dyn_expo = 5            # 4.3 default
+# Receiver
+set rc_smoothing_auto_factor = 30      # 4.3 default
+set rc_smoothing_auto_factor_throttle = 30 # 4.3 default
+set rc_smoothing_setpoint_cutoff = 0   # 4.3 default; Hz; 0 is automatic
+set rc_smoothing_throttle_cutoff = 0   # 4.3 default; Hz; 0 is automatic
+# Motors
+set crashflip_motor_percent = 0        # 4.3 default; percent
+set crashflip_rate = 0                 # ADR-0008; °/s; 0 is off
+set crashflip_auto_rearm = OFF         # 2026.6 default
+# Blackbox
 set blackbox_sample_rate = 1/2         # diff
+
+# Not simulated yet, and not known to OpenDrone: the other settings the diff sets.
 set dshot_bidir = ON                   # diff
 set vbat_max_cell_voltage = 435        # diff
