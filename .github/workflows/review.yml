@@ -1,0 +1,131 @@
+# The Review Report, the Red Flag gate and the Review check on every pull
+# request (#77; #15 §3, §5 and §10; ADR-0010), and naming any merge that
+# skipped a check. How to read it: docs/review-report.md.
+#
+# Security: this workflow can write to PRs, so it never runs anything from a
+# pull request. Its triggers (pull_request_target, issue_comment and push to
+# main) always run this file as it is on main. It checks out main only, builds
+# main's xtask, and fetches the pull request's commits as git objects, which it
+# reads only with `git show` and `git diff`: no checkout of the PR, no build,
+# no cargo, rustup or any other tool run on its files. The PR's comments come
+# from GitHub's API, and its new libraries' licences from crates.io's API; all
+# of that is data. xtask escapes every piece of text from the PR or crates.io
+# before it reaches the Report. Text from an event never reaches a shell
+# command except through an environment variable.
+#
+# The Red Flag gate and the Review check are commit statuses that this workflow
+# sets on the PR's latest commit, because a check run from issue_comment would
+# land on main's commit instead. That is also why no job here is named "Red
+# Flag gate" or "Review check": a job with that name could pass for the status.
+# A status belongs to a commit, not to a PR, so only PRs into main set them,
+# and both fail when two open PRs into main hold the same commit.
+#
+# Limit: any workflow with `statuses: write` can set those statuses too, and a
+# PR from a branch in this repo can change or add one. So for a PR that
+# changes CI's workflows the two statuses can't be trusted; the Report flags
+# such a PR (docs/review-report.md, Limits).
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it. A PR that changes it is still judged by main's copy.
+
+name: Review
+
+on:
+  # A PR opened, pushed to, reopened, or moved onto main. Any PR is reported
+  # on, but only one into main sets the two statuses.
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+  # A Verdict posted, edited or deleted.
+  issue_comment:
+    types: [created, edited, deleted]
+  # A merge, to check it passed every required check.
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  update:
+    name: Post the Review Report and set the Red Flag gate and Review check
+    # Only the maintainer's account posts Verdicts (agents work under it), so
+    # nobody else's comment starts a run.
+    # An edit counts only when it changes the base branch.
+    if: >-
+      (github.event_name == 'pull_request_target'
+       && (github.event.action != 'edited' || github.event.changes.base))
+      || (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && github.event.comment.user.login == 'BartoszSolkaBD')
+    # One run at a time per PR, so two never edit the Report at once. Set on
+    # the job, not the workflow, so a skipped run (someone else's comment)
+    # never joins the queue. Each run works everything out afresh, so a run
+    # that waits behind a newer one can be dropped.
+    concurrency:
+      group: review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write # labels
+      pull-requests: write # the Review Report comment
+      statuses: write # the Red Flag gate and the Review check
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          # The whole history, to find where the PR branched off.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned Rust (main's rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build main's xtask
+        shell: bash
+        run: cargo build --locked --quiet --package xtask
+
+      - name: Work out and post the Review Report, the labels, the Red Flag gate and the Review check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          XTASK: target/debug/xtask
+        run: bash .github/scripts/review.sh update
+
+  merged:
+    name: Name a merge that skipped a check
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: read # the merged PR's check runs
+      statuses: read # and its commit statuses
+      issues: write # the skipped-a-check label
+      pull-requests: write # the comment on the merged PR
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build main's xtask
+        shell: bash
+        run: cargo build --locked --quiet --package xtask
+
+      - name: Check the merged PR passed every required check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BRANCH: ${{ github.event.repository.default_branch }}
+          XTASK: target/debug/xtask
+        run: bash .github/scripts/review.sh merged

@@ -1,0 +1,10 @@
+# A fixture: a Scenario with Observed Expectations only, as a Feel Test
+# sign-off would leave.
+format = 1
+name   = "The Whoop 65 hovers at the signed-off throttle"
+
+[[expect]]
+what  = "height"
+at    = "5 s"
+value = "2 m ± 0.1 m"
+basis = "observed: the maintainer's Feel Test sign-off"

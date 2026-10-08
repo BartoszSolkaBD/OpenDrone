@@ -42,3 +42,12 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 | Docs site and rustdoc | The docs site builds from `docs/` with every page in it; rustdoc builds for every crate, internal items included, with its warnings as errors; and every link in the book leads somewhere real: a page, a heading, a file of the repo or a rustdoc page (`cargo xtask book`). The [Pages workflow](.github/workflows/pages.yml) publishes the same build from main. |
 
 A pull request that changes only Markdown files skips the Rust work inside these checks, except the docs site's, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them, and so does any change under `packs/`, because the Pack checker reads each Quad's Feel Test log.
+
+Two more come from the [review workflow](.github/workflows/review.yml), as commit statuses on every pull request into main, docs-only ones included:
+
+| Check | What it proves |
+|---|---|
+| Red Flag gate | No Red Flag waits for the maintainer: no Source or Rule Expectation changed or removed, no existing ADR edited, and no move to a new Bevy 0.N or wgpu major version. It is worked out by main's code, from the PR's commits read as data, with the Review Report's Red Flags, What moved and Areas touched. Locally: `cargo xtask review-report --base origin/main --head HEAD`. |
+| Review check | The newest Verdict covers the PR's latest commit and says pass, the PR was opened by the maintainer's account or by Dependabot from a branch in this repo, and fewer than 3 review rounds have failed. |
+
+Any workflow with `statuses: write` can set these two statuses, so for a PR that changes CI's workflows they can't be trusted. The Report says so, and the maintainer merges such a PR by hand. How to read the Review Report, and its limits: [`docs/review-report.md`](docs/review-report.md). What the Reviewer checks and the Verdict format: [`docs/agents/reviewer.md`](docs/agents/reviewer.md).

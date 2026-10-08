@@ -1,0 +1,14 @@
+//! A fixture crate. Nothing here is unsafe code.
+
+/// One step. It is never unsafe to call.
+pub fn step() {
+    // Says unsafe in a comment only.
+    let message = "unsafe is a word in a message";
+    let _ = message;
+    let unsafe_count = 0;
+    let _ = unsafe_count;
+    count_unsafe_code(unsafe_count);
+}
+
+/// A function whose name says unsafe code.
+fn count_unsafe_code(_: u32) {}
