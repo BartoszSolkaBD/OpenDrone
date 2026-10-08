@@ -1,0 +1,86 @@
+# A Whoop 65 hovering with its props 17.5 mm (one rotor radius) below the
+# ceiling, its motors "settled": spinning at the speed that holds its height
+# there. The ceiling blocks the air each rotor draws in, so for the same
+# power it gives more thrust and the Quad hovers on slower motors: the
+# ceiling effect (E21 in #10; crates/physics/src/ground_and_ceiling.rs). In
+# open air its settled motors turn at 22,731.6 RPM ("Settled motors hold a
+# Whoop 65 in a hover from the first step"); here they need 22,506.3 RPM.
+#
+# The working, Hsiao & Chirarattananon 2019 (research source S13, eqs. 6, 7
+# and 10, with their recirculation factor α₁ = 0, as Elliott-Roe et al., S14,
+# eq. 2, use it): a rotor z below a ceiling needs γ times less power for the
+# same thrust, with γ = ½ + ½·√(1 + α₀/(8·(z/R)²)), and thrust grows with
+# power to the ⅔, so at the same power, which a motor at a fixed speed gives
+# its prop here, the thrust is γ^⅔ times its open-air thrust (Hsiao &
+# Chirarattananon §V.C: "amplified by a factor of 4^(2/3) or 2.5 times for
+# the same power consumption"). With z/R = 1 and α₀ = 1 (the Whoop 65's
+# ceiling_effect_asymmetry):
+#
+# - γ = ½ + ½·√(1 + 1/8) = 1.030330;
+# - each rotor gives γ^⅔ = 1.020119 times its open-air thrust;
+# - so the hover takes 22,731.6 RPM / √1.020119 = 22,506.3 RPM.
+#
+# The Map is the floor and ceiling Test Map: the ceiling, from 3.1 m up, is a
+# closed triangle-mesh slab. The Quad's centre is 8 mm below its props, at
+# 3.0745 m, so its duct rings' tops (15 mm above its centre) are 10.5 mm from
+# the ceiling, and the floor is far beyond the 17.5 cm each rotor looks. At
+# rest the Quad's drag does nothing. The run is one step long: it checks the
+# start. "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on
+# a drive that sinks it in open air" shows what the pull does next.
+format = 1
+name   = "One rotor radius under the ceiling, a Whoop 65's rotors give 2% more thrust, so it hovers on slower motors"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/floor-and-ceiling"
+position          = "0 m east, 0 m north, 3.0745 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "37%" },
+]
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "22506.3 RPM ± 0.01%"
+basis = "source: Hsiao & Chirarattananon 2019 (S13), eqs. 6, 7 and 10 with α₁ = 0 (Elliott-Roe et al. 2024, S14, eq. 2): one rotor radius below the ceiling, with α₀ = 1, γ = ½ + ½·√(1 + 1/8) = 1.030330, and at the same power each rotor gives γ^⅔ = 1.020119 times its open-air thrust, so the hover takes 22,731.6 RPM / √1.020119 = 22,506.3 RPM"
+
+[[expect]]
+what  = "total thrust"
+at    = "0 s"
+value = "31.211 gf ± 0.01%"
+basis = "rule: settled motors carry the Quad's weight, 0.0312 kg × 9.81 m/s² = 0.30607 N, which is 31.211 grams of thrust"
+
+[[expect]]
+what  = "vertical acceleration"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.01 m/s²"
+basis = "rule: on the first step the thrust, with the ceiling's gain, still equals the weight; a motor moves only 1/280 of the way towards a new command in one step"

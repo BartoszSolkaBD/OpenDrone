@@ -24,11 +24,14 @@
 //!   E25, E26; [`air`]);
 //! - the rotors' own spin: the frame turning against a rotor that speeds up or
 //!   slows down, and their spin's gyroscopic push in a flip (E7, E8; step 6
-//!   below).
+//!   below);
+//! - ground and ceiling effect: each rotor looks down and up at the Map, and
+//!   gets a cushion near a floor and a pull under a ceiling, so a Quad half
+//!   over a ledge tips away from it (E20, E21; [`ground_and_ceiling`]). They
+//!   are the only flight effects that read the Map.
 //!
-//! The other effects arrive with their own tickets and Scenarios: ground and
-//! ceiling effect (#44), Prop Strikes and stalled motors' restarts (#45),
-//! Prop Wash (#46), and so on.
+//! The other effects arrive with their own tickets and Scenarios: Prop
+//! Strikes and stalled motors' restarts (#45), Prop Wash (#46), and so on.
 //!
 //! # How one step moves the Quad
 //!
@@ -42,8 +45,10 @@
 //!    charge goes down ([`battery`]).
 //! 4. The forces on the Quad give its acceleration: the Map's gravity, each
 //!    rotor's thrust along the body's up axis in the air the rotor moves
-//!    through, and the air's drag ([`air`]). They are worked out from where
-//!    the step started, with the motors' new speeds.
+//!    through, the air's drag ([`air`]), and the gain a surface close to a
+//!    rotor gives its thrust, found by looking down and up from each rotor
+//!    at the Map ([`ground_and_ceiling`]). They are worked out from where the
+//!    step started, with the motors' new speeds.
 //! 5. Semi-implicit Euler: the speed changes first, then the position moves
 //!    with the new speed.
 //! 6. The rotation changes by Euler's equation for a rigid body carrying
@@ -160,6 +165,7 @@
 pub mod air;
 mod collide;
 mod geometry;
+pub mod ground_and_ceiling;
 mod map;
 mod shape;
 
@@ -221,6 +227,8 @@ pub struct QuadParameters {
     pub battery: BatteryParameters,
     /// The Quad's collision shape, and how it bounces and slides.
     pub shape: QuadShape,
+    /// How strong ground and ceiling effect are.
+    pub ground_and_ceiling: GroundAndCeiling,
 }
 
 /// The Quad's drag numbers ([`air`] says how each acts). Scenarios that must
@@ -251,6 +259,21 @@ impl Drag {
         duct_ram: 0.0,
         duct_offset: 0.0,
     };
+}
+
+/// The Quad definition's numbers for ground and ceiling effect
+/// ([`ground_and_ceiling`] says how each acts). The rest of both effects
+/// comes from the rotors' size and layout alone.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GroundAndCeiling {
+    /// Sanchez-Cuevas et al.'s body-lift coefficient `K_b`: how much the air
+    /// thrown back up under the body adds to the ground effect. 0 or more;
+    /// close to 2 in their tests.
+    pub ground_effect_body: f64,
+    /// Hsiao and Chirarattananon's `α₀`: how unevenly the air flows round a
+    /// rotor under a ceiling. 1 is their plain model; more pulls harder, and
+    /// 0 gives no ceiling effect.
+    pub ceiling_effect_asymmetry: f64,
 }
 
 /// Where a Quad is and how it moves.
@@ -309,8 +332,10 @@ pub enum StartingMotors {
     Stopped,
     /// Spinning at the speed that holds the Quad's height at the stated
     /// motion, with the ESCs running (ADR-0002): the same speed on every
-    /// motor, whose thrust's upward part, with the air's push at that motion,
-    /// carries the weight. Tilted, that is more thrust than the weight, and
+    /// motor, whose thrust's upward part, with the air's push at that motion
+    /// and the gain from any floor or ceiling near the rotors (on a Map,
+    /// [`QuadBody::new_on_map`]), carries the weight. Tilted, that is more
+    /// thrust than the weight, and
     /// the thrust's sideways part holds the speed only where the air's drag
     /// matches it. Never more than full drive gives: tilted further than that
     /// can hold, full drive. None upside down or past its side, where thrust
@@ -343,6 +368,10 @@ pub enum SetUpProblem {
     /// Every size in the collision shape must be above zero, its bounce from
     /// 0 to 1 and its friction 0 or more.
     ShapeCantBeBuilt,
+    /// The ground effect's body term and the ceiling effect's asymmetry must
+    /// be 0 or more, and the body term small enough for the rotors' layout
+    /// that close to a floor the rotors still push air down.
+    GroundOrCeilingEffectCantWork,
 }
 
 /// What one motor reports after a step.
@@ -390,10 +419,25 @@ pub struct QuadBody {
 }
 
 impl QuadBody {
+    /// A Quad starting in open air, with no Map near it: as
+    /// [`QuadBody::new_on_map`] with a Map that has no solid parts.
     pub fn new(
         parameters: QuadParameters,
         start: QuadStart,
         world: &World,
+    ) -> Result<QuadBody, SetUpProblem> {
+        QuadBody::new_on_map(parameters, start, world, &MapCollision::default())
+    }
+
+    /// A Quad starting on a Map. The Map's surfaces near its rotors at the
+    /// start count, through ground and ceiling effect, for the speed
+    /// "settled" motors spin at and the thrust it reports before its first
+    /// step.
+    pub fn new_on_map(
+        parameters: QuadParameters,
+        start: QuadStart,
+        world: &World,
+        map: &MapCollision,
     ) -> Result<QuadBody, SetUpProblem> {
         // Written so that "not a number" fails too.
         let above_zero = |value: f64| value > 0.0 && value.is_finite();
@@ -426,11 +470,24 @@ impl QuadBody {
         if !parameters.shape.is_buildable() {
             return Err(SetUpProblem::ShapeCantBeBuilt);
         }
+        let positions = parameters.rotors.positions();
+        if !ground_and_ceiling::can_work(&rotors(&parameters, &positions)) {
+            return Err(SetUpProblem::GroundOrCeilingEffectCantWork);
+        }
 
         let battery = Battery::new(&parameters.battery, start.battery);
         let model = Model::new(&parameters.motors, &parameters.props, world.air_density);
-        let positions = parameters.rotors.positions();
         let turning = parameters.rotors.turning();
+        // On the thrust stand the Quad is held in still air, away from the
+        // Map; free, its rotors look at the Map from where it starts.
+        let surfaces = |pushing: [bool; 4]| match start.mount {
+            Mount::ThrustStand => [1.0; 4],
+            Mount::Free => {
+                let rotors = rotors(&parameters, &positions);
+                let distances = ground_and_ceiling::look(map, &start.state, &rotors, pushing);
+                ground_and_ceiling::gains(&distances, &rotors)
+            }
+        };
         let (motors, escs) = match start.motors {
             StartingMotors::PoweringUp => ([Motor::STOPPED; 4], [Esc::powering_up(); 4]),
             StartingMotors::Stopped => ([Motor::STOPPED; 4], [Esc::ready(); 4]),
@@ -442,6 +499,7 @@ impl QuadBody {
                     &start.state,
                     world,
                     most,
+                    &surfaces([true; 4]),
                 );
                 let motor = Motor::steady(&model, speed, battery.voltage());
                 ([motor; 4], [Esc::running(); 4])
@@ -452,7 +510,7 @@ impl QuadBody {
             Mount::ThrustStand => speeds.map(|speed| model.thrust(speed)),
             Mount::Free => {
                 let state = &start.state;
-                air::push(
+                let mut push = air::push(
                     &airframe(&parameters, &positions),
                     &model,
                     state.attitude.world_to_body(state.velocity),
@@ -460,8 +518,10 @@ impl QuadBody {
                     speeds,
                     world.air_density,
                     world.gravity,
-                )
-                .thrusts
+                );
+                let gains = surfaces(speeds.map(|speed| speed > 0.0));
+                ground_and_ceiling::add_lift(&mut push, &gains, &positions);
+                push.thrusts
             }
         };
         let parts = parameters.shape.parts();
@@ -588,7 +648,13 @@ impl QuadBody {
         // gave, so their push is in them, and redoes the move from where the
         // step started.
         let before = self.state;
-        self.move_freely(world, &model, speeds_before, dt);
+        // Each rotor that pushes air looks down and up at the Map from where
+        // the step starts (step 4).
+        let rotors = rotors(&self.parameters, &self.positions);
+        let pushing = self.motors.map(|motor| motor.speed > 0.0);
+        let distances = ground_and_ceiling::look(map, &self.state, &rotors, pushing);
+        let gains = ground_and_ceiling::gains(&distances, &rotors);
+        self.move_freely(world, &model, speeds_before, &gains, dt);
         let collider = Collider {
             mass: self.parameters.mass,
             inertia_inverse: self.inertia_inverse,
@@ -608,12 +674,20 @@ impl QuadBody {
     }
 
     /// Steps 4 to 7: the move as if nothing were in the way, under gravity,
-    /// the rotors' thrust and torques, and the air. `speeds_before` are the
-    /// motors' speeds before this step's.
-    fn move_freely(&mut self, world: &World, model: &Model, speeds_before: [f64; 4], dt: f64) {
+    /// the rotors' thrust and torques, and the air, with each rotor's thrust
+    /// gain from the surfaces near it. `speeds_before` are the motors' speeds
+    /// before this step's.
+    fn move_freely(
+        &mut self,
+        world: &World,
+        model: &Model,
+        speeds_before: [f64; 4],
+        gains: &[f64; 4],
+        dt: f64,
+    ) {
         let speeds = self.motors.map(|motor| motor.speed);
         let state = &mut self.state;
-        let push = air::push(
+        let mut push = air::push(
             &airframe(&self.parameters, &self.positions),
             model,
             state.attitude.world_to_body(state.velocity),
@@ -622,6 +696,7 @@ impl QuadBody {
             world.air_density,
             world.gravity,
         );
+        ground_and_ceiling::add_lift(&mut push, gains, &self.positions);
         self.thrusts = push.thrusts;
 
         // Each prop's drag torque, and the rotors' own spin (step 6).
@@ -692,6 +767,19 @@ impl QuadBody {
     }
 }
 
+/// What ground and ceiling effect need to know about a Quad.
+fn rotors<'a>(
+    parameters: &'a QuadParameters,
+    positions: &'a [Vec3; 4],
+) -> ground_and_ceiling::Rotors<'a> {
+    ground_and_ceiling::Rotors {
+        positions,
+        radius: parameters.props.diameter / 2.0,
+        diagonal: parameters.rotors.diagonal,
+        strengths: &parameters.ground_and_ceiling,
+    }
+}
+
 /// What the air needs to know about a Quad.
 fn airframe<'a>(parameters: &'a QuadParameters, positions: &'a [Vec3; 4]) -> air::Airframe<'a> {
     let diameter = parameters.props.diameter;
@@ -705,14 +793,16 @@ fn airframe<'a>(parameters: &'a QuadParameters, positions: &'a [Vec3; 4]) -> air
 
 /// The speed "settled" motors spin at (see [`StartingMotors::Settled`]): the
 /// same on all four, whose thrust's upward part, with the air's push at the
-/// starting motion, carries the weight; at most `most`, the speed full drive
-/// holds; none upside down or past its side.
+/// starting motion and the `gains` of the surfaces near the rotors, carries
+/// the weight; at most `most`, the speed full drive holds; none upside down
+/// or past its side.
 fn settled_speed(
     airframe: &air::Airframe,
     model: &Model,
     state: &QuadState,
     world: &World,
     most: f64,
+    gains: &[f64; 4],
 ) -> f64 {
     if state.attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0)).z <= 0.0 {
         return 0.0;
@@ -721,7 +811,7 @@ fn settled_speed(
     // How much more than the weight the thrust and the air hold up, in
     // newtons, with every rotor at `speed`.
     let held_up = |speed: f64| {
-        let push = air::push(
+        let mut push = air::push(
             airframe,
             model,
             velocity,
@@ -730,6 +820,7 @@ fn settled_speed(
             world.air_density,
             world.gravity,
         );
+        ground_and_ceiling::add_lift(&mut push, gains, airframe.positions);
         state.attitude.body_to_world(push.force).z - airframe.mass * world.gravity
     };
     // With the motors stopped, the air alone (falling fast) may hold it up.

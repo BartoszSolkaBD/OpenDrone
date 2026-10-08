@@ -59,7 +59,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "e53dc6ebcda80458"   # test/freestyle-5-bench-supply: what the Simulation receives from it
+quad = "fd56361ca4d40849"   # test/freestyle-5-bench-supply: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
 run  = "6a7e84491cd2ac6c"   # the whole state after each of 16000 steps at 8000 Hz, in order
 

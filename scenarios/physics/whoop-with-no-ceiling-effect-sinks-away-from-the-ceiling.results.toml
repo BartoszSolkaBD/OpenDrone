@@ -1,0 +1,46 @@
+# Results of whoop-with-no-ceiling-effect-sinks-away-from-the-ceiling.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "With no ceiling effect, a Whoop 65 on a slowly sinking drive sinks away from the ceiling"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Rule"
+expected = "22731.6 RPM ± 0.01%"
+measured = "22700 RPM"
+
+[[expect]]
+what     = "height, highest over 0 s to 2 s"
+basis    = "Observed"
+expected = "3.0745 m ± 0.0002 m"
+measured = "3.07 m"
+
+[[expect]]
+what     = "height at 2 s"
+basis    = "Observed"
+expected = "3.0425 m ± 0.005 m"
+measured = "3.04 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "f9d1923032863a3e"   # test/whoop-65-no-ceiling-effect: what the Simulation receives from it
+map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
+run  = "b4cff2317b19f227"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "dc4dc9a56ea1b432"
+"0.4 s" = "5957c3a72c0cb282"
+"0.6 s" = "26ba8d0aae600ed8"
+"0.8 s" = "dd00bb21a4136f86"
+"1 s" = "dece2591c2b4cd5e"
+"1.2 s" = "2de32b723741a51e"
+"1.4 s" = "c89522c96cf0a083"
+"1.6 s" = "fe201c2f31628d8d"
+"1.8 s" = "e0eaaaf7ce47ffa3"
+"2 s" = "c7699ea6079d314b"

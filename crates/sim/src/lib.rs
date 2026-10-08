@@ -97,6 +97,7 @@ pub use opendrone_flight_controller::{
     ArmingBlocks, Channel, Channels, DebugRecord, FailsafePhase, FailsafeReadings, Rates,
     SensorReadings, Terms, Tune,
 };
+pub use opendrone_physics::GroundAndCeiling;
 pub use opendrone_physics::{
     BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
     MotorOutput, MotorParameters, Mount, PropDirection, PropParameters, QuadParameters, QuadState,
@@ -204,7 +205,7 @@ impl SimulatedQuad {
     /// ESCs just powered, and its Flight Controller powered up fresh. Its
     /// Radio Link and the Flight Inputs still to arrive are the pilot's, so
     /// they go on.
-    fn reset(&mut self, world: &World) {
+    fn reset(&mut self, world: &World, map: &MapCollision) {
         let start = QuadStart {
             state: self.launch_spot,
             motors: StartingMotors::PoweringUp,
@@ -213,7 +214,7 @@ impl SimulatedQuad {
         };
         // The same parameters were accepted at set-up, so they are accepted
         // again; if they weren't, the Quad would stay as it was.
-        if let Ok(body) = QuadBody::new(self.body.parameters().clone(), start, world) {
+        if let Ok(body) = QuadBody::new_on_map(self.body.parameters().clone(), start, world, map) {
             self.body = body;
         }
         self.motor_commands = MotorCommands::STOPPED;
@@ -236,12 +237,12 @@ impl Simulation {
                 battery: quad.battery,
                 mount: quad.mount,
             };
-            let body = QuadBody::new(quad.parameters, start, &set_up.world).map_err(|problem| {
-                SetUpError::Quad {
+            let body = QuadBody::new_on_map(quad.parameters, start, &set_up.world, &map).map_err(
+                |problem| SetUpError::Quad {
                     quad: index,
                     problem,
-                }
-            })?;
+                },
+            )?;
             quads.push(SimulatedQuad {
                 body,
                 launch_spot: quad.launch_spot,
@@ -292,7 +293,7 @@ impl Simulation {
                     FlightInput::Channels(channels) => quad.radio_link.hear(channels),
                     FlightInput::InputDeviceLost => quad.radio_link.lose(),
                     FlightInput::InputDeviceBack => quad.radio_link.back(),
-                    FlightInput::Reset => quad.reset(&self.world),
+                    FlightInput::Reset => quad.reset(&self.world, &self.map),
                 }
             }
             let frame = quad.radio_link.frame(self.time);

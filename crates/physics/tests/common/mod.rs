@@ -5,9 +5,9 @@
 
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, Mount, PropDirection,
-    PropParameters, QuadParameters, QuadShape, QuadStart, QuadState, RotorLayout, StartingMotors,
-    World,
+    BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters, Mount,
+    PropDirection, PropParameters, QuadParameters, QuadShape, QuadStart, QuadState, RotorLayout,
+    StartingMotors, World,
 };
 
 pub const WORLD: World = World {
@@ -74,8 +74,15 @@ pub fn whoop() -> QuadParameters {
             slow_sag: 0.0,
         },
         shape: whoop_shape(),
+        ground_and_ceiling: WHOOP_GROUND_AND_CEILING,
     }
 }
+
+/// The Whoop 65's ground and ceiling effect numbers.
+pub const WHOOP_GROUND_AND_CEILING: GroundAndCeiling = GroundAndCeiling {
+    ground_effect_body: 2.0,
+    ceiling_effect_asymmetry: 1.0,
+};
 
 /// The Whoop 65's collision shape, as its Quad definition gives it.
 pub fn whoop_shape() -> QuadShape {

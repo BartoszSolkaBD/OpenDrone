@@ -3,7 +3,7 @@
 
 use core::f64::consts::PI;
 
-use opendrone_maths::functions::{cos, max, min};
+use opendrone_maths::functions::{cbrt, cos, max, min};
 use opendrone_maths::{
     Attitude, DEGREE, Fingerprint, Fingerprinter, Mat3, PilotAngles, PilotRates, Vec3,
 };
@@ -205,6 +205,14 @@ fn a_fingerprint_is_the_same_on_every_computer() {
         Fingerprinter::new().finish().to_string(),
         "cbf29ce484222325"
     );
+}
+
+#[test]
+fn the_cube_root_undoes_cubing_whichever_side_of_zero() {
+    assert_eq!(cbrt(8.0), 2.0);
+    assert_eq!(cbrt(-27.0), -3.0);
+    let x = 1.112_372_435_695_794_5_f64;
+    assert!((cbrt(x * x) * cbrt(x) - x).abs() < 1e-15);
 }
 
 #[test]

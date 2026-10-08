@@ -1,0 +1,97 @@
+# A Whoop 65 hovering with its props 35 mm (two rotor radii) above the floor,
+# its motors "settled": spinning at the speed that holds its height there.
+# Near the floor each rotor's air is pushed back up through it, so it gives
+# more thrust at the same speed and the Quad hovers on slower motors: the
+# cushion of ground effect (E20 in #10; crates/physics/src/ground_and_ceiling.rs).
+# In open air its settled motors turn at 22,731.6 RPM ("Settled motors hold a
+# Whoop 65 in a hover from the first step"); here they need 21,710.9 RPM.
+#
+# The working, Sanchez-Cuevas, Heredia & Ollero 2017 (research source S12,
+# flight-dynamics research §4.5), eq. (4), for four rotors level over the
+# ground at height z = 35 mm, with R = 17.5 mm (35 mm props), d = 46.669 mm
+# between neighbouring rotors' axes (the 66 mm diagonal over √2), b = 66 mm
+# between opposite ones, and the body-lift coefficient K_b = 2 (the Whoop 65's
+# ground_effect_body):
+#
+# - (R/4z)² = 0.015625: the rotor's own image (eq. 2 alone would give 1.6%);
+# - R²·z/√(d² + 4z²)³ = 0.018000: its two neighbours' images;
+# - (R²/2)·z/√(2d² + 4z²)³ = 0.006018: the opposite rotor's image;
+# - 2R²·z/√(b² + 4z²)³·K_b = 0.048147: the air thrown back up under the body;
+# - so each rotor gives 1 / (1 − 0.087791) = 1.096240 times its open-air
+#   thrust at the same speed, and a quarter of the weight takes the open-air
+#   hover speed over √1.096240: 22,731.6 RPM / 1.047015 = 21,710.9 RPM.
+#
+# The Map is the floor and ceiling Test Map: the floor is a triangle-mesh
+# sheet, and the ceiling, 3.1 m up, is far beyond the 17.5 cm each rotor
+# looks (ten rotor radii). At rest the Quad's drag does nothing.
+format = 1
+name   = "Two rotor radii over the floor, a Whoop 65's rotors give 9.6% more thrust, so it hovers on slower motors"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/floor-and-ceiling"
+position          = "0 m east, 0 m north, 0.027 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# 35.2%: about the drive that holds that slower speed on this pack once it has
+# sagged under the hover's load.
+timeline = [
+  { at = "0 s", motors = "35.2%" },
+]
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "21710.9 RPM ± 0.01%"
+basis = "source: Sanchez-Cuevas, Heredia & Ollero 2017 (S12), eq. (4): with its props 35 mm over the floor (z = 2R), R = 17.5 mm, d = 46.669 mm, b = 66 mm and K_b = 2, each rotor gives 1/(1 − 0.015625 − 0.018000 − 0.006018 − 0.048147) = 1.096240 times its open-air thrust, so the hover takes 22,731.6 RPM / √1.096240 = 21,710.9 RPM"
+
+[[expect]]
+what  = "total thrust"
+at    = "0 s"
+value = "31.211 gf ± 0.01%"
+basis = "rule: settled motors carry the Quad's weight, 0.0312 kg × 9.81 m/s² = 0.30607 N, which is 31.211 grams of thrust"
+
+[[expect]]
+what  = "vertical acceleration"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.01 m/s²"
+basis = "rule: on the first step the thrust, with the floor's gain, still equals the weight; a motor moves only 1/280 of the way towards a new command in one step"
+
+[[expect]]
+what   = "height"
+over   = "0 s to 0.5 s"
+lowest = "0.027 m ± 0.002 m"
+basis  = "observed: at 35.2% drive the cushion holds it within 2 mm of its height for half a second"
+
+[[expect]]
+what    = "height"
+over    = "0 s to 0.5 s"
+highest = "0.027 m ± 0.002 m"
+basis   = "observed: at 35.2% drive the cushion holds it within 2 mm of its height for half a second"

@@ -1,0 +1,126 @@
+# A Whoop 65 hovering half over a ledge, nose east, its centre right over the
+# ledge's edge: its two rear rotors are over the platform, 35 mm (two rotor
+# radii) above it, and its two front rotors over the drop, the ground a metre
+# further down, beyond the 17.5 cm each rotor looks (ten rotor radii). Its
+# motors are "settled", all four at the one speed that holds its height. Only
+# the rear pair gets the ground's cushion, so the rear lifts harder than the
+# front and tips the nose down, away from the ledge: the pitch kick of flying
+# off an edge (E20 in #10; crates/physics/src/ground_and_ceiling.rs).
+#
+# Sanchez-Cuevas, Heredia & Ollero 2017 (research source S12) call this the
+# partial ground effect: the rotors over the surface lift more, and the
+# moment tips the multirotor away from the surface (§2.3, Figure 7).
+#
+# The working (their method of images, eqs. 2 to 4, for the two rotors over
+# the platform; R = 17.5 mm, d = 46.669 mm between the rear pair's axes,
+# b = 66 mm, K_b = 2, z = 35 mm):
+#
+# - (R/4z)² = 0.015625: each rear rotor's own image;
+# - (R²/2)·z/√(d² + 4z²)³ = 0.009000: the other rear rotor's image (half
+#   eq. (3)'s term for two neighbours: only one is over the platform);
+# - a third of eq. (4)'s body term, 0.048147 / 3 = 0.016049: one of each
+#   rotor's three others is over the platform too (the body term with only
+#   some rotors over a surface has no published form; this sharing is
+#   OpenDrone's, see ground_and_ceiling.rs);
+# - so each rear rotor gives 1 / (1 − 0.040674) = 1.042399 times a front
+#   rotor's thrust at the same speed.
+# - All four at one speed carry the weight, 0.30607 N: the front pair gives
+#   T each and the rear pair 1.042399·T each, so T = 0.30607 N /
+#   (2 × 2.042399) = 0.074930 N (7.6407 gf), and the rear pair 0.078107 N
+#   (7.9646 gf). That takes √(0.074930 / 1.35035 × 10⁻⁸) rad/s = 22,494.4
+#   RPM.
+# - The rear pair sits 23.335 mm behind the centre and the front pair as far
+#   ahead (half the 66 mm diagonal over √2), so the moment is 2 × 0.023335 m ×
+#   (0.078107 − 0.074930) N = 1.4826 × 10⁻⁴ N·m, nose down, and with the
+#   pitch inertia of 9 × 10⁻⁶ kg·m² the pitch speeds up at 16.474 rad/s²:
+#   after one step (0.125 ms), 0.0020592 rad/s, 0.11798 °/s nose down.
+#
+# The ledge Test Map's platform is a convex shape, 1 m high, its edge
+# running north–south through the origin; the ground round it is a box.
+format = 1
+name   = "Half over a ledge, a Whoop 65 gets a pitch kick away from it"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/ledge"
+position          = "0 m east, 0 m north, 1.027 m up"
+attitude          = "level, heading 90°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "36.9%" },
+]
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "22494.4 RPM ± 0.01%"
+basis = "rule: all four settled at one speed whose thrust, with the rear pair's gain of 1.042399, carries the weight: T = 0.30607 N / (2 × 2.042399) = 0.074930 N, √(0.074930 / 1.35035 × 10⁻⁸) rad/s = 22,494.4 RPM"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "0 s"
+value = "7.9646 gf ± 0.01%"
+basis = "rule: motor 1, rear right, over the platform 35 mm below: 1.042399 × 7.6407 gf, from Sanchez-Cuevas et al.'s (S12) images of the two rotors over the platform, (R/4z)² = 0.015625 and (R²/2)·z/√(d² + 4z²)³ = 0.009000, plus a third of eq. (4)'s body term, 0.016049"
+
+[[expect]]
+what  = "motor 2 thrust"
+at    = "0 s"
+value = "7.6407 gf ± 0.01%"
+basis = "rule: motor 2, front right, over the drop: no surface within its reach, so its open-air thrust at the same speed as motor 1"
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.000125 s"
+value = "-0.11798 °/s ± 1%"
+basis = "rule: the rear pair's extra 2 × 0.0031768 N, 23.335 mm behind the centre, against the front pair's lever as far ahead: 1.4826 × 10⁻⁴ N·m nose down, over the pitch inertia of 9 × 10⁻⁶ kg·m², for one 0.125 ms step"
+
+[[expect]]
+what    = "pitch"
+over    = "0 s to 0.3 s"
+highest = "between -90° and 0°"
+basis   = "source: Sanchez-Cuevas, Heredia & Ollero 2017 (S12) §2.3 and Figure 7: in the partial ground effect the rotors over the surface lift more, tipping the multirotor away from it; here the nose goes down, away from the platform behind, and never comes up"
+
+[[expect]]
+what  = "pitch"
+at    = "0.1 s"
+value = "-4.34° ± 0.2°"
+basis = "observed: a tenth of a second on, the kick has tipped its nose 4.3° down"
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 0.5 s"
+lowest  = "0 m ± 0.0001 m"
+basis   = "observed: tipped nose down, its thrust carries it east, off the ledge, and never back over it"
+
+[[expect]]
+what  = "distance east"
+at    = "0.5 s"
+value = "0.182 m ± 0.02 m"
+basis = "observed: half a second on, it has flown 18 cm east, off the ledge"

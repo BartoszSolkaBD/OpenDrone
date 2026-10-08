@@ -1,0 +1,76 @@
+# Results of whoop-half-over-a-ledge-gets-a-pitch-kick.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Half over a ledge, a Whoop 65 gets a pitch kick away from it"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Rule"
+expected = "22494.4 RPM ± 0.01%"
+measured = "22500 RPM"
+
+[[expect]]
+what     = "motor 1 thrust at 0 s"
+basis    = "Rule"
+expected = "7.9646 gf ± 0.01%"
+measured = "7.96 gf"
+
+[[expect]]
+what     = "motor 2 thrust at 0 s"
+basis    = "Rule"
+expected = "7.6407 gf ± 0.01%"
+measured = "7.64 gf"
+
+[[expect]]
+what     = "pitch rate at 0.000125 s"
+basis    = "Rule"
+expected = "-0.11798 °/s ± 1%"
+measured = "-0.118 °/s"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 0.3 s"
+basis    = "Source"
+expected = "between -90° and 0°"
+measured = "-0.0000147°"
+
+[[expect]]
+what     = "pitch at 0.1 s"
+basis    = "Observed"
+expected = "-4.34° ± 0.2°"
+measured = "-4.34°"
+
+[[expect]]
+what     = "distance east, lowest over 0 s to 0.5 s"
+basis    = "Observed"
+expected = "0 m ± 0.0001 m"
+measured = "-0.000000000313 m"
+
+[[expect]]
+what     = "distance east at 0.5 s"
+basis    = "Observed"
+expected = "0.182 m ± 0.02 m"
+measured = "0.182 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "2a4a202f72812d27"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "3f46d31aaa3924b8"   # test/ledge
+run  = "c870f32275bfef99"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "4f96b7e238eda9eb"
+"0.1 s" = "0f228022633cd669"
+"0.15 s" = "362a1709788cb75c"
+"0.2 s" = "7c3b0836930a96a7"
+"0.25 s" = "3cf718e2797268ce"
+"0.3 s" = "08917c0733fe1654"
+"0.35 s" = "f12be5cc0c402bc2"
+"0.4 s" = "4cda6b978751adf1"
+"0.45 s" = "c13f85b7156707db"
+"0.5 s" = "0e6af3c079ee9c43"
