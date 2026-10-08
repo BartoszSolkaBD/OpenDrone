@@ -236,7 +236,7 @@ fn renaming_a_quads_folder_must_keep_every_number() {
 }
 
 #[test]
-fn renaming_a_quads_folder_alone_passes() {
+fn renaming_a_quads_folder_alone_passes_and_names_the_quad_it_took_out() {
     let scratch = Scratch::new("feel-tests-pure-rename").with_base();
     fs::rename(
         scratch.root.join("packs/fixture/quads/ducted"),
@@ -246,6 +246,308 @@ fn renaming_a_quads_folder_alone_passes() {
     scratch.commit("rename the Quad's folder");
     let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
     assert!(passed, "{text}");
+    assert!(
+        text.contains("Quads this change takes out, each renamed, moved or retired; the Reviewer checks each one:\n- fixture/ducted, renamed or moved to fixture/ducted-pro with every setting as it was"),
+        "{text}"
+    );
+}
+
+/// The fixture Pack's manifest.
+const MANIFEST: &str = "packs/fixture/pack.toml";
+
+#[test]
+fn taking_a_quad_out_blocks_unless_its_pack_retires_it() {
+    let scratch = Scratch::new("feel-tests-quad-taken-out").with_base();
+    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    scratch.commit("take the Quad out, saying nothing");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains("- packs/fixture/quads/ducted/quad.toml: this change takes out the Quad fixture/ducted without saying so. Put it back, or retire it: add \"quads/ducted\" = \"<why>\" under [retired] in its Pack's pack.toml. To take a whole Pack out, retire its Quads in one change and take the Pack out in the next"),
+        "{text}"
+    );
+
+    let scratch = Scratch::new("feel-tests-quad-retired").with_base();
+    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    scratch.append(
+        MANIFEST,
+        "\n[retired]\n\"quads/ducted\" = \"Replaced by a 75 mm whoop with the same ducts.\"",
+    );
+    scratch.commit("retire the Quad");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(passed, "{text}");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("- fixture/ducted, retired by packs/fixture/pack.toml line 15: \"Replaced by a 75 mm whoop with the same ducts.\""),
+        "{text}"
+    );
+
+    // Reviewer's case on #103: brought back later, with its inertia 20×, it
+    // has nothing to compare with, so CI says it was retired before, for the
+    // Reviewer to compare it with its old numbers.
+    copy(
+        &repo_root().join("crates/pack/tests/fixtures/good/packs/fixture/quads/ducted"),
+        &scratch.root.join("packs/fixture/quads/ducted"),
+    );
+    scratch.change("packs/fixture/quads/ducted/quad.toml", INERTIA, INERTIA_20X);
+    scratch.change(
+        MANIFEST,
+        "\n[retired]\n\"quads/ducted\" = \"Replaced by a 75 mm whoop with the same ducts.\"\n",
+        "",
+    );
+    scratch.commit("bring the Quad back");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("New, previously retired Quads, with no version at HEAD^1 to compare; the Reviewer compares each with its numbers from before it was retired:\n- fixture/ducted, which packs/fixture/pack.toml line 15 retired before this change: \"Replaced by a 75 mm whoop with the same ducts.\""),
+        "{text}"
+    );
+    assert!(!text.contains("New Quads, with no version"), "{text}");
+}
+
+const DOT_FOLDER: &str = "is a folder whose name starts with a dot, which most computers hide, so the Pack checker refuses it rather than skip it: rename it without the dot, or take it out";
+const LINK: &str = "is a symbolic link, which the Pack checker refuses rather than follow, so it never reads from outside the folder it checks: put the real file or folder here";
+const TAKEN_OUT: &str = "- packs/fixture/quads/ducted/quad.toml: this change takes out the Quad fixture/ducted without saying so";
+
+#[test]
+fn a_pack_folder_renamed_to_a_dot_name_is_refused_so_no_number_moves_behind_it() {
+    // Reviewer's probe H on #99: the Pack's folder renamed to a dot-name, its
+    // inertia moved 20× with no row, then the folder renamed back. Each step
+    // passed: the checkers skipped the hidden folder, the base didn't, so the
+    // Quad left the comparison and came back with the move. The fixture Pack
+    // has no Test Quad building on it, so nothing else blocks.
+    let scratch = Scratch::new("probe-h-dot-named-pack-folder").with_base();
+    fs::rename(
+        scratch.root.join("packs/fixture"),
+        scratch.root.join("packs/.fixture"),
+    )
+    .unwrap();
+    scratch.commit("step 1: rename the Pack's folder to .fixture");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- packs/.fixture: {DOT_FOLDER}")),
+        "{text}"
+    );
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- packs/.fixture: {DOT_FOLDER}")),
+        "{text}"
+    );
+    assert!(text.contains(TAKEN_OUT), "{text}");
+
+    scratch.change(
+        "packs/.fixture/quads/ducted/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("step 2: move the inertia 20×, with no row");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- packs/.fixture: {DOT_FOLDER}")),
+        "{text}"
+    );
+
+    // Step 3 can only follow steps 1 and 2 if they merged past their
+    // failures. Its base then holds the hidden folder, which feel-tests reads
+    // by the same rule: it names it and reads nothing in it. Renaming it back
+    // is the fix, so the base's problem doesn't block it, and the Quad shows
+    // as new.
+    fs::rename(
+        scratch.root.join("packs/.fixture"),
+        scratch.root.join("packs/fixture"),
+    )
+    .unwrap();
+    scratch.commit("step 3: rename the folder back");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(passed, "{text}");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains(&format!("At HEAD^1, these broke the Pack rules, so nothing in them was compared:\n- packs/.fixture: {DOT_FOLDER}")),
+        "{text}"
+    );
+    assert!(
+        text.contains("New Quads, with no version at HEAD^1 to compare: fixture/ducted"),
+        "{text}"
+    );
+}
+
+/// Makes `link` a symbolic link to the folder `target`, a path relative to
+/// the link's folder, as `ln -s` does. `None` means this computer can't make
+/// one: Windows lets only an administrator, or Developer Mode, make symbolic
+/// links, so there, outside CI, the check says why and skips. In CI (the `CI`
+/// variable is set) it fails instead, so a skip never passes unseen.
+fn symbolic_link(target: &str, link: &Path) -> Option<()> {
+    #[cfg(unix)]
+    let made = std::os::unix::fs::symlink(target, link);
+    // Windows follows a link only when its target is written with `\`.
+    #[cfg(windows)]
+    let made = std::os::windows::fs::symlink_dir(target.replace('/', "\\"), link);
+    match made {
+        Ok(()) => Some(()),
+        Err(error) if cfg!(windows) && std::env::var_os("CI").is_none() => {
+            eprintln!(
+                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. CI never skips this check.",
+                link.display()
+            );
+            None
+        }
+        Err(error) => panic!(
+            "can't make the symbolic link {}: {error}. In CI (the CI variable is set) a check that needs one fails rather than skip, so a skip can never pass unseen",
+            link.display()
+        ),
+    }
+}
+
+#[test]
+fn the_packs_folder_replaced_by_a_symbolic_link_is_refused_so_no_number_moves_through_it() {
+    // Reviewer's case on #103: probe S one folder up. packs/ itself moved to
+    // stash/ and linked back, then a 20× move in stash/. Git keeps the link
+    // as one small file, so the base refused it while the working tree
+    // followed it.
+    let scratch = Scratch::new("linked-packs-folder").with_base();
+    fs::create_dir_all(scratch.root.join("stash")).unwrap();
+    fs::rename(scratch.root.join("packs"), scratch.root.join("stash/packs")).unwrap();
+    if symbolic_link("stash/packs", &scratch.root.join("packs")).is_none() {
+        return;
+    }
+    scratch.commit("step 1: move packs/ to stash/ and link it back");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+
+    scratch.change(
+        "stash/packs/fixture/quads/ducted/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("step 2: move the inertia 20× in stash/packs, with no row");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+}
+
+#[test]
+fn a_packs_link_that_points_nowhere_is_refused_rather_than_looked_past() {
+    // Found on Windows CI for #103: a `packs` link that didn't resolve looked
+    // like no packs/ at all, so the commands looked further up for one, and
+    // checked another folder's Packs instead, which passed.
+    let scratch = Scratch::new("packs-link-to-nowhere").with_base();
+    fs::remove_dir_all(scratch.root.join("packs")).unwrap();
+    if symbolic_link("nowhere", &scratch.root.join("packs")).is_none() {
+        return;
+    }
+    scratch.commit("replace packs/ with a link to nowhere");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+}
+
+#[test]
+fn the_test_quad_folder_replaced_by_a_symbolic_link_is_refused() {
+    let scratch = Scratch::new("linked-test-quad-folder");
+    copy(
+        &repo_root().join("crates/pack/tests/fixtures/good/test-quads"),
+        &scratch.root.join("scenarios/test-quads"),
+    );
+    let scratch = scratch.with_base();
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(passed, "{text}");
+    fs::create_dir_all(scratch.root.join("stash")).unwrap();
+    fs::rename(
+        scratch.root.join("scenarios/test-quads"),
+        scratch.root.join("stash/test-quads"),
+    )
+    .unwrap();
+    let link = scratch.root.join("scenarios/test-quads");
+    if symbolic_link("../stash/test-quads", &link).is_none() {
+        return;
+    }
+    scratch.commit("step 1: move the Test Quads to stash/ and link them back");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- scenarios/test-quads: {LINK}")),
+        "{text}"
+    );
+
+    scratch.change(
+        "stash/test-quads/ducted-no-drag.toml",
+        "rotor_drag = \"0 s⁻¹\"",
+        "rotor_drag = \"6 s⁻¹\"",
+    );
+    scratch.commit("step 2: change the Test Quad in stash/");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- scenarios/test-quads: {LINK}")),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_pack_folder_replaced_by_a_symbolic_link_is_refused_so_no_number_moves_through_it() {
+    // Reviewer's probe S on #99: the Pack moved to stash/ and linked back
+    // into packs/, then its inertia moved 20× in stash/ with no row. Git
+    // keeps the link as one small file, so the base had no Quads behind it,
+    // while the working tree followed it and read both as new.
+    let scratch = Scratch::new("probe-s-linked-pack-folder").with_base();
+    fs::create_dir_all(scratch.root.join("stash")).unwrap();
+    fs::rename(
+        scratch.root.join("packs/fixture"),
+        scratch.root.join("stash/fixture"),
+    )
+    .unwrap();
+    if symbolic_link("../stash/fixture", &scratch.root.join("packs/fixture")).is_none() {
+        return;
+    }
+    scratch.commit("step 1: move the Pack to stash/ and link it back");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(text.contains(&format!("- packs/fixture: {LINK}")), "{text}");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    assert!(text.contains(&format!("- packs/fixture: {LINK}")), "{text}");
+    assert!(text.contains(TAKEN_OUT), "{text}");
+
+    scratch.change("stash/fixture/quads/ducted/quad.toml", INERTIA, INERTIA_20X);
+    scratch.commit("step 2: move the inertia 20× in stash/, with no row");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(!passed, "{text}");
+    // The link is in the base too now, as git keeps it, and in the change.
+    assert!(
+        text.contains(&format!("At HEAD^1, these broke the Pack rules, so nothing in them was compared:\n- packs/fixture: {LINK}")),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!(
+            "The Feel Test log rules are broken, compared with HEAD^1:\n- packs/fixture: {LINK}"
+        )),
+        "{text}"
+    );
 }
 
 #[test]
@@ -400,8 +702,16 @@ fn removing_one_quad_and_adding_a_different_one_takes_two_changes() {
         );
     };
 
+    let retire_the_quad = |scratch: &Scratch| {
+        fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+        scratch.append(
+            MANIFEST,
+            "\n[retired]\n\"quads/ducted\" = \"Replaced by the 75 mm one.\"",
+        );
+    };
+
     let scratch = Scratch::new("feel-tests-retire-and-add-at-once").with_base();
-    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    retire_the_quad(&scratch);
     add_a_different_quad(&scratch);
     scratch.commit("retire the Quad and add a different one");
     let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
@@ -412,7 +722,7 @@ fn removing_one_quad_and_adding_a_different_one_takes_two_changes() {
     );
 
     let scratch = Scratch::new("feel-tests-retire-then-add").with_base();
-    fs::remove_dir_all(scratch.root.join("packs/fixture/quads/ducted")).unwrap();
+    retire_the_quad(&scratch);
     scratch.commit("retire the Quad");
     let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
     assert!(passed, "{text}");

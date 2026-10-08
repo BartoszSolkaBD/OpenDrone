@@ -23,6 +23,8 @@
 //! - The log only grows: earlier rows stay as they were.
 //! - Quads are paired by id, not by folder ([`compare_packs`]): a change that
 //!   removes a Quad may add one only as a pure rename or move.
+//! - A change takes a Quad out only by renaming or moving it, or by saying so
+//!   in its Pack's `[retired]` list, and every Quad taken out is named.
 //!
 //! "A new source" means the number names a different `[sources]` key, or the
 //! line of its `[sources]` key says something different. That is easy to do,
@@ -288,6 +290,15 @@ pub struct FeelTestReport {
     pub compared: Vec<String>,
     /// The id of every Quad the change adds, with nothing before it to compare.
     pub new_quads: Vec<String>,
+    /// Every new Quad whose id the version before retired, as a sentence
+    /// each with where it was retired and why: a Quad brought back, which the
+    /// Reviewer compares with its numbers from before it was retired. These
+    /// aren't in `new_quads`.
+    pub previously_retired: Vec<String>,
+    /// Every Quad the change takes out, as a sentence each, saying what
+    /// became of it: renamed or moved (and where to), or retired by its Pack
+    /// (and why). A Quad taken out any other way is a problem instead.
+    pub taken_out: Vec<String>,
 }
 
 impl FeelTestReport {
@@ -299,6 +310,8 @@ impl FeelTestReport {
             .extend(other.changed_without_a_confidence);
         self.compared.extend(other.compared);
         self.new_quads.extend(other.new_quads);
+        self.previously_retired.extend(other.previously_retired);
+        self.taken_out.extend(other.taken_out);
     }
 }
 
@@ -337,6 +350,28 @@ impl QuadFiles {
     }
 }
 
+/// A Quad that its Pack's `pack.toml` retires: one line of its `[retired]`
+/// list.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetiredQuad {
+    /// Such as `opendrone/whoop-65`: the Pack's id and the Quad's folder name.
+    pub id: String,
+    /// The Pack's manifest, such as `packs/opendrone/pack.toml`, and the line
+    /// that retires the Quad.
+    pub manifest_file: String,
+    pub line: usize,
+    pub why: String,
+}
+
+/// One version of the repo's Packs, as the Feel Test log rules compare them.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PacksVersion {
+    /// Every Quad's files.
+    pub quads: Vec<QuadFiles>,
+    /// Every Quad a Pack's `[retired]` list names.
+    pub retired: Vec<RetiredQuad>,
+}
+
 /// Compares every Quad before a change with the same Quad after it, paired by
 /// id, not by path, so moving a Pack's folder changes nothing.
 ///
@@ -346,8 +381,17 @@ impl QuadFiles {
 /// so it must be a pure rename: every setting the same as a removed Quad's. A
 /// rename that also moves a number would compare it with nothing, so it's
 /// refused. Adding a Quad in a change that removes none is a new Quad, so
-/// retiring a Quad and adding a different one takes two changes.
-pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestReport {
+/// retiring a Quad and adding a different one takes two changes. A new Quad
+/// whose id the version before retired is listed apart, so the Reviewer can
+/// compare it with its numbers from before it was retired.
+///
+/// Every Quad the change takes out is named: one renamed or moved, with
+/// where it went, and one its Pack retires (in the `[retired]` lists after
+/// the change), with why. Any other Quad taken out is refused, so no Quad
+/// leaves the comparison unseen, to come back later as new with any numbers.
+pub fn compare_packs(before: &PacksVersion, after: &PacksVersion) -> FeelTestReport {
+    let (retired_before, retired) = (&before.retired, &after.retired);
+    let (before, after) = (&before.quads, &after.quads);
     let mut report = FeelTestReport::default();
     let compare = |was: &QuadFiles, is: &QuadFiles| FeelTestReport {
         compared: vec![is.id.clone()],
@@ -357,23 +401,29 @@ pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestRepor
         .iter()
         .filter(|was| !after.iter().any(|is| is.id == was.id))
         .collect();
-    let mut renamed_from = vec![false; removed.len()];
+    let mut renamed_to: Vec<Option<&str>> = vec![None; removed.len()];
     for is in after {
         if let Some(was) = before.iter().find(|was| was.id == is.id) {
             report.extend(compare(was, is));
             continue;
         }
         if removed.is_empty() {
-            report.new_quads.push(is.id.clone());
+            match retired_before.iter().find(|line| line.id == is.id) {
+                Some(line) => report.previously_retired.push(format!(
+                    "{}, which {} line {} retired before this change: \"{}\"",
+                    is.id, line.manifest_file, line.line, line.why
+                )),
+                None => report.new_quads.push(is.id.clone()),
+            }
             continue;
         }
         let pure_rename = removed
             .iter()
             .enumerate()
-            .find(|(i, was)| !renamed_from[*i] && same_settings(&was.quad, &is.quad));
+            .find(|(i, was)| renamed_to[*i].is_none() && same_settings(&was.quad, &is.quad));
         match pure_rename {
             Some((i, was)) => {
-                renamed_from[i] = true;
+                renamed_to[i] = Some(&is.id);
                 report.extend(compare(was, is));
             }
             None => report.problems.push(Problem::of(
@@ -389,6 +439,32 @@ pub fn compare_packs(before: &[QuadFiles], after: &[QuadFiles]) -> FeelTestRepor
                         .join(", ")
                 ),
             )),
+        }
+    }
+    for (was, renamed_to) in removed.iter().zip(renamed_to) {
+        if let Some(is) = renamed_to {
+            report.taken_out.push(format!(
+                "{}, renamed or moved to {is} with every setting as it was",
+                was.id
+            ));
+        } else if let Some(line) = retired.iter().find(|line| line.id == was.id) {
+            report.taken_out.push(format!(
+                "{}, retired by {} line {}: \"{}\"",
+                was.id, line.manifest_file, line.line, line.why
+            ));
+        } else {
+            let folder = was
+                .id
+                .split_once('/')
+                .map_or(was.id.as_str(), |(_, quad)| quad);
+            report.problems.push(Problem::of(
+                &was.quad_file,
+                0,
+                format!(
+                    "this change takes out the Quad {} without saying so. Put it back, or retire it: add \"quads/{folder}\" = \"<why>\" under [retired] in its Pack's pack.toml. To take a whole Pack out, retire its Quads in one change and take the Pack out in the next",
+                    was.id
+                ),
+            ));
         }
     }
     report
