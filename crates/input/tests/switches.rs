@@ -260,3 +260,18 @@ fn rebinding_arm_to_a_button_already_held_isnt_a_press() {
     inputs.set_copy(dualsense().model(), Some(copy), Duration::from_millis(5));
     assert_eq!(now(&inputs).arm, Some(LOW_US));
 }
+
+#[test]
+fn a_key_already_held_when_the_flying_input_device_is_picked_isnt_a_press() {
+    // The pilot holds the Arm key before pressing FLY: nothing arms until
+    // the key is let go and pressed again.
+    let mut inputs = plugged_in(Some(key_armed()));
+    let a = Key::named("A").unwrap();
+    inputs.key(a.clone(), true, Duration::from_millis(10));
+    inputs.set_flying(Some(DeviceId(0)), Duration::from_millis(20));
+    assert_eq!(now(&inputs).arm, Some(LOW_US));
+    inputs.key(a.clone(), false, Duration::from_millis(30));
+    assert_eq!(now(&inputs).arm, Some(LOW_US));
+    inputs.key(a, true, Duration::from_millis(40));
+    assert_eq!(now(&inputs).arm, Some(HIGH_US), "the first real press arms");
+}

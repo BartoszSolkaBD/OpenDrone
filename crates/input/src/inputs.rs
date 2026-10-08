@@ -82,6 +82,8 @@ pub struct Device {
     channels: Channels,
     lost: Option<Lost>,
     last_heard: Duration,
+    /// When its Channels last changed, on the input thread's clock.
+    channels_at: Duration,
     stick_changes: VecDeque<Duration>,
 }
 
@@ -125,6 +127,12 @@ impl Device {
 
     pub fn channels(&self) -> Channels {
         self.channels
+    }
+
+    /// When its Channels last changed, on the input thread's clock: the
+    /// stamp of the last [`InputEvent::Channels`] it handed over.
+    pub fn channels_changed_at(&self) -> Duration {
+        self.channels_at
     }
 
     /// The Actions whose control is in its bound position right now: only a
@@ -256,11 +264,14 @@ impl Inputs {
         events
     }
 
-    /// Picks the Flying Input Device. Keys held for the old one let go.
+    /// Picks the Flying Input Device. Keys held for the old one let go. A
+    /// key already held when a device becomes the Flying Input Device isn't
+    /// a press: it moves nothing until it is let go and pressed again.
     pub fn set_flying(&mut self, device: Option<DeviceId>, at: Duration) -> Vec<InputEvent> {
         let mut events = Vec::new();
         let old = std::mem::replace(&mut self.flying, device);
         for id in [old, device].into_iter().flatten() {
+            self.seed(id);
             self.refresh(id, at, &mut events);
         }
         events
@@ -444,6 +455,7 @@ impl Inputs {
             channels: Channels::at_rest(),
             lost: None,
             last_heard: at,
+            channels_at: at,
             stick_changes: VecDeque::new(),
         });
         self.seed(id);
@@ -508,6 +520,7 @@ impl Inputs {
             device.stick_changes.push_back(at);
         }
         device.channels = new;
+        device.channels_at = at;
         events.push(InputEvent::Channels {
             device: id,
             at,

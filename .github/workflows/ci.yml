@@ -91,8 +91,9 @@ jobs:
 
       - name: SDL's Linux build loads libudev and leaves out libusb and D-Bus (ADR-0014)
         # deny.toml names libudev, which SDL loads from the system while
-        # running. libusb and D-Bus are switched off in
-        # crates/input/sdl-linux.cmake; this fails if either crept back in.
+        # running, never linked: this fails if SDL stops loading it that way.
+        # libusb and D-Bus are switched off in crates/input/sdl-linux.cmake;
+        # this fails if either crept back in.
         if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
         shell: bash
         run: |
@@ -105,6 +106,12 @@ jobs:
             grep -E "HAVE_LIBUDEV_H|SDL_UDEV_DYNAMIC|HAVE_LIBUSB|SDL_LIBUSB_DYNAMIC|HAVE_DBUS_DBUS_H" "$config"
             if grep -qE "^#define (HAVE_LIBUSB|HAVE_DBUS_DBUS_H)" "$config"; then
               echo "::error::SDL's Linux build turned on libusb or D-Bus; switch it off in crates/input/sdl-linux.cmake, or name it in deny.toml (ADR-0014)"
+              exit 1
+            fi
+            # deny.toml says libudev is loaded from the system and never
+            # linked: SDL must load it by name while running.
+            if ! grep -qE '^#define SDL_UDEV_DYNAMIC "libudev\.so' "$config"; then
+              echo "::error::SDL's Linux build doesn't load libudev from the system while running (SDL_UDEV_DYNAMIC), as deny.toml says it does (ADR-0014)"
               exit 1
             fi
           done

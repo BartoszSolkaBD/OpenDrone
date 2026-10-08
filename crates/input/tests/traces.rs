@@ -673,3 +673,11 @@ fn a_dualsense_whose_motion_sensors_didnt_start_is_never_lost_for_silence() {
     assert!(!device.lost_when_silent());
     assert!(device.heartbeat_missing(), "the game can log it");
 }
+
+#[test]
+fn each_device_keeps_the_stamp_of_its_last_channels_change() {
+    // The stamp the game turns into Simulation Time, and the monitor shows.
+    let (_, inputs, events) = pocket();
+    let (last_at, _) = *channels(&events).last().unwrap();
+    assert_eq!(inputs.devices()[0].channels_changed_at(), last_at);
+}

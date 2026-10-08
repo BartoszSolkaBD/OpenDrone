@@ -78,8 +78,6 @@ pub fn run(args: &[String]) -> ExitCode {
     let mut last_shown = Instant::now();
     let mut polls_then = thread.polls();
     let mut changes: Vec<u32> = Vec::new();
-    // When each device's Channels last changed, on the input thread's clock.
-    let mut last_change: Vec<Option<Duration>> = Vec::new();
     loop {
         let mut events = Vec::new();
         for batch in thread.batches() {
@@ -88,14 +86,12 @@ pub fn run(args: &[String]) -> ExitCode {
         events.extend(inputs.check_silence(thread.now()));
         for event in &events {
             match event {
-                InputEvent::Channels { device, at, .. } => {
+                InputEvent::Channels { device, .. } => {
                     let index = device.0 as usize;
                     if changes.len() <= index {
                         changes.resize(index + 1, 0);
-                        last_change.resize(index + 1, None);
                     }
                     changes[index] += 1;
-                    last_change[index] = Some(*at);
                 }
                 other => println!("{}", happened(&inputs, other)),
             }
@@ -117,10 +113,8 @@ pub fn run(args: &[String]) -> ExitCode {
             let seconds = last_shown.elapsed().as_secs_f64();
             let polls = thread.polls();
             for device in &connected {
-                let index = device.id().0 as usize;
-                let count = changes.get(index).copied().unwrap_or(0);
-                let last = last_change.get(index).copied().flatten();
-                println!("{}", live_line(device, last, f64::from(count) / seconds));
+                let count = changes.get(device.id().0 as usize).copied().unwrap_or(0);
+                println!("{}", live_line(device, f64::from(count) / seconds));
             }
             if !connected.is_empty() {
                 println!(
@@ -207,7 +201,7 @@ fn happened(inputs: &Inputs, event: &InputEvent) -> String {
 
 /// One device's Channels now, when they last changed, its raw sticks and
 /// buttons, and how often its Channels changed.
-fn live_line(device: &Device, last_change: Option<Duration>, changes_a_second: f64) -> String {
+fn live_line(device: &Device, changes_a_second: f64) -> String {
     let c = device.channels();
     let state = device.state();
     let raw = match &state.pad {
@@ -243,12 +237,9 @@ fn live_line(device: &Device, last_change: Option<Duration>, changes_a_second: f
         (Kind::Radio, Transmitting::No { .. }) => "; not transmitting".to_string(),
         _ => String::new(),
     };
-    let stamp = last_change.map_or_else(
-        || "unchanged since it was found".to_string(),
-        |at| format!("last changed at {:.3} s", at.as_secs_f64()),
-    );
+    let stamp = device.channels_changed_at().as_secs_f64();
     format!(
-        "  {}{}: {}\n    Channels {stamp}; {}; Channels changed {:.0} times a second{}{}",
+        "  {}{}: {}\n    Channels last changed at {stamp:.3} s; {}; Channels changed {:.0} times a second{}{}",
         device.info().name,
         if device.calibrated() {
             ""
@@ -279,4 +270,63 @@ fn channels_text(c: &Channels) -> String {
         aux(c.flight_mode),
         aux(c.crash_flip)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    //! A readable check on the monitor's live line, with a Pocket made of
+    //! plain batches, since CI has no devices. Basis: Rule (#61: the monitor
+    //! shows Channels and their stamps).
+
+    use std::path::Path;
+    use std::time::Duration;
+
+    use opendrone_input::profile::Connection;
+    use opendrone_input::{Batch, DeviceInfo, DeviceState, Inputs, Raw, SdlId};
+    use opendrone_pack::Packs;
+
+    use super::live_line;
+
+    #[test]
+    fn the_live_line_shows_each_devices_channels_with_the_stamp_of_their_last_change() {
+        let packs = Packs::open(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../packs"),
+            "packs",
+        )
+        .unwrap();
+        let mut inputs = Inputs::new(packs.input_devices().into_iter().cloned().collect());
+        let pocket = SdlId(1);
+        let mut state = DeviceState::new(8, 24, false);
+        state.axes[2] = -32768;
+        inputs.take(Batch {
+            at: Duration::from_millis(1_000),
+            events: vec![Raw::Added {
+                device: pocket,
+                info: DeviceInfo {
+                    name: "EdgeTX Radiomaster Pocket Joystick".into(),
+                    usb_vendor: 0x1209,
+                    usb_product: 0x4F54,
+                    sdl_gamepad: false,
+                    connection: Some(Connection::Usb),
+                    heartbeat: false,
+                },
+                state,
+            }],
+        });
+        // Full right roll 2.5 s into the input thread's clock.
+        inputs.take(Batch {
+            at: Duration::from_millis(2_500),
+            events: vec![Raw::Axis {
+                device: pocket,
+                axis: 0,
+                value: 32767,
+            }],
+        });
+        let line = live_line(&inputs.devices()[0], 1.0);
+        assert!(
+            line.contains("roll 2012.0, pitch 1500.0, throttle 988.0"),
+            "{line}"
+        );
+        assert!(line.contains("Channels last changed at 2.500 s"), "{line}");
+    }
 }
