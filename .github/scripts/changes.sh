@@ -8,6 +8,8 @@
 #                   assumes no Rust check reads a `.md` file outside packs/;
 #                   the Pack checker reads each Quad's feel-tests.md, which is
 #                   why any change under packs/ runs the checks.
+#                   The Red Flag gate reads ADRs and deep dives, so it runs in
+#                   its own workflow (review.yml) with no skip.
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
 #                   library, or changes the policy, so known security
 #                   advisories are checked (ADR-0014).
@@ -27,7 +29,13 @@ if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
   exit 0
 fi
 
-changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
+# -z gives each path as it is, ended by a NUL byte: without it, git quotes a
+# path that isn't plain ASCII ("docs/\305\202\303\263d\305\272.md"), which
+# then ends in a quote mark instead of ".md" and doesn't start with "packs/".
+# The NULs become line breaks for grep. A path holding a line break splits in
+# parts, which never skips a check: its last part ends in ".md" only if the
+# path does, and its first starts with "packs/" only if the path does.
+changed="$(git diff -z --name-only --no-renames HEAD^1 HEAD | tr '\0' '\n')"
 echo "Files this pull request changes:"
 sed 's/^/  /' <<< "$changed"
 

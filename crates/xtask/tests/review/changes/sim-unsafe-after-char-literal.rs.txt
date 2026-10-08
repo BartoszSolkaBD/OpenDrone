@@ -1,0 +1,8 @@
+//! A fixture crate.
+
+/// One step, with `unsafe` after a char literal that holds a double quote.
+pub fn step() {
+    let x = [1u8, 2, 3];
+    let _q = '"'; let first = unsafe { *x.as_ptr() };
+    let _ = first;
+}

@@ -1,0 +1,7 @@
+# A fixture core crate's manifest.
+[package]
+name = "opendrone-physics"
+version.workspace = true
+
+[lints]
+workspace = true

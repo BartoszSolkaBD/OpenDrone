@@ -51,6 +51,11 @@
 /.cargo/                        @BartoszSolkaBD
 /.config/                       @BartoszSolkaBD
 /rust-toolchain.toml            @BartoszSolkaBD
+/rust-toolchain                 @BartoszSolkaBD
+/clippy.toml                    @BartoszSolkaBD
+/.clippy.toml                   @BartoszSolkaBD
+/rustfmt.toml                   @BartoszSolkaBD
+/.rustfmt.toml                  @BartoszSolkaBD
 /deny.toml                      @BartoszSolkaBD
 /crates/*/clippy.toml           @BartoszSolkaBD
 /crates/xtask/                  @BartoszSolkaBD

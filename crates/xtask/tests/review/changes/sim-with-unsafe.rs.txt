@@ -1,0 +1,8 @@
+//! A fixture crate.
+
+/// One step.
+pub fn step() {
+    let x = [1u8, 2, 3];
+    let first = unsafe { *x.as_ptr() };
+    let _ = first;
+}

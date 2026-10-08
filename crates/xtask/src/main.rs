@@ -19,6 +19,9 @@
 //!   Quad in `scenarios/test-quads/`.
 //! - `feel-tests --base <revision>`: the Feel Test log rules, comparing every
 //!   Quad definition with the one at `<revision>`.
+//! - `review-report`, `new-libraries`, `review-update` and `merge-check`: the
+//!   Review Report, the Red Flag gate and the Review check, run by CI on every
+//!   pull request ([`review`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -27,6 +30,7 @@ use std::process::ExitCode;
 mod book;
 mod migrate;
 mod packs;
+mod review;
 mod scenario_catalogue;
 mod walls;
 
@@ -65,7 +69,7 @@ Commands:
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some((command, rest)) = args.split_first() else {
-        eprintln!("{USAGE}");
+        eprintln!("{USAGE}\n{}", review::usage());
         return ExitCode::from(2);
     };
     match command.as_str() {
@@ -77,8 +81,12 @@ fn main() -> ExitCode {
         "migrate" => migrate::run(rest),
         "packs" => packs::run_packs(rest),
         "feel-tests" => packs::run_feel_tests(rest),
+        "review-report" => review::run_report(rest),
+        "review-update" => review::run_update(rest),
+        "new-libraries" => review::run_new_libraries(rest),
+        "merge-check" => review::run_merge_check(rest),
         _ => {
-            eprintln!("{USAGE}");
+            eprintln!("{USAGE}\n{}", review::usage());
             ExitCode::from(2)
         }
     }
