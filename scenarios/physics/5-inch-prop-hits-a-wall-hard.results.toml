@@ -1,0 +1,94 @@
+# Results of 5-inch-prop-hits-a-wall-hard.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A hard hit stops a 5-inch's motor at once; it restarts after 0.1 s and is back to speed within its spin-up time"
+
+[[expect]]
+what     = "motor 2 speed at 0 s"
+basis    = "Rule"
+expected = "9452 RPM ± 0.1%"
+measured = "9450 RPM"
+
+[[expect]]
+what     = "prop 2 rub, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "between 1 N and 100000 N"
+measured = "697 N"
+
+[[expect]]
+what     = "motor 2 speed at 0.00075 s"
+basis    = "Rule"
+expected = "0 RPM ± 190 RPM"
+measured = "117 RPM"
+
+[[expect]]
+what     = "motor 2 drive, highest over 0.001 s to 0.1 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 drive at 0.100875 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 restarts at 0.100875 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "motor 2 drive, highest over 0.100875 s to 0.2835 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 speed at 0.28375 s"
+basis    = "Observed"
+expected = "833 RPM ± 1%"
+measured = "833 RPM"
+
+[[expect]]
+what     = "motor 2 speed at 0.31675 s"
+basis    = "Source"
+expected = "6254 RPM ± 5%"
+measured = "6240 RPM"
+
+[[expect]]
+what     = "motor 2 speed at 0.41575 s"
+basis    = "Rule"
+expected = "9253 RPM ± 1%"
+measured = "9250 RPM"
+
+[[expect]]
+what     = "motor 2 speed at 0.5 s"
+basis    = "Observed"
+expected = "9410 RPM ± 0.5%"
+measured = "9400 RPM"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "74f51fc55b224c82"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "5e7f0b4514e896ea"
+"0.1 s" = "cb4c7122cee8e409"
+"0.15 s" = "833c2748c120a927"
+"0.2 s" = "f7021c9e5a89f681"
+"0.25 s" = "711c4b0d160b5691"
+"0.3 s" = "7d84b41f7999ec07"
+"0.35 s" = "a612a2985e454dc2"
+"0.4 s" = "e0506218584c0831"
+"0.45 s" = "e1a77bb9c0b3161d"
+"0.5 s" = "04e8c42ecd6d437c"

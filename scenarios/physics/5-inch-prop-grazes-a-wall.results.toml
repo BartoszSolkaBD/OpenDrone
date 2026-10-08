@@ -1,0 +1,94 @@
+# Results of 5-inch-prop-grazes-a-wall.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch's spinning prop grazes a wall: that motor slows, and the Quad is pushed and twisted the way the rub says"
+
+[[expect]]
+what     = "prop 2 rub, highest over 0 s to 0.05 s"
+basis    = "Observed"
+expected = "129 N ± 10%"
+measured = "129 N"
+
+[[expect]]
+what     = "prop 1 rub, highest over 0 s to 0.05 s"
+basis    = "Rule"
+expected = "0 N ± 0 N"
+measured = "0 N"
+
+[[expect]]
+what     = "prop 4 rub, highest over 0 s to 0.05 s"
+basis    = "Rule"
+expected = "0 N ± 0 N"
+measured = "0 N"
+
+[[expect]]
+what     = "prop 3 rub, highest over 0 s to 0.05 s"
+basis    = "Rule"
+expected = "0 N ± 0 N"
+measured = "0 N"
+
+[[expect]]
+what     = "motor 2 speed at 0.0055 s"
+basis    = "Rule"
+expected = "between 190 RPM and 9400 RPM"
+measured = "7640 RPM"
+
+[[expect]]
+what     = "motor 2 speed at 0.0055 s"
+basis    = "Observed"
+expected = "7640 RPM ± 5%"
+measured = "7640 RPM"
+
+[[expect]]
+what     = "motor 4 speed at 0.0055 s"
+basis    = "Rule"
+expected = "9440 RPM ± 0.1%"
+measured = "9440 RPM"
+
+[[expect]]
+what     = "speed north at 0.0055 s"
+basis    = "Rule"
+expected = "between 2.9 m/s and 2.999 m/s"
+measured = "2.98 m/s"
+
+[[expect]]
+what     = "speed north at 0.0055 s"
+basis    = "Observed"
+expected = "2.975 m/s ± 0.005 m/s"
+measured = "2.98 m/s"
+
+[[expect]]
+what     = "yaw rate at 0.0055 s"
+basis    = "Rule"
+expected = "between 1 °/s and 1000 °/s"
+measured = "41.6 °/s"
+
+[[expect]]
+what     = "yaw rate at 0.0055 s"
+basis    = "Observed"
+expected = "41.6 °/s ± 5%"
+measured = "41.6 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "3368f06623a218e9"   # the whole state after each of 400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.005 s" = "d5bbaa99e1869880"
+"0.01 s" = "769167f2fa80c234"
+"0.015 s" = "9b9b8631ae610573"
+"0.02 s" = "85dd540ef6d1df62"
+"0.025 s" = "c25b2ed8258f802c"
+"0.03 s" = "c13f1aae8ef55382"
+"0.035 s" = "2033a5ee497eba58"
+"0.04 s" = "797accdcd5c19a0a"
+"0.045 s" = "eecbe54b185d847d"
+"0.05 s" = "17a3ed133c199bd7"

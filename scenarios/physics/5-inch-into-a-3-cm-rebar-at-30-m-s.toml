@@ -1,8 +1,10 @@
 # The Freestyle 5″ flies level at 30 m/s straight at the 3 cm rebar stub on
 # the Thin rail Test Map, which stands 2 m tall at 3 m east, 10 m north. Its
-# front prop discs (solid until Prop Strikes, #45) meet it first: the stub is
-# just wider than the 29.5 mm gap between them. Proves the thin-rail half of
-# E29 in #10 with the 5″'s prop discs (#26 §6).
+# motors are stopped, their ESCs letting the props turn freely. Its front prop
+# discs meet the stub first: the stub is just wider than the 29.5 mm gap
+# between them. Free to turn, the props are spun up by the stub as it squeezes
+# between them, and its body meets it next. Proves the thin-rail half of E29
+# in #10 with the 5″'s prop discs (#26 §6).
 format = 1
 name   = "A 5-inch at 30 m/s never passes through a 3 cm rebar stub"
 
@@ -50,13 +52,19 @@ highest = "between 2 m and 2.985 m"
 basis   = "rule: the stub's near side is 3 m - 1.5 cm = 2.985 m east. Flying free, the 5-inch's front prop discs would meet it at about 0.031 s, and its centre would pass it at 0.033 s and be 3.2 m east by 0.04 s. Its centre is inside its shape, so by 0.04 s only passing through the stub could take its centre to 2.985 m: the stub stands from the ground to 2 m, so it can't go under it, nor over it (a 1 m climb); going round it needs its prop discs about 16 cm sideways in the 9 ms after they meet it"
 
 [[expect]]
+what  = "motor 2 speed"
+at    = "0.032 s"
+value = "1700 RPM ± 10%"
+basis = "observed: the stub's rub spins the free front props up from a standstill, to about 1,700 RPM, as it squeezes between them"
+
+[[expect]]
 what  = "speed east"
 at    = "0.1 s"
-value = "0 m/s ± 0.5 m/s"
-basis = "observed: its prop discs wedge on the stub and stop it dead, tipping it nose down"
+value = "-1.6 m/s ± 0.3 m/s"
+basis = "observed: its front props turn out of the stub's way instead of wedging on it, so its body meets the stub at about 11 m/s and it bounces back"
 
 [[expect]]
 what  = "pitch rate"
 at    = "0.05 s"
-value = "-980 °/s ± 50 °/s"
-basis = "observed: the stub stops it below its centre of mass, so it tips nose down over the stub at nearly 1,000 °/s"
+value = "1830 °/s ± 50 °/s"
+basis = "observed: the stub stops its body and the pack on top of it, above its centre of mass, so it tips nose up"

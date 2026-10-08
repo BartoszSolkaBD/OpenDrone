@@ -88,6 +88,9 @@ pub struct PropParameters {
     pub reverse_thrust: f64,
     /// Spinning backwards, the drag torque as a share of forward's.
     pub reverse_torque: f64,
+    /// The friction between the prop and what it touches: how hard it rubs,
+    /// as a share of how hard it's pressed (a Prop Strike).
+    pub grip: f64,
 }
 
 /// One motor and prop's numbers, ready to use in the Map's air.

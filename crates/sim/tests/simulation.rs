@@ -3,7 +3,7 @@
 //! Scenarios in `scenarios/`.
 
 use opendrone_maths::Fingerprinter;
-use opendrone_maths::{Attitude, Mat3, Vec3};
+use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, PilotRates, Vec3};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
     FlightControllerSeam, FlightInput, MapShape, MotorCommands, MotorParameters, Mount,
@@ -43,6 +43,7 @@ fn parameters() -> QuadParameters {
             rotor_inertia: 0.25e-7,
             reverse_thrust: 0.5,
             reverse_torque: 1.0,
+            grip: 0.5,
         },
         motors: MotorParameters {
             kv,
@@ -68,6 +69,7 @@ fn parameters() -> QuadParameters {
             slow_sag: 0.0,
         },
         shape: whoop_shape(),
+        gyro_range: 2000.0 * DEGREE,
     }
 }
 
@@ -555,4 +557,59 @@ impl FlightControllerSeam for EscListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+#[test]
+fn each_ticks_contacts_and_output_say_how_hard_each_prop_rubs() {
+    // The whoop without its duct rings, level and nose to the north-east,
+    // its motors settled: only prop 2 reaches east of the rest, 50.5 mm from
+    // the centre of mass. A wall 1 mm beyond it; the Quad drifts into it.
+    let mut quad = quad_at(1.0);
+    quad.parameters.shape.duct_rings = None;
+    quad.motors = StartingMotors::Settled;
+    quad.start.velocity = Vec3::new(0.05, 0.0, 0.0);
+    quad.start.attitude = Attitude::from_pilot_angles(PilotAngles {
+        roll: 0.0,
+        pitch: 0.0,
+        heading: 45.0 * DEGREE,
+    });
+    quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+        SimulationTime::START,
+        MotorCommands::all(0.373),
+    )]));
+    let mut wall = set_up(8000, 1, vec![quad]);
+    wall.map = vec![MapShape::Box {
+        centre: Vec3::new(0.0505 + 0.001 + 0.1, 0.0, 1.0),
+        size: Vec3::new(0.2, 20.0, 20.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    }];
+    let mut sim = Simulation::new(wall).unwrap();
+    assert_eq!(sim.quad_output(0).prop_rubs, [0.0; 4]);
+    while sim.contacts(0).is_empty() {
+        sim.step();
+        assert!(sim.time().ticks() < 8000, "prop 2 never reached the wall");
+    }
+    let contacts = sim.contacts(0);
+    assert!(contacts.iter().all(|c| c.part == QuadPart::PropDisc(2)));
+    assert!(contacts.iter().all(|c| c.rub > 0.0));
+    let rubbed: f64 = contacts.iter().map(|c| c.rub).sum();
+    assert_eq!(sim.quad_output(0).prop_rubs, [0.0, rubbed, 0.0, 0.0]);
+}
+
+#[test]
+fn each_ticks_output_says_what_the_gyro_reads() {
+    // Spinning nose right at 3,000 °/s, past the gyro's ±2,000 °/s, and
+    // rolling right at 500 °/s, within it.
+    let mut quad = quad_at(10.0);
+    quad.start.rotation = PilotRates {
+        roll: 500.0 * DEGREE,
+        pitch: 0.0,
+        yaw: 3000.0 * DEGREE,
+    }
+    .to_body();
+    let sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    let gyro = PilotRates::from_body(sim.quad_output(0).gyro);
+    assert_eq!(gyro.roll, 500.0 * DEGREE);
+    assert_eq!(gyro.pitch, 0.0);
+    assert_eq!(gyro.yaw, 2000.0 * DEGREE);
 }

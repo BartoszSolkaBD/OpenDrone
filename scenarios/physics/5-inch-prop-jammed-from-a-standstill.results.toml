@@ -1,0 +1,70 @@
+# Results of 5-inch-prop-jammed-from-a-standstill.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch prop jammed against a block from a standstill gets 2 restarts: its first start counts as a failed one"
+
+[[expect]]
+what     = "motor 2 drive at 0.600125 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 restarts at 0.600125 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 drive at 2.2795 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 restarts at 2.379375 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "motor 2 restarts at 4.158625 s"
+basis    = "Source"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "motor 2 restarts, highest over 0 s to 7 s"
+basis    = "Source"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "motor 2 drive, highest over 5.84 s to 7 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "1cf123df8fcb25b6"   # test/block
+run  = "b88516e3e07dbd70"   # the whole state after each of 56000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.7 s" = "0e41d3ddd2a3351a"
+"1.4 s" = "4850769eea6a26f5"
+"2.1 s" = "8644e1c25d348ba4"
+"2.8 s" = "f34d076537505bd8"
+"3.5 s" = "2734277a46aec694"
+"4.2 s" = "57dea3c01d3a0d38"
+"4.9 s" = "0d150ce45ceaa57f"
+"5.6 s" = "72f7e5cc289b056d"
+"6.3 s" = "e9bdfcb1117c46a9"
+"7 s" = "70e13d5829eef0ed"

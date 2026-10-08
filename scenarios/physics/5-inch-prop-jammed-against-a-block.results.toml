@@ -1,0 +1,112 @@
+# Results of 5-inch-prop-jammed-against-a-block.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch prop jammed against a block gets 3 restarts, then stays off until disarm, under the start-up power limit"
+
+[[expect]]
+what     = "motor 2 drive, highest over 0.108 s to 0.2075 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 drive at 0.208 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 restarts at 0.208 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "motor 2 speed, highest over 0.208 s to 5.445 s"
+basis    = "Rule"
+expected = "0 RPM ± 190 RPM"
+measured = "4.49 RPM"
+
+[[expect]]
+what     = "motor 2 drive, lowest over 0.208 s to 1.887 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 drive at 1.8875 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 restarts at 1.98725 s"
+basis    = "Source"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "motor 2 restarts at 3.7665 s"
+basis    = "Source"
+expected = "3 ± 0"
+measured = "3.00"
+
+[[expect]]
+what     = "motor 2 restarts, highest over 0 s to 7 s"
+basis    = "Source"
+expected = "3 ± 0"
+measured = "3.00"
+
+[[expect]]
+what     = "motor 2 drive, highest over 5.446 s to 8 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 current, highest over 0.208 s to 5.446 s"
+basis    = "Rule"
+expected = "between 0 A and 2.61 A"
+measured = "2.60 A"
+
+[[expect]]
+what     = "battery current, highest over 0.208 s to 5.446 s"
+basis    = "Rule"
+expected = "between 0 A and 0.052 A"
+measured = "0.0510 A"
+
+[[expect]]
+what     = "motor 2 restarts at 7.375 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 drive at 8.100125 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "1cf123df8fcb25b6"   # test/block
+run  = "47f7ed8095a7d851"   # the whole state after each of 64801 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.81 s" = "3c235075a520604a"
+"1.62 s" = "2e919e644b3f98bf"
+"2.43 s" = "898f57ecf25af2d7"
+"3.24 s" = "d5046150a1d18e5c"
+"4.05 s" = "c5406dce044e5aab"
+"4.86 s" = "0b1c8567fe576ea5"
+"5.67 s" = "84b683bf5e00e425"
+"6.48 s" = "e352b4d79346b8fb"
+"7.29 s" = "80603f166b2fb31f"
+"8.100125 s" = "000ee6e6a95dce6c"

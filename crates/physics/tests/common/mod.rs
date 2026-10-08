@@ -3,7 +3,7 @@
 
 #![allow(dead_code)]
 
-use opendrone_maths::{Attitude, Mat3, Vec3};
+use opendrone_maths::{Attitude, DEGREE, Mat3, Vec3};
 use opendrone_physics::{
     BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, Mount, PropDirection,
     PropParameters, QuadParameters, QuadShape, QuadStart, QuadState, RotorLayout, StartingMotors,
@@ -43,6 +43,7 @@ pub fn whoop() -> QuadParameters {
             rotor_inertia: 0.25e-7,
             reverse_thrust: 0.5,
             reverse_torque: 1.0,
+            grip: 0.5,
         },
         motors: MotorParameters {
             kv: 19500.0 * KV,
@@ -74,6 +75,7 @@ pub fn whoop() -> QuadParameters {
             slow_sag: 0.0,
         },
         shape: whoop_shape(),
+        gyro_range: 2000.0 * DEGREE,
     }
 }
 

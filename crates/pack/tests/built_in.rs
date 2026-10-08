@@ -428,7 +428,7 @@ fn a_map_that_isnt_built_in_yet_is_refused() {
     let problems = built_in().map("opendrone/skate-park").unwrap_err();
     assert_eq!(
         problems.to_string(),
-        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge"
+        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge, test/block"
     );
 }
 

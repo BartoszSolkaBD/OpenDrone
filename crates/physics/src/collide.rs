@@ -55,8 +55,14 @@ pub struct Contact {
     /// by the step's length.
     pub push: f64,
     /// How hard, and which way, friction held or dragged the Quad along the
-    /// surface, in newtons, in world axes, worked out the same way.
+    /// surface, in newtons, in world axes, worked out the same way. On a prop
+    /// disc this is the prop's rub.
     pub friction: Vec3,
+    /// On a prop disc, how hard its prop rubs along the surface, in newtons:
+    /// the size of `friction` there. While the prop spins, this is a Prop
+    /// Strike: the rub brakes its motor and pushes and twists the Quad. Zero
+    /// on every other part.
+    pub rub: f64,
 }
 
 /// What the collision stage needs to know about the Quad.
@@ -65,51 +71,98 @@ pub(crate) struct Collider<'a> {
     pub inertia_inverse: Mat3,
     pub bounce: f64,
     pub friction: f64,
+    /// The friction between a prop and what it touches.
+    pub grip: f64,
+    /// Each prop and its motor's spinning parts, in kg·m².
+    pub rotor_inertia: f64,
     pub parts: &'a [Part],
     /// How far the Quad's farthest point is from its centre of mass.
     pub reach: f64,
 }
 
-/// One direction at one contact point: how a push along it moves the Quad.
+/// One direction at one contact point: how a push along it moves the Quad,
+/// and, on a prop, its prop.
 #[derive(Clone, Copy)]
 struct Direction {
     /// In world axes.
     world: Vec3,
     /// The contact point's lever about the centre of mass, crossed with the
-    /// direction, in body axes: a push along `world` turns the Quad about
-    /// this.
+    /// direction, in body axes: the Quad's rotation about this moves the
+    /// point along `world`.
     lever: Vec3,
-    /// The mass a push along it meets: the Quad's mass and inertia, as felt
-    /// at that point.
+    /// What a push along `world` turns the Quad about, in body axes: the
+    /// lever, less, on a prop, the part about the prop's own axis, which
+    /// turns the prop instead (see the crate's "Prop Strikes").
+    turn: Vec3,
+    /// On a prop: the point's lever about the hub, crossed with the
+    /// direction, along the prop's axis (the body's up). The prop's spin
+    /// moves the point along `world` by this times the spin, and a push
+    /// along `world` turns the prop by this times the push. Zero off the
+    /// props.
+    blade: f64,
+    /// The mass a push along it meets: the Quad's mass and inertia, and on a
+    /// prop the prop's, as felt at that point.
     mass: f64,
 }
 
 impl Direction {
     fn new(quad: &Collider<'_>, attitude: Attitude, at: Vec3, body: Vec3) -> Direction {
+        Direction::on(quad, attitude, at, body, None)
+    }
+
+    /// Along `body` at the point `at`, on the prop whose hub is `hub` if
+    /// there is one (both in body axes, from the centre of mass).
+    fn on(
+        quad: &Collider<'_>,
+        attitude: Attitude,
+        at: Vec3,
+        body: Vec3,
+        hub: Option<Vec3>,
+    ) -> Direction {
         let lever = at.cross(body);
-        let give = 1.0 / quad.mass + lever.dot(quad.inertia_inverse * lever);
+        let blade = hub.map_or(0.0, |hub| (at - hub).cross(body).z);
+        let turn = lever - Vec3::new(0.0, 0.0, blade);
+        let mut give = 1.0 / quad.mass + lever.dot(quad.inertia_inverse * turn);
+        if hub.is_some() {
+            give += blade * blade / quad.rotor_inertia;
+        }
         Direction {
             world: attitude.body_to_world(body),
             lever,
+            turn,
+            blade,
             mass: 1.0 / give,
         }
     }
 
-    /// How fast the contact point moves along this direction.
-    fn speed(&self, velocity: Vec3, rotation: Vec3) -> f64 {
-        velocity.dot(self.world) + rotation.dot(self.lever)
+    /// How fast the contact point moves along this direction, with its prop
+    /// spinning at `spin` (rad/s about the body's up axis).
+    fn speed(&self, velocity: Vec3, rotation: Vec3, spin: f64) -> f64 {
+        velocity.dot(self.world) + rotation.dot(self.lever) + self.blade * spin
     }
 
     /// A push of `amount` (in N·s) along this direction.
-    fn push(&self, quad: &Collider<'_>, amount: f64, velocity: &mut Vec3, rotation: &mut Vec3) {
+    fn push(
+        &self,
+        quad: &Collider<'_>,
+        amount: f64,
+        velocity: &mut Vec3,
+        rotation: &mut Vec3,
+        spin: &mut f64,
+    ) {
         *velocity += self.world * (amount / quad.mass);
-        *rotation += quad.inertia_inverse * self.lever * amount;
+        *rotation += quad.inertia_inverse * self.turn * amount;
+        if self.blade != 0.0 {
+            *spin += self.blade * amount / quad.rotor_inertia;
+        }
     }
 }
 
 /// One contact point.
 struct Row {
     part: QuadPart,
+    /// On a prop disc, its motor, counting from 0.
+    prop: Option<usize>,
     shape: usize,
     /// In world axes.
     point: Vec3,
@@ -129,7 +182,9 @@ struct Row {
 
 /// Meets the Map after a step's free move: `before` is the state the step
 /// started from, `state` the free move's result, changed here only if the
-/// Quad touches something. `contacts` is cleared and filled with every point
+/// Quad touches something. `spins` is each prop's spin about the body's up
+/// axis (rad/s, anticlockwise seen from above), in motor order, changed here
+/// only where a prop rubs. `contacts` is cleared and filled with every point
 /// where the Map pushed.
 pub(crate) fn collide(
     quad: &Collider<'_>,
@@ -138,6 +193,7 @@ pub(crate) fn collide(
     state: &mut QuadState,
     dt: f64,
     contacts: &mut Vec<Contact>,
+    spins: &mut [f64; 4],
 ) {
     contacts.clear();
     if map.is_empty() {
@@ -165,35 +221,40 @@ pub(crate) fn collide(
         return;
     }
 
-    // 2. Push and friction.
+    // 2. Push and friction; on a prop, the rub.
     let mut velocity = state.velocity;
     let mut rotation = state.rotation;
+    // A push along a normal never turns a prop, so it needs no spin.
+    let mut no_spin = 0.0;
     for row in &mut rows {
-        row.came_in_at = row.normal.speed(velocity, rotation);
+        row.came_in_at = row.normal.speed(velocity, rotation, 0.0);
     }
     for _ in 0..PASSES {
         for row in &mut rows {
-            let limit = quad.friction * row.push;
-            let mut rub = [0.0; 2];
-            for (i, along) in row.along.iter().enumerate() {
-                rub[i] = row.rub[i] - along.speed(velocity, rotation) * along.mass;
-            }
-            let size = (rub[0] * rub[0] + rub[1] * rub[1]).sqrt();
-            if size > limit {
-                let scale = limit / size;
-                rub = [rub[0] * scale, rub[1] * scale];
-            }
-            for (i, along) in row.along.iter().enumerate() {
-                along.push(quad, rub[i] - row.rub[i], &mut velocity, &mut rotation);
-            }
-            row.rub = rub;
+            let (grip, spin) = match row.prop {
+                Some(motor) => (quad.grip, &mut spins[motor]),
+                None => (quad.friction, &mut no_spin),
+            };
+            slide(
+                quad,
+                row,
+                grip * row.push,
+                &mut velocity,
+                &mut rotation,
+                spin,
+            );
 
             // A gap may be closed this step, never crossed.
             let allowed = if row.gap > 0.0 { -row.gap / dt } else { 0.0 };
-            let speed = row.normal.speed(velocity, rotation);
+            let speed = row.normal.speed(velocity, rotation, 0.0);
             let push = max(row.push + (allowed - speed) * row.normal.mass, 0.0);
-            row.normal
-                .push(quad, push - row.push, &mut velocity, &mut rotation);
+            row.normal.push(
+                quad,
+                push - row.push,
+                &mut velocity,
+                &mut rotation,
+                &mut no_spin,
+            );
             row.push = push;
         }
     }
@@ -203,11 +264,33 @@ pub(crate) fn collide(
     for _ in 0..BOUNCE_PASSES {
         for row in rows.iter_mut().filter(|row| hit(row)) {
             let out = -quad.bounce * row.came_in_at;
-            let speed = row.normal.speed(velocity, rotation);
+            let speed = row.normal.speed(velocity, rotation, 0.0);
             let push = max(row.push + (out - speed) * row.normal.mass, 0.0);
-            row.normal
-                .push(quad, push - row.push, &mut velocity, &mut rotation);
+            row.normal.push(
+                quad,
+                push - row.push,
+                &mut velocity,
+                &mut rotation,
+                &mut no_spin,
+            );
             row.push = push;
+        }
+    }
+    // A prop's blade slides over the surface through the whole hit, so its
+    // rub is worked out again with the whole push, bounce included.
+    for _ in 0..BOUNCE_PASSES {
+        for row in rows.iter_mut().filter(|row| hit(row)) {
+            if let Some(motor) = row.prop {
+                let limit = quad.grip * row.push;
+                slide(
+                    quad,
+                    row,
+                    limit,
+                    &mut velocity,
+                    &mut rotation,
+                    &mut spins[motor],
+                );
+            }
         }
     }
 
@@ -261,15 +344,47 @@ pub(crate) fn collide(
     state.position += out;
 
     for row in rows.iter().filter(|row| row.push > 0.0) {
+        let friction = (row.along[0].world * row.rub[0] + row.along[1].world * row.rub[1]) / dt;
         contacts.push(Contact {
             part: row.part,
             shape: row.shape,
             point: row.point,
             normal: row.normal.world,
             push: row.push / dt,
-            friction: (row.along[0].world * row.rub[0] + row.along[1].world * row.rub[1]) / dt,
+            friction,
+            rub: if row.prop.is_some() {
+                friction.length()
+            } else {
+                0.0
+            },
         });
     }
+}
+
+/// Friction at one contact point: the push along the surface that stops the
+/// point sliding, kept within `limit` (N·s) in all, Coulomb's law. On a prop
+/// the point slides with the prop's spin too, so the push turns the prop.
+fn slide(
+    quad: &Collider<'_>,
+    row: &mut Row,
+    limit: f64,
+    velocity: &mut Vec3,
+    rotation: &mut Vec3,
+    spin: &mut f64,
+) {
+    let mut rub = [0.0; 2];
+    for (i, along) in row.along.iter().enumerate() {
+        rub[i] = row.rub[i] - along.speed(*velocity, *rotation, *spin) * along.mass;
+    }
+    let size = (rub[0] * rub[0] + rub[1] * rub[1]).sqrt();
+    if size > limit {
+        let scale = limit / size;
+        rub = [rub[0] * scale, rub[1] * scale];
+    }
+    for (i, along) in row.along.iter().enumerate() {
+        along.push(quad, rub[i] - row.rub[i], velocity, rotation, spin);
+    }
+    row.rub = rub;
 }
 
 /// 1. Every contact point within `reach` of the Quad where the step started:
@@ -313,7 +428,7 @@ fn contact_points(
                 let normal = -from_parry(part.local.rotation * manifold.local_n1);
                 for point in &manifold.points {
                     let at = from_parry(part.local.transform_point(point.local_p1));
-                    rows.push(row(quad, part.part, index, before, at, normal, point.dist));
+                    rows.push(row(quad, part, index, before, at, normal, point.dist));
                 }
             }
         }
@@ -323,7 +438,7 @@ fn contact_points(
 
 fn row(
     quad: &Collider<'_>,
-    part: QuadPart,
+    part: &Part,
     shape: usize,
     before: &QuadState,
     at: Vec3,
@@ -332,15 +447,17 @@ fn row(
 ) -> Row {
     let attitude = before.attitude;
     let [first, second] = along(normal);
+    let hub = part.prop.map(|(_, hub)| hub);
     Row {
-        part,
+        part: part.part,
+        prop: part.prop.map(|(motor, _)| motor),
         shape,
         point: before.position + attitude.body_to_world(at),
         gap,
         normal: Direction::new(quad, attitude, at, normal),
         along: [
-            Direction::new(quad, attitude, at, first),
-            Direction::new(quad, attitude, at, second),
+            Direction::on(quad, attitude, at, first, hub),
+            Direction::on(quad, attitude, at, second, hub),
         ],
         came_in_at: 0.0,
         push: 0.0,

@@ -1,0 +1,121 @@
+# The Freestyle 5″, level and nose to the north-east, flies into the Wall
+# Test Map's wall at 1 m/s. Turned that way, only its front right prop (motor
+# 2) reaches east of the rest, so its disc alone meets the wall, 0.75 mm away
+# at the start: the prop strikes it while spinning at its hover speed. Only
+# motor 2 is kept at the drive that held it there; the others are cut, so
+# the Quad falls free instead of tipping back into the wall.
+#
+# The strike stops the prop at once, the ESC finds its motor stalled, and
+# restarts it as Bluejay v0.21.0 does (src/Bluejay.asm; the esc module in
+# crates/physics has the working): power off for 100 ms (`wait100ms`, L1084),
+# then a start with the drive capped at Startup Power Max, 1.96%, for 15
+# electrical turns, then the motor speeds up with its spin-up time back to
+# the speed its drive holds. Proves a hard hit's Prop Strike and the restart
+# (#26 §6).
+format = 1
+name   = "A hard hit stops a 5-inch's motor at once; it restarts after 0.1 s and is back to speed within its spin-up time"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "test/wall"
+position          = "4.822 m east, 0 m north, 2.5 m up"
+attitude          = "level, heading 45°"
+speed             = "1 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+# 24.4%: about the drive that holds settled motors at their speed on this
+# pack.
+timeline = [
+  { at = "0 s", motors = "0%, 24.4%, 0%, 0%" },
+]
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0 s"
+value = "9452 RPM ± 0.1%"
+basis = "rule: settled motors turn at the speed whose thrust carries a quarter of the Quad's weight: the Quad weighs 0.652 kg × 9.81 m/s², a quarter is 1.599 N, and its props make k_f·ω² with k_f = C_T·ρ·D⁴/4π² = 0.187 × 1.225 kg/m³ × (0.1295 m)⁴ / 4π² = 1.632 × 10⁻⁶ N/(rad/s)², so ω = √(1.599 / 1.632 × 10⁻⁶) = 989.8 rad/s = 9,452 RPM"
+
+[[expect]]
+what    = "prop 2 rub"
+over    = "0 s to 0.5 s"
+highest = "between 1 N and 100000 N"
+basis   = "rule: the front right prop disc meets the wall 0.75 mm away at 1 m/s, during the step that ends at 0.00075 s, while its prop spins, so it rubs"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.00075 s"
+value = "0 RPM ± 190 RPM"
+basis = "rule: a hard hit stops the motor at once. Struck at 1 m/s, the wall's push stops and bounces the Quad, about 0.8 N·s, and the rub can be up to the prop grip, 0.5, times that, at 65 mm from the hub: about five times the turn it takes to stop the prop (its 55 g·cm² spinning at 990 rad/s). So it stops within the step, below Bluejay's minimum speed, 1,330 electrical RPM, 190 RPM on this 14-pole motor"
+
+[[expect]]
+what    = "motor 2 drive"
+over    = "0.001 s to 0.1 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (`exit_run_mode`, L1037–1041) and waits 100 ms before restarting it (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. It finds the stall on the step after the hit, 0.000875 s"
+
+[[expect]]
+what  = "motor 2 drive"
+at    = "0.100875 s"
+value = "1.96% ± 0.001%"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1086 and L762–768: 0.1 s after the stall the ESC restarts the motor as from a standstill (`ljmp motor_start`), its drive capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%"
+
+[[expect]]
+what  = "motor 2 restarts"
+at    = "0.100875 s"
+value = "1 ± 0"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: its first restart; a running motor that stalls hasn't failed a start, so it may have three"
+
+[[expect]]
+what    = "motor 2 drive"
+over    = "0.100875 s to 0.2835 s"
+highest = "1.96% ± 0.001%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L894–955: the drive stays capped through the start-up phase (24 commutations) and the initial-run phase (a countdown of 12 turns), lifted only at L951"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.28375 s"
+value = "833 RPM ± 1%"
+basis = "observed: where the capped restart ends, after 15 electrical turns, at 0.28375 s"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.31675 s"
+value = "6254 RPM ± 5%"
+basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured spin-up time of 33 ms. One time constant after the capped restart ends at 0.28375 s, a first lag has covered 63% of the way from 833 RPM to the 9,410 RPM its 24.4% drive holds: 833 + 0.632 × (9,410 − 833) = 6,254 RPM"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.41575 s"
+value = "9253 RPM ± 1%"
+basis = "rule: back to speed within its spin-up time: four spin-up times (4 × 33 ms) after the capped restart ends, a first lag has covered 1 − e⁻⁴ = 98.2% of the way, 833 + 0.982 × (9,410 − 833) = 9,253 RPM. Allow 1%: for its first few steps the motor speeds up a little slower than the lag, as its drive can give no more than the command"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.5 s"
+value = "9410 RPM ± 0.5%"
+basis = "observed: the speed its 24.4% drive holds, within 0.5% of its speed before the hit"

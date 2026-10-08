@@ -1,0 +1,10 @@
+# The built-in Test Map test/block. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Block"
+description = "The flat floor with a small block on it: 2 cm square and 2.5 cm tall, its middle 11 cm east and 11 cm north of the origin, where a 5″ landed level at the origin has its front right prop."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"

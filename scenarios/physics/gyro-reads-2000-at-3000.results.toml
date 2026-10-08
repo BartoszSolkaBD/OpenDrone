@@ -1,0 +1,58 @@
+# Results of gyro-reads-2000-at-3000.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Spun at 3,000 °/s, the gyro reads 2,000 °/s"
+
+[[expect]]
+what     = "yaw rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "3000 °/s ± 0.001 °/s"
+measured = "3000 °/s"
+
+[[expect]]
+what     = "gyro yaw rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "gyro yaw rate, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "gyro roll rate, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "gyro pitch rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "19dcc67dc9d24c34"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "fb79a7fc1175d4d9"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "a0d3ece60ee856bd"
+"0.1 s" = "42c067790a0cece5"
+"0.15 s" = "7908d42baa459b08"
+"0.2 s" = "47e448e9f973538a"
+"0.25 s" = "3e02efd76dd955dd"
+"0.3 s" = "632835cf49697a4b"
+"0.35 s" = "c60f71902339c1fd"
+"0.4 s" = "e75dacbc092cb60d"
+"0.45 s" = "e214b6d1e52d027e"
+"0.5 s" = "23e9920b21832e0a"

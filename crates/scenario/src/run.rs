@@ -297,7 +297,7 @@ fn simulate(
                         "its battery's voltage curve has no points".to_string()
                     }
                     SetUpProblem::ShapeCantBeBuilt => {
-                        "its collision shape needs every size above zero, a bounce from 0 to 1 and a friction of 0 or more".to_string()
+                        "its collision shape needs every size above zero, a bounce from 0 to 1, and a friction and a prop grip of 0 or more".to_string()
                     }
                 };
                 (

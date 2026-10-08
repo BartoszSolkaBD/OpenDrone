@@ -36,13 +36,14 @@
 //! - The thrust-stand set-up: a Quad set up with [`Mount::ThrustStand`] is
 //!   held still while its motors, ESCs and battery work as in flight.
 //! - [`Simulation::quad_output`]: each tick's output per Quad: where it is and
-//!   how it moves, each motor's speed, thrust, torque and current, each ESC's
-//!   state, the battery's voltage, current and charge, the motor commands,
-//!   and what our Flight Controller's loop did.
+//!   how it moves, what its gyro reads, each motor's speed, thrust, torque and
+//!   current, each ESC's state and restarts, how hard each prop rubs the Map,
+//!   the battery's voltage, current and charge, the motor commands, and what
+//!   our Flight Controller's loop did.
 //! - [`Simulation::fingerprint`]: a fingerprint of the whole state, the same on
 //!   every computer, for the repeat and agreement checks.
-//! - After each tick, every Quad's state and its contacts with the Map
-//!   ([`Simulation::contacts`]).
+//! - After each tick, every Quad's state and its contacts with the Map,
+//!   including how hard each prop rubs ([`Simulation::contacts`]).
 //! - The read-only line question ([`Simulation::line_question`]): which Map
 //!   surfaces a straight line passes through, and where it goes in and comes
 //!   out, for the Video Signal and the Where-you-stand sound. It never
@@ -100,7 +101,7 @@ pub use opendrone_flight_controller::{
 pub use opendrone_physics::{
     BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
     MotorOutput, MotorParameters, Mount, PropDirection, PropParameters, QuadParameters, QuadState,
-    RotorLayout, SetUpProblem, SpinDirection, StartUpStep, StartingMotors, World,
+    RotorLayout, SetUpProblem, SpinDirection, StartUpStep, StartingMotors, StoppedStep, World,
 };
 pub use opendrone_physics::{
     Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
@@ -148,8 +149,14 @@ pub struct QuadSetUp {
 pub struct QuadOutput {
     /// Where it is and how it moves.
     pub state: QuadState,
+    /// What its gyro reads: the true rotation in body axes (forward, left,
+    /// up), in rad/s, each axis clipped at the board's gyro range.
+    pub gyro: Vec3,
     /// Each motor, in Betaflight's motor order, with its ESC's state.
     pub motors: [MotorOutput; 4],
+    /// How hard each prop rubbed the Map during the tick, in newtons, in
+    /// Betaflight's motor order (0 when it touched nothing).
+    pub prop_rubs: [f64; 4],
     pub battery: BatteryOutput,
     /// The motor commands the Flight Controller seam gave on the tick (all
     /// stopped before the first).
@@ -331,13 +338,16 @@ impl Simulation {
     }
 
     /// A Quad's output after the last tick (at the start before the first):
-    /// where it is and how it moves, each motor and its ESC, and the battery.
+    /// where it is and how it moves, what its gyro reads, each motor and its
+    /// ESC, how hard each prop rubbed, and the battery.
     pub fn quad_output(&self, quad: usize) -> QuadOutput {
         let quad = &self.quads[quad];
         let body = &quad.body;
         QuadOutput {
             state: *body.state(),
+            gyro: body.gyro(),
             motors: body.motors(),
+            prop_rubs: body.prop_rubs(),
             battery: body.battery(),
             commands: quad.motor_commands,
             flight_controller: if quad.stepped {
@@ -349,8 +359,8 @@ impl Simulation {
     }
 
     /// Every place where the Map pushed a Quad during the last tick, by part
-    /// and then by Map shape (none before the first tick, and none on the
-    /// thrust stand).
+    /// and then by Map shape, with how hard each prop rubbed (none before the
+    /// first tick, and none on the thrust stand).
     pub fn contacts(&self, quad: usize) -> &[Contact] {
         self.quads[quad].body.contacts()
     }

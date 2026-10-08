@@ -1,0 +1,142 @@
+# The Freestyle 5″, level and nose north, its motors "settled", is let go
+# 4 cm up over the Block Test Map's small block, which stands under its front
+# right prop (motor 2). Motors 1, 3 and 4 are cut; motor 2 is turned down to
+# 3%. The Quad drops onto the block and the floor, tipped back on its body
+# with prop 2's disc pressed on the block, and the rub stops prop 2: at 3% its
+# motor can't turn it against the rub, so it stalls while running.
+#
+# Its ESC restarts it as Bluejay v0.21.0 does (src/Bluejay.asm; the esc
+# module in crates/physics has the working): 0.1 s off, then a start with the
+# drive capped at 1.96%, too weak to break the prop free. Bluejay counts the
+# failed starts in a row, and a running motor that stalls hasn't failed one,
+# so it gets 3 restarts. After the third fails, it plays its "motor stalled"
+# beeps and keeps the motor off until the throttle has been zero for ten
+# counts of its 32 ms timer: until the Flight Controller disarms. Here the
+# scripted commands disarm at 7 s (0% to every motor, as Betaflight sends a
+# disarmed Quad's ESCs) and arm again at 8 s. Proves stalls, restarts and
+# "stopped after failed restarts" (#26 §1, #26 §6).
+format = 1
+name   = "A 5-inch prop jammed against a block gets 3 restarts, then stays off until disarm, under the start-up power limit"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "test/block"
+position          = "0 m east, 0 m north, 0.04 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%, 3%, 0%, 0%" },
+  { at = "7 s", motors = "0%" },
+  { at = "8 s", motors = "0%, 3%, 0%, 0%" },
+]
+
+[[expect]]
+what    = "motor 2 drive"
+over    = "0.108 s to 0.2075 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (L1037–1041) and waits 100 ms (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. Prop 2 lands on the block and stalls at 0.108 s (observed)"
+
+[[expect]]
+what  = "motor 2 drive"
+at    = "0.208 s"
+value = "1.96% ± 0.001%"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1086 and L762–768: 0.1 s after the stall it restarts the motor (`ljmp motor_start`), its drive capped at Startup Power Max, 1.96%"
+
+[[expect]]
+what  = "motor 2 restarts"
+at    = "0.208 s"
+value = "1 ± 0"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: its first restart"
+
+[[expect]]
+what    = "motor 2 speed"
+over    = "0.208 s to 5.445 s"
+highest = "0 RPM ± 190 RPM"
+basis   = "rule: the prop stays jammed: at 1.96% of 25.2 V the motor's torque can't pass 2.6 A × 1 / (1,750 KV) = 0.014 N·m, and the rub holds more than that against it, so the prop never turns faster than Bluejay's minimum speed, 190 RPM on this 14-pole motor, and every restart fails"
+
+[[expect]]
+what   = "motor 2 drive"
+over   = "0.208 s to 1.887 s"
+lowest = "1.96% ± 0.001%"
+basis  = "source: Bluejay v0.21.0 (src/Modules/Timing.asm L533–575, L640–652, L771–788; src/Bluejay.asm L1033–1036): a start never gives up on a timeout during its start-up and initial-run phases, so the field steps on at its timeouts' pace through all 15 capped electrical turns, 24 commutations of 34.1 ms and 66 of 13.0 ms, 1.679 s, before the first timeout after them ends the try; the esc module in crates/physics has the working"
+
+[[expect]]
+what  = "motor 2 drive"
+at    = "1.8875 s"
+value = "0% ± 0%"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1041 and L1084: the try has failed, 0.208 s + 1.679 s = 1.887 s, so the ESC switches the motor off and waits 100 ms to try again"
+
+[[expect]]
+what  = "motor 2 restarts"
+at    = "1.98725 s"
+value = "2 ± 0"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: one failed start in a row, fewer than 3, so it restarts again 0.1 s after the failed try"
+
+[[expect]]
+what  = "motor 2 restarts"
+at    = "3.7665 s"
+value = "3 ± 0"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: two failed starts in a row, fewer than 3, so it restarts a third time"
+
+[[expect]]
+what    = "motor 2 restarts"
+over    = "0 s to 7 s"
+highest = "3 ± 0"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1036 and L1073–1077: the third failed start makes 3 in a row, the Quad definition's restart_tries and Bluejay's own limit, so there is no fourth restart"
+
+[[expect]]
+what    = "motor 2 drive"
+over    = "5.446 s to 8 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1088–1107 and L633–656: after giving up it plays its \"motor stalled\" beeps and goes back to waiting for arming, which needs the throttle at zero for ten counts of its 32 ms timer; while the command stays at 3% it never comes, so the motor stays off, \"stopped after failed restarts\", through the disarm at 7 s until the next command above zero"
+
+[[expect]]
+what    = "motor 2 current"
+over    = "0.208 s to 5.446 s"
+highest = "between 0 A and 2.61 A"
+basis   = "rule: through the restarts the drive is capped at 1.96% of the pack's 25.2 V, 0.494 V, so a jammed motor, held still with no back-voltage, draws at most 0.494 V / 0.19 Ω = 2.60 A"
+
+[[expect]]
+what    = "battery current"
+over    = "0.208 s to 5.446 s"
+highest = "between 0 A and 0.052 A"
+basis   = "rule: the ESC draws its drive times the motor's current from the pack, 1.96% × 2.60 A = 0.051 A, and the other motors are off; at that rate the 1,400 mAh pack would last 27 hours, so a jammed motor can't drain it"
+
+[[expect]]
+what  = "motor 2 restarts"
+at    = "7.375 s"
+value = "0 ± 0"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L647–656, as at power-up: the disarm at 7 s sends zero, and after ten counts of its 32 ms timer at zero and its ready beep (66.5 ms) the ESC is ready again, its count cleared; observed at 7.375 s"
+
+[[expect]]
+what  = "motor 2 drive"
+at    = "8.100125 s"
+value = "1.96% ± 0.001%"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L726–768: armed again at 8 s, the ready ESC starts the motor on the first step after its 0.1 s start wait, capped at Startup Power Max, as from any standstill"
