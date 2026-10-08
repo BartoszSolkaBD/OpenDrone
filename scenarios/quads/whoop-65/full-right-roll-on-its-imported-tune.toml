@@ -15,7 +15,7 @@
 # Sinking a few metres a second, its rotors are inside the band where a
 # rotor sinks into its own air, so Prop Wash (#46) shakes it as it rolls,
 # each rotor's thrust flickering its own way: the PID loop fights it, and
-# its pitch and yaw rates wander by up to about 15 °/s and 5 °/s instead of
+# its pitch and yaw rates wander by up to about 27 °/s and 10 °/s instead of
 # holding still, and half a second after the stick is let go it still
 # shakes. How hard comes from the Whoop 65's Prop Wash numbers and the
 # random seed.
@@ -96,29 +96,29 @@ basis   = "observed: the roll rate swings around the max rate as the sinking who
 [[expect]]
 what    = "pitch rate"
 over    = "1 s to 3 s"
-lowest  = "-13.5 °/s ± 3 °/s"
-basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash shakes the sinking whoop (#46), and the PID loop holds pitch within about 15 °/s of what the centred stick asks (it held it within 1 °/s without Prop Wash)"
+lowest  = "-27.1 °/s ± 3 °/s"
+basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash shakes the sinking whoop (#46), and the PID loop holds pitch within about 27 °/s of what the centred stick asks (it held it within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
 
 [[expect]]
 what    = "pitch rate"
 over    = "1 s to 3 s"
 highest = "14.7 °/s ± 3 °/s"
-basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash shakes the sinking whoop (#46), and the PID loop holds pitch within about 15 °/s of what the centred stick asks (it held it within 1 °/s without Prop Wash)"
+basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash shakes the sinking whoop (#46), and the PID loop holds pitch within about 27 °/s of what the centred stick asks (it held it within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
 
 [[expect]]
 what    = "yaw rate"
 over    = "1 s to 3 s"
-lowest  = "-3.53 °/s ± 1.5 °/s"
-basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 5 °/s (within 1 °/s without Prop Wash)"
+lowest  = "-9.35 °/s ± 1.5 °/s"
+basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 10 °/s (within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
 
 [[expect]]
 what    = "yaw rate"
 over    = "1 s to 3 s"
-highest = "5.13 °/s ± 1.5 °/s"
-basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 5 °/s (within 1 °/s without Prop Wash)"
+highest = "10.6 °/s ± 1.5 °/s"
+basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 10 °/s (within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
 
 [[expect]]
 what  = "roll rate"
 at    = "3.5 s"
-value = "12.7 °/s ± 5 °/s"
-basis = "observed: half a second after the stick is let go the roll has stopped, but the whoop still sinks through its own air, so Prop Wash still shakes it (#46: it read 0 °/s ± 1 °/s without it)"
+value = "5.22 °/s ± 5 °/s"
+basis = "observed: half a second after the stick is let go the roll has stopped, but the whoop still sinks through its own air, so Prop Wash still shakes it (#46: it read 0 °/s ± 1 °/s without it); it moved when the flicker began to draw per rotor"

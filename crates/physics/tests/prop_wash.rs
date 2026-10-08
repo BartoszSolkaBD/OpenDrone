@@ -60,8 +60,9 @@ fn fingerprint(quad: &QuadBody) -> u64 {
 #[test]
 fn settled_motors_in_the_band_make_up_prop_washs_average_loss() {
     // Drag-free and sinking at 5 m/s, each rotor carries a quarter of the
-    // weight, so v_h is 5.6975 m/s and 5 m/s is 0.878 v_h, near the band's
-    // middle. Settled with the flicker at its middle, the four thrusts still
+    // weight after Prop Wash's loss. v_h is measured from momentum theory's
+    // thrust before it, 9.54 gf, so it is 6.30 m/s and 5 m/s is 0.794 v_h,
+    // near the band's middle. Settled with the flicker at its middle, the four thrusts still
     // carry the weight exactly; the rotors spin faster to give it.
     let weight = 0.0312 * 9.81;
     let washed = sinking(with_prop_wash(WHOOP_PROP_WASH), 5.0);

@@ -26,43 +26,43 @@ measured = "0.148 °/s"
 what     = "roll rate, highest over 1.5 s to 3 s"
 basis    = "Observed"
 expected = "829 °/s ± 3%"
-measured = "836 °/s"
+measured = "837 °/s"
 
 [[expect]]
 what     = "roll rate, lowest over 1.5 s to 3 s"
 basis    = "Observed"
 expected = "491 °/s ± 3%"
-measured = "491 °/s"
+measured = "493 °/s"
 
 [[expect]]
 what     = "pitch rate, lowest over 1 s to 3 s"
 basis    = "Observed"
-expected = "-13.5 °/s ± 3 °/s"
-measured = "-13.5 °/s"
+expected = "-27.1 °/s ± 3 °/s"
+measured = "-27.1 °/s"
 
 [[expect]]
 what     = "pitch rate, highest over 1 s to 3 s"
 basis    = "Observed"
 expected = "14.7 °/s ± 3 °/s"
-measured = "14.7 °/s"
+measured = "15.7 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 3 s"
 basis    = "Observed"
-expected = "-3.53 °/s ± 1.5 °/s"
-measured = "-3.53 °/s"
+expected = "-9.35 °/s ± 1.5 °/s"
+measured = "-9.35 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 3 s"
 basis    = "Observed"
-expected = "5.13 °/s ± 1.5 °/s"
-measured = "5.13 °/s"
+expected = "10.6 °/s ± 1.5 °/s"
+measured = "10.6 °/s"
 
 [[expect]]
 what     = "roll rate at 3.5 s"
 basis    = "Observed"
-expected = "12.7 °/s ± 5 °/s"
-measured = "12.7 °/s"
+expected = "5.22 °/s ± 5 °/s"
+measured = "5.22 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -73,16 +73,16 @@ measured = "none broken"
 [fingerprints]
 quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "5892edb7269e5e1e"   # the whole state after each of 28000 steps at 8000 Hz, in order
+run  = "896ecf9ae8aa1f0c"   # the whole state after each of 28000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.35 s" = "861abe1afd232ae1"
-"0.7 s" = "ecccb4115ef3fac7"
-"1.05 s" = "074a22be21a196e0"
-"1.4 s" = "8a313379ef8917d1"
-"1.75 s" = "7e81860b0da34927"
-"2.1 s" = "c9fedaa5f4a9093d"
-"2.45 s" = "820e6395071a1f44"
-"2.8 s" = "60b3db39d44e64c8"
-"3.15 s" = "2faa03e78690b87e"
-"3.5 s" = "5b28055d0cfb62ad"
+"0.35 s" = "19b24bef3d9fd9e6"
+"0.7 s" = "a4156322e0011582"
+"1.05 s" = "2433ba5e3333ad14"
+"1.4 s" = "775d14a64b35f09c"
+"1.75 s" = "982e28ceee366b87"
+"2.1 s" = "f9d3b301194c1710"
+"2.45 s" = "f08f09a9f6c15c2a"
+"2.8 s" = "e2f8ca2c1200b6e4"
+"3.15 s" = "025c74d6e546c865"
+"3.5 s" = "0742233a1c8f8602"

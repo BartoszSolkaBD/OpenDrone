@@ -2,14 +2,16 @@
 # ADR-0001): the same seed gives the same flicker, to the last bit, and a
 # different seed a different flicker. The flight is the one in
 # prop-wash-shakes-a-whoop-sinking-through-the-middle-of-its-band.toml: a
-# Whoop 65, level, sinking straight down at 5 m/s, 0.917 v_h, in the middle
-# of its band, where each rotor's thrust flickers between 5.71 and 8.57 gf
+# Whoop 65, level, sinking straight down at 5 m/s, 0.825 v_h, in the middle
+# of its band, where each rotor's thrust flickers between 5.774 and 8.504 gf
 # (the working is there). It is compared with itself run again three ways:
 # with the same seed, with seed 2, and at 4 kHz.
 #
-# Each rotor's flicker glides between random levels drawn from the seed,
-# timed in seconds of Simulation Time (crates/physics/src/prop_wash.rs, "The
-# flicker"), so at 4 kHz it draws the same levels at the same moments.
+# Each rotor's flicker glides between random levels drawn from its own
+# generator, seeded from the Quad's seed, and timed in seconds of Simulation
+# Time (crates/physics/src/prop_wash.rs, "The flicker"), so at 4 kHz each rotor
+# draws the same levels at the same moments, to within rounding in the timing
+# (a readable check sweeps seeds 0 to 199 at 1, 4 and 8 kHz).
 format = 1
 name   = "Prop Wash's flicker comes from the random seed"
 
@@ -96,32 +98,32 @@ what    = "motor 1 thrust"
 at      = "0.1 s"
 against = { random_seed = 2 }
 compare = "gap"
-value   = "between 0.001 gf and 2.86 gf"
-basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.57 − 5.71 = 2.86 gf, while the Quad still sinks level"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
 
 [[expect]]
 what    = "motor 2 thrust"
 at      = "0.1 s"
 against = { random_seed = 2 }
 compare = "gap"
-value   = "between 0.001 gf and 2.86 gf"
-basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.57 − 5.71 = 2.86 gf, while the Quad still sinks level"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
 
 [[expect]]
 what    = "motor 3 thrust"
 at      = "0.1 s"
 against = { random_seed = 2 }
 compare = "gap"
-value   = "between 0.001 gf and 2.86 gf"
-basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.57 − 5.71 = 2.86 gf, while the Quad still sinks level"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
 
 [[expect]]
 what    = "motor 4 thrust"
 at      = "0.1 s"
 against = { random_seed = 2 }
 compare = "gap"
-value   = "between 0.001 gf and 2.86 gf"
-basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.57 − 5.71 = 2.86 gf, while the Quad still sinks level"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
 
 [[expect]]
 what    = "roll rate"
@@ -137,7 +139,7 @@ at      = "0.1 s"
 against = { physics_rate = "4 kHz" }
 compare = "ratio"
 value   = "100% ± 1%"
-basis   = "rule: the flicker is timed in seconds and draws its levels in the same order at any physics rate, so at 4 kHz the rotor flickers the same"
+basis   = "rule: the flicker is timed in seconds and each rotor draws its levels from its own generator, so at 4 kHz the rotor flickers the same, to within rounding in the timing"
 
 [[expect]]
 what    = "motor 2 thrust"
@@ -145,4 +147,4 @@ at      = "0.1 s"
 against = { physics_rate = "4 kHz" }
 compare = "ratio"
 value   = "100% ± 1%"
-basis   = "rule: the flicker is timed in seconds and draws its levels in the same order at any physics rate, so at 4 kHz the rotor flickers the same"
+basis   = "rule: the flicker is timed in seconds and each rotor draws its levels from its own generator, so at 4 kHz the rotor flickers the same, to within rounding in the timing"

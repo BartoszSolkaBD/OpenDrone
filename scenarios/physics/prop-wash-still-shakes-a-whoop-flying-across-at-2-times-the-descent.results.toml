@@ -5,40 +5,28 @@ format   = 1
 scenario = "Flying forward at only 2 times its descent, a Whoop 65 is still shaken by Prop Wash"
 
 [[expect]]
-what     = "roll rate, highest over 0 s to 1 s"
+what     = "roll rate at 1 s, how far from the same run with random seed 2"
 basis    = "Source"
-expected = "between 0.1 °/s and 10000 °/s"
-measured = "238 °/s"
+expected = "between 0.001 °/s and 10000 °/s"
+measured = "52.4 °/s"
 
 [[expect]]
-what     = "roll rate, lowest over 0 s to 1 s"
+what     = "pitch rate at 1 s, how far from the same run with random seed 2"
 basis    = "Source"
-expected = "between -10000 °/s and -0.1 °/s"
-measured = "-96.4 °/s"
-
-[[expect]]
-what     = "pitch rate, highest over 0 s to 1 s"
-basis    = "Source"
-expected = "between 0.1 °/s and 10000 °/s"
-measured = "75.4 °/s"
-
-[[expect]]
-what     = "pitch rate, lowest over 0 s to 1 s"
-basis    = "Source"
-expected = "between -10000 °/s and -0.1 °/s"
-measured = "-178 °/s"
+expected = "between 0.001 °/s and 10000 °/s"
+measured = "2.98 °/s"
 
 [[expect]]
 what     = "roll at 1 s"
 basis    = "Observed"
-expected = "46.8° ± 10°"
-measured = "46.8°"
+expected = "-2.49° ± 10°"
+measured = "-2.49°"
 
 [[expect]]
 what     = "pitch at 1 s"
 basis    = "Observed"
-expected = "-30.7° ± 10°"
-measured = "-30.7°"
+expected = "-9.42° ± 10°"
+measured = "-9.42°"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -49,16 +37,16 @@ measured = "none broken"
 [fingerprints]
 quad = "bb331df5a141eda0"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "acf3505d76af0277"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "219f3bc3a3b9d9a5"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "68920329881b264e"
-"0.2 s" = "74525e1ebaa41c46"
-"0.3 s" = "cf717121b778016c"
-"0.4 s" = "7217045c253d76ab"
-"0.5 s" = "7bc78aadce0be0de"
-"0.6 s" = "206014a588f141ac"
-"0.7 s" = "483412d7193c2412"
-"0.8 s" = "c03a4cf2111e2f2e"
-"0.9 s" = "ca6df32e03fd2ee2"
-"1 s" = "cf98d5cb2acd5b5e"
+"0.1 s" = "2b7e17fe6aa430e5"
+"0.2 s" = "1797d13d833323fb"
+"0.3 s" = "bcce941d890ce98f"
+"0.4 s" = "b4bd46e736389757"
+"0.5 s" = "23bfcf71e2cad2cf"
+"0.6 s" = "963535abfb78435e"
+"0.7 s" = "11a907129a3639eb"
+"0.8 s" = "0c60764df4b1fe76"
+"0.9 s" = "4a6b901b123daec4"
+"1 s" = "71aa33eeb0108509"

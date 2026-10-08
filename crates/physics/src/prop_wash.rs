@@ -69,8 +69,15 @@
 //!
 //! The levels come from [`Random`], a seeded random number generator, with
 //! the timing in seconds of Simulation Time: so the same seed gives the same
-//! flicker, on every computer and at every physics rate (to within rounding
-//! in its timing), and a different seed a different one. The flicker moves
+//! flicker, on every computer, and a different seed a different one. Each
+//! rotor has its own generator, seeded from the Quad's seed (a generator
+//! seeded with it hands each rotor, in motor order, its first number as the
+//! rotor's seed), so a rotor's levels never depend on when the other rotors
+//! move on. That keeps the flicker the same at every physics rate, to within
+//! rounding in its timing (under 1e-11 of the −1 to 1 range, the worst measured 5e-13, over 1 s at 1, 4
+//! and 8 kHz, for every seed from 0 to 199 that the test sweeps), while the
+//! flicker is slower than the physics rate: a flicker that moves on by two
+//! levels or more in one step skips levels differently at each rate. The flicker moves
 //! on at every step the Quad is free to fly, in the band or not, so a rotor
 //! entering the band meets it mid-flicker rather than at a fresh start; held
 //! on the thrust stand, in still air, it waits. The Simulation gives each Quad its own seed ([`Flicker::new`],
@@ -163,17 +170,18 @@ pub fn thrust_factor(strength: f64, share: f64, flicker: f64) -> f64 {
     (1.0 - acting) * (1.0 + acting * flicker)
 }
 
-/// Each rotor's flicker, and the seeded generator its levels come from (see
-/// the module's "The flicker"). Part of the Quad's state.
+/// Each rotor's flicker, with the seeded generator each rotor's levels come
+/// from (see the module's "The flicker"). Part of the Quad's state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Flicker {
-    random: Random,
     rotors: [Glide; 4],
 }
 
-/// One rotor's flicker: gliding from one level to the next.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// One rotor's flicker: gliding from one level to the next, with the
+/// generator that draws its levels.
+#[derive(Clone, Debug, PartialEq)]
 struct Glide {
+    random: Random,
     /// The share of the time from `from` to `to` gone, from 0 up to 1.
     gone: f64,
     from: f64,
@@ -181,21 +189,26 @@ struct Glide {
 }
 
 impl Flicker {
-    /// The flicker the seed alone decides: each rotor in turn, in
-    /// Betaflight's motor order, draws where it starts between two levels,
-    /// then the two levels.
+    /// The flicker the seed alone decides. A generator seeded from `seed`
+    /// hands each rotor, in Betaflight's motor order, the first number it
+    /// draws as that rotor's own seed. Each rotor's generator then draws
+    /// where its rotor starts between two levels, then the two levels.
     pub fn new(seed: u64) -> Flicker {
-        let mut random = Random::new(seed);
-        let rotors = [(); 4].map(|_| Glide {
-            gone: random.uniform(),
-            from: random.signed(),
-            to: random.signed(),
+        let mut seeds = Random::new(seed);
+        let rotors = [(); 4].map(|_| {
+            let mut random = Random::new(seeds.next_u64());
+            Glide {
+                gone: random.uniform(),
+                from: random.signed(),
+                to: random.signed(),
+                random,
+            }
         });
-        Flicker { random, rotors }
+        Flicker { rotors }
     }
 
     /// Moves every rotor's flicker on by `dt` seconds, at `rate` new levels a
-    /// second, drawing each new level in turn, rotor by rotor.
+    /// second, each rotor drawing its new levels from its own generator.
     pub(crate) fn step(&mut self, rate: f64, dt: f64) {
         for glide in &mut self.rotors {
             glide.gone += rate * dt;
@@ -206,28 +219,29 @@ impl Flicker {
                 // Faster than the physics steps: a level it skipped over
                 // could never have shown, so it glides on from a fresh one.
                 glide.gone = fmod(glide.gone, 1.0);
-                glide.from = self.random.signed();
+                glide.from = glide.random.signed();
             } else {
                 glide.gone -= 1.0;
                 glide.from = glide.to;
             }
-            glide.to = self.random.signed();
+            glide.to = glide.random.signed();
         }
     }
 
     /// Each rotor's flicker now, from −1 to 1, in Betaflight's motor order.
     pub fn values(&self) -> [f64; 4] {
-        self.rotors.map(|glide| {
+        [0, 1, 2, 3].map(|k| {
+            let glide = &self.rotors[k];
             let p = glide.gone;
             glide.from + (glide.to - glide.from) * p * p * (3.0 - 2.0 * p)
         })
     }
 
-    /// Feeds the generator, the levels and the timing into a fingerprint, in
-    /// a fixed order.
+    /// Feeds each rotor's generator, levels and timing into a fingerprint,
+    /// rotor by rotor.
     pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
-        self.random.write_fingerprint(f);
         for glide in &self.rotors {
+            glide.random.write_fingerprint(f);
             f.write_f64s(&[glide.gone, glide.from, glide.to]);
         }
     }
@@ -341,19 +355,36 @@ mod tests {
     }
 
     #[test]
-    fn the_flicker_is_the_same_at_4_and_8_khz() {
-        // Its timing is in seconds and its levels are drawn in the same
-        // order, so only rounding in the timing differs.
-        let mut slow = Flicker::new(9);
-        let mut fast = Flicker::new(9);
-        for _ in 0..4000 {
-            slow.step(15.0, 1.0 / 4000.0);
-            fast.step(15.0, 1.0 / 8000.0);
-            fast.step(15.0, 1.0 / 8000.0);
-            for (s, f) in slow.values().iter().zip(fast.values()) {
-                assert!((s - f).abs() < 1e-9);
+    fn the_flicker_is_the_same_at_1_4_and_8_khz_for_every_seed() {
+        // Each rotor's timing is in seconds and its levels come from its own
+        // generator, so a rotor draws the same levels in the same order
+        // whenever the others move on. What differs is rounding in the
+        // timing: `gone` is summed in steps of 1/1000, 1/4000 or 1/8000 of a
+        // second, each a few 1e-16 off, so after 1 s they differ by well
+        // under 1e-12, and a level reached a rounding earlier or later
+        // changes the glide by no more than its slope (at most 1.5 × 2 per
+        // unit of `gone`) times that. The worst the sweep sees is 5e-13; the tolerance is 1e-11.
+        let rate = 15.0;
+        let mut worst = 0.0_f64;
+        for seed in 0..200 {
+            let mut rates = [1000_u32, 4000, 8000].map(|hz| (hz, Flicker::new(seed)));
+            // Every 1/1000 s for 1 s, all three have moved on to the same time.
+            for _ in 0..1000 {
+                for (hz, flicker) in &mut rates {
+                    for _ in 0..(*hz / 1000) {
+                        flicker.step(rate, 1.0 / f64::from(*hz));
+                    }
+                }
+                let fine = rates[2].1.values();
+                for (_, flicker) in &rates[..2] {
+                    for (a, b) in flicker.values().iter().zip(fine) {
+                        worst = opendrone_maths::functions::max(worst, (a - b).abs());
+                    }
+                }
             }
         }
+
+        assert!(worst < 1e-11, "the rates part by {worst}");
     }
 
     #[test]
