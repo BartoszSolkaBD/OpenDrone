@@ -17,6 +17,24 @@ expected = "0 °/s ± 0.001 °/s"
 measured = "0.0000000000000776 °/s"
 
 [[expect]]
+what     = "roll rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "-0.0000000000000258 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0.00000000000000780 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "-0.0000000000000327 °/s"
+
+[[expect]]
 what     = "yaw rate at 1 s"
 basis    = "Observed"
 expected = "546 °/s ± 10 °/s"

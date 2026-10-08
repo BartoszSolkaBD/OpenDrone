@@ -47,8 +47,12 @@
 //!   across the disc (which grows only with the root of the descent), plus
 //!   the most momentum theory lets any disc take from the air arriving at it,
 //!   `½ρA·(v_c² + μ²)` (an ideal windmill's thrust coefficient of 1). Straight
-//!   up or down, or straight across, it never acts; it acts at all only once
-//!   both speeds pass about `v_h`, and strongly only far beyond.
+//!   up or down, straight across or climbing, it never acts; it acts at all
+//!   only once the descent passes about 0.8 `v_h` with at least 1.1 `v_h`
+//!   across. It trims about 2% at a descent of `v_h` with 1.2 `v_h` across,
+//!   19% at 2 `v_h` each way and 32% at 3 `v_h`: fast dives with the motors
+//!   low reach that. **The guard has no source**: it is a modelling choice the
+//!   research doesn't give.
 //! - **Spinning backwards** (Crash Flip), the rotor's thrust is its still-air
 //!   reverse share: the momentum theory above is for a rotor pushing air
 //!   down through itself.
@@ -56,6 +60,15 @@
 //! Vortex ring state, where a rotor descends into its own air, is momentum
 //! theory's blind spot. What it does there, Prop Wash, is its own effect
 //! (ADR-0005).
+//!
+//! **To watch: nearly stopped props.** As a rotor's power goes to nothing
+//! while air comes down through it and across it, momentum theory's thrust
+//! stops depending on its speed: it tends to the smaller of `2ρA·|v_c|·μ` and
+//! `½ρA·(v_c² + μ²)` (an ideal autorotation). Only a prop at exactly 0 RPM
+//! gives none, and a coasting motor never quite reaches 0, so nearly stopped
+//! props in a fast fall still lift a little, roughly as windmilling props
+//! would. Prop Wash, Failsafe and disarm, Prop Strikes and Feel Tests should
+//! keep an eye on it.
 //!
 //! # Rotor drag and the nose lifting at speed (E16, E18)
 //!

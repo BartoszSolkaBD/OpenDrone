@@ -11,6 +11,12 @@ expected = "0 °/s ± 0.05 °/s"
 measured = "0 °/s"
 
 [[expect]]
+what     = "yaw rate, highest over 0 s to 0.1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.05 °/s"
+measured = "0 °/s"
+
+[[expect]]
 what     = "yaw rate at 0.100125 s"
 basis    = "Rule"
 expected = "between 1 °/s and 3 °/s"

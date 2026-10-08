@@ -9,10 +9,13 @@
 # pushed the other way about the pitch axis). Their speeding up also yaws
 # the frame clockwise ("A punch on its anticlockwise pair twitches a Whoop
 # 65's nose right at once"), and a frame that rolls and yaws at once pitches
-# by its own inertia, nose up; but by angular momentum that yaw holds the
-# rotors' spin over the yaw inertia, so it pushes back only roll inertia over
-# yaw inertia of it, 70 of 140 g·cm²: the nose still goes down, at half the
-# push. The props' drag, which also yaws it, builds slower.
+# by its own inertia, nose up. By angular momentum that yaw is the rotors'
+# spin over the yaw inertia, so the frame's roll-and-yaw coupling pushes back
+# (yaw inertia − roll inertia) / yaw inertia of the rotors' push: (140 − 70)
+# / 140 g·cm², half. That leaves roll inertia / yaw inertia of it, the other
+# half, so the nose still goes down. Both inertias are Estimates a Feel Test
+# may move; the nose goes down for any roll inertia above nothing. The
+# props' drag, which also yaws it, builds slower.
 format = 1
 name   = "Rolling, a punch on its anticlockwise pair tips a Whoop 65's nose down"
 
@@ -58,7 +61,7 @@ timeline = [
 what  = "pitch rate"
 at    = "0.01 s"
 value = "between -1000 °/s and -0.1 °/s"
-basis = "rule: rolling right while the anticlockwise rotors speed up, their spin is turned by the roll and pushes the nose down; the frame's own roll-and-yaw coupling pushes it up by only half as much (working above)"
+basis = "rule: rolling right while the anticlockwise rotors speed up, their spin is turned by the roll and pushes the nose down; the frame's own roll-and-yaw coupling pushes back only (yaw inertia − roll inertia) / yaw inertia of that, so roll inertia / yaw inertia of it is left (working above)"
 
 [[expect]]
 what  = "pitch rate"

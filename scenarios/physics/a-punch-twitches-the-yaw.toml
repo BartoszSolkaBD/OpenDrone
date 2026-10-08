@@ -69,6 +69,12 @@ lowest = "0 °/s ± 0.05 °/s"
 basis  = "rule: before the punch all four rotors turn at one speed, so their drags and spins cancel"
 
 [[expect]]
+what    = "yaw rate"
+over    = "0 s to 0.1 s"
+highest = "0 °/s ± 0.05 °/s"
+basis   = "rule: before the punch all four rotors turn at one speed, so their drags and spins cancel"
+
+[[expect]]
 what  = "yaw rate"
 at    = "0.100125 s"
 value = "between 1 °/s and 3 °/s"

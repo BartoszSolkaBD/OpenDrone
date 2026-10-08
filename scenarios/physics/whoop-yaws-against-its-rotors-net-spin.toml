@@ -56,9 +56,27 @@ lowest = "between 0.01 °/s and 10000 °/s"
 basis  = "rule: the anticlockwise props turn faster, so their drag twists the frame clockwise harder than the clockwise props' twists it back: it yaws right, nose right, throughout"
 
 [[expect]]
+what    = "roll rate"
+over    = "0 s to 1 s"
+highest = "0 °/s ± 0.001 °/s"
+basis   = "rule: each pair sits on a diagonal, so its thrust neither rolls nor pitches the Quad"
+
+[[expect]]
 what   = "roll rate"
 over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.001 °/s"
+basis  = "rule: each pair sits on a diagonal, so its thrust neither rolls nor pitches the Quad"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 1 s"
 highest = "0 °/s ± 0.001 °/s"
+basis   = "rule: each pair sits on a diagonal, so its thrust neither rolls nor pitches the Quad"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.001 °/s"
 basis  = "rule: each pair sits on a diagonal, so its thrust neither rolls nor pitches the Quad"
 
 [[expect]]
