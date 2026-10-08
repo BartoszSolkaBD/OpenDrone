@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use opendrone_flight_controller::Tune as FlightControllerTune;
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters,
+    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters, PropWash,
     QuadParameters, QuadShape, RotorLayout,
 };
 
@@ -1304,6 +1304,10 @@ fn definition(
             // A Quad without ducts has no duct drag.
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
             duct_offset: ducts.as_ref().map_or(0.0, |d| d.nose_up_offset),
+        },
+        prop_wash: PropWash {
+            strength: r.one("feel.prop_wash_strength"),
+            flicker: r.one("feel.prop_wash_flicker"),
         },
         rotors: RotorLayout {
             diagonal: frame.diagonal,

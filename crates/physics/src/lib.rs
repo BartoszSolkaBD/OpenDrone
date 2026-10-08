@@ -24,11 +24,14 @@
 //!   E25, E26; [`air`]);
 //! - the rotors' own spin: the frame turning against a rotor that speeds up or
 //!   slows down, and their spin's gyroscopic push in a flip (E7, E8; step 6
-//!   below).
+//!   below);
+//! - Prop Wash: a rotor sinking into its own air loses some thrust and its
+//!   thrust flickers, each rotor its own way, from a seeded random generator
+//!   kept in the Quad's state (E19, ADR-0005; [`prop_wash`]).
 //!
 //! The other effects arrive with their own tickets and Scenarios: ground and
 //! ceiling effect (#44), Prop Strikes and stalled motors' restarts (#45),
-//! Prop Wash (#46), and so on.
+//! and so on.
 //!
 //! # How one step moves the Quad
 //!
@@ -42,8 +45,10 @@
 //!    charge goes down ([`battery`]).
 //! 4. The forces on the Quad give its acceleration: the Map's gravity, each
 //!    rotor's thrust along the body's up axis in the air the rotor moves
-//!    through, and the air's drag ([`air`]). They are worked out from where
-//!    the step started, with the motors' new speeds.
+//!    through, with Prop Wash's loss and flicker where it sinks into its own
+//!    air, and the air's drag ([`air`], [`prop_wash`]). They are worked out
+//!    from where the step started, with the motors' new speeds and the
+//!    flicker moved on by the step.
 //! 5. Semi-implicit Euler: the speed changes first, then the position moves
 //!    with the new speed.
 //! 6. The rotation changes by Euler's equation for a rigid body carrying
@@ -161,6 +166,7 @@ pub mod air;
 mod collide;
 mod geometry;
 mod map;
+pub mod prop_wash;
 mod shape;
 
 pub mod battery;
@@ -183,6 +189,7 @@ pub use commands::{MotorCommand, MotorCommands, SpinDirection};
 pub use esc::{EscParameters, EscState, StartUpStep};
 pub use map::{LineCrossing, MapCollision, MapShape, MapShapeError, MapShapeProblem};
 pub use motor::{MotorParameters, PropParameters};
+pub use prop_wash::{Flicker, PropWash};
 pub use rotors::{PropDirection, RotorLayout};
 pub use shape::{DUCT_RING_SEGMENTS, DuctRings, PROP_DISC_THICKNESS, QuadPart, QuadShape};
 
@@ -214,6 +221,8 @@ pub struct QuadParameters {
     /// Inertia in body axes (forward, left, up), in kg·m².
     pub inertia: Mat3,
     pub drag: Drag,
+    /// How strong Prop Wash is, and how fast it flickers ([`prop_wash`]).
+    pub prop_wash: PropWash,
     pub rotors: RotorLayout,
     pub props: PropParameters,
     pub motors: MotorParameters,
@@ -340,6 +349,9 @@ pub enum SetUpProblem {
     NotAboveZero(&'static str),
     /// The battery's voltage curve has no points.
     NoVoltageCurve,
+    /// Prop Wash's strength must be from 0 to 100% and its flicker 0 Hz or
+    /// more, both real numbers.
+    PropWashOutOfRange,
     /// Every size in the collision shape must be above zero, its bounce from
     /// 0 to 1 and its friction 0 or more.
     ShapeCantBeBuilt,
@@ -387,6 +399,8 @@ pub struct QuadBody {
     reach: f64,
     /// Where the Map pushed the Quad during the last step.
     contacts: Vec<Contact>,
+    /// Each rotor's Prop Wash flicker, and the generator it draws from.
+    flicker: Flicker,
 }
 
 impl QuadBody {
@@ -422,6 +436,9 @@ impl QuadBody {
         }
         if parameters.battery.voltage_curve.is_empty() {
             return Err(SetUpProblem::NoVoltageCurve);
+        }
+        if !parameters.prop_wash.is_usable() {
+            return Err(SetUpProblem::PropWashOutOfRange);
         }
         if !parameters.shape.is_buildable() {
             return Err(SetUpProblem::ShapeCantBeBuilt);
@@ -484,7 +501,21 @@ impl QuadBody {
             parts,
             reach,
             contacts: Vec::new(),
+            flicker: Flicker::new(0),
         })
+    }
+
+    /// The same Quad with this Prop Wash flicker, in place of the one it
+    /// starts with, seeded with 0. The Simulation gives each Quad its own,
+    /// from its random seed, and hands it on through Reset.
+    pub fn with_flicker(mut self, flicker: Flicker) -> QuadBody {
+        self.flicker = flicker;
+        self
+    }
+
+    /// Each rotor's Prop Wash flicker, and the generator it draws from.
+    pub fn flicker(&self) -> &Flicker {
+        &self.flicker
     }
 
     pub fn state(&self) -> &QuadState {
@@ -612,9 +643,12 @@ impl QuadBody {
     /// motors' speeds before this step's.
     fn move_freely(&mut self, world: &World, model: &Model, speeds_before: [f64; 4], dt: f64) {
         let speeds = self.motors.map(|motor| motor.speed);
+        self.flicker.step(self.parameters.prop_wash.flicker, dt);
+        let mut frame = airframe(&self.parameters, &self.positions);
+        frame.flicker = self.flicker.values();
         let state = &mut self.state;
         let push = air::push(
-            &airframe(&self.parameters, &self.positions),
+            &frame,
             model,
             state.attitude.world_to_body(state.velocity),
             state.rotation,
@@ -681,7 +715,7 @@ impl QuadBody {
     }
 
     /// Feeds the Quad's whole state into a fingerprint: where it is and how
-    /// it moves, each motor and ESC, and the battery.
+    /// it moves, each motor and ESC, the battery, and the Prop Wash flicker.
     pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
         self.state.write_fingerprint(f);
         for (motor, esc) in self.motors.iter().zip(&self.escs) {
@@ -689,10 +723,12 @@ impl QuadBody {
             esc.write_fingerprint(f);
         }
         self.battery.write_fingerprint(f);
+        self.flicker.write_fingerprint(f);
     }
 }
 
-/// What the air needs to know about a Quad.
+/// What the air needs to know about a Quad, with every rotor's Prop Wash
+/// flicker at its middle.
 fn airframe<'a>(parameters: &'a QuadParameters, positions: &'a [Vec3; 4]) -> air::Airframe<'a> {
     let diameter = parameters.props.diameter;
     air::Airframe {
@@ -700,6 +736,8 @@ fn airframe<'a>(parameters: &'a QuadParameters, positions: &'a [Vec3; 4]) -> air
         drag: &parameters.drag,
         positions,
         disc_area: core::f64::consts::PI * diameter * diameter / 4.0,
+        prop_wash: parameters.prop_wash,
+        flicker: [0.0; 4],
     }
 }
 

@@ -1,0 +1,18 @@
+# The Freestyle 5″ with no Prop Wash.    id: test/freestyle-5-no-prop-wash
+#
+# Everything else is the Freestyle 5″'s own, its Tune and drag included, so a
+# Scenario flown on it shows what the same flight does without Prop Wash. Its
+# flicker is random, each rotor its own way, so it is no mirror image of
+# itself: a Scenario that checks a flight against its mirror image needs it
+# off.
+#
+# A Test Quad lists only what it changes, so any other change to the
+# Freestyle 5″ carries into it. Only the Scenario runner reads Test Quads;
+# pilots never fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "No Prop Wash, whose random flicker would break a flight's mirror image"
+
+# A deliberate test value: no Confidence or source.
+[feel]
+prop_wash_strength = "0%"

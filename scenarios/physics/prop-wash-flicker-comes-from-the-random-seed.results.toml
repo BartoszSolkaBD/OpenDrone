@@ -1,0 +1,100 @@
+# Results of prop-wash-flicker-comes-from-the-random-seed.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Prop Wash's flicker comes from the random seed"
+
+[[expect]]
+what     = "motor 1 thrust at 0.25 s, minus the same run with random seed 1"
+basis    = "Rule"
+expected = "0 gf ± 0 gf"
+measured = "0 gf"
+
+[[expect]]
+what     = "motor 2 thrust at 0.25 s, minus the same run with random seed 1"
+basis    = "Rule"
+expected = "0 gf ± 0 gf"
+measured = "0 gf"
+
+[[expect]]
+what     = "motor 3 thrust at 0.25 s, minus the same run with random seed 1"
+basis    = "Rule"
+expected = "0 gf ± 0 gf"
+measured = "0 gf"
+
+[[expect]]
+what     = "motor 4 thrust at 0.25 s, minus the same run with random seed 1"
+basis    = "Rule"
+expected = "0 gf ± 0 gf"
+measured = "0 gf"
+
+[[expect]]
+what     = "roll rate at 0.5 s, minus the same run with random seed 1"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "motor 1 thrust at 0.1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "between 0.001 gf and 2.73 gf"
+measured = "0.921 gf"
+
+[[expect]]
+what     = "motor 2 thrust at 0.1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "between 0.001 gf and 2.73 gf"
+measured = "0.154 gf"
+
+[[expect]]
+what     = "motor 3 thrust at 0.1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "between 0.001 gf and 2.73 gf"
+measured = "1.05 gf"
+
+[[expect]]
+what     = "motor 4 thrust at 0.1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "between 0.001 gf and 2.73 gf"
+measured = "1.15 gf"
+
+[[expect]]
+what     = "roll rate at 0.5 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "between 1 °/s and 10000 °/s"
+measured = "185 °/s"
+
+[[expect]]
+what     = "motor 1 thrust at 0.1 s, as a share of the same run at 4 kHz"
+basis    = "Rule"
+expected = "100% ± 1%"
+measured = "100%"
+
+[[expect]]
+what     = "motor 2 thrust at 0.1 s, as a share of the same run at 4 kHz"
+basis    = "Rule"
+expected = "100% ± 1%"
+measured = "100%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "2f48a7f98cd054bc"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "0cad1ddce5d1bb89"
+"0.1 s" = "d5fa133e71cbe8b0"
+"0.15 s" = "63d7db175eb54ef6"
+"0.2 s" = "f73687ceffeb0c3c"
+"0.25 s" = "4ed1e7d103763b4d"
+"0.3 s" = "aff65df9377baab2"
+"0.35 s" = "a1b5bfc0bc9be6ab"
+"0.4 s" = "efb9f3821ba64558"
+"0.45 s" = "874472a06a6b411c"
+"0.5 s" = "4411e71213dd33c4"

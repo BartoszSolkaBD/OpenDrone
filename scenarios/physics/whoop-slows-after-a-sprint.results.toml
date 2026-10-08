@@ -20,13 +20,13 @@ measured = "8.00 m/s"
 what     = "speed north at 0.1 s"
 basis    = "Observed"
 expected = "6.50 m/s ± 0.1 m/s"
-measured = "6.50 m/s"
+measured = "6.59 m/s"
 
 [[expect]]
 what     = "pitch at 0.1 s"
 basis    = "Observed"
-expected = "35.5° ± 2°"
-measured = "35.5°"
+expected = "38.7° ± 2°"
+measured = "38.7°"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -37,16 +37,16 @@ measured = "none broken"
 [fingerprints]
 quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "e169172c0b71c29e"   # the whole state after each of 800 steps at 8000 Hz, in order
+run  = "093fc203b94707cd"   # the whole state after each of 800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.01 s" = "801c77fd321971b7"
-"0.02 s" = "b708cb63ce56758f"
-"0.03 s" = "9fd09ec4f66e6f59"
-"0.04 s" = "69128b3421cb1562"
-"0.05 s" = "fe82e9d40e0de8b1"
-"0.06 s" = "e94deccca1796244"
-"0.07 s" = "58bc5e392738d9a3"
-"0.08 s" = "4999efcc6345928d"
-"0.09 s" = "86a3837d77833099"
-"0.1 s" = "20a1d8d9add48df9"
+"0.01 s" = "08f8027c40630e96"
+"0.02 s" = "c15cd3700c61a6b5"
+"0.03 s" = "9a71ac2e47cea3ac"
+"0.04 s" = "d7011bb300770c35"
+"0.05 s" = "404b9590a735f202"
+"0.06 s" = "f31c8f5db479252b"
+"0.07 s" = "aaa96430b4cd8053"
+"0.08 s" = "91a8cde114434669"
+"0.09 s" = "7aa0d906945fcbd8"
+"0.1 s" = "9647b4cb4380a897"

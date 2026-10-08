@@ -1,0 +1,64 @@
+# Results of prop-wash-is-gone-sinking-faster-than-its-band.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Sinking faster than its band, a Whoop 65 feels no Prop Wash"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "motor 1 thrust, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "6.1038 gf ± 0.1%"
+measured = "6.10 gf"
+
+[[expect]]
+what     = "motor 1 thrust, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "6.1038 gf ± 0.1%"
+measured = "6.10 gf"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "82483f34b7795fd0"   # test/whoop-65-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "9bd1269b90c57d0b"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "913a8de1b47ffa29"
+"0.2 s" = "e5b01aa54ee84d2a"
+"0.3 s" = "70a2dd2e19a8e5e3"
+"0.4 s" = "289003f31e505f1e"
+"0.5 s" = "e88dc201ca68c6f9"
+"0.6 s" = "a66eab43ac6c21bf"
+"0.7 s" = "03aaefbce30c6e47"
+"0.8 s" = "f8e7c613a8a2c8e0"
+"0.9 s" = "d95bd18ca607f574"
+"1 s" = "c411ac66bf519bfa"

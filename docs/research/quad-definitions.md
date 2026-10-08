@@ -127,6 +127,23 @@ They moved with a new source, logged in the Whoop 65's Feel Test log; a Feel Tes
 - **The thrust guard has no source.** Where air arrives down through a rotor and across it at once, both far faster than the rotor's own still-air flow, momentum theory lets the thrust grow with both speeds multiplied. The air ticket caps it at the same descent's thrust plus ½ρA·(v_c² + μ²), an ideal windmill's most. The cap is a modelling choice the research doesn't give. It acts only in that corner: in units of the still-air flow, it trims about 2% at a descent of 1 across 1.2, 19% at 2 across 2, and 32% at 3 across 3. Fast dives with the motors low reach those.
 - **Nearly stopped props still lift.** Descending with air across the disc, momentum theory's thrust stops depending on the rotor's speed as its power goes to nothing. It tends to the smaller of 2ρA·|v_c|·μ and ½ρA·(v_c² + μ²), an ideal autorotation. Only a prop at exactly 0 RPM gives none, and a coasting motor in the motor model never quite reaches 0. The Reviewer probed it: a Whoop 65 pitched 20° nose down and cut from a hover to 0% had its props at 25.8 RPM after 3 s, yet they gave 3.5 gf, 11% of its weight. It fell at 14.3 m/s against 16.2 m/s for a "stopped" start, and levelled itself. That may stand in roughly for windmilling props, which the motor model can't drive. Watch it in Prop Wash (#46), Failsafe and disarm (#52), Prop Strikes (#45) and Feel Tests.
 
+## Prop Wash (#46)
+
+Prop Wash makes the two `[feel]` numbers act (crates/physics/src/prop_wash.rs explains it, and the Physics Scenarios named `prop-wash-…` prove it). It adds no number to the Quad definition.
+
+| Number | What it does |
+|---|---|
+| `prop_wash_strength` (20%, Estimate, range 10–30%) | At the band's middle, a rotor loses this share of its thrust on average, and its thrust flickers up to this share of what is left either way: from 64% to 96% of momentum theory's thrust. The research's cheap model (§4.4) has two numbers here, a loss and a flicker, both anchored on the same 10–30% thrust fluctuations; the Quad definition gives one, so both use it. |
+| `prop_wash_flicker` (15 Hz, Estimate, range 5–40 Hz) | How many times a second each rotor's flicker glides to a new random level. No source; a Feel Test tunes it. |
+
+**Where it acts.** A rotor sinking along its own axis at 0.4 to 1.4 times its hover flow `v_h = √(T / 2ρA)`, with `T` its own thrust (Johnson's band, research §4.4), and only while the air across its disc is under 2.75 times that descent (Talaeizadeh et al.'s rule). For a Whoop 65 rotor carrying a quarter of the weight, `v_h` is 5.70 m/s, so the band is a descent of 2.28–7.98 m/s; for a Freestyle 5″ rotor at its hover share, about 2.8–9.8 m/s (§4.4's Derived numbers). How strong it is inside the band (rising smoothly from either edge to the whole at its middle), and how it fades as the air across the disc nears 2.75 times the descent, are shapes with no source.
+
+**What to watch in Feel Tests:**
+
+- **Open loop, it is violent on a whoop.** With no Flight Controller to catch it, a Whoop 65 sinking straight down through the band's middle is rolled and pitched at about 400 °/s within half a second, and tips 15° in that time. The real test is with the Flight Controller and its delays, as ADR-0005 says.
+- **Forward speed and momentum theory.** Sinking with air across its disc, momentum theory lets a rotor carry its share of the weight turning slowly (a drag-free Whoop 65 sinking at 3.5 m/s while flying at 3 times that holds its weight at 3,781 RPM). Prop Wash uses the thrust a rotor gives, not its speed, to place the band, so a rotor carrying the weight there is still inside it, and the 2.75 times rule alone lets it escape.
+- **Nearly stopped props** (see the air section above) are not touched by it: their little thrust gives a small `v_h`, so any fall is far past their band.
+
 ## Both Quads
 
 - **ESC numbers** (#26 §5, from Bluejay v0.21.0's source): a 100 ms wait before a restart (`wait100ms` between stall restarts), at most 3 restarts (the stall count is checked against 3), and start-up power capped at the default Startup Power Max, 5 on Bluejay's 0–255 scale, which is 1.96% of full drive while the motor starts. They are Manufacturer numbers: Bluejay's own defaults.

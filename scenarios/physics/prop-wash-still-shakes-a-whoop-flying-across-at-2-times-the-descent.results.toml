@@ -1,0 +1,52 @@
+# Results of prop-wash-still-shakes-a-whoop-flying-across-at-2-times-the-descent.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Flying forward at only 2 times its descent, a Whoop 65 is still shaken by Prop Wash"
+
+[[expect]]
+what     = "roll rate at 1 s, how far from the same run with random seed 2"
+basis    = "Source"
+expected = "between 0.001 °/s and 10000 °/s"
+measured = "52.4 °/s"
+
+[[expect]]
+what     = "pitch rate at 1 s, how far from the same run with random seed 2"
+basis    = "Source"
+expected = "between 0.001 °/s and 10000 °/s"
+measured = "2.98 °/s"
+
+[[expect]]
+what     = "roll at 1 s"
+basis    = "Observed"
+expected = "-2.49° ± 10°"
+measured = "-2.49°"
+
+[[expect]]
+what     = "pitch at 1 s"
+basis    = "Observed"
+expected = "-9.42° ± 10°"
+measured = "-9.42°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "bb331df5a141eda0"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "219f3bc3a3b9d9a5"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "2b7e17fe6aa430e5"
+"0.2 s" = "1797d13d833323fb"
+"0.3 s" = "bcce941d890ce98f"
+"0.4 s" = "b4bd46e736389757"
+"0.5 s" = "23bfcf71e2cad2cf"
+"0.6 s" = "963535abfb78435e"
+"0.7 s" = "11a907129a3639eb"
+"0.8 s" = "0c60764df4b1fe76"
+"0.9 s" = "4a6b901b123daec4"
+"1 s" = "71aa33eeb0108509"
