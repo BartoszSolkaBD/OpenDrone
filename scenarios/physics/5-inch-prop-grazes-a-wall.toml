@@ -79,8 +79,8 @@ basis   = "rule: prop 3 sits west of the centre of mass, the farthest from the w
 [[expect]]
 what  = "motor 2 speed"
 at    = "0.0055 s"
-value = "between 190 RPM and 9400 RPM"
-basis = "rule: the rub brakes prop 2 below the 9,320 RPM it was turning at, and a graze only slows it: it doesn't stop, or fall below Bluejay's minimum speed, 1,330 electrical RPM (190 RPM on this 14-pole motor), where its ESC would find it stalled"
+value = "between 190 RPM and 9250 RPM"
+basis = "rule: the rub brakes prop 2, so it reads below 9,250 RPM, under the 9,273 RPM (0.5% below 9,320) that an untouched motor can drift to, which an unbraked prop 2 would read; and a graze only slows it: it doesn't stop, or fall below Bluejay's minimum speed, 1,330 electrical RPM (190 RPM on this 14-pole motor), where its ESC would find it stalled"
 
 [[expect]]
 what  = "motor 2 speed"
@@ -92,7 +92,7 @@ basis = "observed: the graze takes about a fifth of its speed"
 what  = "motor 4 speed"
 at    = "0.0055 s"
 value = "9320 RPM ± 0.5%"
-basis = "rule: prop 4 touches nothing, so nothing brakes it: it stays within 0.5% of the 9,310 RPM it settled at, drifting only as its drive and the air it flies through set it"
+basis = "rule: prop 4 touches nothing, so nothing brakes it: it stays within 0.5% of 9,320 RPM, the speed it holds at the start of the flight (9,310 RPM a moment earlier), drifting only as its drive and the air it flies through set it"
 
 [[expect]]
 what  = "speed north"

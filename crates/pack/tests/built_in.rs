@@ -51,6 +51,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/freestyle-5-bench-supply",
             "test/freestyle-5-filters-and-shaping-off",
             "test/freestyle-5-no-drag",
+            "test/freestyle-5-no-runaway-takeoff-prevention",
             "test/freestyle-5-output-limit-80",
             "test/whoop-65-bench-supply",
             "test/whoop-65-body-drag-only",
