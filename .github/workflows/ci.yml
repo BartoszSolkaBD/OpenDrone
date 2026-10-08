@@ -133,16 +133,17 @@ jobs:
         run: cargo xtask walls
 
       - name: The core's compiled code calls none of the operating system's maths
-        # Builds the core crates together with the game, so every feature the
-        # game turns on in a library the core uses counts, then reads the
-        # compiled code of every library the core is built with: none may
-        # call the operating system's maths library (cos, acos, log2, …),
-        # whose results differ from one OS to another, except where
-        # crates/xtask/walls.toml allows a call with its reason (ADR-0001).
-        # It reads ELF on Linux and Mach-O on macOS; Windows is left out to
-        # keep its slower job short.
-        if: steps.changes.outputs.rust == 'true' && runner.os != 'Windows'
-        run: cargo xtask core-maths --with opendrone
+        # Builds the core crates together with the game and the Scenario
+        # runner, so every feature they turn on in a library the core uses
+        # counts, then reads the compiled code of every library the core is
+        # built with, and the core's functions compiled into the game's and
+        # the runner's code: none may call the operating system's maths
+        # library (cos, acos, log2, …), whose results differ from one OS to
+        # another, except where crates/xtask/walls.toml allows a call with its
+        # reason (ADR-0001). Each OS checks its own build, so a library or
+        # feature only one OS uses counts too.
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask core-maths --with opendrone --with opendrone-scenario
 
       - name: Packs (every Pack and Test Quad passes the Pack checker)
         # The checker the game uses, over packs/ and scenarios/test-quads/.

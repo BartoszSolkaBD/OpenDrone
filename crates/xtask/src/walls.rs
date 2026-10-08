@@ -265,16 +265,19 @@ impl Rules {
 
     /// Why the core may keep this call to the operating system's maths, if
     /// `walls.toml` allows it: only when every function that makes it is one
-    /// the allowance names, so a new caller fails the check.
+    /// the allowance names, so a new caller fails the check. A reference from
+    /// outside any function, such as a table of function pointers, is never
+    /// allowed: nothing says what calls through it.
     pub(crate) fn platform_maths_reason(&self, call: &crate::core_maths::Call) -> Option<&str> {
         let allowance = self
             .core_platform_maths
             .get(&format!("{}/{}", call.library, call.function))?;
         let all_named = !call.callers.is_empty()
-            && call
-                .callers
-                .iter()
-                .all(|caller| allowance.from.iter().any(|from| from == caller));
+            && call.callers.iter().all(|caller| {
+                caller
+                    .function_name()
+                    .is_some_and(|name| allowance.from.iter().any(|from| from == name))
+            });
         all_named.then_some(allowance.reason.as_str())
     }
 
