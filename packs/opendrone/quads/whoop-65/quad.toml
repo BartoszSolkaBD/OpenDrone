@@ -77,6 +77,7 @@ voltage_curve = { value = "4.35 V at 100%, 4.15 V at 80%, 3.92 V at 50%, 3.77 V 
                   confidence = "Estimate", range = "×0.97–×1.03", source = "typical-curve" }
 resistance    = { value = "29 mΩ", confidence = "Derived", source = "lava-resistance" }
 recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "battery-model" }
+slow_sag      = { value = "0 mV·Ah/W", confidence = "Estimate", range = "0–1.048 mV·Ah/W", source = "lava-slow-sag" }   # none on top of the 29 mΩ, which holds it
 connector     = { value = "10 mΩ", confidence = "Estimate", range = "5–20 mΩ", source = "dynamics" }   # BT2.0
 
 [ducts]
@@ -147,6 +148,7 @@ bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before 
 battery-window  = "docs/research/flight-dynamics.md §5.3: a LiHV cell runs from 4.35 V down to about 3.3 V"
 typical-curve   = "docs/research/quad-definitions.md: a typical LiHV open-circuit voltage curve; BetaFPV publishes none for this pack"
 battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]"
+lava-slow-sag   = "docs/research/quad-definitions.md: the 29 mΩ is read about 2 s into BetaFPV's 18 A discharge curve, so it already holds the slow sag built by then, and after that the curve falls only as charge is used; none is added on top. Up to Bauersfeld & Scaramuzza's 1.048 mV·Ah/W, fitted to 4S–6S packs (flight-dynamics.md §5.3, eq. 13 of [S7]), if a Feel Test finds the pack recovering after a chop"
 ducts           = "docs/research/flight-dynamics.md §5.1: ram drag about 1.2 s⁻¹ for a Meteor65 Pro in hover, and the ducted rotor's centre of pressure 0.75 rotor radius higher (Pereira [S16])"
 prop-wash       = "docs/research/flight-dynamics.md §4.4: thrust loss and flicker of 10–30% in a rotor's own air [S10, S11]"
 flicker         = "docs/research/flight-dynamics.md §4.4: how fast Prop Wash flickers has no published source, so Feel Tests tune it"

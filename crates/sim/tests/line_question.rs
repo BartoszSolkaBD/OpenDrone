@@ -6,8 +6,10 @@
 
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
-    Drag, LineCrossing, MapShape, MapShapeProblem, PhysicsRate, QuadParameters, QuadSetUp,
-    QuadShape, QuadState, ScriptedMotors, SetUp, SetUpError, Simulation, World,
+    BatteryParameters, Drag, EscParameters, LineCrossing, MapShape, MapShapeProblem,
+    MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadSetUp,
+    QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp, SetUpError, Simulation,
+    StartingMotors, World,
 };
 
 fn level_box(centre: Vec3, size: Vec3) -> MapShape {
@@ -60,7 +62,10 @@ fn ceiling() -> MapShape {
     }
 }
 
+/// A whoop-sized Quad, its motors stopped: the Whoop 65's numbers in SI
+/// units.
 fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
+    let kv = 19500.0 * 2.0 * core::f64::consts::PI / 60.0;
     QuadSetUp {
         parameters: QuadParameters {
             mass: 0.0312,
@@ -69,6 +74,42 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 body_area: Vec3::ZERO,
                 rotor: 0.0,
                 duct_ram: 0.0,
+            },
+            rotors: RotorLayout {
+                diagonal: 0.066,
+                rotor_height: 0.008,
+                direction: PropDirection::PropsIn,
+            },
+            props: PropParameters {
+                diameter: 0.035,
+                thrust_coefficient: 0.29,
+                power_coefficient: 0.26,
+                rotor_inertia: 0.25e-7,
+                reverse_thrust: 0.5,
+                reverse_torque: 1.0,
+            },
+            motors: MotorParameters {
+                kv,
+                poles: 12,
+                winding_resistance: 0.5,
+                no_load_current: 0.3,
+                no_load_voltage: 4.0,
+                spin_up: 0.035,
+                slow_down: 0.035,
+            },
+            esc: EscParameters {
+                start_wait: 0.1,
+                startup_power_limit: 0.0196,
+                restart_tries: 3,
+            },
+            battery: BatteryParameters {
+                cells: 1,
+                capacity: 0.320 * 3600.0,
+                voltage_curve: vec![(1.0, 4.35), (0.5, 3.92), (0.0, 3.30)],
+                resistance: 0.029,
+                connector: 0.010,
+                recovery: 3.3,
+                slow_sag: 0.0,
             },
             shape: QuadShape {
                 body: Vec3::new(0.035, 0.030, 0.020),
@@ -88,6 +129,9 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
             attitude: Attitude::BODY_IS_WORLD,
             rotation: Vec3::ZERO,
         },
+        motors: StartingMotors::Stopped,
+        battery: 1.0,
+        mount: Mount::Free,
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }

@@ -1,0 +1,70 @@
+# Results of flat-pack-fades.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A flat Whoop 65 pack fades, with no cutoff"
+
+[[expect]]
+what     = "battery charge used at 20 s"
+basis    = "Observed"
+expected = "45.6 mAh ± 1%"
+measured = "45.6 mAh"
+
+[[expect]]
+what     = "motor 1 drive, lowest over 1 s to 20 s"
+basis    = "Rule"
+expected = "100% ± 0%"
+measured = "100%"
+
+[[expect]]
+what     = "battery voltage, highest over 10 s to 20 s"
+basis    = "Rule"
+expected = "between 0 V and 3.30 V"
+measured = "2.87 V"
+
+[[expect]]
+what     = "battery voltage at 1 s"
+basis    = "Observed"
+expected = "3.01 V ± 1%"
+measured = "3.01 V"
+
+[[expect]]
+what     = "battery voltage at 20 s"
+basis    = "Observed"
+expected = "2.73 V ± 1%"
+measured = "2.73 V"
+
+[[expect]]
+what     = "total thrust at 1 s"
+basis    = "Observed"
+expected = "82.9 gf ± 1%"
+measured = "82.9 gf"
+
+[[expect]]
+what     = "total thrust at 20 s"
+basis    = "Observed"
+expected = "71.8 gf ± 1%"
+measured = "71.8 gf"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9234b03f5c910ae"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "68d4a24e35bf3d9b"   # the whole state after each of 160000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"2 s" = "cc95151477f33f03"
+"4 s" = "8781e93efe5cb76e"
+"6 s" = "22af18ac0fec4a4d"
+"8 s" = "47e04291ce33cbf8"
+"10 s" = "0ac93830c97f105f"
+"12 s" = "3746cf7bdc4dc8ff"
+"14 s" = "5fa25f8d4a0e4b7e"
+"16 s" = "c3082afb922ae574"
+"18 s" = "79f0bb0815f9f765"
+"20 s" = "1375a04bc4ac2166"

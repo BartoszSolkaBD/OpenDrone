@@ -17,7 +17,10 @@
 use std::collections::BTreeMap;
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
-use opendrone_physics::{Drag, DuctRings, QuadParameters, QuadShape};
+use opendrone_physics::{
+    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters,
+    QuadParameters, QuadShape, RotorLayout,
+};
 
 use crate::document::{Document, Item, Problem, Problems, Table};
 use crate::migration::{self, FileKind};
@@ -695,9 +698,10 @@ pub struct QuadDefinition {
     pub picture: String,
     /// The real Quad a Test Quad builds on.
     pub based_on: Option<String>,
-    /// What the physics receives so far: the mass (dry mass plus the battery,
-    /// stored apart and added here), the inertia, the drag and the collision
-    /// shape with its bounce and friction.
+    /// What the physics receives: the mass (dry mass plus the battery, stored
+    /// apart and added here), the inertia, the drag, the rotors' layout, the
+    /// props, motors and ESCs, the battery, and the collision shape with its
+    /// bounce and friction.
     pub parameters: QuadParameters,
     pub frame: Frame,
     pub collision: Collision,
@@ -826,6 +830,10 @@ pub struct Battery {
     pub resistance: f64,
     /// How long the voltage takes to recover after a punch.
     pub recovery: f64,
+    /// How big the slow part of the sag grows, in seconds: each cell's slow
+    /// sag settles at this times the power it gives per coulomb of its
+    /// capacity (written in mV·Ah/W).
+    pub slow_sag: f64,
     pub connector: f64,
 }
 
@@ -1183,6 +1191,7 @@ fn definition(
         voltage_curve: r.curve("battery.voltage_curve"),
         resistance: r.one("battery.resistance"),
         recovery: r.one("battery.recovery"),
+        slow_sag: r.one("battery.slow_sag"),
         connector: r.one("battery.connector"),
     };
     let ducts = has_ducts.then(|| Ducts {
@@ -1200,6 +1209,19 @@ fn definition(
         reverse_thrust: r.one("props.reverse_thrust"),
         reverse_torque: r.one("props.reverse_torque"),
         grip: r.one("props.grip"),
+    };
+    let no_load = r.numbers("motors.no_load_current");
+    let motors = Motors {
+        kv: r.one("motors.kv"),
+        poles: r.whole("motors.poles"),
+        winding_resistance: r.one("motors.winding_resistance"),
+        no_load_current: no_load.first().copied().unwrap_or(0.0),
+        no_load_voltage: no_load.get(1).copied().unwrap_or(0.0),
+        spin_up: r.one("motors.spin_up"),
+        slow_down: r.one("motors.slow_down"),
+        start_wait: r.one("motors.start_wait"),
+        restart_tries: r.whole("motors.restart_tries"),
+        startup_power_limit: r.one("motors.startup_power_limit"),
     };
     let [roll, pitch, yaw] = frame.inertia;
     let [front, side, top] = frame.drag_area;
@@ -1227,6 +1249,45 @@ fn definition(
             // A Quad without ducts has no duct drag.
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
         },
+        rotors: RotorLayout {
+            diagonal: frame.diagonal,
+            rotor_height: frame.rotor_height,
+            direction: match props.direction {
+                PropDirection::PropsIn => opendrone_physics::PropDirection::PropsIn,
+                PropDirection::PropsOut => opendrone_physics::PropDirection::PropsOut,
+            },
+        },
+        props: PropParameters {
+            diameter: props.diameter,
+            thrust_coefficient: props.thrust_coefficient,
+            power_coefficient: props.power_coefficient,
+            rotor_inertia: props.rotor_inertia,
+            reverse_thrust: props.reverse_thrust,
+            reverse_torque: props.reverse_torque,
+        },
+        motors: MotorParameters {
+            kv: motors.kv,
+            poles: motors.poles,
+            winding_resistance: motors.winding_resistance,
+            no_load_current: motors.no_load_current,
+            no_load_voltage: motors.no_load_voltage,
+            spin_up: motors.spin_up,
+            slow_down: motors.slow_down,
+        },
+        esc: EscParameters {
+            start_wait: motors.start_wait,
+            startup_power_limit: motors.startup_power_limit,
+            restart_tries: motors.restart_tries,
+        },
+        battery: BatteryParameters {
+            cells: battery.cells,
+            capacity: battery.capacity,
+            voltage_curve: battery.voltage_curve.clone(),
+            resistance: battery.resistance,
+            connector: battery.connector,
+            recovery: battery.recovery,
+            slow_sag: battery.slow_sag,
+        },
         shape: QuadShape {
             body: size(collision.body),
             pack: size(collision.pack),
@@ -1245,7 +1306,6 @@ fn definition(
             friction: collision.friction,
         },
     };
-    let no_load = r.numbers("motors.no_load_current");
     let block = SECTIONS
         .iter()
         .find(|s| s.name == "sound_block")
@@ -1275,18 +1335,7 @@ fn definition(
         frame,
         collision,
         props,
-        motors: Motors {
-            kv: r.one("motors.kv"),
-            poles: r.whole("motors.poles"),
-            winding_resistance: r.one("motors.winding_resistance"),
-            no_load_current: no_load.first().copied().unwrap_or(0.0),
-            no_load_voltage: no_load.get(1).copied().unwrap_or(0.0),
-            spin_up: r.one("motors.spin_up"),
-            slow_down: r.one("motors.slow_down"),
-            start_wait: r.one("motors.start_wait"),
-            restart_tries: r.whole("motors.restart_tries"),
-            startup_power_limit: r.one("motors.startup_power_limit"),
-        },
+        motors,
         battery,
         ducts,
         feel: Feel {

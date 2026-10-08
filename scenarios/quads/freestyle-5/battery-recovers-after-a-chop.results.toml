@@ -1,0 +1,46 @@
+# Results of battery-recovers-after-a-chop.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Freestyle 5″'s pack recovers after a chop"
+
+[[expect]]
+what     = "battery sag at 4.5 s"
+basis    = "Observed"
+expected = "0.56081 V ± 0.01%"
+measured = "0.561 V"
+
+[[expect]]
+what     = "battery sag at 7.8 s"
+basis    = "Source"
+expected = "0.20631 V ± 0.1%"
+measured = "0.206 V"
+
+[[expect]]
+what     = "battery current, highest over 4.5 s to 7.8 s"
+basis    = "Rule"
+expected = "0 A ± 0 A"
+measured = "0 A"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "a1e5885f1a39ce49"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "02c4b7ddb0b0ea07"   # the whole state after each of 62400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.78 s" = "1e93df067d31475e"
+"1.56 s" = "9b87704324db9448"
+"2.34 s" = "b3de648c1cddc2f9"
+"3.12 s" = "895e533ff7858ba1"
+"3.9 s" = "aa262454caa1ffc5"
+"4.68 s" = "a8785f4260adc6ab"
+"5.46 s" = "aa3e36daf8e3a92f"
+"6.24 s" = "0914d3e46e22da8d"
+"7.02 s" = "1f8e030fe5af17ba"
+"7.8 s" = "5b44a7eafa316529"

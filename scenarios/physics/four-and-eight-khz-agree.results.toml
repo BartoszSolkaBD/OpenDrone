@@ -1,0 +1,58 @@
+# Results of four-and-eight-khz-agree.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The same flight at 4 kHz and 8 kHz gives nearly the same result"
+
+[[expect]]
+what     = "height at 2 s, minus the same run at 4 kHz"
+basis    = "Rule"
+expected = "0 m ± 0.006 m"
+measured = "-0.00189 m"
+
+[[expect]]
+what     = "vertical speed at 2 s, minus the same run at 4 kHz"
+basis    = "Rule"
+expected = "0 m/s ± 0.004 m/s"
+measured = "-0.000543 m/s"
+
+[[expect]]
+what     = "motor 1 speed at 0.6 s, as a share of the same run at 4 kHz"
+basis    = "Rule"
+expected = "100% ± 0.5%"
+measured = "100%"
+
+[[expect]]
+what     = "battery charge used at 2 s, as a share of the same run at 4 kHz"
+basis    = "Rule"
+expected = "100% ± 0.5%"
+measured = "100%"
+
+[[expect]]
+what     = "battery voltage at 2 s, minus the same run at 4 kHz"
+basis    = "Rule"
+expected = "0 V ± 0.005 V"
+measured = "-0.000000396 V"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "19dcc67dc9d24c34"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "b4020ca727645c9b"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "040ff5099214d74f"
+"0.4 s" = "2422ef6668e57665"
+"0.6 s" = "ede9a2acb44cbe50"
+"0.8 s" = "14085912db157685"
+"1 s" = "42d1efff5afa5e99"
+"1.2 s" = "3c789341f73178d5"
+"1.4 s" = "9790ef2829509208"
+"1.6 s" = "172854f52201b82b"
+"1.8 s" = "40e73ecedae6767a"
+"2 s" = "1156364a6eb3e154"

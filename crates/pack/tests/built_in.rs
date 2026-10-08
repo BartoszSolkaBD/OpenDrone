@@ -47,7 +47,12 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
     let test_ids: Vec<&str> = packs.test_quads().iter().map(|q| q.id.as_str()).collect();
     assert_eq!(
         test_ids,
-        ["test/freestyle-5-no-drag", "test/whoop-65-no-drag"]
+        [
+            "test/freestyle-5-bench-supply",
+            "test/freestyle-5-no-drag",
+            "test/whoop-65-bench-supply",
+            "test/whoop-65-no-drag"
+        ]
     );
 }
 

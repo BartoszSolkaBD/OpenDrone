@@ -1,0 +1,72 @@
+# The Whoop 65 on the thrust stand, its pack just plugged in, with a command
+# above 0% arriving while its ESCs wait for zero throttle. Bluejay beeps ready
+# only after the throttle has been zero for ten counts of its 32.1 ms timer,
+# and any command above zero starts the count again, so an ESC never gets
+# ready, and never starts its motor, while the Flight Controller asks for
+# thrust. Proves the ESCs' power-up (#26 §5, #32 §4).
+#
+# - 1.5 s: 25%, during the wait for zero throttle (1.444 s to 1.595 s): no
+#   ready beep while it lasts.
+# - 2.5 s: back to 0%: ten counts (0.32 s) and the ready beep (67 ms) later,
+#   at about 2.9 s, the ESCs are ready.
+# - 3.2 s: 25% again: the motors start after the 0.1 s start wait.
+format = 1
+name   = "The Whoop 65's ESCs wait for zero throttle before their ready beep"
+
+[start]
+kind              = "thrust stand"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same. "Powering up": the ESCs were just powered.
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "0%" },
+  { at = "1.5 s", motors = "25%" },
+  { at = "2.5 s", motors = "0%" },
+  { at = "3.2 s", motors = "25%" },
+]
+
+[[expect]]
+what    = "motor 1 speed"
+over    = "0 s to 3.3 s"
+highest = "0 RPM ± 0 RPM"
+basis   = "source: Bluejay v0.21.0: in `arming_wait` (src/Bluejay.asm L647–651) the ESC waits for `Rcp_Stop_Cnt` to reach 10, which Timer2 counts up every 32.1 ms only at zero throttle and any frame above zero sets back to nought (src/Modules/Isrs.asm L338, L538–549). So the 25% at 1.5 s is never answered, and after 2.5 s the ESC is ready only once ten counts and the ready beep have passed; the 25% at 3.2 s then waits out the 100 ms start wait (L726–730)"
+
+[[expect]]
+what  = "motor 1 drive"
+at    = "3.300125 s"
+value = "1.96% ± 0.001%"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L726–768: after the start wait the ESC starts the motor, its drive capped at Startup Power Max, 1.96%"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "4 s"
+value = "16500 RPM ± 2%"
+basis = "observed: by 4 s the motor turns at its speed for 25% drive on a full pack"

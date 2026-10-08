@@ -1,0 +1,107 @@
+# A Freestyle 5″ motor stepped from 0% to full and back to 0% on the thrust
+# stand, from T-Motor's 24.0 V bench supply (test/freestyle-5-bench-supply).
+# Proves the ESC's start from a stop, as Bluejay starts a motor, and the
+# separate spin-up and slow-down times, the slow-down being the ESC's braking
+# (E5 and E9 in #10).
+#
+# - The ESC waits 0.1 s after the first command above 0% (Bluejay's start
+#   wait), then holds its drive at Bluejay's start-up power limit, 1.96%, for
+#   15 electrical turns of the motor: Bluejay's 24 start-up commutations (four
+#   turns), then its initial-run countdown of 12 turns, which starts on the
+#   fourth. On this 14-pole motor that is 2.1 turns of the prop.
+# - Then the motor spins up with the 5″'s spin-up time, 33 ms: a first lag
+#   that covers 63% of the way to its full-drive speed in that time.
+# - At 0% the ESC brakes it with the slow-down time, 33 ms: after 33 ms 37%
+#   of its speed is left, after 66 ms 13.5%. Below Bluejay's minimum speed
+#   (1,330 electrical RPM, 190 RPM on a 14-pole motor) the ESC lets go and the
+#   motor turns freely.
+format = 1
+name   = "A Freestyle 5″ motor stepped 0 → 100 → 0% follows its spin-up and slow-down times"
+
+[start]
+kind              = "thrust stand"
+quad              = "test/freestyle-5-bench-supply"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same. The ESCs start ready, so the first command
+# above 0% starts motor 1 after the start wait.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "0%" },
+  { at = "0.5 s", motors = "100%, 0%, 0%, 0%" },
+  { at = "1.5 s", motors = "0%" },
+]
+
+[[expect]]
+what    = "motor 1 speed"
+over    = "0.5 s to 0.6 s"
+highest = "0 RPM ± 0 RPM"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L726–730: on the first command above zero a ready ESC waits 100 ms (`wait100ms`, \"wait to see if start pulse was glitch\") before it starts the motor; the Quad definition's start wait is 0.1 s"
+
+[[expect]]
+what    = "motor 1 drive"
+over    = "0.6 s to 0.795 s"
+highest = "1.96% ± 0.001%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L762–768, L894–955 and src/Modules/Isrs.asm L347–372: from the start the drive is capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%, through the start-up phase (24 commutations) and the initial-run phase (a countdown of 12 turns), lifted only at L951"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0.795 s"
+value = "794 RPM ± 1%"
+basis = "observed: where the capped start ends, after 15 electrical turns (2.1 turns of the 14-pole motor), at 0.795 s"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0.828 s"
+value = "18920 RPM ± 5%"
+basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured motor time constant of 33 ms. One time constant after the capped start ends at 0.795 s, a first lag has covered 63% of the way from 794 RPM to its full-drive speed of 29,470 RPM: 794 + 0.632 × (29,470 − 794) = 18,920 RPM. The bench supply sags 1 V as the motor draws its first rush of current, so allow 5%"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "1.5 s"
+value = "29447.1 RPM ± 2%"
+basis = "source: T-Motor's T5147 table, 100% row: 29,447.1 RPM at full throttle"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "1.533 s"
+value = "10840 RPM ± 1%"
+basis = "source: NeuroBEM's 5″ racing quad, a motor time constant of 33 ms both ways. One time constant after the command drops to 0% at 1.5 s, the ESC's braking leaves 37% of the full-drive speed: 0.368 × 29,470 RPM = 10,840 RPM"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "1.566 s"
+value = "3990 RPM ± 3%"
+basis = "source: NeuroBEM's 5″ racing quad, a motor time constant of 33 ms: two time constants leave 13.5%, 0.135 × 29,470 RPM = 3,990 RPM. At these speeds Bluejay's full braking at zero drive barely keeps up with the lag, so allow 3%"
+
+[[expect]]
+what  = "motor 1 drive"
+over    = "1.7 s to 2 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L983–987: below its minimum speed, about 1,330 electrical RPM (190 RPM on this 14-pole motor), a stopping ESC leaves run mode and switches its motor off"

@@ -1,0 +1,76 @@
+# Results of motor-step.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Freestyle 5″ motor stepped 0 → 100 → 0% follows its spin-up and slow-down times"
+
+[[expect]]
+what     = "motor 1 speed, highest over 0.5 s to 0.6 s"
+basis    = "Source"
+expected = "0 RPM ± 0 RPM"
+measured = "0 RPM"
+
+[[expect]]
+what     = "motor 1 drive, highest over 0.6 s to 0.795 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 1 speed at 0.795 s"
+basis    = "Observed"
+expected = "794 RPM ± 1%"
+measured = "794 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 0.828 s"
+basis    = "Source"
+expected = "18920 RPM ± 5%"
+measured = "18800 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 1.5 s"
+basis    = "Source"
+expected = "29447.1 RPM ± 2%"
+measured = "29500 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 1.533 s"
+basis    = "Source"
+expected = "10840 RPM ± 1%"
+measured = "10800 RPM"
+
+[[expect]]
+what     = "motor 1 speed at 1.566 s"
+basis    = "Source"
+expected = "3990 RPM ± 3%"
+measured = "3990 RPM"
+
+[[expect]]
+what     = "motor 1 drive, highest over 1.7 s to 2 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "8c169e60fb4f3936"   # test/freestyle-5-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "8d36993497719a98"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "2dc1aa19388fcab5"
+"0.4 s" = "846517c1218e32a7"
+"0.6 s" = "7ce4fbdde6d796ab"
+"0.8 s" = "0ebff1126ff1444d"
+"1 s" = "4109686cafd4fddd"
+"1.2 s" = "3e9f532e3eecd259"
+"1.4 s" = "fe90850fcbb56e28"
+"1.6 s" = "b0986c95da24e6b6"
+"1.8 s" = "07928483b1878bef"
+"2 s" = "63c16093082a51eb"

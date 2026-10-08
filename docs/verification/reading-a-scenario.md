@@ -4,9 +4,9 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 ## Where they live
 
-- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic, such as `physics/`.
+- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `physics/`, and `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios.
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
-- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero.
+- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, and `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on.
 
 ## The Scenario file
 
@@ -23,7 +23,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 
 | Item | Example | Meaning |
 |---|---|---|
-| `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`. So far only Physics Scenarios run: scripted motors stand in for the Flight Controller. |
+| `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`. So far Physics and Thrust Stand Scenarios run: scripted motors stand in for the Flight Controller. On the thrust stand the Quad is held still, so its `speed` and `rotation` must be zero, while its motors, ESCs and battery work as in flight. |
 | `quad` | `"test/whoop-65-no-drag"` | The Quad, by id. Its numbers come from its Quad definition, never from the Scenario. |
 | `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. |
 | `position` | `"0 m east, 0 m north, 0 m up"` | From the Map's origin. |
@@ -31,7 +31,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
 | `rotation` | `"roll 2000 °/s, pitch 0 °/s, yaw 0 °/s"` | Rolling right, pitching nose up and yawing nose right are positive, as in Betaflight. |
 | `armed` | `false` | Whether the Quad is armed. |
-| `motors` | `"stopped"` | `"stopped"`: at rest, with the ESCs already powered up and ready, so a motor starts on its first command; only for Physics and Thrust Stand Scenarios, which script their motors. Or `"settled"`: spinning at the speed that holds the stated motion, with the ESCs running (needs the motor model, which comes later). Neither is Reset: a landed start with a "fresh" Flight Controller is exactly Reset, so its ESCs play their start-up first, about 1.7 s. |
+| `motors` | `"stopped"` | How the motors and their ESCs start: see [How the motors start](#how-the-motors-start) below. |
 | `flight_controller` | `"fresh"` | As right after Reset powers it up. |
 | `battery` | `"100%"` | The charge. |
 | `flight_mode` | `"Acro"` | `"Acro"`, `"Angle"` or `"Horizon"`. |
@@ -41,7 +41,22 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `random_seed` | `1` | The seed for the Simulation's random numbers. |
 | `[start.rates]` | `type = "Actual"`, `roll = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"`, … | Every field of a Betaflight 2026.6 rate profile, written as the Betaflight App shows it: see [The Rates](#the-rates) below. |
 
-In a Physics Scenario the Flight Controller doesn't run, so `armed` down to the Rates change nothing. They are written down all the same, so the format never needs them added later.
+In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `armed`, `flight_controller`, the Flight Mode, the Assists, the Radio Link and the Rates change nothing. They are written down all the same, so the format never needs them added later.
+
+### How the motors start
+
+| `motors` | The motors | Their ESCs |
+|---|---|---|
+| `"powering up"` | Stopped. | Just powered, as when a pack is plugged in: they play Bluejay's start-up melody, a "signal found" beep and a ready beep, and answer no command until they are ready, about 1.66 s later. They beep ready only once the throttle has been at 0% for ten counts of their 32 ms timer, so a command above 0% before then holds them back. |
+| `"stopped"` | Stopped. | Already powered up and ready: each starts its motor on its first command above 0%, after the start wait. |
+| `"settled"` | Spinning, all at the speed whose thrust carries the Quad's weight along the motors' axis (none upside down). Level, that holds the stated motion; tilted, only drag could, and drag arrives with the air ticket (#42). | Running. |
+
+`"powering up"` and `"stopped"` are only for Physics and Thrust Stand Scenarios, which script their motors, and a Quad held still on the thrust stand has no motion for `"settled"` motors to hold. Where the Flight Controller runs, a landed start with a "fresh" Flight Controller is exactly Reset, whose ESCs power up first; the arming and power-up ticket (#52) names how its motors are written.
+
+Each ESC copies Bluejay v0.21.0 ([`crates/physics/src/esc.rs`](../../crates/physics/src/esc.rs) has the timing, with the firmware's file and line for each step):
+
+- **Starting a stopped motor:** on the first command above 0%, a ready ESC waits the Quad's start wait (0.1 s), then starts the motor with its drive held at the Quad's start-up power limit (1.96%) for 15 electrical turns (Bluejay's 24 start-up commutations, then its initial-run countdown of 12 turns, which starts on the fourth), and then runs it as commanded.
+- **Stopping:** at 0% it brakes the motor, and below Bluejay's minimum speed, about 1,330 electrical RPM, switches it off and is ready again.
 
 ### Test Maps
 
@@ -99,7 +114,7 @@ timeline = [
 ]
 ```
 
-A Timeline: what happens when. Each value holds until it changes. A Physics Scenario scripts the four motor commands, either one for all four (`"0%"`) or four in Betaflight's motor order. Until the motor model arrives, every command must be 0%.
+A Timeline: what happens when. Each value holds until it changes. A Physics or Thrust Stand Scenario scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
 
 ### The Expectations, `[[expect]]`
 
@@ -119,7 +134,10 @@ lowest = "-9.81 m/s² ± 0.00001 m/s²"
 basis  = "rule: ..."
 ```
 
-- **`what`** is one of: height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
+- **`what`** is one of:
+  - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
+  - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %). **Total thrust** is all four motors' thrust.
+  - **the battery:** **battery voltage** (at its terminals, past the connector), **battery current** (drawn from it; negative while braking motors give some back), **battery charge used** (since the start, in mAh) and **battery sag** (how far the voltage sits below the pack's resting voltage at its charge).
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.
@@ -128,6 +146,18 @@ basis  = "rule: ..."
   - Pitch reads from -90° (nose straight down) to 90° (nose straight up). With the nose straight up or down, roll and heading turn about the same line, so only their difference (nose up) or sum (nose down) says anything: then roll reads 0° and heading carries the whole turn. A Quad at roll 30°, nose straight up, heading 45° reads roll 0°, heading 15°, which is the same attitude.
   - "Straight up or down" means within about 0.00000006° of vertical. Turned back into an attitude, the three angles point every part of the Quad the same way to within 1e-12, exactly vertical included. The one exception is a nose inside that band but not exactly vertical: roll still reads 0° there, so the angles are off by up to twice the nose's distance from vertical, at most about 2e-9 (0.0000001°). No tolerance can tell the difference.
   - A stretch in which the nose is inside that band for some steps and outside it for others mixes the two ways of reading roll and heading, for example a Quad that starts there and leaves very slowly. Then roll's and heading's lowest, highest and mean have no single answer either, and the Expectation fails saying so; their `final` value still works. A stretch wholly inside the band, such as a spin about the nose pointing straight up, keeps all four.
+- **Compared with another run:** an Expectation may compare this run with the same Scenario run again with one or two starting-state items changed, written in `against` as in `[start]`: `physics_rate`, `battery`, or both. `compare` says how: `"difference"` (this run's value minus the other's, in the measure's unit) or `"ratio"` (this run's value as a share of the other's, in %). The moment or stretch is the same in both runs, so it must be a whole number of steps at both physics rates. Angles can't be compared yet, because they wrap round.
+
+  ```toml
+  [[expect]]
+  what    = "total thrust"
+  at      = "1.9 s"
+  against = { battery = "100%" }
+  compare = "ratio"
+  value   = "between 75.2% and 86.7%"
+  basis   = "rule: ..."
+  ```
+
 - **`basis`** says where the number comes from: `source:` a cited outside reference, `rule:` worked out from physics with the working shown, or `observed:` what the Simulation did when the Expectation was written. Source and Rule Expectations are locked: if the Simulation disagrees, the Simulation is fixed.
 
 Times are Simulation Time, counted in whole physics steps: at 8 kHz, `"1 s"` is the state after step 8000, and a moment between two steps is refused. The run lasts until the last moment the file mentions.

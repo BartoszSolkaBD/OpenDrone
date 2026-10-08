@@ -5,12 +5,16 @@
 //! The Quads here carry the alpha Quads' shapes and masses (the Whoop 65's
 //! and the Freestyle 5″'s Quad definitions, written out, since physics can't
 //! read Packs); the Maps are built from plain shapes, as the Test Maps are.
+//! Their motors stay stopped, so the motors, ESCs and battery they carry
+//! (the whoop's, from `common`) never push them.
+
+mod common;
 
 use opendrone_maths::functions::{max, sin_cos};
 use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
 use opendrone_physics::{
-    Contact, Drag, DuctRings, MapCollision, MapShape, QuadBody, QuadParameters, QuadPart,
-    QuadShape, QuadState, World,
+    Contact, Drag, DuctRings, MapCollision, MapShape, MotorCommands, Mount, QuadBody,
+    QuadParameters, QuadPart, QuadShape, QuadStart, QuadState, SetUpProblem, StartingMotors, World,
 };
 
 const WORLD: World = World {
@@ -45,6 +49,7 @@ fn whoop() -> QuadParameters {
             bounce: 0.3,
             friction: 0.5,
         },
+        ..common::whoop()
     }
 }
 
@@ -66,6 +71,7 @@ fn freestyle() -> QuadParameters {
             bounce: 0.3,
             friction: 0.5,
         },
+        ..common::whoop()
     }
 }
 
@@ -79,6 +85,17 @@ fn ground() -> MapShape {
         size: Vec3::new(200.0, 200.0, 2.0),
         attitude: Attitude::BODY_IS_WORLD,
     }
+}
+
+/// A Quad starting from `state`, its motors stopped and its ESCs ready.
+fn body(parameters: QuadParameters, state: QuadState) -> Result<QuadBody, SetUpProblem> {
+    let start = QuadStart {
+        state,
+        motors: StartingMotors::Stopped,
+        battery: 1.0,
+        mount: Mount::Free,
+    };
+    QuadBody::new(parameters, start, &WORLD)
 }
 
 fn map(shapes: Vec<MapShape>) -> MapCollision {
@@ -131,7 +148,7 @@ fn fly(
     mut each: impl FnMut(&QuadBody),
 ) {
     for _ in 0..steps {
-        quad.step(&WORLD, map, 1.0 / hz);
+        quad.step(&WORLD, map, &MotorCommands::STOPPED, 1.0 / hz);
         each(quad);
     }
 }
@@ -144,7 +161,7 @@ fn a_landed_whoop_stays_exactly_still_with_no_creep_or_jitter() {
         Vec3::ZERO,
         level(30.0 * DEGREE),
     );
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     // Ten seconds here; the Scenario landed-whoop-stays-still checks minutes.
     fly(&mut quad, &floor, 8000.0, 80_000, |quad| {
         assert_eq!(quad.state().position, start.position);
@@ -162,7 +179,7 @@ fn landed_the_floors_pushes_add_up_to_the_quads_weight() {
         Vec3::ZERO,
         level(0.0),
     );
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     fly(&mut quad, &floor, 8000.0, 10, |_| {});
     let contacts = quad.contacts();
     assert!(!contacts.is_empty());
@@ -196,7 +213,7 @@ fn an_upside_down_5_inch_rests_on_its_pack_with_its_props_clear() {
         heading: 0.0,
     });
     let start = state(Vec3::new(0.0, 0.0, 0.046), Vec3::ZERO, upside_down);
-    let mut quad = QuadBody::new(freestyle(), start).unwrap();
+    let mut quad = body(freestyle(), start).unwrap();
     fly(&mut quad, &floor, 8000.0, 8000, |_| {});
     let contacts = quad.contacts();
     assert!(!contacts.is_empty());
@@ -218,7 +235,7 @@ fn a_dropped_whoop_comes_back_up_at_its_bounce_times_its_landing_speed() {
         Vec3::ZERO,
         level(0.0),
     );
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     let mut landing_speed = 0.0_f64;
     let mut leaving_speed = None;
     let mut highest_after = 0.0_f64;
@@ -258,7 +275,7 @@ fn a_whoop_sliding_on_the_floor_stops_where_coulomb_friction_says() {
         Vec3::new(3.0, 0.0, 0.0),
         level(90.0 * DEGREE),
     );
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     fly(&mut quad, &floor, 8000.0, 8000, |_| {});
     let slid = quad.state().position.x;
     assert!((slid - 0.917).abs() < 0.005, "slid {slid} m");
@@ -283,7 +300,7 @@ fn never_passes(
         Vec3::new(30.0, 0.0, 0.0),
         level(90.0 * DEGREE),
     );
-    let mut quad = QuadBody::new(parameters, start).unwrap();
+    let mut quad = body(parameters, start).unwrap();
     let mut furthest = f64::MIN;
     let mut hit = Vec::new();
     fly(&mut quad, &map, hz, (hz * 0.1) as u64, |quad| {
@@ -356,7 +373,7 @@ fn a_whoop_sliding_along_a_wall_touches_it_with_its_duct_rings_never_its_props()
         Vec3::new(1.0, 3.0, 0.0),
         level(0.0),
     );
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     let mut parts = Vec::new();
     fly(&mut quad, &map, 8000.0, 4000, |quad| {
         parts.extend(
@@ -377,7 +394,7 @@ fn a_whoop_sliding_along_a_wall_touches_it_with_its_duct_rings_never_its_props()
 fn a_quad_started_sunk_into_the_floor_is_moved_out_without_being_thrown() {
     let floor = map(vec![ground()]);
     let start = state(Vec3::new(0.0, 0.0, 0.005), Vec3::ZERO, level(0.0));
-    let mut quad = QuadBody::new(whoop(), start).unwrap();
+    let mut quad = body(whoop(), start).unwrap();
     fly(&mut quad, &floor, 8000.0, 8000, |quad| {
         assert!(quad.state().velocity.length() < 0.01);
     });
@@ -402,11 +419,16 @@ fn in_empty_air_collisions_change_nothing() {
         attitude: level(45.0 * DEGREE),
         rotation: Vec3::new(20.0, 3.0, 5.0),
     };
-    let mut alone = QuadBody::new(whoop(), start).unwrap();
-    let mut over_a_floor = QuadBody::new(whoop(), start).unwrap();
+    let mut alone = body(whoop(), start).unwrap();
+    let mut over_a_floor = body(whoop(), start).unwrap();
     for _ in 0..8000 {
-        alone.step(&WORLD, &empty, 1.0 / 8000.0);
-        over_a_floor.step(&WORLD, &floor_far_below, 1.0 / 8000.0);
+        alone.step(&WORLD, &empty, &MotorCommands::STOPPED, 1.0 / 8000.0);
+        over_a_floor.step(
+            &WORLD,
+            &floor_far_below,
+            &MotorCommands::STOPPED,
+            1.0 / 8000.0,
+        );
         assert_eq!(alone.state(), over_a_floor.state());
         assert!(over_a_floor.contacts().is_empty());
     }

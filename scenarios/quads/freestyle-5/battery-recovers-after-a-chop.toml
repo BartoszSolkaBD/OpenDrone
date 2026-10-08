@@ -1,0 +1,72 @@
+# The Freestyle 5″ on the thrust stand, on its own full 6S pack: a hover's
+# worth of drive, a punch, then a chop. Proves the battery's recovery after a
+# chop (E13 and E14 in #10).
+#
+# Part of a pack's sag builds up slowly under load and dies away slowly after
+# it: one resistor–capacitor pair, as Bauersfeld & Scaramuzza fitted to ten
+# 4S–6S packs (flight-dynamics research §5.3, [S7]). By their eq. 13 it
+# settles at 1.048 mV·Ah/W times each cell's power per amp-hour of capacity
+# (the Quad definition's `slow_sag`), with a time constant of 3.3 s (its
+# `recovery`). Once the motors have stopped after the chop and nothing is
+# drawn, that slow part is all the sag left, and it shrinks to 37% in each
+# 3.3 s.
+format = 1
+name   = "The Freestyle 5″'s pack recovers after a chop"
+
+[start]
+kind              = "thrust stand"
+quad              = "opendrone/freestyle-5"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "0%" },
+  { at = "0.5 s", motors = "50%" },
+  { at = "3 s",   motors = "100%" },
+  { at = "4 s",   motors = "0%" },
+]
+
+[[expect]]
+what  = "battery sag"
+at    = "4.5 s"
+value = "0.56081 V ± 0.01%"
+basis = "observed: 0.5 s after the chop the motors have stopped, so nothing is drawn, and the sag left is the slow part the punch built up"
+
+[[expect]]
+what  = "battery sag"
+at    = "7.8 s"
+value = "0.20631 V ± 0.1%"
+basis = "source: Bauersfeld & Scaramuzza's battery model, a recovery time constant of 3.3 s (flight-dynamics research §5.3, [S7]): 3.3 s later the slow sag has shrunk to e⁻¹ = 36.79% of what it was at 4.5 s, 0.56081 V × 0.36788 = 0.20631 V"
+
+[[expect]]
+what    = "battery current"
+over    = "4.5 s to 7.8 s"
+highest = "0 A ± 0 A"
+basis   = "rule: the motors have stopped and their ESCs are switched off, so nothing is drawn"

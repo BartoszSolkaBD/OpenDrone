@@ -1,0 +1,124 @@
+# The Whoop 65's motor and prop on the thrust stand, against BetaFPV's table
+# for the 0802SE 19500KV with 35 mm props at 4.0 V (docs/research/
+# flight-dynamics.md §8.1, from BetaFPV's motor page), on a 4.0 V bench
+# supply (test/whoop-65-bench-supply). Proves thrust and torque growing with
+# the square of speed, from a motor model driven by the supply's voltage (E4
+# and E6 in #10, ADR-0006).
+#
+# BetaFPV's table gives thrust against current, with no throttle column:
+#
+#   current   0.5 A   1.0 A   1.5 A   2.0 A   2.5 A   3.0 A   3.4 A
+#   thrust    4.1 g   8.8 g  14.0 g  18.5 g  23.0 g  26.3 g  30.6 g
+#
+# Its thrust grows in step with the current, about 9 g per amp all the way:
+# that is how the current through the motor itself behaves, since the motor's
+# torque, and the prop's thrust, both follow it. (The current an ESC draws
+# from the battery at part throttle is smaller, about the drive times this.)
+# So each step below is checked as a point on that line: the motor's current
+# at the step is what the motor model gives (Observed), and its thrust must be
+# the table's thrust at that current (Source). At 100% the table's last row,
+# 30.6 g at 3.4 A, is the Meteor65 Pro's full thrust at 4.0 V.
+#
+# One motor runs; "gf" is grams of thrust, as the table's "g" means.
+format = 1
+name   = "The Whoop 65's motor and prop meet BetaFPV's 0802SE thrust table"
+
+[start]
+kind              = "thrust stand"
+quad              = "test/whoop-65-bench-supply"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same. The bench supply gives 4.0 V at 50%.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# Motor 1 only, in Betaflight's motor order; each step settles for 0.9 s
+# before it's measured.
+timeline = [
+  { at = "0 s", motors = "25%, 0%, 0%, 0%" },
+  { at = "1 s", motors = "50%, 0%, 0%, 0%" },
+  { at = "2 s", motors = "75%, 0%, 0%, 0%" },
+  { at = "3 s", motors = "100%, 0%, 0%, 0%" },
+]
+
+# 25%.
+[[expect]]
+what  = "motor 1 current"
+at    = "0.9 s"
+value = "0.420 A ± 1%"
+basis = "observed: what the motor model draws at 25% drive on 4.0 V"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "0.9 s"
+value = "3.35 gf ± 10%"
+basis = "source: BetaFPV's 0802SE table at 4.0 V: 4.1 g at 0.5 A and 8.8 g at 1.0 A. The step draws 0.420 A, just under the table's first row, so the line through those two rows, carried on down, gives 4.1 g − 0.08 A × 9.4 g/A = 3.35 g; checked to 10% for that"
+
+# 50%.
+[[expect]]
+what  = "motor 1 current"
+at    = "1.9 s"
+value = "1.22 A ± 1%"
+basis = "observed: what the motor model draws at 50% drive on 4.0 V"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "1.9 s"
+value = "11.1 gf ± 5%"
+basis = "source: BetaFPV's 0802SE table at 4.0 V: 8.8 g at 1.0 A and 14.0 g at 1.5 A, so at the step's 1.22 A, 8.8 g + 0.22 A × 10.4 g/A = 11.1 g"
+
+# 75%.
+[[expect]]
+what  = "motor 1 current"
+at    = "2.9 s"
+value = "2.21 A ± 1%"
+basis = "observed: what the motor model draws at 75% drive on 4.0 V"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "2.9 s"
+value = "20.4 gf ± 5%"
+basis = "source: BetaFPV's 0802SE table at 4.0 V: 18.5 g at 2.0 A and 23.0 g at 2.5 A, so at the step's 2.21 A, 18.5 g + 0.21 A × 9.0 g/A = 20.4 g"
+
+# 100%: the table's last row.
+[[expect]]
+what  = "motor 1 current"
+at    = "3.9 s"
+value = "3.4 A ± 5%"
+basis = "source: BetaFPV's 0802SE table at 4.0 V, last row: 3.4 A at full thrust, as the Meteor65 Pro's page gives too (30.6 g at 3.4 A and 4 V)"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "3.9 s"
+value = "30.6 gf ± 5%"
+basis = "source: BetaFPV's 0802SE table at 4.0 V, last row: 30.6 g at full thrust"
+
+[[expect]]
+what  = "battery current"
+at    = "3.9 s"
+value = "3.32 A ± 0.5%"
+basis = "observed: the motor's own current at full drive, 3.32 A (above), which moves with it; at full drive the ESC puts the whole supply across the motor, so the supply gives the motor's current"

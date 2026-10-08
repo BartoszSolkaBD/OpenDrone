@@ -33,14 +33,16 @@ The one exception is a Quad's Tune, which keeps Betaflight's own CLI form and un
 | Power | `W` | | `mW`, `kW` | `"25 mW"` |
 | Energy | `Wh` | | | `"1.22 Wh"` |
 | Motor KV (RPM per volt) | `KV` | `kv`, `Kv` | | `"19500 KV"` |
-| Force | `N` | | `mN` | `"0.3 N"` |
+| Force | `N`, `gf` | | `mN`, `kgf` (on `gf`) | `"0.3 N"`, `"1591 gf"` |
 | Share | `%` | `percent` | | `"50%"` |
 | Sound level | `dB` | `db` | | `"-12 dB"` |
 | An FPV Camera's Dynamic Range | `stops` | `stop` | | `"7 stops"` |
 | An FPV Camera's picture height | `lines` | | | `"480 lines"` |
 | An FPV Camera's sharpness | `TVL` | `tvl` | | `"300 TVL"` |
 
-Units combine into others: products with `·` (or `*`, or a space), quotients with one `/`, and powers with `²`, `³` and `⁻¹` (or `^2`, `^3` and `^-1`). For example `"9.81 m/s²"`, `"670 °/s"`, `"140 g·cm²"`, `"25 cm²"`, `"1.225 kg/m³"` and `"0.3 s⁻¹"`.
+`gf` is a gram of thrust (gram-force: 9.80665 mN, a gram's weight under standard gravity). Makers' thrust tables give thrust in grams; written in `gf`, a Scenario can quote them as they are.
+
+Units combine into others: products with `·` (or `*`, or a space), quotients with one `/`, and powers with `²`, `³` and `⁻¹` (or `^2`, `^3` and `^-1`). For example `"9.81 m/s²"`, `"670 °/s"`, `"140 g·cm²"`, `"25 cm²"`, `"1.225 kg/m³"`, `"0.3 s⁻¹"`, for a torque `"180 mN·m"`, and for a battery's slow sag `"1.048 mV·Ah/W"` (volts a cell for each watt per amp-hour of capacity).
 
 Other symbols and their plain-keyboard spellings: `µ` or `u` for micro, `±` or `+-` or `+/-`, `−` or `-` for minus, `×` or `x` for times, and `–` or `-` between the two ends of a range.
 

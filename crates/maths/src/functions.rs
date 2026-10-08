@@ -38,6 +38,16 @@ pub fn asin(x: f64) -> f64 {
     libm::asin(x)
 }
 
+/// e raised to the power `x`.
+pub fn exp(x: f64) -> f64 {
+    libm::exp(x)
+}
+
+/// e raised to the power `x`, less 1, accurate even when `x` is tiny.
+pub fn exp_m1(x: f64) -> f64 {
+    libm::expm1(x)
+}
+
 /// What is left of `x` after taking away whole `y`s, with the sign of `x`
 /// (C's `fmod`).
 pub fn fmod(x: f64, y: f64) -> f64 {

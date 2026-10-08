@@ -1,0 +1,95 @@
+# The same flight at 8 kHz and at 4 kHz: a Whoop 65, with drag set to zero,
+# hovering on settled motors, punching out for 0.3 s and settling back. Each
+# Expectation compares this 8 kHz run with the same run at 4 kHz. Proves the
+# physics rate is a setting, not part of the physics (#10 §3): halving the
+# step barely changes the flight.
+#
+# Each motor's lag and the battery's slow sag are worked out exactly over each
+# step, so the step's length barely changes them. What it does change is when
+# a change of thrust lands: a motor answers a command over the step after it,
+# so the 4 kHz run's punch starts, and ends, up to 0.125 ms (half its longer
+# step) away from the 8 kHz run's. The punch changes the Quad's acceleration
+# by about 30 m/s² each way, so the two runs' vertical speeds differ by at most
+# 30 m/s² × 0.125 ms ≈ 4 mm/s, and over the 1.5 s that follow their heights by
+# at most 4 mm/s × 1.5 s = 6 mm.
+format = 1
+name   = "The same flight at 4 kHz and 8 kHz gives nearly the same result"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "37.3%" },
+  { at = "0.5 s", motors = "100%" },
+  { at = "0.8 s", motors = "37.3%" },
+]
+
+[[expect]]
+what    = "height"
+at      = "2 s"
+against = { physics_rate = "4 kHz" }
+compare = "difference"
+value   = "0 m ± 0.006 m"
+basis   = "rule: the punch lands up to 0.125 ms apart in the two runs, so their vertical speeds differ by at most 30 m/s² × 0.125 ms ≈ 4 mm/s, and their heights after the 1.5 s that follow by at most 6 mm"
+
+[[expect]]
+what    = "vertical speed"
+at      = "2 s"
+against = { physics_rate = "4 kHz" }
+compare = "difference"
+value   = "0 m/s ± 0.004 m/s"
+basis   = "rule: the punch lands up to 0.125 ms apart in the two runs, a change of about 30 m/s² in the acceleration, so their vertical speeds differ by at most 30 m/s² × 0.125 ms ≈ 4 mm/s"
+
+[[expect]]
+what    = "motor 1 speed"
+at      = "0.6 s"
+against = { physics_rate = "4 kHz" }
+compare = "ratio"
+value   = "100% ± 0.5%"
+basis   = "rule: each motor's lag is worked out exactly over each step, so mid-punch its speed hardly depends on the step; the battery's voltage reaches it a step late, a quarter of a millisecond at 4 kHz"
+
+[[expect]]
+what    = "battery charge used"
+at      = "2 s"
+against = { physics_rate = "4 kHz" }
+compare = "ratio"
+value   = "100% ± 0.5%"
+basis   = "rule: the charge is the current added up step by step; halving the step changes the sum only by the current's change over a step"
+
+[[expect]]
+what    = "battery voltage"
+at      = "2 s"
+against = { physics_rate = "4 kHz" }
+compare = "difference"
+value   = "0 V ± 0.005 V"
+basis   = "rule: the battery's slow sag is worked out exactly over each step, and its fast sag follows the current, which the two runs share to within the step"

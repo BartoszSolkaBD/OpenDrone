@@ -186,7 +186,7 @@ fn an_unknown_measurement_is_refused_listing_what_the_runner_measures() {
     assert_eq!(
         failures(&report(&file, ResultsFile::Write)),
         [format!(
-            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading"
+            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag"
         )]
     );
 }
@@ -262,13 +262,18 @@ fn radians_and_decimal_commas_are_refused_in_a_scenario_too() {
 }
 
 #[test]
-fn motor_commands_above_0_percent_wait_for_the_motor_model() {
-    let file = changed("motors-on", "motors = \"0%\"", "motors = \"40%\"");
+fn a_motor_command_above_100_percent_is_refused() {
+    let file = changed(
+        "motors-over",
+        "motors = \"0%\"",
+        "motors = \"40%, 40%, 101%, 40%\"",
+    );
     let found = failures(&report(&file, ResultsFile::Write));
     assert_eq!(found.len(), 1);
-    assert!(found[0].ends_with(
-        "motor commands above 0% need the motor model, which arrives with the Thrust Stand ticket (#41)"
-    ));
+    assert!(
+        found[0].ends_with("a motor command must be from 0% to 100%"),
+        "{found:?}"
+    );
 }
 
 #[test]
@@ -296,22 +301,156 @@ fn stopped_motors_are_only_for_scenarios_that_script_their_motors() {
     let found = failures(&report(&file, ResultsFile::Write));
     assert!(
         found.iter().any(|line| line.ends_with(
-            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start"
+            "motors \"stopped\" (at rest, with the ESCs already ready) and \"powering up\" (with the ESCs just powered) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start"
         )),
         "{found:#?}"
     );
 }
 
 #[test]
-fn only_physics_scenarios_run_so_far() {
-    let file = changed(
-        "thrust-stand",
-        "kind              = \"physics\"",
-        "kind              = \"thrust stand\"",
+fn flight_and_flight_controller_scenarios_wait_for_the_flight_controller() {
+    for kind in ["flight", "flight controller"] {
+        let file = changed(
+            "flight-kind",
+            "kind              = \"physics\"",
+            &format!("kind              = \"{kind}\""),
+        );
+        let found = failures(&report(&file, ResultsFile::Write));
+        assert!(
+            found[0].ends_with(
+                "only Physics and Thrust Stand Scenarios can run so far: Flight and Flight Controller Scenarios arrive with the Flight Controller (#48)"
+            ),
+            "{found:#?}"
+        );
+    }
+}
+
+#[test]
+fn a_quad_on_the_thrust_stand_is_held_still_so_it_starts_still_and_never_settled() {
+    let text = free_fall()
+        .replacen(
+            "kind              = \"physics\"",
+            "kind              = \"thrust stand\"",
+            1,
+        )
+        .replacen(
+            "speed             = \"0 m/s\"",
+            "speed             = \"1 m/s east, 0 m/s north, 0 m/s up\"",
+            1,
+        )
+        .replacen(
+            "rotation          = \"0 °/s\"",
+            "rotation          = \"roll 10 °/s, pitch 0 °/s, yaw 0 °/s\"",
+            1,
+        )
+        .replacen(
+            "motors            = \"stopped\"",
+            "motors            = \"settled\"",
+            1,
+        );
+    let found = failures(&report(&fixture("held-still", &text), ResultsFile::Write));
+    assert_eq!(found.len(), 3, "{found:#?}");
+    assert!(found[0].ends_with(
+        "a Quad on the thrust stand is held still, so there is no motion for \"settled\" motors to hold; start them \"stopped\" (ESCs ready) or \"powering up\" (ESCs just powered)"
+    ));
+    assert!(
+        found[1].ends_with("a Quad on the thrust stand is held still: its `speed` must be zero")
     );
-    let found = failures(&report(&file, ResultsFile::Write));
-    assert_eq!(found.len(), 1);
-    assert!(found[0].contains("only Physics Scenarios can run so far"));
+    assert!(
+        found[2].ends_with("a Quad on the thrust stand is held still: its `rotation` must be zero")
+    );
+}
+
+#[test]
+fn on_the_thrust_stand_the_quad_stays_where_it_starts() {
+    // Basis: Rule. The free-fall Scenario on the thrust stand: nothing moves.
+    let text = free_fall()
+        .replacen(
+            "kind              = \"physics\"",
+            "kind              = \"thrust stand\"",
+            1,
+        )
+        .replacen(
+            "value = \"-9.81 m/s ± 0.00001 m/s\"",
+            "value = \"0 m/s ± 0 m/s\"",
+            1,
+        );
+    let report = report(&fixture("on-the-stand", &text), ResultsFile::Write);
+    let found = failures(&report);
+    assert!(
+        found.iter().any(|line| line
+            .starts_with("vertical acceleration, lowest over 0 s to 1 s: measured 0 m/s²")),
+        "{found:#?}"
+    );
+    assert!(
+        !found
+            .iter()
+            .any(|line| line.starts_with("vertical speed at 1 s")),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn an_expectation_can_compare_with_the_same_run_at_another_physics_rate() {
+    // Basis: Rule. Falling for 1 s in fixed steps of length h lands
+    // ½·g·t·h lower than ½·g·t²: 0.613 mm at 8 kHz and 1.226 mm at 4 kHz,
+    // so this run is 0.613 mm higher than the 4 kHz one.
+    let text = free_fall()
+        + "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\nagainst = { physics_rate = \"4 kHz\" }\ncompare = \"difference\"\nvalue = \"0.613125 mm ± 0.000001 mm\"\nbasis = \"rule: ½ × 9.81 m/s² × 1 s × (1/4000 − 1/8000) s\"\n"
+        + "\n[[expect]]\nwhat = \"vertical speed\"\nover = \"0 s to 1 s\"\nmean = \"100% ± 0.000001%\"\nagainst = { battery = \"50%\" }\ncompare = \"ratio\"\nbasis = \"rule: the battery changes nothing with the motors stopped\"\n";
+    let report = report(&fixture("compared", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+    let lines: Vec<&String> = report.checks.iter().map(|(_, line)| line).collect();
+    assert!(lines.iter().any(|line| line.starts_with(
+        "height at 1 s, minus the same run at 4 kHz: measured 0.613 mm, expected 0.613125 mm ± 0.000001 mm"
+    )));
+    assert!(lines.iter().any(|line| line.starts_with(
+        "vertical speed, mean over 0 s to 1 s, as a share of the same run with the battery at 50%: measured 100%"
+    )));
+}
+
+#[test]
+fn a_comparison_needs_both_its_other_run_and_how_to_compare() {
+    let expect = |extra: &str| {
+        format!(
+            "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\n{extra}\nvalue = \"0 m ± 1 m\"\nbasis = \"rule: x\"\n"
+        )
+    };
+    let text = free_fall()
+        + &expect("compare = \"difference\"")
+        + &expect("against = { physics_rate = \"4 kHz\" }")
+        + &expect("against = { wind = \"5 m/s\" }\ncompare = \"difference\"")
+        + &expect("against = { physics_rate = \"4 kHz\" }\ncompare = \"sum\"");
+    let found = failures(&report(&fixture("comparisons", &text), ResultsFile::Write));
+    let ends = [
+        "`compare` needs `against`: the other run to compare with, such as `against = { physics_rate = \"4 kHz\" }`",
+        "an Expectation `against` another run needs `compare`: `compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's)",
+        "`wind` isn't something OpenDrone reads in [expect[8].against]; it reads `physics_rate`, `battery`",
+        "`against` names what the other run changes: `physics_rate`, `battery`, or both, written as in [start]",
+        "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's), not \"sum\"",
+    ];
+    assert_eq!(found.len(), ends.len(), "{found:#?}");
+    for (found, end) in found.iter().zip(ends) {
+        assert!(found.ends_with(end), "{found}");
+    }
+}
+
+#[test]
+fn a_compared_moment_must_be_a_whole_step_in_the_other_run_and_angles_cant_be_compared_yet() {
+    let text = free_fall()
+        + "\n[[expect]]\nwhat = \"height\"\nat = \"0.000125 s\"\nagainst = { physics_rate = \"4 kHz\" }\ncompare = \"difference\"\nvalue = \"0 m ± 1 m\"\nbasis = \"rule: x\"\n"
+        + "\n[[expect]]\nwhat = \"pitch\"\nat = \"1 s\"\nagainst = { physics_rate = \"4 kHz\" }\ncompare = \"difference\"\nvalue = \"0° ± 1°\"\nbasis = \"rule: x\"\n";
+    let found = failures(&report(
+        &fixture("compared-badly", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].ends_with(
+        "this moment isn't a whole number of physics steps at 4000 Hz, the rate of the run it's compared with: there one step is 0.00025 s"
+    ), "{found:#?}");
+    assert!(found[1].ends_with(
+        "pitch can't be compared with another run yet, because angles wrap round; compare a rate or a position instead"
+    ), "{found:#?}");
 }
 
 #[test]

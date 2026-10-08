@@ -1,0 +1,124 @@
+# Results of thrust-table.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Freestyle 5″'s motor and prop meet T-Motor's T5147 thrust table"
+
+[[expect]]
+what     = "motor 1 thrust at 0.9 s"
+basis    = "Observed"
+expected = "210.1 gf ± 1%"
+measured = "210 gf"
+
+[[expect]]
+what     = "motor 1 speed at 0.9 s"
+basis    = "Source"
+expected = "11293.6 RPM ± 6%"
+measured = "10700 RPM"
+
+[[expect]]
+what     = "battery current at 0.9 s"
+basis    = "Source"
+expected = "2.2 A ± 35%"
+measured = "1.51 A"
+
+[[expect]]
+what     = "motor 1 thrust at 1.4 s"
+basis    = "Observed"
+expected = "525.7 gf ± 1%"
+measured = "526 gf"
+
+[[expect]]
+what     = "motor 1 speed at 1.4 s"
+basis    = "Source"
+expected = "17179.4 RPM ± 2%"
+measured = "17000 RPM"
+
+[[expect]]
+what     = "battery current at 1.4 s"
+basis    = "Source"
+expected = "7.0 A ± 15%"
+measured = "6.09 A"
+
+[[expect]]
+what     = "motor 1 thrust at 1.9 s"
+basis    = "Observed"
+expected = "784.6 gf ± 1%"
+measured = "785 gf"
+
+[[expect]]
+what     = "motor 1 speed at 1.9 s"
+basis    = "Source"
+expected = "20865.8 RPM ± 2%"
+measured = "20700 RPM"
+
+[[expect]]
+what     = "battery current at 1.9 s"
+basis    = "Source"
+expected = "12.7 A ± 12%"
+measured = "11.4 A"
+
+[[expect]]
+what     = "motor 1 thrust at 2.4 s"
+basis    = "Observed"
+expected = "1158.9 gf ± 1%"
+measured = "1160 gf"
+
+[[expect]]
+what     = "motor 1 speed at 2.4 s"
+basis    = "Source"
+expected = "25070.7 RPM ± 2%"
+measured = "25200 RPM"
+
+[[expect]]
+what     = "battery current at 2.4 s"
+basis    = "Source"
+expected = "21.1 A ± 5%"
+measured = "21.1 A"
+
+[[expect]]
+what     = "motor 1 thrust at 3 s"
+basis    = "Source"
+expected = "1591.1 gf ± 3%"
+measured = "1580 gf"
+
+[[expect]]
+what     = "motor 1 speed at 3 s"
+basis    = "Source"
+expected = "29447.1 RPM ± 2%"
+measured = "29500 RPM"
+
+[[expect]]
+what     = "battery current at 3 s"
+basis    = "Source"
+expected = "34.6 A ± 5%"
+measured = "35.0 A"
+
+[[expect]]
+what     = "battery voltage at 3 s"
+basis    = "Source"
+expected = "23.5 V ± 0.05 V"
+measured = "23.5 V"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "8c169e60fb4f3936"   # test/freestyle-5-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "080e57fd10291b41"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "23340f818de9b380"
+"0.6 s" = "1d78458de554e9d4"
+"0.9 s" = "2add8929952e7930"
+"1.2 s" = "4ae3fac9d87b82c3"
+"1.5 s" = "274be6cceab480b5"
+"1.8 s" = "b47d605e3f0ab401"
+"2.1 s" = "eafc8ea1132bc7ce"
+"2.4 s" = "2f23b02dee7baafd"
+"2.7 s" = "00d81c23d1553058"
+"3 s" = "4a9986a081b5ba4e"
