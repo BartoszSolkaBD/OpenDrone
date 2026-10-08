@@ -7,9 +7,10 @@ use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
     FlightControllerSeam, FlightInput, MapShape, MotorCommands, MotorParameters, Mount,
-    OurFlightController, PacketRate, PhysicsRate, PropDirection, PropParameters, QuadParameters,
-    QuadPart, QuadSetUp, QuadShape, QuadState, Rates, RotorLayout, ScriptedMotors, SensorReadings,
-    SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors, Tune, World,
+    OurFlightController, PacketRate, PhysicsRate, PropDirection, PropParameters, PropWash,
+    QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, Rates, RotorLayout, ScriptedMotors,
+    SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors,
+    Tune, World,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -31,6 +32,7 @@ fn parameters() -> QuadParameters {
             duct_ram: 0.0,
             duct_offset: 0.0,
         },
+        prop_wash: PropWash::NONE,
         rotors: RotorLayout {
             diagonal: 0.066,
             rotor_height: 0.008,
@@ -555,4 +557,46 @@ impl FlightControllerSeam for EscListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+/// A whoop with the Whoop 65's Prop Wash numbers, level and sinking straight
+/// down at 5 m/s, in the middle of the band where a rotor sinks into its own
+/// air, its motors settled and held there.
+fn whoop_sinking_through_its_own_air(east: f64) -> QuadSetUp {
+    let mut quad = quad_at(100.0);
+    quad.parameters.prop_wash = PropWash {
+        strength: 0.2,
+        flicker: 15.0,
+    };
+    quad.start.position.x = east;
+    quad.start.velocity = Vec3::new(0.0, 0.0, -5.0);
+    quad.motors = StartingMotors::Settled;
+    quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+        SimulationTime::START,
+        MotorCommands::all(0.355),
+    )]));
+    quad
+}
+
+#[test]
+fn each_quad_flickers_its_own_way_and_the_seed_decides_how() {
+    // Each Quad's Prop Wash flicker is seeded from the Simulation's seed in
+    // turn, so two Quads flying the same way are shaken differently, and the
+    // same set-up shakes them the same way again.
+    let flown = |seed| {
+        let quads = vec![
+            whoop_sinking_through_its_own_air(0.0),
+            whoop_sinking_through_its_own_air(5.0),
+        ];
+        let mut sim = Simulation::new(set_up(8000, seed, quads)).unwrap();
+        for _ in 0..800 {
+            sim.step();
+        }
+        [sim.quad_state(0).rotation, sim.quad_state(1).rotation]
+    };
+    let [first, second] = flown(1);
+    assert!(first != Vec3::ZERO && second != Vec3::ZERO);
+    assert_ne!(first, second);
+    assert_eq!(flown(1), [first, second]);
+    assert_ne!(flown(2), [first, second]);
 }

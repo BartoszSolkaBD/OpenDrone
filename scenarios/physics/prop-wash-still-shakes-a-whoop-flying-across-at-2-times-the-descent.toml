@@ -1,0 +1,103 @@
+# A drag-free Whoop 65, level, sinks at 3.5 m/s, inside the band where a
+# rotor sinks into its own air, while flying north at 7 m/s: only twice its
+# descent. That isn't enough to escape: Prop Wash still acts, weaker than
+# sinking straight down, and shakes it. Proves E19 in #10 (ADR-0005): below
+# about 2.75 times the descent rate in forward speed, Prop Wash is still
+# there (prop-wash-is-gone-flying-across-at-3-times-the-descent.toml shows it
+# gone at 3 times).
+#
+# The working (crates/physics/src/prop_wash.rs, "Where it acts"):
+#
+# - With no drag, nothing slows it, so it keeps its speed across the props,
+#   and its settled motors carry exactly a quarter of its weight each,
+#   0.0312 kg × 9.81 m/s² / 4 = 0.076518 N, 7.8027 gf (the air crossing the
+#   disc lets slower rotors give it).
+# - That thrust pushes the air down through the 9.6211 cm² disc at v_h =
+#   √(0.076518 / (2 × 1.225 × 9.6211 × 10⁻⁴)) = 5.6975 m/s, so 3.5 m/s is a
+#   descent of 0.614 v_h: inside Johnson's band of 0.4 to 1.4 v_h (research
+#   §4.4).
+# - Level and not turning, every rotor is in the same air, so with the same
+#   thrust on all four nothing rolls or pitches it.
+# - Across the disc the air comes at 7 m/s, 2 times the descent: short of
+#   Talaeizadeh et al.'s 2.75 times (research §4.4), so some is left. With
+#   the model's fade, (1 − (2 / 2.75)²)² = 22% of what acts sinking straight
+#   down at this descent, which is 45% of its whole strength: 2.0% of the
+#   thrust, against 20% at the band's middle.
+#
+# The motors are held at 21.77%, their settled drive, 14,708 RPM.
+format = 1
+name   = "Flying forward at only 2 times its descent, a Whoop 65 is still shaken by Prop Wash"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "7 m/s north, 0 m/s east, -3.5 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "21.77%" },
+  { at = "1 s", motors = "21.77%" },
+]
+
+[[expect]]
+what    = "roll rate"
+over    = "0 s to 1 s"
+highest = "between 0.1 °/s and 10000 °/s"
+basis   = "source: research §4.4 (Talaeizadeh et al., S11): forward speed below 2.75 times the descent doesn't escape Prop Wash, and this is 2 times; every rotor is in the same air, so only its flicker, each rotor its own way, can roll the Quad, and it rolls right"
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 1 s"
+lowest = "between -10000 °/s and -0.1 °/s"
+basis  = "source: research §4.4 (Talaeizadeh et al., S11): below 2.75 times the descent Prop Wash still shakes the Quad, so it rolls left as well as right"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 1 s"
+highest = "between 0.1 °/s and 10000 °/s"
+basis   = "source: research §4.4 (Talaeizadeh et al., S11): below 2.75 times the descent Prop Wash's flicker pitches the Quad too, nose up"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 1 s"
+lowest = "between -10000 °/s and -0.1 °/s"
+basis  = "source: research §4.4 (Talaeizadeh et al., S11): below 2.75 times the descent Prop Wash still shakes the Quad, so it pitches nose down as well as up"
+
+[[expect]]
+what  = "roll"
+at    = "1 s"
+value = "46.8° ± 10°"
+basis = "observed: with nothing to catch it, the weaker shaking has rolled it 46.8° right in a second"
+
+[[expect]]
+what  = "pitch"
+at    = "1 s"
+value = "-30.7° ± 10°"
+basis = "observed: and pitched it 30.7° nose down"

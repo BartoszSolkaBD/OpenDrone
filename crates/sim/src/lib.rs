@@ -10,6 +10,10 @@
 //! - [`SetUp`]: what a Simulation starts from. The world values and the Quad
 //!   definitions come from `opendrone-pack`, already checked; the physics rate
 //!   and the random seed from the caller.
+//! - The random seed: each Quad's Prop Wash flicker is drawn from it, so the
+//!   same seed gives the same flicker and a different seed a different one
+//!   ([`Flicker`]). The generator is part of the Simulation's state: it is
+//!   fingerprinted with each Quad's state and goes on through Reset.
 //! - [`Simulation`]: steps every Quad once per tick, in a fixed order, and
 //!   counts [`SimulationTime`] in whole ticks at the set-up's [`PhysicsRate`]
 //!   (8 kHz in the alpha), never with the computer's clock.
@@ -88,7 +92,7 @@ mod motors;
 mod radio_link;
 mod time;
 
-use opendrone_maths::{Fingerprint, Fingerprinter, Vec3};
+use opendrone_maths::{Fingerprint, Fingerprinter, Random, Vec3};
 use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 
 pub use flight_controller::{OurFlightController, sensor_readings};
@@ -105,6 +109,7 @@ pub use opendrone_physics::{
 pub use opendrone_physics::{
     Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
 };
+pub use opendrone_physics::{Flicker, PropWash};
 pub use radio_link::{FlightInput, PacketRate, RadioLink};
 pub use time::{PhysicsRate, SimulationTime};
 
@@ -117,8 +122,10 @@ pub struct SetUp {
     /// The Map's solid parts, as plain data, in a fixed order: contacts and
     /// the line question name them by their place in this list.
     pub map: Vec<MapShape>,
-    /// The seed for the Simulation's random numbers, kept in its state. Nothing
-    /// draws random numbers yet; Prop Wash will (#46).
+    /// The seed for the Simulation's random numbers, kept in its state. Each
+    /// Quad's Prop Wash flicker is seeded from it in turn, in the set-up's
+    /// order: the first with SplitMix64's first number from it, the next with
+    /// its second, and so on ([`opendrone_maths::Random`]).
     pub random_seed: u64,
     /// Every Quad, in the fixed order they are stepped in. The alpha flies one.
     pub quads: Vec<QuadSetUp>,
@@ -212,9 +219,10 @@ impl SimulatedQuad {
             mount: self.body.mount(),
         };
         // The same parameters were accepted at set-up, so they are accepted
-        // again; if they weren't, the Quad would stay as it was.
+        // again; if they weren't, the Quad would stay as it was. The air's
+        // flicker isn't the Quad's: it goes on where it was.
         if let Ok(body) = QuadBody::new(self.body.parameters().clone(), start, world) {
-            self.body = body;
+            self.body = body.with_flicker(self.body.flicker().clone());
         }
         self.motor_commands = MotorCommands::STOPPED;
         let readings = sensor_readings(self.body.state(), self.body.escs_ready());
@@ -229,6 +237,7 @@ impl Simulation {
             problem: error.problem,
         })?;
         let mut quads = Vec::with_capacity(set_up.quads.len());
+        let mut seeds = Random::new(set_up.random_seed);
         for (index, quad) in set_up.quads.into_iter().enumerate() {
             let start = QuadStart {
                 state: quad.start,
@@ -236,12 +245,12 @@ impl Simulation {
                 battery: quad.battery,
                 mount: quad.mount,
             };
-            let body = QuadBody::new(quad.parameters, start, &set_up.world).map_err(|problem| {
-                SetUpError::Quad {
+            let body = QuadBody::new(quad.parameters, start, &set_up.world)
+                .map_err(|problem| SetUpError::Quad {
                     quad: index,
                     problem,
-                }
-            })?;
+                })?
+                .with_flicker(Flicker::new(seeds.next_u64()));
             quads.push(SimulatedQuad {
                 body,
                 launch_spot: quad.launch_spot,
@@ -379,8 +388,9 @@ impl Simulation {
 
     /// A fingerprint of the whole state, in a fixed order: Simulation Time,
     /// the physics rate, the world, the random seed, then every Quad's state
-    /// (with its motors, ESCs and battery), motor commands, Radio Link and
-    /// Flight Controller seam. Two runs, or two computers,
+    /// (with its motors, ESCs, battery and Prop Wash flicker, the random
+    /// generator's place included), motor commands, Radio Link and Flight
+    /// Controller seam. Two runs, or two computers,
     /// that give the same fingerprint are in exactly the same state.
     ///
     /// The Map's solid parts never change, so they are left out, as the

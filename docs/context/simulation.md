@@ -28,5 +28,6 @@ _Avoid_: Front door (informal only), event, command
 - World values, such as wind, come only from the Map.
 - Game modes and scripts change a flight only through Flight Inputs, settings, Assists and the choice of Map. They never change physics rules.
 - The Simulation can hold several Quads, stepped in a fixed order. The alpha flies one.
+- Its only randomness is Prop Wash's flicker, drawn from the random seed the caller gives it, each Quad's from its own seed taken from that one in turn. The generator is part of the Simulation's state: it is fingerprinted and copied with it, and goes on through Reset. The same seed gives the same flights; another seed gives other flicker.
 - After each tick, the Simulation hands out every Quad's state and its contacts with the Map: which part of the Quad touched which part of the Map, where, which way the Map pushed and how hard, and how hard friction held or dragged it.
 - The Simulation answers one read-only question about the Map, the line question: which surfaces does a straight line pass through, and where does it go into and come out of each? The Video Signal and the Where-you-stand sound ask it between ticks. Asking never changes the Simulation.

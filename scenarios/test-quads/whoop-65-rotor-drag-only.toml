@@ -5,11 +5,16 @@
 # them.
 format   = 1
 based_on = "opendrone/whoop-65"
-why      = "No body drag and no duct drag, so what its rotor drag does shows on its own"
+why      = "No body drag, no duct drag and no Prop Wash, so what its rotor drag does shows on its own"
 
-# Deliberate test values: no Confidence or source.
+# Deliberate test values: no Confidence or source. Prop Wash is off too: a
+# flare sinks the rotors into their own air, and its flicker would blur what
+# the drag does on its own.
 [frame]
 drag_area = "front 0, side 0, top 0 cm²"
 
 [ducts]
 ram_drag = "0 s⁻¹"
+
+[feel]
+prop_wash_strength = "0%"

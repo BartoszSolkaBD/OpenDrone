@@ -59,7 +59,8 @@
 //!
 //! Vortex ring state, where a rotor descends into its own air, is momentum
 //! theory's blind spot. What it does there, Prop Wash, is its own effect
-//! (ADR-0005).
+//! (ADR-0005, [`crate::prop_wash`]): it changes the thrust worked out here,
+//! before the ducts' ram drag reads it.
 //!
 //! **To watch: nearly stopped props.** As a rotor's power goes to nothing
 //! while air comes down through it and across it, momentum theory's thrust
@@ -115,6 +116,7 @@ use opendrone_maths::functions::{max, min};
 
 use crate::Drag;
 use crate::motor::Model;
+use crate::prop_wash::{self, PropWash};
 
 /// What the physics needs to know about the Quad to work out the air's push.
 pub(crate) struct Airframe<'a> {
@@ -124,6 +126,9 @@ pub(crate) struct Airframe<'a> {
     pub positions: &'a [Vec3; 4],
     /// The props' disc area, in m².
     pub disc_area: f64,
+    pub prop_wash: PropWash,
+    /// Each rotor's Prop Wash flicker now, from −1 to 1.
+    pub flicker: [f64; 4],
 }
 
 /// The rotors' and the air's push on the Quad over one step, in body axes.
@@ -170,6 +175,10 @@ pub(crate) fn push(
             airframe.disc_area,
             air_density,
         );
+        // Prop Wash, where the rotor sinks into its own air.
+        let wash = prop_wash::share(thrust, air, airframe.disc_area, air_density);
+        let thrust = thrust
+            * prop_wash::thrust_factor(airframe.prop_wash.strength, wash, airframe.flicker[k]);
         thrusts[k] = thrust;
         let lift = Vec3::new(0.0, 0.0, thrust);
         force += lift;

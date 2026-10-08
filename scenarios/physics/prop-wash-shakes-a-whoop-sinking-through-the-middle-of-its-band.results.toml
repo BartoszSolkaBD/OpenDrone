@@ -1,0 +1,100 @@
+# Results of prop-wash-shakes-a-whoop-sinking-through-the-middle-of-its-band.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Sinking through the middle of its band, a Whoop 65 is shaken by Prop Wash"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 0.5 s"
+basis    = "Source"
+expected = "between 1 °/s and 10000 °/s"
+measured = "410 °/s"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 0.5 s"
+basis    = "Source"
+expected = "between -10000 °/s and -1 °/s"
+measured = "-404 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 0.5 s"
+basis    = "Source"
+expected = "between 1 °/s and 10000 °/s"
+measured = "343 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 0.5 s"
+basis    = "Source"
+expected = "between -10000 °/s and -1 °/s"
+measured = "-364 °/s"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Observed"
+expected = "21147 RPM ± 0.1%"
+measured = "21100 RPM"
+
+[[expect]]
+what     = "motor 1 thrust, lowest over 0 s to 0.1 s"
+basis    = "Rule"
+expected = "between 5.71 gf and 8.57 gf"
+measured = "5.83 gf"
+
+[[expect]]
+what     = "motor 1 thrust, highest over 0 s to 0.1 s"
+basis    = "Rule"
+expected = "between 5.71 gf and 8.57 gf"
+measured = "7.71 gf"
+
+[[expect]]
+what     = "motor 1 thrust, lowest over 0 s to 0.5 s"
+basis    = "Observed"
+expected = "5.83 gf ± 0.3 gf"
+measured = "5.83 gf"
+
+[[expect]]
+what     = "motor 1 thrust, highest over 0 s to 0.5 s"
+basis    = "Observed"
+expected = "7.93 gf ± 0.3 gf"
+measured = "7.93 gf"
+
+[[expect]]
+what     = "roll at 0.5 s"
+basis    = "Observed"
+expected = "-15.5° ± 5°"
+measured = "-15.5°"
+
+[[expect]]
+what     = "pitch at 0.5 s"
+basis    = "Observed"
+expected = "-13.7° ± 5°"
+measured = "-13.7°"
+
+[[expect]]
+what     = "vertical speed at 0.5 s"
+basis    = "Observed"
+expected = "-4.92 m/s ± 0.1 m/s"
+measured = "-4.92 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "598b4c12d962b95e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "29b09728f1b666ed"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "0149a4bcf7aca703"
+"0.1 s" = "a11ade212c830608"
+"0.15 s" = "a9ac33113e3c4980"
+"0.2 s" = "294df5eddf95851b"
+"0.25 s" = "252f2ffba7642333"
+"0.3 s" = "7b51ca3131e97b93"
+"0.35 s" = "67c04da6bc44720b"
+"0.4 s" = "c6bdc194b1b4e058"
+"0.45 s" = "2a726f6db5e126fb"
+"0.5 s" = "77e76c075171c1ea"

@@ -112,6 +112,8 @@ pub struct OtherRun {
     /// The battery's charge, from 0 to 1, or `None` for the same as this
     /// run's.
     pub battery: Option<f64>,
+    /// The random seed, or `None` for the same as this run's.
+    pub random_seed: Option<u64>,
     /// Whether its roll and yaw sticks are this run's, mirrored.
     pub mirrored: bool,
     /// The Timeline, in that run's steps.
@@ -253,6 +255,9 @@ pub enum Comparison {
     Difference,
     /// This run's value as a share of the other's.
     Ratio,
+    /// How far apart this run's value and the other's are, whichever is the
+    /// higher: never below zero.
+    Gap,
 }
 
 /// When an Expectation is measured, in steps.
@@ -1776,6 +1781,7 @@ impl Reader<'_> {
                 description.push_str(&match how {
                     Comparison::Difference => format!(", minus the same run {words}"),
                     Comparison::Ratio => format!(", as a share of the same run {words}"),
+                    Comparison::Gap => format!(", how far from the same run {words}"),
                 });
                 Some(Compared { run, when, how })
             }
@@ -1795,7 +1801,7 @@ impl Reader<'_> {
     /// and how. `None` when it compares with nothing; `Some(None)` when it
     /// tries to and can't.
     fn comparison(&mut self, table: &Table<'_, '_>) -> Option<Option<(Comparison, usize)>> {
-        let help = "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's)";
+        let help = "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's), \"ratio\" (this run's as a share of the other's) or \"gap\" (how far apart the two are, whichever is higher)";
         match (table.get("against"), table.get("compare")) {
             (None, None) => None,
             (None, Some(compare)) => {
@@ -1815,6 +1821,7 @@ impl Reader<'_> {
                     Some(item) => match item.text(self.problems) {
                         Some("difference") => Some(Comparison::Difference),
                         Some("ratio") => Some(Comparison::Ratio),
+                        Some("gap") => Some(Comparison::Gap),
                         Some(other) => {
                             self.problems
                                 .push(item.problem(format!("{help}, not \"{other}\"")));
@@ -1833,7 +1840,10 @@ impl Reader<'_> {
     /// unless an earlier Expectation named the same one.
     fn other_run(&mut self, against: &Item<'_, '_>) -> Option<usize> {
         let table = against.table(self.problems)?;
-        table.refuse_unknown(&["physics_rate", "battery", "sticks"], self.problems);
+        table.refuse_unknown(
+            &["physics_rate", "battery", "random_seed", "sticks"],
+            self.problems,
+        );
         let mut problems = Problems::new();
         let rate = table
             .get("physics_rate")
@@ -1855,6 +1865,23 @@ impl Reader<'_> {
                     }
                 },
             )
+        });
+        let random_seed = table.get("random_seed").map(|item| {
+            if self.kind == Kind::FlightController {
+                problems.push(item.problem(
+                    "a Flight Controller Scenario draws no random numbers, so its other run can't change the random seed",
+                ));
+                return None;
+            }
+            match item.integer().and_then(|n| u64::try_from(n).ok()) {
+                Some(seed) => Some(seed),
+                None => {
+                    problems.push(item.problem(
+                        "`random_seed` must be a whole number of 0 or more, written without quotes",
+                    ));
+                    None
+                }
+            }
         });
         let mirrored = table.get("sticks").map(|item| {
             match item.text(&mut problems) {
@@ -1888,14 +1915,15 @@ impl Reader<'_> {
         if failed {
             return None;
         }
-        if rate.is_none() && battery.is_none() && mirrored.is_none() {
+        if rate.is_none() && battery.is_none() && random_seed.is_none() && mirrored.is_none() {
             self.problems.push(against.problem(
-                "`against` names what the other run changes: `physics_rate`, `battery` or `sticks`, written as in [start], or `sticks = \"mirrored\"`",
+                "`against` names what the other run changes: `physics_rate`, `battery` or `random_seed`, written as in [start], or `sticks = \"mirrored\"`",
             ));
             return None;
         }
         let rate = rate.flatten().unwrap_or(self.rate);
         let battery = battery.flatten();
+        let random_seed = random_seed.flatten();
         let mirrored = mirrored.unwrap_or(false);
         let mut words = Vec::new();
         if rate != self.rate {
@@ -1903,6 +1931,9 @@ impl Reader<'_> {
         }
         if let Some((_, text)) = &battery {
             words.push(format!("with the battery at {text}"));
+        }
+        if let Some(seed) = random_seed {
+            words.push(format!("with random seed {seed}"));
         }
         if mirrored {
             words.push("with roll and yaw mirrored".to_string());
@@ -1914,7 +1945,10 @@ impl Reader<'_> {
         };
         let battery = battery.map(|(value, _)| value);
         if let Some(found) = self.other_runs.iter().position(|run| {
-            run.physics_rate == rate && run.battery == battery && run.mirrored == mirrored
+            run.physics_rate == rate
+                && run.battery == battery
+                && run.random_seed == random_seed
+                && run.mirrored == mirrored
         }) {
             return Some(found);
         }
@@ -1947,6 +1981,7 @@ impl Reader<'_> {
             words,
             physics_rate: rate,
             battery,
+            random_seed,
             mirrored,
             inputs,
             length: SimulationTime::from_ticks(length),
