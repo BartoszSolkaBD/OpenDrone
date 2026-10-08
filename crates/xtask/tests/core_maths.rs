@@ -142,12 +142,14 @@ fn a_library_calling_abs_sub_fails_naming_the_rust_operation() {
 #[test]
 fn powf_with_a_base_of_10_fails_on_every_os_and_as_apples_exp10_on_macos() {
     // Optimised, the compiler turns `10.powf(x)` into Apple's own `__exp10`
-    // on macOS, and keeps `pow` elsewhere.
+    // on macOS, and keeps `pow` elsewhere. `inline(never)` keeps the function
+    // in glamx's own optimised code: a small function of an optimised library
+    // may otherwise be compiled into its caller's crate.
     let outcome = Fixture::new("library-powers-of-ten")
         .outside(
             "glamx",
             &[],
-            "pub fn decibels(x: f64) -> f64 { 10f64.powf(x) }",
+            "#[inline(never)]\npub fn decibels(x: f64) -> f64 { 10f64.powf(x) }",
         )
         .member("opendrone-maths", &[], "")
         .member(
@@ -315,10 +317,10 @@ fn a_generic_core_function_calling_acos_compiled_into_the_games_program_fails() 
     assert!(alone.passed, "{}", alone.output);
     let with_the_game = fixture("generic-core-in-the-game").check_with(&["opendrone"]);
     assert!(!with_the_game.passed, "{}", with_the_game.output);
-    with_the_game.says(
-        "- `glamx` calls the operating system's `acos` (Rust's `f64::acos`) from \
-         glamx::eigen::<f32> (compiled into the program `opendrone`).",
-    );
+    // Named from glamx's `eigen::<f32>`, or from the physics' `hull::<f32>`
+    // when the optimised physics has taken `eigen` into it.
+    with_the_game.says("calls the operating system's `acos` (Rust's `f64::acos`) from ");
+    with_the_game.says("::<f32> (compiled into the program `opendrone`).");
 }
 
 #[test]
@@ -345,8 +347,10 @@ fn an_inline_core_function_calling_acos_compiled_into_the_scenario_runner_fails(
         )
         .check_with(&["opendrone-scenario"]);
     assert!(!outcome.passed, "{}", outcome.output);
+    // Named from glamx's `eigen`, or from the physics' `hull` when the
+    // optimised physics has taken `eigen` into it.
+    outcome.says("calls the operating system's `acos` (Rust's `f64::acos`) from ");
     outcome.says("(compiled into `opendrone-scenario`)");
-    outcome.says("- `glamx` calls the operating system's `acos` (Rust's `f64::acos`) from ");
 }
 
 #[test]

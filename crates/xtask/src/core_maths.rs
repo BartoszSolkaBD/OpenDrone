@@ -481,10 +481,12 @@ fn read_rlibs(rlibs: &[PathBuf]) -> Result<Code, String> {
     Ok(code)
 }
 
-/// Adds the calls in one core library's compiled code. Everything in it is
-/// the library's: a call inside a function of another crate's (such as
-/// std's `f64::acos`, copied in) counts as made by the core's functions that
-/// lead to it, or by that function itself when none does.
+/// Adds the calls in one core library's compiled code. A call inside a
+/// function of another crate's (such as std's `f64::acos`, copied in) counts
+/// as made by the core's functions that lead to it, or by that function
+/// itself when none does. Each core function's call counts as its own
+/// library's, wherever the compiler put its code: an optimised library's
+/// small functions are compiled into the crates that call them, too.
 fn core_calls(
     library: &str,
     code: &Code,
@@ -492,27 +494,49 @@ fn core_calls(
     calls: &mut BTreeMap<(String, String), BTreeSet<Caller>>,
 ) {
     for (function, places) in &code.maths {
-        let callers = calls
-            .entry((library.to_owned(), function.clone()))
-            .or_default();
+        // Even with no reference found, a maths function the code names
+        // counts, from code this check couldn't name.
+        if places.is_empty() {
+            calls
+                .entry((library.to_owned(), function.clone()))
+                .or_default();
+        }
         for place in places {
             match place {
                 Place::Function(name) => {
                     let (core, uncalled) = owners.functions_leading_to(code, name);
-                    let mut found: BTreeSet<&str> = core.into_iter().chain(uncalled).collect();
-                    if found.is_empty() {
-                        found.insert(name);
+                    let mut theirs: BTreeSet<&str> = uncalled;
+                    if core.is_empty() && theirs.is_empty() {
+                        theirs.insert(name);
                     }
-                    callers.extend(found.into_iter().map(|name| Caller::Function {
-                        name: demangle(name),
-                        compiled_into: None,
-                    }));
+                    for name in core {
+                        let owner = owners.library(name).unwrap_or(library);
+                        calls
+                            .entry((owner.to_owned(), function.clone()))
+                            .or_default()
+                            .insert(Caller::Function {
+                                name: demangle(name),
+                                compiled_into: (owner != library).then(|| format!("`{library}`")),
+                            });
+                    }
+                    for name in theirs {
+                        calls
+                            .entry((library.to_owned(), function.clone()))
+                            .or_default()
+                            .insert(Caller::Function {
+                                name: demangle(name),
+                                compiled_into: None,
+                            });
+                    }
                 }
                 Place::Outside { data, section } => {
-                    callers.insert(Caller::Outside {
-                        data: data.as_deref().map(demangle),
-                        section: section.clone(),
-                    });
+                    calls
+                        .entry((library.to_owned(), function.clone()))
+                        .or_default()
+                        .insert(Caller::Outside {
+                            data: data.as_deref().map(demangle),
+                            section: section.clone(),
+                        });
                 }
             }
         }
