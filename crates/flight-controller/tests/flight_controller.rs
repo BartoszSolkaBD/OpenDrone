@@ -119,13 +119,62 @@ fn a_tune_value_the_flight_controller_cant_read_is_refused_with_a_sentence() {
 }
 
 #[test]
-fn settings_the_flight_controller_doesnt_read_yet_are_left_alone() {
+fn settings_the_flight_controller_doesnt_know_are_left_alone() {
     let lines = DEFAULTS
         .iter()
         .copied()
-        .chain([("motor_poles", "14"), ("tpa_rate", "65")]);
+        .chain([("motor_poles", "14"), ("crashflip_rate", "0")]);
     assert_eq!(Tune::read(lines).unwrap(), tune());
-    assert!(Tune::check("tpa_rate", "anything").is_ok());
+    assert!(Tune::check("crashflip_rate", "anything").is_ok());
+}
+
+#[test]
+fn settings_not_simulated_yet_are_optional_but_checked_as_betaflight_checks_them() {
+    // Basis: Rule (ADR-0015), with the ranges and words of Betaflight
+    // 2026.6.2's src/main/cli/settings.c.
+    let names: Vec<&str> = Tune::not_simulated_yet()
+        .iter()
+        .map(|(name, _)| *name)
+        .collect();
+    for name in [
+        "f_roll",
+        "yaw_lowpass_hz",
+        "rc_smoothing",
+        "iterm_relax",
+        "tpa_low_rate",
+    ] {
+        assert!(names.contains(&name), "{name}");
+    }
+    // Set off, they read; the Flight Controller flies as now either way.
+    let off = DEFAULTS.iter().copied().chain([
+        ("yaw_lowpass_hz", "0"),
+        ("rc_smoothing", "OFF"),
+        ("iterm_relax", "OFF"),
+    ]);
+    assert_eq!(Tune::read(off).unwrap(), tune());
+    // A value Betaflight wouldn't take is refused.
+    let wrong = DEFAULTS
+        .iter()
+        .copied()
+        .chain([("yaw_lowpass_hz", "501"), ("iterm_relax", "SOME")]);
+    let problems = Tune::read(wrong).unwrap_err();
+    assert!(problems.missing.is_empty());
+    assert_eq!(
+        problems.wrong,
+        [
+            (
+                "iterm_relax",
+                "`iterm_relax` must be one of OFF, RP, RPY, RP_INC, RPY_INC, not \"SOME\""
+                    .to_string()
+            ),
+            (
+                "yaw_lowpass_hz",
+                "`yaw_lowpass_hz` is a whole number from 0 to 500, not \"501\"".to_string()
+            ),
+        ]
+    );
+    assert!(Tune::check("dyn_notch_count", "8").is_err());
+    assert!(Tune::check("dyn_notch_count", "0").is_ok());
 }
 
 #[test]

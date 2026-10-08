@@ -1,5 +1,5 @@
-//! Flight Inputs at the front door, and the Radio Link that carries their
-//! Channels to the Flight Controller (ADR-0007).
+//! Flight Inputs, the one way into the Simulation, and the Radio Link that
+//! carries their Channels to the Flight Controller (ADR-0007).
 //!
 //! The Radio Link sends regular frames at the pilot's Packet Rate, like an
 //! ELRS link, each carrying the newest Channels; the Flight Controller sees

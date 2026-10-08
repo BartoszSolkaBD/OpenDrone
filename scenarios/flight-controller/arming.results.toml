@@ -11,7 +11,7 @@ expected = "0 ± 0"
 measured = "0"
 
 [[expect]]
-what     = "motor 1 DShot at 0.105 s"
+what     = "motor 1 DShot at 0.13 s"
 basis    = "Source"
 expected = "158 ± 0"
 measured = "158"
@@ -41,7 +41,7 @@ expected = "0 ± 0"
 measured = "0"
 
 [[expect]]
-what     = "motor 1 DShot at 1.61 s"
+what     = "motor 1 DShot at 1.63 s"
 basis    = "Source"
 expected = "158 ± 0"
 measured = "158"
@@ -71,7 +71,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "7e44d6e56de6a105"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "4a9e587d4a888682"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "cbff6f0c970bf34e"   # the whole state after each of 22400 steps at 8000 Hz, in order
 

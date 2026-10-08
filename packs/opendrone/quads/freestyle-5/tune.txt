@@ -46,3 +46,31 @@ set motor_poles = 14                   # 2026.6.2 default; must match [motors] p
 set yaw_motors_reversed = OFF          # 2026.6.2 default; must match [props] direction, props-in
 # Motors, CLI only
 set mixer_type = LEGACY                # 2026.6.2 default
+
+# Not simulated yet. The Flight Controller checks these values but flies as
+# if each were off until its ticket lands: the filters, RC smoothing and
+# feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA and
+# throttle boost with #50 (ADR-0015).
+# PID Tuning
+set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
+set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
+set f_yaw = 120                        # 2026.6.2 default; not simulated yet (#49)
+set d_max_roll = 40                    # 2026.6.2 default; not simulated yet (#50)
+set d_max_pitch = 46                   # 2026.6.2 default; not simulated yet (#50)
+set d_max_yaw = 0                      # 2026.6.2 default; not simulated yet (#50)
+set iterm_relax = RP                   # 2026.6.2 default; not simulated yet (#50)
+set anti_gravity_gain = 80             # 2026.6.2 default; not simulated yet (#50)
+set tpa_rate = 65                      # 2026.6.2 default; not simulated yet (#50)
+set tpa_low_rate = 20                  # 2026.6.2 default; not simulated yet (#50)
+set throttle_boost = 5                 # 2026.6.2 default; not simulated yet (#50)
+# PID Tuning, filters
+set gyro_lpf1_static_hz = 250          # 2026.6.2 default; not simulated yet (#49)
+set gyro_lpf1_dyn_min_hz = 250         # 2026.6.2 default; not simulated yet (#49)
+set gyro_lpf2_static_hz = 500          # 2026.6.2 default; not simulated yet (#49)
+set dyn_notch_count = 3                # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf1_static_hz = 75          # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf1_dyn_min_hz = 75         # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#49)
+set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
+# Receiver
+set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)

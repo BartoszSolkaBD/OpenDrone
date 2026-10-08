@@ -1,17 +1,46 @@
-# The Freestyle 5″ with its motor output limit at 80%.    id: test/freestyle-5-output-limit-80
+# The Freestyle 5″ with its motor output limit at 80%, and the Flight
+# Controller's filters and loop shaping off.    id: test/freestyle-5-output-limit-80
 #
 # Betaflight's `motor_output_limit` cuts the top of the motors' range, as
 # pilots do to fly a higher-voltage pack. The Freestyle 5″ flies Betaflight's
 # default, 100%, so its Tune never shows the limit at work; this Test Quad
-# does. Everything else is the Freestyle 5″'s.
+# does.
+#
+# Like test/freestyle-5-filters-and-shaping-off, it also switches off what
+# Betaflight 2026.6.2 puts between a throttle step and the motors that the
+# Flight Controller doesn't simulate yet: RC smoothing (#49), and throttle
+# boost and anti-gravity (#50), with the rest of the filters and loop
+# shaping. So the motors' numbers are what Betaflight gives on this Tune today
+# and once those tickets land. (A Test Quad builds on a real Quad only, so the
+# list is written out again here.) Everything else is the Freestyle 5″'s.
 #
 # A Test Quad lists only what it changes, so any other change to the Freestyle
 # 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
 # fly them.
 format   = 1
 based_on = "opendrone/freestyle-5"
-why      = "The motor output limit at 80%, so a Scenario can show it cutting the top of the motors' range"
+why      = "The motor output limit at 80%, with the filters and loop shaping off, so a Scenario can show the limit cutting the top of the motors' range"
 
-# A Tune change keeps Betaflight's own units, as `tune.txt` does: percent here.
+# Tune changes keep Betaflight's own units, as `tune.txt` does: percent for the
+# limit. Each other change is off as Betaflight 2026.6.2 reads it.
 [tune]
 motor_output_limit = 80
+f_roll = 0
+f_pitch = 0
+f_yaw = 0
+d_max_roll = 0
+d_max_pitch = 0
+iterm_relax = "OFF"
+anti_gravity_gain = 0
+tpa_rate = 0
+tpa_low_rate = 0
+throttle_boost = 0
+gyro_lpf1_static_hz = 0
+gyro_lpf1_dyn_min_hz = 0
+gyro_lpf2_static_hz = 0
+dyn_notch_count = 0
+dterm_lpf1_static_hz = 0
+dterm_lpf1_dyn_min_hz = 0
+dterm_lpf2_static_hz = 0
+yaw_lowpass_hz = 0
+rc_smoothing = "OFF"

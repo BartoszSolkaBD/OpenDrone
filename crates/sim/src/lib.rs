@@ -13,7 +13,7 @@
 //! - [`Simulation`]: steps every Quad once per tick, in a fixed order, and
 //!   counts [`SimulationTime`] in whole ticks at the set-up's [`PhysicsRate`]
 //!   (8 kHz in the alpha), never with the computer's clock.
-//! - The front door: [`Simulation::flight_input`] takes Flight Inputs
+//! - Flight Inputs, the one way in: [`Simulation::flight_input`] takes them,
 //!   stamped with Simulation Time; so far, Channels ([`FlightInput`]).
 //! - The Radio Link: each Quad's Channels reach its Flight Controller in
 //!   regular frames at the pilot's [`PacketRate`], like an ELRS link on CRSF
@@ -219,7 +219,7 @@ impl Simulation {
         })
     }
 
-    /// The front door: a Flight Input for a Quad (counting from 0 in the
+    /// The one way in: a Flight Input for a Quad (counting from 0 in the
     /// set-up's order), stamped with the Simulation Time it arrives at. It
     /// takes effect at the start of the tick at that moment, or of the next
     /// tick if that moment has passed. Inputs stamped with the same moment

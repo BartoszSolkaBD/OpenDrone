@@ -2,9 +2,12 @@
 # leaves idle where it was, as Betaflight 2026.6.2's `dshotInitEndpoints`
 # (src/main/drivers/dshot.c) sets it. The Test Quad
 # test/freestyle-5-output-limit-80 is the Freestyle 5″ with
-# `motor_output_limit` at 80%. Each case is a fresh, armed Flight Controller,
-# one Radio Link frame and one loop, with nothing to correct but the centre
-# stick's 0.11 °/s (see mixer-and-airmode.toml).
+# `motor_output_limit` at 80%, and with the Flight Controller's filters and
+# loop shaping off, as in mixer-and-airmode.toml, so RC smoothing (#49) and
+# throttle boost (#50) don't change a case's first frame: every number here is
+# what Betaflight 2026.6.2 gives on that Tune, and stays so when those tickets
+# land. Each case is a fresh, armed Flight Controller, one Radio Link frame and
+# one loop, with nothing to correct but the centre stick's 0.11 °/s.
 format = 1
 name   = "A motor output limit of 80% cuts the top of the motors' range"
 
@@ -54,7 +57,7 @@ arm      = "on"
 [[case.expect]]
 what  = "motor 1 DShot"
 value = "862 ± 1"
-basis = "source: dshotInitEndpoints and applyMixToMotors: the top is 2047 - 1999 × (1 - 0.80) = 1647.2; 50% stick gives a throttle of 0.473, so 157.9 + (1647.2 - 157.9) × 0.473 = 862"
+basis = "source: dshotInitEndpoints and applyMixToMotors, with RC smoothing and throttle boost off: the top is 2047 - 1999 × (1 - 0.80) = 1647.2; 50% stick gives a throttle of 0.473, so 157.9 + (1647.2 - 157.9) × 0.473 = 862"
 
 # Full throttle: the cut top.
 [[case]]
@@ -67,4 +70,4 @@ arm      = "on"
 [[case.expect]]
 what  = "motor 3 DShot"
 value = "1647 ± 0"
-basis = "source: dshotInitEndpoints: the top is 2047 - 1999 × (1 - 0.80) = 1647.2, sent as 1647"
+basis = "source: dshotInitEndpoints, with RC smoothing off so full stick is full throttle on the first loop: the top is 2047 - 1999 × (1 - 0.80) = 1647.2, sent as 1647"

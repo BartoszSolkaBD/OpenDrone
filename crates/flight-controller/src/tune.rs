@@ -5,7 +5,14 @@
 //! This takes the Tune's `set` lines as name and value text, and gives the
 //! settings out; it opens no files. Every setting this Flight Controller reads
 //! must be there: a Tune spells out every setting, so no default hides in the
-//! code ([ADR-0015]). Settings it doesn't read yet are left alone; later
+//! code ([ADR-0015]).
+//!
+//! Some settings it knows but doesn't simulate yet ([`Tune::not_simulated_yet`]):
+//! the filters, RC smoothing and feedforward (#49), and Dynamic D, I-term
+//! relax, anti-gravity, TPA and throttle boost (#50). A Tune may set them,
+//! and their values are checked, but the Flight Controller flies as if each
+//! were off until its ticket lands; a Test Quad sets them off to fly exactly
+//! as Betaflight does. Settings it doesn't know at all are left alone; later
 //! Flight Controller tickets read more of them.
 //!
 //! [ADR-0015]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md
@@ -151,6 +158,45 @@ const SPECS: &[(&str, Kind)] = &[
     ),
 ];
 
+/// Settings this Flight Controller knows but doesn't simulate yet, with
+/// their ticket. A Tune may set them, and each value is checked as Betaflight
+/// 2026.6.2's CLI checks it, but nothing reads them yet, so the Flight
+/// Controller flies as if each were off. A Test Quad that sets them off
+/// (Betaflight's way: a cutoff, gain or count of 0, `OFF`) flies exactly as
+/// Betaflight does now, and stays so once their tickets land. Grouped as the
+/// Betaflight App shows them.
+const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
+    // PID Tuning: feedforward, Dynamic D, I-term relax, anti-gravity, TPA and
+    // throttle boost.
+    ("f_roll", Kind::Number(0, 1000), "#49"),
+    ("f_pitch", Kind::Number(0, 1000), "#49"),
+    ("f_yaw", Kind::Number(0, 1000), "#49"),
+    ("d_max_roll", Kind::Number(0, 250), "#50"),
+    ("d_max_pitch", Kind::Number(0, 250), "#50"),
+    ("d_max_yaw", Kind::Number(0, 250), "#50"),
+    (
+        "iterm_relax",
+        Kind::Choice(&["OFF", "RP", "RPY", "RP_INC", "RPY_INC"], ""),
+        "#50",
+    ),
+    ("anti_gravity_gain", Kind::Number(0, 250), "#50"),
+    ("tpa_rate", Kind::Number(0, 100), "#50"),
+    ("tpa_low_rate", Kind::Number(0, 100), "#50"),
+    ("throttle_boost", Kind::Number(0, 100), "#50"),
+    // PID Tuning, filters: the gyro and D-term low-passes, the dynamic notch
+    // and the yaw P low-pass.
+    ("gyro_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
+    ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
+    ("gyro_lpf2_static_hz", Kind::Number(0, 1000), "#49"),
+    ("dyn_notch_count", Kind::Number(0, 7), "#49"),
+    ("dterm_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
+    ("dterm_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
+    ("dterm_lpf2_static_hz", Kind::Number(0, 1000), "#49"),
+    ("yaw_lowpass_hz", Kind::Number(0, 500), "#49"),
+    // Receiver: RC smoothing.
+    ("rc_smoothing", Kind::OffOn, "#49"),
+];
+
 /// Betaflight's words for every value of the two lookups read here, so a
 /// value Betaflight knows but OpenDrone doesn't simulate is told apart from a
 /// typo.
@@ -181,10 +227,26 @@ impl Tune {
         SPECS.iter().map(|(name, _)| *name).collect()
     }
 
-    /// Checks one setting's value, if it is one this Flight Controller reads:
-    /// a plain sentence when it can't read it.
+    /// The settings this Flight Controller knows but doesn't simulate yet,
+    /// each with the ticket that brings it, in the order a Tune lists them.
+    /// A Tune may set them; until their tickets land the Flight Controller
+    /// flies as if each were off.
+    pub fn not_simulated_yet() -> Vec<(&'static str, &'static str)> {
+        NOT_SIMULATED_YET
+            .iter()
+            .map(|(name, _, ticket)| (*name, *ticket))
+            .collect()
+    }
+
+    /// Checks one setting's value, if it is one this Flight Controller reads
+    /// or knows it will read: a plain sentence when it can't read it.
     pub fn check(name: &str, value: &str) -> Result<(), String> {
-        match SPECS.iter().find(|(n, _)| *n == name) {
+        let known = SPECS
+            .iter()
+            .map(|(n, kind)| (*n, kind))
+            .chain(NOT_SIMULATED_YET.iter().map(|(n, kind, _)| (*n, kind)))
+            .find(|(n, _)| *n == name);
+        match known {
             Some((name, kind)) => self::value(name, kind, value.trim()).map(|_| ()),
             None => Ok(()),
         }
@@ -209,6 +271,15 @@ impl Tune {
                     values.insert(name, v);
                 }
                 Err(sentence) => problems.wrong.push((name, sentence)),
+            }
+        }
+        // The settings it doesn't simulate yet needn't be there, but any that
+        // are must hold a value Betaflight would take.
+        for (name, kind, _) in NOT_SIMULATED_YET {
+            if let Some(text) = given.get(name)
+                && let Err(sentence) = value(name, kind, text.trim())
+            {
+                problems.wrong.push((name, sentence));
             }
         }
         if !problems.is_empty() {

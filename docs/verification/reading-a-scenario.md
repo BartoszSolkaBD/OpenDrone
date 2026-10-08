@@ -6,7 +6,7 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 - `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, and `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios.
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
-- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, and `freestyle-5-output-limit-80.toml`, the Freestyle 5″ with one Tune setting changed.
+- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, and `freestyle-5-filters-and-shaping-off.toml`, the Freestyle 5″ with the Flight Controller's filters and loop shaping off in its Tune, which the Flight Controller doesn't simulate yet (#49, #50), so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own.
 
 ## The Scenario file
 
@@ -152,7 +152,7 @@ timeline = [
 
 How the sticks reach the Flight Controller, as on a real quad on ExpressLRS:
 
-1. **Each stick becomes a whole-number Channel:** the step an ELRS receiver hands over CRSF, from 172 (-100%, 988 µs) through 992 (centre, 1500 µs) to 1811 (+100%, 2012 µs). The runner rounds each percent to the nearest step: 50% is 1500 + 512 × 0.5 = 1756 µs, step 1401. A Channel is a Flight Input, stamped with Simulation Time, and enters at the Simulation's front door whenever it changes.
+1. **Each stick becomes a whole-number Channel:** the step an ELRS receiver hands over CRSF, from 172 (-100%, 988 µs) through 992 (centre, 1500 µs) to 1811 (+100%, 2012 µs). The runner rounds each percent to the nearest step: 50% is 1500 + 512 × 0.5 = 1756 µs, step 1401. Whenever a Channel changes, it enters the Simulation as a Flight Input, stamped with Simulation Time.
 2. **The Radio Link** sends a frame with the newest Channels at the Packet Rate (`radio_link`), the first at 0 s: every 4 ms at 250 Hz. A frame due between two physics steps leaves on the later one.
 3. **The Flight Controller** reads each step as Betaflight 2026.6 reads CRSF: 0.62477 × step + 881 µs. So a centred stick reads 1500.77 µs, not 1500 µs, and asks for a little rotation (0.11 °/s on Actual 70/670), and 50% stick reads 1756.30 µs, a deflection of 0.5126. Full stick reads 2012.46 µs, beyond 500 µs from centre, so it is exactly full. [`actual-rates.toml`](../../scenarios/flight-controller/actual-rates.toml) has the table.
 4. **One Flight Controller loop runs per physics step,** reading the gyro (the Quad's true rotation) and the true attitude at the step's start.

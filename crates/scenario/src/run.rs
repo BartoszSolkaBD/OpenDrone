@@ -153,7 +153,9 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         .collect();
     let this_run = Plan {
         physics_rate: start.physics_rate,
-        battery: start.battery.unwrap_or(1.0),
+        battery: start
+            .battery
+            .expect("the reader requires `battery` for every kind that runs the physics"),
         inputs: &scenario.inputs,
         length: scenario.length,
     };
@@ -180,7 +182,10 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             .unzip();
         let plan = Plan {
             physics_rate: other.physics_rate,
-            battery: other.battery.or(start.battery).unwrap_or(1.0),
+            battery: other
+                .battery
+                .or(start.battery)
+                .expect("the reader requires `battery` for every kind that runs the physics"),
             inputs: &other.inputs,
             length: other.length,
         };
@@ -330,8 +335,8 @@ fn simulate(
     let mut last_channels: Option<Channels> = None;
     for tick in 0..=plan.length.ticks() {
         if tick > 0 {
-            // The pilot's Channels for the step that starts now enter at the
-            // front door, whenever they change.
+            // The pilot's Channels for the step that starts now enter the
+            // Simulation as Flight Inputs, whenever they change.
             if let Some(track) = &track {
                 let channels = track.channels(tick - 1);
                 if last_channels != Some(channels) {

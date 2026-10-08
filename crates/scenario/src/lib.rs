@@ -5,7 +5,7 @@
 //! Test Pilot, `opendrone-pack` and `opendrone-blackbox`.
 //!
 //! It runs all four kinds: Flight Scenarios fly our Flight Controller and
-//! the physics together, the pilot's sticks entering at the front door;
+//! the physics together, the pilot's sticks entering as Flight Inputs;
 //! Physics and Thrust Stand Scenarios script the motors in its place (on the
 //! thrust stand the Quad is held still); Flight Controller Scenarios run the
 //! Flight Controller alone, fed a Timeline of sticks and sensor readings or a

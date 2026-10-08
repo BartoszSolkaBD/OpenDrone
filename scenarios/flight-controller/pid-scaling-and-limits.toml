@@ -7,6 +7,16 @@
 # rolling left at 100 °/s and yawing right at 100 °/s. The Freestyle 5″'s
 # gains: roll P/I/D 45/80/30, yaw P/I 45/80. Each loop is 1/8000 s.
 #
+# It flies the Test Quad test/freestyle-5-filters-and-shaping-off: the
+# Freestyle 5″ with the Flight Controller's filters and loop shaping switched
+# off in its Tune, the way Betaflight 2026.6.2 reads "off": the gyro, D-term
+# and yaw P low-passes, the dynamic notch, RC smoothing and feedforward
+# (which come with #49), and Dynamic D, I-term relax, anti-gravity, TPA and
+# throttle boost (#50). So every number here is what Betaflight 2026.6.2
+# gives on that Tune, and stays so when those tickets land. On the 5″'s own
+# Tune they would come out otherwise: its D-term low-passes would take the
+# D term's kick down to about 1, for one.
+#
 # Centred sticks reach Betaflight at 1500.77 µs over CRSF (see
 # actual-rates.toml), so Actual 70/670 asks for 0.10966 °/s on each axis: the
 # roll error is 0.10966 °/s while still, 1.10966 °/s rolling left at 1 °/s and
@@ -20,7 +30,7 @@ name   = "The PID loop's terms follow Betaflight's scaling, and I stops at its l
 
 [start]
 kind              = "flight controller"
-quad              = "opendrone/freestyle-5"
+quad              = "test/freestyle-5-filters-and-shaping-off"
 attitude          = "level, heading 0°"
 rotation          = "0 °/s"
 armed             = true
@@ -51,13 +61,13 @@ timeline = [
 what  = "roll I term"
 at    = "0.5 s"
 value = "1.0719 ± 0.0001"
-basis = "source: pidController: I grows by 0.244381 × I gain × error ÷ 8000 each loop: 4000 loops at 0.10966 °/s give 0.244381 × 80 × 0.10966 × 4000 ÷ 8000 = 1.0719"
+basis = "source: pidController, with anti-gravity and I-term relax off: I grows by 0.244381 × I gain × error ÷ 8000 each loop: 4000 loops at 0.10966 °/s give 0.244381 × 80 × 0.10966 × 4000 ÷ 8000 = 1.0719"
 
 [[expect]]
 what  = "roll D term"
 at    = "0.500125 s"
 value = "126.96 ± 0.01"
-basis = "source: pidController: D = 0.000529 × D gain × how fast the gyro falls, per second; on the first loop rolling left the gyro reading drops by 1 °/s in 1/8000 s, so D = 0.000529 × 30 × 1 × 8000 = 126.96"
+basis = "source: pidController, with the gyro and D-term low-passes, TPA and Dynamic D off: D = 0.000529 × D gain × how fast the gyro falls, per second; on the first loop rolling left the gyro reading drops by 1 °/s in 1/8000 s, so D = 0.000529 × 30 × 1 × 8000 = 126.96"
 
 [[expect]]
 what  = "roll D term"
@@ -75,7 +85,7 @@ basis = "source: pidController: P = 0.032029 × P gain × error = 0.032029 × 45
 what  = "roll I term"
 at    = "0.61 s"
 value = "22.813 ± 0.001"
-basis = "source: pidController: 0.244381 × 80 ÷ 8000 × (4000 loops × 0.10966 + 800 loops × 1.10966 + 80 loops × 100.10966) = 22.813"
+basis = "source: pidController, with anti-gravity, I-term relax and the gyro low-passes off: 0.244381 × 80 ÷ 8000 × (4000 loops × 0.10966 + 800 loops × 1.10966 + 80 loops × 100.10966) = 22.813"
 
 [[expect]]
 what  = "roll P term"
@@ -87,7 +97,7 @@ basis = "source: pidController: P = 0.032029 × 45 × 100.10966 = 144.29"
 what  = "yaw P term"
 at    = "0.7 s"
 value = "-143.97 ± 0.01"
-basis = "source: pidController: yawing right at 100 °/s against a setpoint of 0.10966 °/s nose left, the error is 99.89 °/s nose left: P = 0.032029 × 45 × 99.89 = 143.97, pushing the nose left"
+basis = "source: pidController, with the yaw P low-pass off: yawing right at 100 °/s against a setpoint of 0.10966 °/s nose right, the error is 99.89 °/s nose left: P = 0.032029 × 45 × 99.89 = 143.97, pushing the nose left"
 
 [[expect]]
 what  = "roll I term"
