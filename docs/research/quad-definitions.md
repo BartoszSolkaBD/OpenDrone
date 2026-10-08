@@ -127,6 +127,37 @@ They moved with a new source, logged in the Whoop 65's Feel Test log; a Feel Tes
 - **The thrust guard has no source.** Where air arrives down through a rotor and across it at once, both far faster than the rotor's own still-air flow, momentum theory lets the thrust grow with both speeds multiplied. The air ticket caps it at the same descent's thrust plus ½ρA·(v_c² + μ²), an ideal windmill's most. The cap is a modelling choice the research doesn't give. It acts only in that corner: in units of the still-air flow, it trims about 2% at a descent of 1 across 1.2, 19% at 2 across 2, and 32% at 3 across 3. Fast dives with the motors low reach those.
 - **Nearly stopped props still lift.** Descending with air across the disc, momentum theory's thrust stops depending on the rotor's speed as its power goes to nothing. It tends to the smaller of 2ρA·|v_c|·μ and ½ρA·(v_c² + μ²), an ideal autorotation. Only a prop at exactly 0 RPM gives none, and a coasting motor in the motor model never quite reaches 0. The Reviewer probed it: a Whoop 65 pitched 20° nose down and cut from a hover to 0% had its props at 25.8 RPM after 3 s, yet they gave 3.5 gf, 11% of its weight. It fell at 14.3 m/s against 16.2 m/s for a "stopped" start, and levelled itself. That may stand in roughly for windmilling props, which the motor model can't drive. Watch it in Prop Wash (#46), Failsafe and disarm (#52), Prop Strikes (#45) and Feel Tests.
 
+## Ground and ceiling effect (#44)
+
+Each rotor looks down and up at the Map every step, along its own axis, and a surface near it changes its thrust (`crates/physics/src/ground_and_ceiling.rs` gives the formulas, and the Physics Scenarios in `scenarios/physics/` prove them). Apart from the two numbers below, the strength comes from the rotors' size and layout: the props' radius, the distance between neighbouring rotors and the diagonal.
+
+| Effect | Formula | Numbers it uses |
+|---|---|---|
+| Ground effect (E20) | Sanchez-Cuevas, Heredia & Ollero 2017 [S12], eq. (4), each rotor from its own distance and the images of the rotors that see a surface below them | `diameter`, `diagonal`, `ground_effect_body` (their `K_b`) |
+| Ceiling effect (E21) | Hsiao & Chirarattananon 2019 [S13], eqs. 6, 7 and 10, with their recirculation factor `α₁` = 0: the thrust at the same power is `γ^⅔` | `diameter`, `ceiling_effect_asymmetry` (their `α₀`) |
+
+**A new number: `[feel] ceiling_effect_asymmetry`, 1 on both Quads, Estimate, range 0.5–1.6.** Hsiao and Chirarattananon's `α₀` describes how unevenly the air flows round a rotor under a ceiling. 1 is the plain formula Elliott-Roe et al. [S14] use, which they report earlier single-rotor and quadrotor tests agree with; Hsiao and Chirarattananon fitted 1.60 for a single 23 mm prop, and found every configuration they tested above 1. Below 1 stands in for their recirculation factor, left out here, which weakened their 50 mm prop's ceiling effect: 0.5 roughly halves the plain formula's pull at half a radius. Without it the ceiling effect would have no number of its own for a whoop's Feel Test ("fly up to the Bando ceiling") to move. A Test Quad can set it to 0 for no ceiling effect at all (`test/whoop-65-no-ceiling-effect`).
+
+**`ground_effect_body` now acts:** 2 on both Quads (range 0–4), Sanchez-Cuevas et al.'s "close to 2". With all four rotors over the floor it is most of the multirotor's extra cushion: two rotor radii up, the body term cancels 4.8% of each rotor's air on the Whoop 65, against 1.6% for the rotor's own image. A Quad whose body term is too big for its layout (one that would leave a rotor pushing no air close to a floor) is refused when the Simulation starts.
+
+What it gives the two Quads, at the same rotor speed, level:
+
+| Distance from the surface | Whoop 65 over a floor | Freestyle 5″ over a floor | Under a ceiling (both) |
+|---|---|---|---|
+| half a rotor radius (the closest the formulas are used) | +44.8% | +48.0% | +7.4% |
+| one rotor radius | +17.3% | +19.6% | +2.0% |
+| two rotor radii | +9.6% | +10.6% | +0.5% |
+| five rotor radii | +2.6% | +2.7% | +0.08% |
+
+A rotor radius is 17.5 mm on the Whoop 65 and 64.75 mm on the Freestyle 5″. Landed, the Whoop 65's props are 18 mm (1.03 radii) above the floor, so spinning up on the ground it gets about 17% more thrust; the Freestyle 5″'s are 12.5 mm (0.19 radii) above it, closer than the formulas reach, so it gets their half-radius 48%.
+
+**What to watch in Feel Tests:**
+
+- **The pull under a ceiling grows as the whoop rises,** from +2.0% a rotor radius below to +7.4% at half a radius; pressed against the ceiling by its duct rings its props are 0.4 radii below it, held at the half-radius value. A Feel Test that finds it sticking too hard or too little moves `ceiling_effect_asymmetry`.
+- **The cushion near the floor** comes mostly from the body term, so `ground_effect_body` is the number to move if skimming the floor feels too floaty or too flat.
+- **Half over a ledge or a table edge,** the rotors over it lift harder and the Quad tips away from it. With only some rotors over a surface the body term is shared by the share of the other rotors that see one too, which is OpenDrone's choice: the paper gives the body term only for all four.
+- **The 5″'s cushion on the ground** is large (+48% at lift-off). Sanchez-Cuevas et al.'s own curve for eq. (4) runs to about +70% at half a radius for their quad, so it is in line with the paper, but their measurements start at one radius.
+
 ## Prop Wash (#46)
 
 Prop Wash makes the two `[feel]` numbers act (crates/physics/src/prop_wash.rs explains it, and the Physics Scenarios named `prop-wash-…` prove it). It adds no number to the Quad definition.
@@ -147,7 +178,7 @@ Prop Wash makes the two `[feel]` numbers act (crates/physics/src/prop_wash.rs ex
 ## Both Quads
 
 - **ESC numbers** (#26 §5, from Bluejay v0.21.0's source): a 100 ms wait before a restart (`wait100ms` between stall restarts), at most 3 restarts (the stall count is checked against 3), and start-up power capped at the default Startup Power Max, 5 on Bluejay's 0–255 scale, which is 1.96% of full drive while the motor starts. They are Manufacturer numbers: Bluejay's own defaults.
-- **Prop Wash and ground effect** (research §4.4–§4.5): thrust flicker 20% (range 10–30%), flickering 15 times a second (range 5–40, with no published source), and a ground-effect body term of 2 (range 0–4).
+- **Prop Wash and ground effect** (research §4.4–§4.5): thrust flicker 20% (range 10–30%), flickering 15 times a second (range 5–40, with no published source), a ground-effect body term of 2 (range 0–4) and a ceiling-effect asymmetry of 1 (range 0.5–1.6; see "Ground and ceiling effect (#44)" above).
 - **Prop grip** 0.5 (range 0.2–0.8) and **reverse torque** 100% of forward (range 50–100%) come from #26.
 - **The camera** (#14, #28): lens, FOV, Camera Tilt and VTX power are defaults with no Confidence; Dynamic Range, lines and sharpness are its limits, with a Confidence.
 - **The sound block** (#32 §6, #34): the round-2 values from `prototype/quad-sound`'s `tuning/defaults.toml`, with readable names and units. The 5″ has a buzzer at 2.7 kHz; the whoop has none. Both play Bluejay's default start-up melody.
@@ -160,5 +191,5 @@ Every Estimate above may move in a Feel Test (the whoop) or a fit to the TII log
 - **Made from photos and frame sizes, with nothing measured:** every collision shape except the two pack boxes (each from its maker), both props' heights, both packs' heights, the duct rings, and both camera positions.
 - **The battery curves:** typical LiPo and LiHV curves, not these packs' own.
 - **The whoop's C_T and C_P,** until a Feel Test or the maintainer's recording settles the hover pitch.
-- **Prop Wash's flicker speed and the ground effect's body term,** which have no source for these Quads.
+- **Prop Wash's flicker speed, the ground effect's body term and the ceiling effect's asymmetry,** which have no source for these Quads.
 - **The whoop's current at hover.** BetaFPV's table is read as the motor's own current, which the model meets; the pack's current at hover then looks low against the maintainer's 4–6 minutes (see the motor model section above). The hover-time check (#57) settles it.

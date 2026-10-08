@@ -1,0 +1,58 @@
+# Results of whoop-hovers-on-a-cushion-over-the-floor.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Two rotor radii over the floor, a Whoop 65's rotors give 9.6% more thrust, so it hovers on slower motors"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Source"
+expected = "21710.9 RPM ± 0.01%"
+measured = "21700 RPM"
+
+[[expect]]
+what     = "total thrust at 0 s"
+basis    = "Rule"
+expected = "31.211 gf ± 0.01%"
+measured = "31.2 gf"
+
+[[expect]]
+what     = "vertical acceleration at 0.000125 s"
+basis    = "Rule"
+expected = "0 m/s² ± 0.01 m/s²"
+measured = "0.000692 m/s²"
+
+[[expect]]
+what     = "height, lowest over 0 s to 0.5 s"
+basis    = "Observed"
+expected = "0.027 m ± 0.002 m"
+measured = "0.0270 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 0.5 s"
+basis    = "Observed"
+expected = "0.027 m ± 0.002 m"
+measured = "0.0289 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "9c08ee377f648787"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
+run  = "7ded7aa6a582b600"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "43f66a32b32e9a40"
+"0.1 s" = "ef554cfb9555ef26"
+"0.15 s" = "a1a67ada3e57655a"
+"0.2 s" = "26240d0f2c4f8189"
+"0.25 s" = "7e4a15078d3d9100"
+"0.3 s" = "acf7437a14d66475"
+"0.35 s" = "756bbdb54c844711"
+"0.4 s" = "dfbd12877c771055"
+"0.45 s" = "2c618571e805297e"
+"0.5 s" = "dfc00c790c818a64"

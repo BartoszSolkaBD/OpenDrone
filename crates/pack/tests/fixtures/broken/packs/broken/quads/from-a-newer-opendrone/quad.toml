@@ -75,6 +75,7 @@ nose_up_offset = { value = "13 mm", confidence = "Estimate", range = "9–18 mm"
 prop_wash_strength = { value = "20%", confidence = "Estimate", range = "10–30%", source = "guess" }
 prop_wash_flicker  = { value = "15 Hz", confidence = "Estimate", range = "5–40 Hz", source = "guess" }
 ground_effect_body = { value = "2", confidence = "Estimate", range = "0–4", source = "guess" }
+ceiling_effect_asymmetry = { value = "1", confidence = "Estimate", range = "0–1.6", source = "guess" }
 
 [board]
 gyro_range = { value = "2000 °/s", confidence = "Manufacturer", source = "maker" }

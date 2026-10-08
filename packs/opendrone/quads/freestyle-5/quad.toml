@@ -85,6 +85,7 @@ connector     = { value = "2 mΩ", confidence = "Estimate", range = "1–5 mΩ",
 prop_wash_strength = { value = "20%", confidence = "Estimate", range = "10–30%", source = "prop-wash" }   # thrust flicker
 prop_wash_flicker  = { value = "15 Hz", confidence = "Estimate", range = "5–40 Hz", source = "flicker" }
 ground_effect_body = { value = "2", confidence = "Estimate", range = "0–4", source = "ground-effect" }
+ceiling_effect_asymmetry = { value = "1", confidence = "Estimate", range = "0.5–1.6", source = "ceiling-effect" }   # Hsiao and Chirarattananon's α₀: 1 is the plain formula
 
 [board]
 gyro_range = { value = "2000 °/s", confidence = "Manufacturer", source = "gyro" }   # it reads up to ± this
@@ -153,6 +154,7 @@ bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before 
 prop-wash       = "docs/research/flight-dynamics.md §4.4: thrust loss and flicker of 10–30% in a rotor's own air [S10, S11]"
 flicker         = "docs/research/flight-dynamics.md §4.4: how fast Prop Wash flickers has no published source"
 ground-effect   = "docs/research/flight-dynamics.md §4.5: Sanchez-Cuevas et al.'s body-lift term, K_b ≈ 2 [S12]"
+ceiling-effect  = "docs/research/flight-dynamics.md §4.5: the ceiling effect's γ = ½ + ½·√(1 + α₀/(8·(z/R)²)) from Hsiao and Chirarattananon [S13], eqs. 6 and 10; α₀ = 1 is the plain formula Elliott-Roe et al. [S14] use, which they report earlier single-rotor and quadrotor tests agree with, and Hsiao and Chirarattananon fitted 1.60 for a single 23 mm prop. Below 1 stands in for the recirculation (their α₁, left out here) that weakened their 50 mm prop's ceiling effect: 0.5 roughly halves the plain formula's pull at half a radius"
 feel            = "a starting guess; nobody Feel-Tests the 5″, so Scenarios pin it"
 gyro            = "the ICM-42688-P and BMI270, the gyros on typical 5″ boards: both read up to ±2000 °/s (makers' datasheets)"
 camera-5in      = "#28 §2 and docs/research/fpv-camera-dynamic-range-and-resolution.md: a typical 5″ analog camera (Ratel 2 or Phoenix 2 class), NTSC (480 lines)"

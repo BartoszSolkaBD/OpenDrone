@@ -155,6 +155,34 @@ impl MapCollision {
         &self.solids
     }
 
+    /// How far the nearest Map surface is from `from` along `direction`
+    /// (which must have length one), in metres, if one is within `reach`:
+    /// what ground and ceiling effect look for. A start inside a solid finds
+    /// it at 0. It changes nothing.
+    ///
+    /// It is one parry3d ray cast per Map shape whose bounding box the ray's
+    /// stretch overlaps: on a box or a convex shape a single test, on a
+    /// triangle mesh a walk down its tree of triangles, testing only the
+    /// triangles near the ray (parry3d's `TriMesh` ray cast, which needs no
+    /// pseudo-normals).
+    pub(crate) fn nearest_along(&self, from: Vec3, direction: Vec3, reach: f64) -> Option<f64> {
+        let ray = Ray::new(to_parry(from), to_parry(direction));
+        let stretch = Aabb::from_points([to_parry(from), to_parry(from + direction * reach)]);
+        let mut nearest: Option<f64> = None;
+        for solid in &self.solids {
+            if !solid.aabb.intersects(&stretch) {
+                continue;
+            }
+            let farthest = nearest.unwrap_or(reach);
+            if let Some(distance) = solid.shape.cast_ray(&solid.pose, &ray, farthest, true)
+                && nearest.is_none_or(|before| distance < before)
+            {
+                nearest = Some(distance);
+            }
+        }
+        nearest
+    }
+
     /// The line question: every Map surface the straight line from `from` to
     /// `to` passes through, with where it goes in and comes out, in order
     /// along the line (by entry, then by shape). It changes nothing.

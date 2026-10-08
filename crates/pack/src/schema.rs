@@ -365,6 +365,10 @@ pub const SECTIONS: &[Section] = &[
                 "ground_effect_body",
                 Physics(one(Dimension::NONE, ZeroOrMore)),
             ),
+            key(
+                "ceiling_effect_asymmetry",
+                Physics(one(Dimension::NONE, ZeroOrMore)),
+            ),
         ],
     },
     Section {

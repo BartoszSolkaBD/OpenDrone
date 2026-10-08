@@ -363,6 +363,8 @@ Anchors:
 - In measurements a 23 mm-radius prop went from 0.18 N to 0.45 N at 1 mm from the ceiling [S13].
 - This is positive feedback, which is why whoops stick to ceilings.
 
+**Correction (#44): the ceiling formula is a power ratio.** In Hsiao and Chirarattananon's own paper [S13] (eqs. 6 and 7), `γ = ½ + ½·√(1 + 1/(8·(z/R)²))` is how many times less power the rotor needs for the same thrust. Thrust grows with power to the ⅔, so at the same power the thrust is `γ^⅔` times its free thrust: +7.4% at half a radius, not +11%. Their measurement agrees: γ ≈ 4 at 1 mm from the ceiling, "amplified by a factor of 4^(2/3) or 2.5 times for the same power consumption" (§V.C), which is the 0.18 N to 0.45 N above. Elliott-Roe et al. [S14] write `γ` itself as the thrust ratio at a fixed speed, and their own measurements fall below it closer than half a radius. The simulation holds a motor's power fixed at a fixed speed, so it uses `γ^⅔` (`crates/physics/src/ground_and_ceiling.rs`).
+
 **Wall:** the craft tends to "pitch towards the wall and be drawn into it" [S15]. **No verified closed-form model**, so this is left for later.
 
 **Cost.** One short ray cast per rotor, or one per Quad with an analytic plane. It is the only aerodynamic effect that needs a world query.

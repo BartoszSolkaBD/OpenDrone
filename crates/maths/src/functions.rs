@@ -38,6 +38,12 @@ pub fn asin(x: f64) -> f64 {
     libm::asin(x)
 }
 
+/// The cube root of `x`: the number that, multiplied by itself three times,
+/// gives `x` (negative for a negative `x`).
+pub fn cbrt(x: f64) -> f64 {
+    libm::cbrt(x)
+}
+
 /// e raised to the power `x`.
 pub fn exp(x: f64) -> f64 {
     libm::exp(x)

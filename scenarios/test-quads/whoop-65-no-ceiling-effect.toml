@@ -1,0 +1,12 @@
+# The Whoop 65 with its ceiling effect set to zero.  id: test/whoop-65-no-ceiling-effect
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No ceiling effect (Hsiao and Chirarattananon's α₀ = 0 gives γ = 1), so a Scenario under a ceiling shows what the ceiling effect alone does"
+
+# A deliberate test value: no Confidence or source.
+[feel]
+ceiling_effect_asymmetry = "0"

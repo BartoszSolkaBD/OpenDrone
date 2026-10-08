@@ -1,0 +1,84 @@
+# A Freestyle 5″ hovering with its props 129.5 mm (two rotor radii) above the
+# floor, its motors "settled": spinning at the speed that holds its height
+# there. The same ground effect as the Whoop 65's ("Two rotor radii over the
+# floor, a Whoop 65's rotors give 9.6% more thrust"), on a Quad whose rotors
+# sit closer together for their size: its props are 129.5 mm across on a
+# 225 mm diagonal (E20 in #10; crates/physics/src/ground_and_ceiling.rs).
+#
+# In open air a quarter of its weight, 0.652 kg × 9.81 m/s² / 4 = 1.59903 N,
+# takes √(1.59903 N / 1.63191 × 10⁻⁶ N/(rad/s)²) = 989.874 rad/s, 9,452.6 RPM
+# (k_f = C_T·ρ·D⁴/4π² with C_T = 0.187 and D = 0.1295 m).
+#
+# The working, Sanchez-Cuevas, Heredia & Ollero 2017 (research source S12,
+# flight-dynamics research §4.5), eq. (4), for four rotors level over the
+# ground at z = 129.5 mm, with R = 64.75 mm, d = 159.10 mm between
+# neighbouring rotors' axes (the 225 mm diagonal over √2), b = 225 mm between
+# opposite ones and K_b = 2 (the Freestyle 5″'s ground_effect_body):
+#
+# - (R/4z)² = 0.015625: the rotor's own image;
+# - R²·z/√(d² + 4z²)³ = 0.019332: its two neighbours' images;
+# - (R²/2)·z/√(2d² + 4z²)³ = 0.006722: the opposite rotor's image;
+# - 2R²·z/√(b² + 4z²)³·K_b = 0.053779: the air thrown back up under the body;
+# - so each rotor gives 1 / (1 − 0.095459) = 1.105533 times its open-air
+#   thrust at the same speed, and the hover takes 9,452.6 RPM / √1.105533 =
+#   8,990.1 RPM.
+#
+# The Map is the flat floor Test Map, whose ground is a box. At rest the
+# Quad's drag does nothing. The run is one step long: it checks the start.
+format = 1
+name   = "Two rotor radii over the floor, a Freestyle 5″'s rotors give 10.6% more thrust, so it hovers on slower motors"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.1345 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "25%" },
+]
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "8990.1 RPM ± 0.01%"
+basis = "source: Sanchez-Cuevas, Heredia & Ollero 2017 (S12), eq. (4): with its props 129.5 mm over the floor (z = 2R), R = 64.75 mm, d = 159.10 mm, b = 225 mm and K_b = 2, each rotor gives 1/(1 − 0.015625 − 0.019332 − 0.006722 − 0.053779) = 1.105533 times its open-air thrust, so the hover takes 9,452.6 RPM / √1.105533 = 8,990.1 RPM"
+
+[[expect]]
+what  = "total thrust"
+at    = "0 s"
+value = "652.22 gf ± 0.01%"
+basis = "rule: settled motors carry the Quad's weight, 0.652 kg × 9.81 m/s² = 6.3961 N, which is 652.22 grams of thrust"
+
+[[expect]]
+what  = "vertical acceleration"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.02 m/s²"
+basis = "rule: on the first step the thrust, with the floor's gain, still equals the weight; a motor moves only 1/264 of the way towards a new command in one step (0.125 ms of its 33 ms spin-up time)"

@@ -6,11 +6,11 @@ use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_maths::{Fingerprinter, functions};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
-    FlightControllerSeam, FlightInput, InputDeviceFacts, MapShape, MotorCommands, MotorParameters,
-    Mount, OurFlightController, PacketRate, PhysicsRate, PropDirection, PropParameters, PropWash,
-    QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, Rates, ReportRate, RotorLayout,
-    ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime,
-    StartingMotors, Tune, World,
+    FlightControllerSeam, FlightInput, GroundAndCeiling, InputDeviceFacts, MapShape, MotorCommands,
+    MotorParameters, Mount, OurFlightController, PacketRate, PhysicsRate, PropDirection,
+    PropParameters, PropWash, QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, Rates,
+    ReportRate, RotorLayout, ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem,
+    Simulation, SimulationTime, StartingMotors, Tune, World,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -70,6 +70,10 @@ fn parameters() -> QuadParameters {
             slow_sag: 0.0,
         },
         shape: whoop_shape(),
+        ground_and_ceiling: GroundAndCeiling {
+            ground_effect_body: 2.0,
+            ceiling_effect_asymmetry: 1.0,
+        },
     }
 }
 

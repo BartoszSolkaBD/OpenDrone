@@ -20,8 +20,13 @@
 # drives it up the wall's face, and from about 1.04 s to 1.33 s it scrapes
 # over the wall's top, 5 m up, in many short knocks: the pitch sum keeps
 # reaching past 600 and falling back below within 30 ms, the roll sum's
-# spikes last 15 ms at most and the yaw sum's 30 ms. After that it flies on
+# spikes last 20 ms at most and the yaw sum's 15 ms. After that it flies on
 # east, clear of the wall.
+#
+# Since ground and ceiling effect (#44): tipped into the wall, its rotors
+# blow at the wall's face and over its top, which cushions them, so the PID
+# sums during and after the scrape moved (the pitch sum's lowest from -536 to
+# -591); the flight up to the wall is the same.
 #
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with

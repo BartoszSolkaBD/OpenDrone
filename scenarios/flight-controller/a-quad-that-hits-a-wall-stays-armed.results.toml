@@ -38,79 +38,79 @@ measured = "8.22"
 what     = "pitch PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "322"
+measured = "319"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 0.52 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-536"
+measured = "-591"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.04 s to 1.07 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.0351"
+measured = "-0.697"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.07 s to 1.10 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-64.5"
+measured = "-26.8"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.10 s to 1.13 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-118"
+measured = "-135"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.13 s to 1.16 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-37.7"
+measured = "-96.4"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.16 s to 1.19 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-159"
+measured = "-114"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.19 s to 1.22 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-288"
+measured = "-311"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.22 s to 1.25 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-393"
+measured = "-483"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.25 s to 1.28 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-473"
+measured = "-569"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.28 s to 1.31 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-524"
+measured = "-591"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.31 s to 1.34 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-536"
+measured = "-566"
 
 [[expect]]
 what     = "pitch PID sum, highest over 1.34 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "22.2"
+measured = "21.8"
 
 [[expect]]
 what     = "roll PID sum, highest over 0 s to 0.55 s"
@@ -128,25 +128,25 @@ measured = "-0.0371"
 what     = "roll PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "3.17"
+measured = "3.19"
 
 [[expect]]
 what     = "roll PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-4.99"
+measured = "-4.95"
 
 [[expect]]
 what     = "roll PID sum, highest over 1.34 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "59.4"
+measured = "51.7"
 
 [[expect]]
 what     = "roll PID sum, lowest over 1.34 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-4.23"
+measured = "-4.79"
 
 [[expect]]
 what     = "yaw PID sum, highest over 0 s to 0.55 s"
@@ -170,19 +170,19 @@ measured = "12.9"
 what     = "yaw PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.226"
+measured = "0.144"
 
 [[expect]]
 what     = "yaw PID sum, highest over 1.34 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "3.95"
+measured = "31.2"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 1.34 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-4.60"
+measured = "-0.0369"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -191,18 +191,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "59c46e1cf781ecbe"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "34e34c81e3d4c5ab"   # the whole state after each of 24000 steps at 8000 Hz, in order
+run  = "d941d92e2cf6ab65"   # the whole state after each of 24000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.3 s" = "3b82808c8434d45a"
-"0.6 s" = "428ee6ed263732f9"
-"0.9 s" = "a4869477672672b5"
-"1.2 s" = "4e0181967616f11d"
-"1.5 s" = "5f270ac6020ae052"
-"1.8 s" = "63594943c7b15dfe"
-"2.1 s" = "daeaba0591937510"
-"2.4 s" = "c9d67ed6fe0cafd8"
-"2.7 s" = "764a847a34ad7b96"
-"3 s" = "69d6c317062ef80a"
+"0.6 s" = "6dc1d33416a3a5ab"
+"0.9 s" = "32f2e418ae417d61"
+"1.2 s" = "39b6c3a3df9cba73"
+"1.5 s" = "a9d6da42efe4c5fb"
+"1.8 s" = "fd18520596fa5240"
+"2.1 s" = "0c53c739ec8db316"
+"2.4 s" = "7ed366fb16078287"
+"2.7 s" = "4736f60901195a41"
+"3 s" = "d994aebcd8982608"

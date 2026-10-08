@@ -6,10 +6,10 @@
 
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
-    BatteryParameters, Drag, EscParameters, LineCrossing, MapShape, MapShapeProblem,
-    MotorParameters, Mount, PacketRate, PhysicsRate, PropDirection, PropParameters, PropWash,
-    QuadParameters, QuadSetUp, QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp,
-    SetUpError, Simulation, StartingMotors, World,
+    BatteryParameters, Drag, EscParameters, GroundAndCeiling, LineCrossing, MapShape,
+    MapShapeProblem, MotorParameters, Mount, PacketRate, PhysicsRate, PropDirection,
+    PropParameters, PropWash, QuadParameters, QuadSetUp, QuadShape, QuadState, RotorLayout,
+    ScriptedMotors, SetUp, SetUpError, Simulation, StartingMotors, World,
 };
 
 fn level_box(centre: Vec3, size: Vec3) -> MapShape {
@@ -123,6 +123,10 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 duct_rings: None,
                 bounce: 0.3,
                 friction: 0.5,
+            },
+            ground_and_ceiling: GroundAndCeiling {
+                ground_effect_body: 2.0,
+                ceiling_effect_asymmetry: 1.0,
             },
         },
         start: QuadState {
