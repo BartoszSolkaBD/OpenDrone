@@ -27,7 +27,7 @@ use controls::{
     AXIS_MAX, AXIS_MIN, Key, PadButton, PadControl, Position, Stick, Trigger, value_at_percent,
 };
 
-pub use read::read_input_device_file;
+pub use read::{read_input_device_file, read_input_device_file_with_steps};
 
 /// Radio or Gamepad (#19 §1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

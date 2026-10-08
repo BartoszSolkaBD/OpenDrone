@@ -53,7 +53,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
-pub use input_device::{InputDeviceProfile, read_input_device_file};
+pub use input_device::{
+    InputDeviceProfile, read_input_device_file, read_input_device_file_with_steps,
+};
 pub use manifest::{LicenceOverride, Manifest, is_an_id, read_manifest};
 pub use map::{
     MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps, test_map,

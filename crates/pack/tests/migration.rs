@@ -25,8 +25,9 @@ use opendrone_pack::migration::{
     migrate, pack_files, toml_files, upgrade, upgraded_with,
 };
 use opendrone_pack::{
-    Problems, TEST_MAPS_FOLDER, check_quad, read_map_file, read_map_file_with_steps,
-    read_quad_file, read_tune, test_map, test_map_ids,
+    Problems, TEST_MAPS_FOLDER, check_quad, read_input_device_file,
+    read_input_device_file_with_steps, read_map_file, read_map_file_with_steps, read_quad_file,
+    read_tune, test_map, test_map_ids,
 };
 
 /// The format before the newest: the one the synthetic steps upgrade.
@@ -402,6 +403,71 @@ fn the_pack_reader_upgrades_an_older_quad_in_memory_with_the_same_step_as_the_to
         };
         assert_eq!(fingerprint(&in_memory), fingerprint(&committed), "{label}");
     }
+}
+
+/// A synthetic Pack step for Input Device profiles: the format before wrote
+/// `report_rates`, and the step renames it `report_rate`, keeping its value.
+const RENAME_REPORT_RATES: Step = Step {
+    name: "rename-report-rates",
+    family: Family::Packs,
+    from: PREVIOUS,
+    says: "Input Device profiles' `report_rates` becomes `report_rate`, with the same value",
+    rewrite: rename_report_rates,
+};
+
+fn rename_report_rates(kind: FileKind, doc: &mut DocumentMut) -> Result<(), String> {
+    if kind == FileKind::InputDevice
+        && let Some(rates) = doc.remove("report_rates")
+    {
+        doc.insert("report_rate", rates);
+    }
+    Ok(())
+}
+
+#[test]
+fn the_input_device_reader_upgrades_an_older_profile_in_memory_too() {
+    let folder = repo().join("packs/opendrone/input-devices");
+    let profiles = toml_files(
+        &folder,
+        "packs/opendrone/input-devices",
+        FileKind::InputDevice,
+    )
+    .unwrap();
+    assert_eq!(
+        profiles.len(),
+        4,
+        "the Pocket, DualSense, Any Radio and Any Gamepad"
+    );
+    let mut renamed = 0;
+    for file in &profiles {
+        let committed = fs::read_to_string(&file.path).unwrap();
+        let mut old = before(&committed, None);
+        if let Some(line) = old.lines().find(|line| line.starts_with("report_rate ")) {
+            old = old.replacen(line, &line.replacen("report_rate", "report_rates", 1), 1);
+            renamed += 1;
+        }
+        let id = format!(
+            "opendrone/{}",
+            file.label
+                .rsplit('/')
+                .next()
+                .unwrap()
+                .trim_end_matches(".toml")
+        );
+        assert_eq!(
+            read_input_device_file_with_steps(&id, &file.label, &old, &[RENAME_REPORT_RATES])
+                .unwrap(),
+            read_input_device_file(&id, &file.label, &committed).unwrap(),
+            "{}: the older profile, upgraded in memory, reads as the very same profile",
+            file.label
+        );
+        // Without the step, the same older file can't be read.
+        assert!(read_input_device_file(&id, &file.label, &old).is_err());
+    }
+    assert_eq!(
+        renamed, 2,
+        "the Pocket and the DualSense write their Report Rate"
+    );
 }
 
 #[test]
