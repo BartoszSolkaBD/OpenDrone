@@ -69,10 +69,11 @@
 //!
 //! The levels come from [`Random`], a seeded random number generator, with
 //! the timing in seconds of Simulation Time: so the same seed gives the same
-//! flicker, on every computer and at every physics rate, and a different seed
-//! a different one. The flicker goes on all the time, in the band or not, so
-//! a rotor entering the band meets it mid-flicker rather than at a fresh
-//! start. The Simulation gives each Quad its own seed ([`Flicker::new`],
+//! flicker, on every computer and at every physics rate (to within rounding
+//! in its timing), and a different seed a different one. The flicker moves
+//! on at every step the Quad is free to fly, in the band or not, so a rotor
+//! entering the band meets it mid-flicker rather than at a fresh start; held
+//! on the thrust stand, in still air, it waits. The Simulation gives each Quad its own seed ([`Flicker::new`],
 //! [`crate::QuadBody::with_flicker`]); the generator, the levels and the
 //! timing are part of the Quad's state, so they are fingerprinted and copied
 //! with it.
