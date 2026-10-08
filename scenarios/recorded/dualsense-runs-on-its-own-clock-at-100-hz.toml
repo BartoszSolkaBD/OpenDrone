@@ -1,0 +1,54 @@
+# At a Packet Rate of 100 Hz, which doesn't divide a DualSense's 250 Hz
+# Report Rate, the Radio Link runs on its own clock (ADR-0020): a frame every
+# 10 ms from the start, whatever the device's beat. Its reports come every
+# 4 ms, so the frames carry two and three of them by turns, 2.5 on average:
+# the uneven steps the Packet Rate setting's gentle note warns about.
+#
+# The same Input Track as at 250 Hz: the maintainer's DualSense on the desk,
+# untouched, its motion sensors reporting every 4 ms (dualsense-at-rest.csv).
+format = 1
+name   = "A DualSense's Radio Link frames at 100 Hz run on the link's own clock and carry two or three reports"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "100 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "dualsense-at-rest.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = true }
+
+[[expect]]
+what   = "reports in the frame"
+over   = "0.005 s to 6 s"
+lowest = "2 ± 0"
+basis  = "rule: ADR-0020: on its own clock a frame leaves every 10 ms; reports come every 4 ms, arriving up to 0.5 ms late (#27), so 3.5 to 4.5 ms apart: every 10 ms holds at least two"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0.005 s to 6 s"
+highest = "3 ± 0"
+basis   = "rule: ADR-0020: as above, and never four, which would need three gaps within 10 ms"
+
+[[expect]]
+what  = "reports in the frame"
+over  = "0.005 s to 6 s"
+mean  = "2.5 ± 0.01"
+basis = "rule: 250 reports a second over 100 frames a second"

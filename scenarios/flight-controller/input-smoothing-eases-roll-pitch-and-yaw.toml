@@ -1,0 +1,90 @@
+# Input smoothing, the Assist, is one fixed gentle low-pass on roll, pitch
+# and yaw before the Radio Link: a first-order filter at 15 Hz, about 10 ms
+# of delay (1 ÷ (2π × 15 Hz) = 10.6 ms). The throttle is untouched (#21).
+# After a stick jumps, the smoothed stick has covered 1 − e^(−2π × 15 Hz × t)
+# of the jump t seconds later, and each Radio Link frame carries it as it
+# stands when the frame leaves, rounded to the receiver's nearest step
+# (0.061% of the stick at most).
+#
+# The Freestyle 5″ sits on the floor, disarmed, its ESCs powering up. At 1 s
+# roll and yaw jump to full right, pitch to full back and the throttle to
+# 50%. Frames leave every 4 ms from the start (250 Hz); a frame that leaves at
+# 1.012 s shows after its step, at 1.012125 s. The sticks at rest read 0.06%
+# (receiver step 992 is 1500.31 µs).
+format = 1
+name   = "Input smoothing eases roll, pitch and yaw with a gentle 15 Hz low-pass and leaves the throttle"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "on", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "1 s", roll = "100%", pitch = "-100%", yaw = "100%", throttle = "50%" },
+]
+
+[[expect]]
+what  = "roll channel"
+at    = "1.000125 s"
+value = "0.06% ± 0.01%"
+basis = "rule: the frame that leaves at 1 s, as the sticks jump, carries the smoothed roll as it stands: still at rest, 0 of the way"
+
+[[expect]]
+what  = "throttle channel"
+at    = "1.000125 s"
+value = "50% ± 0.1%"
+basis = "rule: #21: Input smoothing leaves the throttle untouched, so the same frame carries all of its jump"
+
+[[expect]]
+what  = "roll channel"
+at    = "1.012125 s"
+value = "67.73% ± 0.15%"
+basis = "rule: 12 ms on, 1 − e^(−2π × 15 Hz × 0.012 s) = 67.73% of the way, rounded to the receiver's nearest step, from a rest at 0.06%"
+
+[[expect]]
+what  = "pitch channel"
+at    = "1.012125 s"
+value = "-67.73% ± 0.15%"
+basis = "rule: as roll, the other way"
+
+[[expect]]
+what  = "yaw channel"
+at    = "1.012125 s"
+value = "67.73% ± 0.15%"
+basis = "rule: as roll"
+
+[[expect]]
+what  = "roll channel"
+at    = "1.032125 s"
+value = "95.10% ± 0.15%"
+basis = "rule: 32 ms on, three time constants: 1 − e^(−2π × 15 Hz × 0.032 s) = 95.10% of the way"
+
+[[expect]]
+what  = "roll channel"
+at    = "1.100125 s"
+value = "100% ± 0.1%"
+basis = "rule: 100 ms on, 1 − e^(−2π × 15 Hz × 0.1 s) = 99.99% of the way, which the receiver's nearest step makes full stick"

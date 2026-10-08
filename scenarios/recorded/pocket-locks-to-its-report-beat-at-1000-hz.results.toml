@@ -1,0 +1,52 @@
+# Results of pocket-locks-to-its-report-beat-at-1000-hz.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Pocket's Radio Link frames at 1000 Hz never carry two reports"
+
+[[expect]]
+what     = "reports in the frame, highest over 0 s to 2.09 s"
+basis    = "Rule"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "reports in the frame, mean over 0 s to 2.09 s"
+basis    = "Observed"
+expected = "0.865 ± 0.01"
+measured = "0.865"
+
+[[expect]]
+what     = "frame age, highest over 0 s to 2.09 s"
+basis    = "Rule"
+expected = "0.75 ms ± 0.000001 ms"
+measured = "0.750 ms"
+
+[[expect]]
+what     = "frame age, lowest over 0 s to 2.09 s"
+basis    = "Observed"
+expected = "0.125 ms ± 0.000001 ms"
+measured = "0.125 ms"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "f067d06e2088dcc7"   # the whole state after each of 16792 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.209875 s" = "83c32ae6b4086b91"
+"0.41975 s" = "d13b8560ecffd7e7"
+"0.629625 s" = "fff44283f5896eb1"
+"0.8395 s" = "52d7abaf5786b980"
+"1.0495 s" = "72b0d66537bdb881"
+"1.259375 s" = "112b07ec3e7099f6"
+"1.46925 s" = "655d0694eae5aef9"
+"1.679125 s" = "71b1cf76052ad203"
+"1.889 s" = "65a69fc46c6f35d5"
+"2.099 s" = "7513f54d86211309"
