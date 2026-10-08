@@ -12,7 +12,10 @@
 //!
 //! Like Betaflight when it checks its settings, a rate number above what its
 //! Rates type allows is held at that limit (`ratesSettingLimits` in
-//! `src/main/fc/controlrate_profile.c`), with a note.
+//! `src/main/fc/controlrate_profile.c`), with a note. A paste from before
+//! 2025.12 with throttle expo gets a note too: 2025.12 rebuilt the throttle
+//! curve, so with expo the old curve bends differently (the Betaflight
+//! research §4).
 
 use super::{CliText, Command, Refusal, Section};
 use crate::rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
@@ -134,7 +137,16 @@ impl RatesPaste {
                 "There's no rate profile here: paste the output of `diff all`, `diff` or `dump`, which holds the `rateprofile` lines.",
             ));
         }
-        let notes = hold_within_limits(&mut rates);
+        let mut notes = hold_within_limits(&mut rates);
+        if let Some(version) = cli.version
+            && (version.major, version.minor) < (2025, 12)
+            && rates.thr_expo > 0
+        {
+            notes.push(format!(
+                "Betaflight 2025.12 changed the throttle curve: with thr_expo at {}, Betaflight {version}'s curve bends differently from the 2026.6 curve OpenDrone flies.",
+                rates.thr_expo
+            ));
+        }
         Ok(RatesPaste {
             rate_profile,
             rates,

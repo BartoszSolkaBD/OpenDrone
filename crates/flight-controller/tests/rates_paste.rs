@@ -194,3 +194,21 @@ fn a_paste_with_no_rate_profile_is_refused() {
             .starts_with("There's no rate profile here")
     );
 }
+
+#[test]
+fn a_paste_from_before_2025_12_with_throttle_expo_says_the_throttle_curve_changed() {
+    // Basis: Source (the Betaflight research §4: 2025.12 rebuilt the
+    // throttle curve; with no expo both are straight).
+    let text = changed(
+        CETUS,
+        "set yaw_srate = 65",
+        "set yaw_srate = 65\nset thr_expo = 30",
+    );
+    assert_eq!(
+        paste(&text).notes,
+        [
+            "Betaflight 2025.12 changed the throttle curve: with thr_expo at 30, Betaflight 4.4.0's curve bends differently from the 2026.6 curve OpenDrone flies."
+        ]
+    );
+    assert!(paste(CETUS).notes.is_empty());
+}

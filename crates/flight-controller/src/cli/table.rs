@@ -3,7 +3,8 @@
 //! Betaflight version the translator reads ([`Family::ALL`]).
 //!
 //! Adding a setting is adding its row to [`SETTINGS`]. Every row carries a
-//! [`Source`] for each version, oldest first:
+//! [`Source`] for each version, oldest first (4.3, 4.4, 4.5, 2025.12,
+//! 2026.6):
 //!
 //! - [`Source::Same`]: the version has the setting under the same name, with
 //!   the same meaning; the text is that version's default.
@@ -22,7 +23,8 @@
 //! (`pg/rx.c`, `pg/motor.c`, `flight/pid.c`, `flight/imu.c`,
 //! `flight/mixer_init.c`, `flight/failsafe.c`, `sensors/gyro.c`,
 //! `fc/rc_controls.c`, `fc/controlrate_profile.c`, `blackbox/blackbox.c`) at
-//! tags 4.3.0, 4.4.0 and 2026.6.2, for a build with every flight feature on.
+//! tags 4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2, for a build with every
+//! flight feature on.
 //!
 //! A row is written into a Tune under its [`Place`] once the Flight
 //! Controller reads it ([`crate::Tune::settings`]); until then the importer
@@ -103,26 +105,29 @@ pub enum Source {
 /// settings. Each takes its inputs in the order its row lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Rule {
-    /// `d_<axis>` from 4.3–4.4's `d_<axis>` and `d_min_<axis>`. Back then
+    /// `d_<axis>` from 4.3–4.5's `d_<axis>` and `d_min_<axis>`. Back then
     /// `d_min` was the base D and `d` the peak, and Dynamic D ran only when
-    /// `d_min` was above 0 and below `d`; 2026.6 calls the base `d` and the
+    /// `d_min` was above 0 and below `d`; 2025.12 calls the base `d` and the
     /// peak `d_max`, and runs Dynamic D when `d_max` is above `d`. So with
     /// Dynamic D on, D is the old `d_min`; with it off, the old `d`.
     DBase,
     /// `d_max_<axis>` from the same two: the old `d` with Dynamic D on; with
     /// it off, the old `d_min` when that keeps it off (not above `d`), else 0.
     DPeak,
-    /// `d_max_advance` from 4.3–4.4's `d_max_gain` and `d_max_advance`: the
-    /// stick-driven boost was their product ÷ 100; 2026.6 uses
+    /// `d_max_advance` from 4.3–4.5's `d_max_gain` and `d_max_advance`: the
+    /// stick-driven boost was their product ÷ 100; from 2025.12 it's
     /// `d_max_advance` alone (the Betaflight research §6.3, #21: 37 × 20 ÷ 100
     /// ≈ 7).
     DMaxAdvance,
-    /// `iterm_windup` from 4.3–4.4's `iterm_limit` and `pidsum_limit`: the I
-    /// term's limit was `iterm_limit`; 2026.6's is `iterm_windup` percent of
-    /// the PID-sum limit (the Betaflight research §3). 4.3–4.4's own
-    /// `iterm_windup` meant something else (see [`RETIRED`]).
+    /// `iterm_windup` from 4.3–4.5's `iterm_limit` and `pidsum_limit`: the I
+    /// term's limit was `iterm_limit`; from 2025.12 it's `iterm_windup`
+    /// percent of the PID-sum limit (the Betaflight research §3). 4.3–4.5's
+    /// own `iterm_windup` meant something else (see [`RETIRED`]).
     ItermWindup,
 }
+
+/// How many versions each row covers: [`Family::ALL`]'s.
+pub const VERSIONS: usize = 5;
 
 /// One setting the translator knows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,7 +139,7 @@ pub struct Setting {
     pub note: &'static str,
     /// Where its value comes from in each version, in [`Family::ALL`]'s
     /// order.
-    pub from: [Source; 3],
+    pub from: [Source; VERSIONS],
 }
 
 impl Setting {
@@ -152,7 +157,12 @@ impl Setting {
     }
 }
 
-const fn row(name: &'static str, place: Place, note: &'static str, from: [Source; 3]) -> Setting {
+const fn row(
+    name: &'static str,
+    place: Place,
+    note: &'static str,
+    from: [Source; VERSIONS],
+) -> Setting {
     Setting {
         name,
         place,
@@ -168,7 +178,11 @@ const fn all(
     note: &'static str,
     default: &'static str,
 ) -> Setting {
-    row(name, place, note, [Source::Same(default); 3])
+    row(name, place, note, [Source::Same(default); VERSIONS])
+}
+
+const fn rule(rule: Rule, inputs: &'static [(&'static str, &'static str)]) -> Source {
+    Source::Rule(rule, inputs)
 }
 
 use Place::*;
@@ -180,20 +194,12 @@ const D_YAW: &[(&str, &str)] = &[("d_yaw", "0"), ("d_min_yaw", "0")];
 const ADVANCE: &[(&str, &str)] = &[("d_max_gain", "37"), ("d_max_advance", "20")];
 const WINDUP: &[(&str, &str)] = &[("iterm_limit", "400"), ("pidsum_limit", "500")];
 
-const fn rule(rule: Rule, inputs: &'static [(&'static str, &'static str)]) -> Source {
-    Source::Rule(rule, inputs)
-}
-
 /// Every setting the translator knows, in the order a Tune lists them: by
 /// [`Place`], and within a place as the App shows them.
+#[rustfmt::skip]
 pub const SETTINGS: &[Setting] = &[
     // Configuration
-    all(
-        "small_angle",
-        Configuration,
-        "degrees: the most it may tilt and still arm",
-        "25",
-    ),
+    all("small_angle", Configuration, "degrees: the most it may tilt and still arm", "25"),
     all("yaw_spin_recovery", ConfigurationCli, "", "AUTO"),
     all("yaw_spin_threshold", ConfigurationCli, "°/s", "1950"),
     // Failsafe
@@ -201,123 +207,48 @@ pub const SETTINGS: &[Setting] = &[
     all("failsafe_procedure", Failsafe, "", "DROP"),
     all("failsafe_switch_mode", Failsafe, "", "STAGE1"),
     all("failsafe_throttle", FailsafeCli, "µs", "1000"),
-    all(
-        "failsafe_throttle_low_delay",
-        FailsafeCli,
-        "tenths of a second",
-        "100",
-    ),
-    row(
-        "failsafe_recovery_delay",
-        FailsafeCli,
-        "tenths of a second",
-        [Same("10"), Same("10"), Same("5")],
-    ),
+    all("failsafe_throttle_low_delay", FailsafeCli, "tenths of a second", "100"),
+    row("failsafe_recovery_delay", FailsafeCli, "tenths of a second",
+        [Same("10"), Same("10"), Same("5"), Same("5"), Same("5")]),
     all("failsafe_stick_threshold", FailsafeCli, "percent", "30"),
     // PID Tuning: the PIDs, axis by axis, as the App's table shows them.
+    // Until 2025.12, d_min was the base D and d the peak (see Rule::DBase).
     all("p_roll", PidTuning, "", "45"),
     all("i_roll", PidTuning, "", "80"),
-    row(
-        "d_roll",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DBase, D_ROLL),
-            rule(Rule::DBase, D_ROLL),
-            Same("30"),
-        ],
-    ),
-    row(
-        "d_max_roll",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DPeak, D_ROLL),
-            rule(Rule::DPeak, D_ROLL),
-            Same("40"),
-        ],
-    ),
+    row("d_roll", PidTuning, "",
+        [rule(Rule::DBase, D_ROLL), rule(Rule::DBase, D_ROLL), rule(Rule::DBase, D_ROLL), Same("30"), Same("30")]),
+    row("d_max_roll", PidTuning, "",
+        [rule(Rule::DPeak, D_ROLL), rule(Rule::DPeak, D_ROLL), rule(Rule::DPeak, D_ROLL), Same("40"), Same("40")]),
     all("f_roll", PidTuning, "", "120"),
     all("p_pitch", PidTuning, "", "47"),
     all("i_pitch", PidTuning, "", "84"),
-    row(
-        "d_pitch",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DBase, D_PITCH),
-            rule(Rule::DBase, D_PITCH),
-            Same("34"),
-        ],
-    ),
-    row(
-        "d_max_pitch",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DPeak, D_PITCH),
-            rule(Rule::DPeak, D_PITCH),
-            Same("46"),
-        ],
-    ),
+    row("d_pitch", PidTuning, "",
+        [rule(Rule::DBase, D_PITCH), rule(Rule::DBase, D_PITCH), rule(Rule::DBase, D_PITCH), Same("34"), Same("34")]),
+    row("d_max_pitch", PidTuning, "",
+        [rule(Rule::DPeak, D_PITCH), rule(Rule::DPeak, D_PITCH), rule(Rule::DPeak, D_PITCH), Same("46"), Same("46")]),
     all("f_pitch", PidTuning, "", "125"),
     all("p_yaw", PidTuning, "", "45"),
     all("i_yaw", PidTuning, "", "80"),
-    row(
-        "d_yaw",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DBase, D_YAW),
-            rule(Rule::DBase, D_YAW),
-            Same("0"),
-        ],
-    ),
-    row(
-        "d_max_yaw",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DPeak, D_YAW),
-            rule(Rule::DPeak, D_YAW),
-            Same("0"),
-        ],
-    ),
+    row("d_yaw", PidTuning, "",
+        [rule(Rule::DBase, D_YAW), rule(Rule::DBase, D_YAW), rule(Rule::DBase, D_YAW), Same("0"), Same("0")]),
+    row("d_max_yaw", PidTuning, "",
+        [rule(Rule::DPeak, D_YAW), rule(Rule::DPeak, D_YAW), rule(Rule::DPeak, D_YAW), Same("0"), Same("0")]),
     all("f_yaw", PidTuning, "", "120"),
-    // Feedforward. 4.3 and 4.4 had no yaw hold: its gain 0 turns it off.
+    // Feedforward. Before 2025.12 there was no yaw hold: its gain 0 turns it
+    // off.
     all("feedforward_transition", PidTuning, "", "0"),
-    row(
-        "feedforward_averaging",
-        PidTuning,
-        "",
-        [Same("OFF"), Same("OFF"), Same("2_POINT")],
-    ),
-    row(
-        "feedforward_smooth_factor",
-        PidTuning,
-        "",
-        [Same("25"), Same("25"), Same("65")],
-    ),
+    row("feedforward_averaging", PidTuning, "",
+        [Same("OFF"), Same("OFF"), Same("OFF"), Same("2_POINT"), Same("2_POINT")]),
+    row("feedforward_smooth_factor", PidTuning, "",
+        [Same("25"), Same("25"), Same("25"), Same("65"), Same("65")]),
     all("feedforward_jitter_factor", PidTuning, "", "7"),
     all("feedforward_boost", PidTuning, "", "15"),
     all("feedforward_max_rate_limit", PidTuning, "", "90"),
     // Dynamic D.
-    row(
-        "d_max_gain",
-        PidTuning,
-        "",
-        [Same("37"), Same("37"), Same("0")],
-    ),
-    row(
-        "d_max_advance",
-        PidTuning,
-        "",
-        [
-            rule(Rule::DMaxAdvance, ADVANCE),
-            rule(Rule::DMaxAdvance, ADVANCE),
-            Same("35"),
-        ],
-    ),
+    row("d_max_gain", PidTuning, "",
+        [Same("37"), Same("37"), Same("37"), Same("37"), Same("0")]),
+    row("d_max_advance", PidTuning, "",
+        [rule(Rule::DMaxAdvance, ADVANCE), rule(Rule::DMaxAdvance, ADVANCE), rule(Rule::DMaxAdvance, ADVANCE), Same("20"), Same("35")]),
     // I-term relax, anti-gravity, TPA and throttle boost. 4.3's anti-gravity
     // worked differently (its gain 3500 meant ×3.5, with a mode and a
     // threshold) and no 2026.6 value behaves like it (ADR-0008's
@@ -326,156 +257,59 @@ pub const SETTINGS: &[Setting] = &[
     all("iterm_relax", PidTuning, "", "RP"),
     all("iterm_relax_type", PidTuning, "", "SETPOINT"),
     all("iterm_relax_cutoff", PidTuning, "Hz", "15"),
-    row(
-        "anti_gravity_gain",
-        PidTuning,
-        "",
-        [Newer, Same("80"), Same("80")],
-    ),
+    row("anti_gravity_gain", PidTuning, "",
+        [Newer, Same("80"), Same("80"), Same("80"), Same("80")]),
     all("tpa_mode", PidTuning, "", "D"),
     all("tpa_rate", PidTuning, "percent", "65"),
     all("tpa_breakpoint", PidTuning, "µs", "1350"),
     all("throttle_boost", PidTuning, "", "5"),
     all("motor_output_limit", PidTuning, "percent", "100"),
-    // Angle and Horizon. 4.5 rebuilt both; 4.3 and 4.4 named Angle's
-    // strength angle_level_strength, its limit level_limit and Horizon's
-    // stick transition horizon_transition, in the same places. They had no
-    // earth reference: 0 turns it off.
-    row(
-        "angle_p_gain",
-        PidTuning,
-        "",
-        [
-            Was("angle_level_strength", "50"),
-            Was("angle_level_strength", "50"),
-            Same("50"),
-        ],
-    ),
-    row(
-        "angle_limit",
-        PidTuning,
-        "degrees",
-        [
-            Was("level_limit", "55"),
-            Was("level_limit", "55"),
-            Same("60"),
-        ],
-    ),
-    row(
-        "horizon_level_strength",
-        PidTuning,
-        "",
-        [Same("50"), Same("50"), Same("75")],
-    ),
+    // Angle and Horizon. 4.5 rebuilt both; 4.3 and 4.4 named Angle's strength
+    // angle_level_strength, its limit level_limit and Horizon's stick
+    // transition horizon_transition, in the same places. They had no earth
+    // reference: 0 turns it off.
+    row("angle_p_gain", PidTuning, "",
+        [Was("angle_level_strength", "50"), Was("angle_level_strength", "50"), Same("50"), Same("50"), Same("50")]),
+    row("angle_limit", PidTuning, "degrees",
+        [Was("level_limit", "55"), Was("level_limit", "55"), Same("60"), Same("60"), Same("60")]),
+    row("horizon_level_strength", PidTuning, "",
+        [Same("50"), Same("50"), Same("75"), Same("75"), Same("75")]),
     // PID Tuning, CLI only
-    all(
-        "pidsum_limit",
-        PidTuningCli,
-        "1000 is the whole motor range",
-        "500",
-    ),
+    all("pidsum_limit", PidTuningCli, "1000 is the whole motor range", "500"),
     all("pidsum_limit_yaw", PidTuningCli, "", "400"),
-    row(
-        "iterm_windup",
-        PidTuningCli,
-        "the I limit, in percent of the PID-sum limit",
-        [
-            rule(Rule::ItermWindup, WINDUP),
-            rule(Rule::ItermWindup, WINDUP),
-            Same("80"),
-        ],
-    ),
+    row("iterm_windup", PidTuningCli, "the I limit, in percent of the PID-sum limit",
+        [rule(Rule::ItermWindup, WINDUP), rule(Rule::ItermWindup, WINDUP), rule(Rule::ItermWindup, WINDUP), Same("80"), Same("80")]),
     all("pid_at_min_throttle", PidTuningCli, "", "ON"),
-    row(
-        "feedforward_yaw_hold_gain",
-        PidTuningCli,
-        "",
-        [Adr0008("0"), Adr0008("0"), Same("15")],
-    ),
-    row(
-        "feedforward_yaw_hold_time",
-        PidTuningCli,
-        "ms",
-        [Newer, Newer, Same("100")],
-    ),
-    row(
-        "anti_gravity_cutoff_hz",
-        PidTuningCli,
-        "Hz",
-        [Newer, Same("5"), Same("5")],
-    ),
-    row(
-        "anti_gravity_p_gain",
-        PidTuningCli,
-        "",
-        [Newer, Same("100"), Same("100")],
-    ),
+    row("feedforward_yaw_hold_gain", PidTuningCli, "",
+        [Adr0008("0"), Adr0008("0"), Adr0008("0"), Same("15"), Same("15")]),
+    row("feedforward_yaw_hold_time", PidTuningCli, "ms",
+        [Newer, Newer, Newer, Same("100"), Same("100")]),
+    row("anti_gravity_cutoff_hz", PidTuningCli, "Hz",
+        [Newer, Same("5"), Same("5"), Same("5"), Same("5")]),
+    row("anti_gravity_p_gain", PidTuningCli, "",
+        [Newer, Same("100"), Same("100"), Same("100"), Same("100")]),
     // Low-throttle TPA arrived in 4.5: a rate of 0 turns it off.
-    row(
-        "tpa_low_rate",
-        PidTuningCli,
-        "percent",
-        [Adr0008("0"), Adr0008("0"), Same("20")],
-    ),
-    row(
-        "tpa_low_breakpoint",
-        PidTuningCli,
-        "µs",
-        [Newer, Newer, Same("1050")],
-    ),
-    row(
-        "tpa_low_always",
-        PidTuningCli,
-        "",
-        [Newer, Newer, Same("OFF")],
-    ),
+    row("tpa_low_rate", PidTuningCli, "percent",
+        [Adr0008("0"), Adr0008("0"), Same("20"), Same("20"), Same("20")]),
+    row("tpa_low_breakpoint", PidTuningCli, "µs",
+        [Newer, Newer, Same("1050"), Same("1050"), Same("1050")]),
+    row("tpa_low_always", PidTuningCli, "",
+        [Newer, Newer, Same("OFF"), Same("OFF"), Same("OFF")]),
     all("throttle_boost_cutoff", PidTuningCli, "Hz", "15"),
-    row(
-        "angle_feedforward",
-        PidTuningCli,
-        "",
-        [Newer, Newer, Same("50")],
-    ),
-    row(
-        "angle_feedforward_smoothing_ms",
-        PidTuningCli,
-        "ms",
-        [Newer, Newer, Same("80")],
-    ),
-    row(
-        "angle_earth_ref",
-        PidTuningCli,
-        "percent",
-        [Adr0008("0"), Adr0008("0"), Same("100")],
-    ),
-    row(
-        "horizon_limit_sticks",
-        PidTuningCli,
-        "",
-        [
-            Was("horizon_transition", "75"),
-            Was("horizon_transition", "75"),
-            Same("75"),
-        ],
-    ),
-    row(
-        "horizon_limit_degrees",
-        PidTuningCli,
-        "degrees",
-        [Newer, Newer, Same("135")],
-    ),
-    row(
-        "horizon_ignore_sticks",
-        PidTuningCli,
-        "",
-        [Newer, Newer, Same("OFF")],
-    ),
-    row(
-        "horizon_delay_ms",
-        PidTuningCli,
-        "ms",
-        [Newer, Newer, Same("500")],
-    ),
+    row("angle_feedforward", PidTuningCli, "",
+        [Newer, Newer, Same("50"), Same("50"), Same("50")]),
+    row("angle_feedforward_smoothing_ms", PidTuningCli, "ms",
+        [Newer, Newer, Same("80"), Same("80"), Same("80")]),
+    row("angle_earth_ref", PidTuningCli, "percent",
+        [Adr0008("0"), Adr0008("0"), Same("100"), Same("100"), Same("100")]),
+    row("horizon_limit_sticks", PidTuningCli, "",
+        [Was("horizon_transition", "75"), Was("horizon_transition", "75"), Same("75"), Same("75"), Same("75")]),
+    row("horizon_limit_degrees", PidTuningCli, "degrees",
+        [Newer, Newer, Same("135"), Same("135"), Same("135")]),
+    row("horizon_ignore_sticks", PidTuningCli, "",
+        [Newer, Newer, Same("OFF"), Same("OFF"), Same("OFF")]),
+    row("horizon_delay_ms", PidTuningCli, "ms",
+        [Newer, Newer, Same("500"), Same("500"), Same("500")]),
     // PID Tuning: Filter Settings
     all("gyro_lpf1_type", Filters, "", "PT1"),
     all("gyro_lpf1_static_hz", Filters, "Hz; 0 is off", "250"),
@@ -500,61 +334,26 @@ pub const SETTINGS: &[Setting] = &[
     all("rc_smoothing", Receiver, "", "ON"),
     all("rc_smoothing_auto_factor", Receiver, "", "30"),
     all("rc_smoothing_auto_factor_throttle", Receiver, "", "30"),
-    all(
-        "rc_smoothing_setpoint_cutoff",
-        Receiver,
-        "Hz; 0 is automatic",
-        "0",
-    ),
-    all(
-        "rc_smoothing_throttle_cutoff",
-        Receiver,
-        "Hz; 0 is automatic",
-        "0",
-    ),
+    all("rc_smoothing_setpoint_cutoff", Receiver, "Hz; 0 is automatic", "0"),
+    all("rc_smoothing_throttle_cutoff", Receiver, "Hz; 0 is automatic", "0"),
     all("yaw_control_reversed", ReceiverCli, "", "OFF"),
     all("airmode_start_throttle_percent", ReceiverCli, "", "25"),
-    // Motors. Before 2025.12 Betaflight's own default protocol was DISABLED:
+    // Motors. Before 4.5, Betaflight's own default protocol was DISABLED:
     // each board's settings chose one.
-    row(
-        "motor_pwm_protocol",
-        Motors,
-        "",
-        [Same("DISABLED"), Same("DISABLED"), Same("DSHOT600")],
-    ),
-    row(
-        "motor_idle",
-        Motors,
-        "hundredths of a percent",
-        [
-            Was("dshot_idle_value", "550"),
-            Was("dshot_idle_value", "550"),
-            Same("550"),
-        ],
-    ),
+    row("motor_pwm_protocol", Motors, "",
+        [Same("DISABLED"), Same("DISABLED"), Same("DSHOT600"), Same("DSHOT600"), Same("DSHOT600")]),
+    row("motor_idle", Motors, "hundredths of a percent",
+        [Was("dshot_idle_value", "550"), Was("dshot_idle_value", "550"), Was("dshot_idle_value", "550"), Same("550"), Same("550")]),
     all("motor_poles", Motors, "must match [motors] poles", "14"),
-    all(
-        "yaw_motors_reversed",
-        Motors,
-        "must match [props] direction",
-        "OFF",
-    ),
+    all("yaw_motors_reversed", Motors, "must match [props] direction", "OFF"),
     all("mixer_type", MotorsCli, "", "LEGACY"),
-    // Crash Flip. 4.3 and 4.4 had no rate fade: 0 turns it off. Leaving Crash
-    // Flip changed in 2026.6 and no setting brings 4.3's back (#26).
+    // Crash Flip. Before 2025.12 it had no rate fade: 0 turns it off. Leaving
+    // Crash Flip changed then, and no setting brings the old way back (#26).
     all("crashflip_motor_percent", MotorsCli, "percent", "0"),
-    row(
-        "crashflip_rate",
-        MotorsCli,
-        "°/s; 0 is off",
-        [Adr0008("0"), Adr0008("0"), Same("0")],
-    ),
-    row(
-        "crashflip_auto_rearm",
-        MotorsCli,
-        "",
-        [Newer, Newer, Same("OFF")],
-    ),
+    row("crashflip_rate", MotorsCli, "°/s; 0 is off",
+        [Adr0008("0"), Adr0008("0"), Adr0008("0"), Same("0"), Same("0")]),
+    row("crashflip_auto_rearm", MotorsCli, "",
+        [Newer, Newer, Newer, Same("OFF"), Same("OFF")]),
     // Blackbox
     all("blackbox_sample_rate", Blackbox, "", "1/4"),
 ];
@@ -576,15 +375,17 @@ pub struct Retired {
     pub why: &'static str,
 }
 
-const OLD: &[Family] = &[Family::V4_3, Family::V4_4];
+const UP_TO_4_4: &[Family] = &[Family::V4_3, Family::V4_4];
+const UP_TO_4_5: &[Family] = &[Family::V4_3, Family::V4_4, Family::V4_5];
+const UP_TO_2025_12: &[Family] = &[Family::V4_3, Family::V4_4, Family::V4_5, Family::V2025_12];
 
 /// Older settings with no 2026.6 counterpart. The importer leaves them out
 /// and says why.
 pub const RETIRED: &[Retired] = &[
     Retired {
         name: "iterm_windup",
-        versions: OLD,
-        why: "in 4.3 and 4.4 it slowed the I term's growth once the motors passed that share of their range (on yaw only in 4.3); 2026.6 has no such thing, and its iterm_windup is the I limit, worked out from iterm_limit instead",
+        versions: UP_TO_4_5,
+        why: "before 2025.12 it slowed the I term's growth once the motors passed that share of their range (on yaw only in 4.3); 2026.6 has no such thing, and its iterm_windup is the I limit, worked out from iterm_limit instead",
     },
     Retired {
         name: "anti_gravity_gain",
@@ -603,57 +404,67 @@ pub const RETIRED: &[Retired] = &[
     },
     Retired {
         name: "abs_control_gain",
-        versions: OLD,
+        versions: UP_TO_2025_12,
         why: "2026.6 has no absolute control",
     },
     Retired {
         name: "abs_control_limit",
-        versions: OLD,
+        versions: UP_TO_2025_12,
         why: "2026.6 has no absolute control",
     },
     Retired {
         name: "abs_control_error_limit",
-        versions: OLD,
+        versions: UP_TO_2025_12,
         why: "2026.6 has no absolute control",
     },
     Retired {
         name: "abs_control_cutoff",
-        versions: OLD,
+        versions: UP_TO_2025_12,
         why: "2026.6 has no absolute control",
     },
     Retired {
         name: "crashflip_expo",
-        versions: OLD,
+        versions: UP_TO_4_5,
         why: "2026.6 has none: its Crash Flip power is linear (#26)",
     },
     Retired {
         name: "failsafe_off_delay",
-        versions: OLD,
+        versions: UP_TO_4_5,
         why: "it timed the AUTO-LAND procedure, which OpenDrone doesn't simulate (#21); 2026.6 times it in seconds as failsafe_landing_time",
     },
     Retired {
         name: "horizon_tilt_effect",
-        versions: OLD,
+        versions: UP_TO_4_4,
         why: "2026.6's Horizon fades by horizon_limit_degrees instead, which works differently",
     },
     Retired {
         name: "horizon_tilt_expert_mode",
-        versions: OLD,
+        versions: UP_TO_4_4,
         why: "2026.6's Horizon has no expert mode",
     },
     Retired {
         name: "min_throttle",
-        versions: OLD,
+        versions: UP_TO_4_5,
         why: "it set the lowest output of analog ESC protocols; with DShot, motor_idle does, and 2026.6 has no min_throttle",
     },
     Retired {
         name: "rc_smoothing_feedforward_cutoff",
-        versions: OLD,
+        versions: UP_TO_4_5,
         why: "2026.6 has none: feedforward_smooth_factor smooths feedforward",
     },
     Retired {
         name: "transient_throttle_limit",
-        versions: OLD,
+        versions: UP_TO_2025_12,
+        why: "2026.6 has none",
+    },
+    Retired {
+        name: "dyn_idle_start_increase",
+        versions: &[Family::V4_5],
+        why: "2026.6 has none",
+    },
+    Retired {
+        name: "pos_hold_without_mag",
+        versions: &[Family::V2025_12],
         why: "2026.6 has none",
     },
 ];

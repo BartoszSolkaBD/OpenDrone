@@ -77,24 +77,35 @@ impl fmt::Display for Version {
 
 /// The Betaflight versions whose settings the translator knows, oldest first:
 /// 4.3, the oldest it imports ([ADR-0008]), up to 2026.6, the one our Flight
-/// Controller copies. A version's patch releases share its defaults.
+/// Controller copies. Every release from 4.3 on belongs to one; a version's
+/// patch releases share its defaults.
 ///
 /// [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Family {
     V4_3,
     V4_4,
+    V4_5,
+    V2025_12,
     V2026_6,
 }
 
 impl Family {
-    pub const ALL: [Family; 3] = [Family::V4_3, Family::V4_4, Family::V2026_6];
+    pub const ALL: [Family; table::VERSIONS] = [
+        Family::V4_3,
+        Family::V4_4,
+        Family::V4_5,
+        Family::V2025_12,
+        Family::V2026_6,
+    ];
 
     /// How the version is named, such as `4.3`: marks say `4.3 default`.
     pub fn name(self) -> &'static str {
         match self {
             Family::V4_3 => "4.3",
             Family::V4_4 => "4.4",
+            Family::V4_5 => "4.5",
+            Family::V2025_12 => "2025.12",
             Family::V2026_6 => "2026.6",
         }
     }
@@ -104,6 +115,8 @@ impl Family {
         match self {
             Family::V4_3 => "4.3.0",
             Family::V4_4 => "4.4.0",
+            Family::V4_5 => "4.5.0",
+            Family::V2025_12 => "2025.12.1",
             Family::V2026_6 => "2026.6.2",
         }
     }
@@ -113,7 +126,9 @@ impl Family {
         match self {
             Family::V4_3 => 0,
             Family::V4_4 => 1,
-            Family::V2026_6 => 2,
+            Family::V4_5 => 2,
+            Family::V2025_12 => 3,
+            Family::V2026_6 => 4,
         }
     }
 
@@ -123,16 +138,17 @@ impl Family {
         match (version.major, version.minor) {
             (4, 3) => Ok(Family::V4_3),
             (4, 4) => Ok(Family::V4_4),
+            (4, 5) => Ok(Family::V4_5),
+            (2025, 12) => Ok(Family::V2025_12),
             (2026, 6) => Ok(Family::V2026_6),
             (major, minor) if (major, minor) < (4, 3) => Err(format!(
                 "This is Betaflight {version}, which is older than 4.3: OpenDrone imports Betaflight 4.3 or newer (ADR-0008)."
             )),
             (major, minor) if (major, minor) > (2026, 6) => Err(format!(
-                "This is Betaflight {version}, which is newer than 2026.6, the Betaflight OpenDrone copies: OpenDrone imports 4.3, 4.4 and 2026.6."
+                "This is Betaflight {version}, which is newer than 2026.6, the Betaflight OpenDrone copies: OpenDrone imports 4.3 to 2026.6."
             )),
             _ => Err(format!(
-                "This is Betaflight {version}. OpenDrone knows the settings and defaults of Betaflight 4.3, 4.4 and 2026.6 so far, not yet of {}.{}, so it can't translate it.",
-                version.major, version.minor
+                "This is Betaflight {version}, which isn't a release OpenDrone knows: it imports 4.3, 4.4, 4.5, 2025.12 and 2026.6."
             )),
         }
     }

@@ -21,7 +21,7 @@ Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is
 ## What it accepts
 
 - `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find the PID profile. `diff all` is the best choice, because it lists only what the quad changed.
-- So far it knows the settings and defaults of **4.3, 4.4 and 2026.6**, from each one's source (4.3.0, 4.4.0 and 2026.6.2). An export from 4.5 or 2025.12 is refused for now, with a sentence saying so; adding a version means adding its defaults to every row of the table. Older than 4.3, and newer than 2026.6, are refused too.
+- It knows the settings and defaults of every Betaflight release from 4.3 to 2026.6: **4.3, 4.4, 4.5, 2025.12 and 2026.6**, each read from its source (4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2). A version's patch releases share its defaults. Older than 4.3, and newer than 2026.6, are refused with a sentence saying so.
 
 ## What it reads
 
@@ -44,16 +44,16 @@ Every `set` line ends with a mark saying where its value came from, then perhaps
 
 ## What it translates
 
-| 4.3 and 4.4 | 2026.6 | Why |
+| Before | 2026.6 | Why |
 |---|---|---|
-| `d_min_roll`, the base D | `d_roll` | 2025.12 renamed Dynamic D's two numbers: the base is now `d_roll` and the peak `d_max_roll`. The same for pitch and yaw. |
-| `d_roll`, the peak D | `d_max_roll` | When Dynamic D was off (`d_min` at 0, or not below `d`), D stays `d_roll`, and `d_max_roll` keeps it off. |
-| `dshot_idle_value` | `motor_idle` | Renamed; the same hundredths of a percent. |
-| `level_limit`, `angle_level_strength`, `horizon_transition` | `angle_limit`, `angle_p_gain`, `horizon_limit_sticks` | Renamed when 4.5 rebuilt Angle and Horizon. |
-| `iterm_limit`, the I limit (400) | `iterm_windup` (80) | 2026.6's I limit is `iterm_windup` percent of `pidsum_limit`: 400 is 80% of 500. 4.3's own `iterm_windup` meant something else, so it's left out. |
-| `d_max_gain` × `d_max_advance` ÷ 100 | `d_max_advance` (7) | Before 2025.12 the stick-driven D boost was the two multiplied; now it's `d_max_advance` alone: 37 × 20 ÷ 100 ≈ 7. |
+| `d_min_roll`, the base D (4.3 to 4.5) | `d_roll` | 2025.12 renamed Dynamic D's two numbers: the base is now `d_roll` and the peak `d_max_roll`. The same for pitch and yaw. |
+| `d_roll`, the peak D (4.3 to 4.5) | `d_max_roll` | When Dynamic D was off (`d_min` at 0, or not below `d`), D stays `d_roll`, and `d_max_roll` keeps it off. |
+| `dshot_idle_value` (4.3 to 4.5) | `motor_idle` | Renamed; the same hundredths of a percent. |
+| `level_limit`, `angle_level_strength`, `horizon_transition` (4.3 and 4.4) | `angle_limit`, `angle_p_gain`, `horizon_limit_sticks` | Renamed when 4.5 rebuilt Angle and Horizon. |
+| `iterm_limit`, the I limit, 400 (4.3 to 4.5) | `iterm_windup`, 80 | From 2025.12 the I limit is `iterm_windup` percent of `pidsum_limit`: 400 is 80% of 500. The old `iterm_windup` meant something else, so it's left out. |
+| `d_max_gain` × `d_max_advance` ÷ 100 (4.3 to 4.5) | `d_max_advance`, 7 | Before 2025.12 the stick-driven D boost was the two multiplied; now it's `d_max_advance` alone: 37 × 20 ÷ 100 ≈ 7. |
 
-Settings the old version lacked take the value that behaves like it (ADR-0008): yaw hold off (`feedforward_yaw_hold_gain = 0`), low-throttle TPA off (`tpa_low_rate = 0`), Angle's earth reference off (`angle_earth_ref = 0`) and no Crash Flip rate fade (`crashflip_rate = 0`). Where no value behaves like the old version, the setting takes 2026.6.2's default. One example is 4.3's anti-gravity, which worked differently: ADR-0008 accepts that 2026.6's punch-out boost is weaker.
+Settings the old version lacked take the value that behaves like it (ADR-0008): yaw hold off before 2025.12 (`feedforward_yaw_hold_gain = 0`), low-throttle TPA off before 4.5 (`tpa_low_rate = 0`), Angle's earth reference off before 4.5 (`angle_earth_ref = 0`) and no Crash Flip rate fade before 2025.12 (`crashflip_rate = 0`). Where no value behaves like the old version, the setting takes 2026.6.2's default. One example is 4.3's anti-gravity, which worked differently: ADR-0008 accepts that 2026.6's punch-out boost is weaker.
 
 A setting the export doesn't set takes **its own version's** default, never 2026.6's. That matters for the Meteor: 2026.6's feedforward defaults would give it 5 to 11 times the real quad's feedforward lag (ADR-0008).
 

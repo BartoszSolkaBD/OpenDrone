@@ -485,17 +485,91 @@ fn betaflight_older_than_4_3_is_refused_with_a_clear_message() {
 }
 
 #[test]
-fn a_betaflight_whose_settings_the_translator_doesnt_know_is_refused_too() {
+fn a_betaflight_newer_than_2026_6_or_one_that_was_never_released_is_refused_too() {
     // Newer than the Betaflight our Flight Controller copies.
     let newer = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 2026.12.0 Jun");
     assert!(
         refusal(&newer).starts_with("This is Betaflight 2026.12.0, which is newer than 2026.6")
     );
-    // 4.5 and 2025.12: the table doesn't hold their defaults yet.
-    let between = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 4.5.1 Jun");
+    let unreleased = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 4.6.0 Jun");
     assert_eq!(
-        refusal(&between),
-        "This is Betaflight 4.5.1. OpenDrone knows the settings and defaults of Betaflight 4.3, 4.4 and 2026.6 so far, not yet of 4.5, so it can't translate it."
+        refusal(&unreleased),
+        "This is Betaflight 4.6.0, which isn't a release OpenDrone knows: it imports 4.3, 4.4, 4.5, 2025.12 and 2026.6."
+    );
+}
+
+#[test]
+fn a_diff_all_from_betaflight_4_5_imports_with_4_5s_own_angle_and_low_throttle_tpa() {
+    // Basis: Source (4.5.0's resetPidProfile: Angle and Horizon rebuilt, with
+    // angle_limit 60 and low-throttle TPA at 20%; still d_min, iterm_limit
+    // and no yaw hold). The Cetus X's settings all exist in 4.5 under the same
+    // names, so its export stands in for one.
+    let text = changed(CETUS, "(S411) 4.4.0 Oct", "(S411) 4.5.0 Oct");
+    let text = changed(
+        &text,
+        "set tpa_rate = 70",
+        "set tpa_rate = 70\nset dyn_idle_start_increase = 40",
+    );
+    let four_five = import(&text);
+    assert_eq!(four_five.family, Family::V4_5);
+    assert_eq!(four_five.problems, Vec::<String>::new());
+    assert_eq!(got(&four_five, "d_roll"), is("48", "diff (was d_min_roll)"));
+    assert_eq!(got(&four_five, "angle_limit"), is("60", "4.5 default"));
+    assert_eq!(
+        got(&four_five, "horizon_level_strength"),
+        is("75", "4.5 default")
+    );
+    assert_eq!(got(&four_five, "tpa_low_rate"), is("20", "4.5 default"));
+    assert_eq!(
+        got(&four_five, "feedforward_yaw_hold_gain"),
+        is("0", "ADR-0008")
+    );
+    assert_eq!(
+        got(&four_five, "motor_pwm_protocol"),
+        is("DSHOT300", "diff")
+    );
+    assert_eq!(
+        got(&four_five, "failsafe_recovery_delay"),
+        is("5", "4.5 default")
+    );
+    assert_eq!(got(&four_five, "iterm_windup").0, "80");
+    assert!(
+        four_five
+            .left_out
+            .iter()
+            .any(|l| l.text == "set dyn_idle_start_increase = 40"
+                && matches!(l.why, Why::Retired(_)))
+    );
+}
+
+#[test]
+fn a_diff_all_from_betaflight_2025_12_imports_under_its_own_names() {
+    // Basis: Source (2025.12.1's resetPidProfile: d is the base and d_max the
+    // peak, iterm_windup is the I limit, and Dynamic D's defaults are still
+    // 37/20, where 2026.6.2's are 0/35).
+    let text = "# diff all\n# version\n# Betaflight / STM32F405 (S405) 2025.12.1 Dec  1 2025 / 12:00:00 (abcdef0) MSP API: 1.47\nbatch start\ndefaults nosave\nset motor_idle = 450\nset transient_throttle_limit = 5\nprofile 0\nset d_roll = 35\nset d_max_roll = 45\nset iterm_windup = 70\nrateprofile 0\nsave\n";
+    let latest = import(text);
+    assert_eq!(latest.family, Family::V2025_12);
+    assert_eq!(got(&latest, "d_roll"), is("35", "diff"));
+    assert_eq!(got(&latest, "d_max_roll"), is("45", "diff"));
+    assert_eq!(got(&latest, "iterm_windup"), is("70", "diff"));
+    assert_eq!(got(&latest, "motor_idle"), is("450", "diff"));
+    assert_eq!(got(&latest, "d_max_gain"), is("37", "2025.12 default"));
+    assert_eq!(got(&latest, "d_max_advance"), is("20", "2025.12 default"));
+    assert_eq!(
+        got(&latest, "feedforward_yaw_hold_gain"),
+        is("15", "2025.12 default")
+    );
+    assert_eq!(
+        got(&latest, "motor_pwm_protocol"),
+        is("DSHOT600", "2025.12 default")
+    );
+    assert!(
+        latest
+            .left_out
+            .iter()
+            .any(|l| l.text == "set transient_throttle_limit = 5"
+                && matches!(l.why, Why::Retired(_)))
     );
 }
 
