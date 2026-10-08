@@ -392,7 +392,6 @@ impl Measure {
             names.insert(at + k, motor);
         }
         names.push("motor N DShot");
-        names.push("mixer throttle");
         names
     }
 

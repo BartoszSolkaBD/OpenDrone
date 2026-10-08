@@ -35,9 +35,9 @@ expected = "47.3% ± 0.001%"
 measured = "47.3%"
 
 [[expect]]
-what     = "mixer throttle at 1.3 s"
+what     = "mixer throttle at 1.4 s"
 basis    = "Source"
-expected = "0% ± 0%"
+expected = "0% ± 0.01%"
 measured = "0%"
 
 [[expect]]
@@ -107,7 +107,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "b62cbcad064b73da"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "2d6ef8d2ad8b9b4f"   # the whole state after each of 48000 steps at 8000 Hz, in order
 

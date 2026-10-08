@@ -3,7 +3,9 @@
 # switch must go off before it can arm, as in Betaflight 2026.6.2
 # (`processRcStickPositions`, src/main/fc/rc_controls.c; `tryArm` and
 # `updateArmingStatus`, src/main/fc/core.c). Each refusal is named as
-# Betaflight names it: THROTTLE, ANGLE and ARM_SWITCH. The checks that come
+# Betaflight 2026.6.2 names it: THROTTLE, ANGLE and ARM_SWITCH (the bases of
+# the DShot checks below say ARMSWITCH, its name in older Betaflight, for the
+# same flag). The checks that come
 # with power-up and the Radio Link (BOOTGRACE, RXLOSS, NOT_DISARMED and
 # FAILSAFE) have their own Scenarios: arming-waits-for-the-escs-after-reset,
 # arm-switch-on-at-power-up and failsafe.
@@ -100,31 +102,31 @@ basis = "source: processRcStickPositions: disarmed by the frame at 0.516 s, the 
 what  = "motor 1 DShot"
 at    = "1.2 s"
 value = "0 ± 0"
-basis = "source: updateArmingStatus: with the throttle at 1500.77 µs, not below min_check 1050 µs, arming is refused (THROTTLE), and the switch on while refused blocks it too (ARM_SWITCH)"
+basis = "source: updateArmingStatus: with the throttle at 1500.77 µs, not below min_check 1050 µs, arming is refused (THROTTLE), and the switch on while refused blocks it too (ARMSWITCH)"
 
 [[expect]]
 what  = "motor 1 DShot"
 at    = "1.4 s"
 value = "0 ± 0"
-basis = "source: updateArmingStatus: the throttle came down at 1.3 s, but ARM_SWITCH clears only when the switch goes off"
+basis = "source: updateArmingStatus: the throttle came down at 1.3 s, but ARMSWITCH clears only when the switch goes off"
 
 [[expect]]
 what  = "motor 1 DShot"
 at    = "1.63 s"
 value = "158 ± 0"
-basis = "source: updateArmingStatus and tryArm: the switch went off at 1.5 s, clearing ARM_SWITCH; on again at 1.6 s with the throttle low, it arms a frame later, at 1.604 s, and idles once the spin-direction command is sent, about 20 ms later (#54)"
+basis = "source: updateArmingStatus and tryArm: the switch went off at 1.5 s, clearing ARMSWITCH; on again at 1.6 s with the throttle low, it arms a frame later, at 1.604 s, and idles once the spin-direction command is sent, about 20 ms later (#54)"
 
 [[expect]]
 what  = "motor 1 DShot"
 at    = "2.3 s"
 value = "0 ± 0"
-basis = "source: updateArmingStatus and isUpright (src/main/flight/imu.c): tilted 30°, cos 30° = 0.866 isn't above cos 25° = 0.906, so arming is refused (ANGLE), and ARM_SWITCH with it"
+basis = "source: updateArmingStatus and isUpright (src/main/flight/imu.c): tilted 30°, cos 30° = 0.866 isn't above cos 25° = 0.906, so arming is refused (ANGLE), and ARMSWITCH with it"
 
 [[expect]]
 what  = "motor 1 DShot"
 at    = "2.5 s"
 value = "0 ± 0"
-basis = "source: updateArmingStatus: tilted back to 20°, within small_angle, but ARM_SWITCH clears only when the switch goes off"
+basis = "source: updateArmingStatus: tilted back to 20°, within small_angle, but ARMSWITCH clears only when the switch goes off"
 
 [[expect]]
 what  = "motor 1 DShot"

@@ -79,4 +79,4 @@ basis = "source: processRcStickPositions and tryArm: the frame at 2.7 s turns Ar
 what  = "motor 1 DShot"
 at    = "2.8 s"
 value = "158 ± 1"
-basis = "source: armed at zero throttle, the motors idle at 48 + 5.5% × 1999 = 157.9, sent as 158, give or take the PID loop's corrections on the floor"
+basis = "source: armed at zero throttle, the motors idle at 48 + 5.5% × 1999 = 157.9, sent as 158, give or take the PID loop's corrections on the floor; 96 ms after arming, past the spin-direction command Betaflight sends on arming, about 21 ms (dshot_command.c; not sent yet, #54)"

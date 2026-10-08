@@ -22,6 +22,21 @@
 //! power-up (#32 §4): the sensor readings say when ([`crate::SensorReadings`]).
 //! So an Arm switch already on at power-up is refused, and must go off and
 //! on again (`ARM_SWITCH`).
+//!
+//! # Not yet
+//!
+//! - On arming and on disarming, Betaflight sends each ESC the DShot
+//!   command "spin the normal way" (or reversed, for Crash Flip): ten times,
+//!   1 ms apart, after a 10 ms wait, so the throttle reaches the ESCs about
+//!   21 ms after the frame that armed or disarmed (`setMotorSpinDirection`,
+//!   `dshot_command.c`). It comes with Crash Flip (#54); until then the
+//!   motor commands change at once.
+//! - Runaway takeoff prevention (`runaway_takeoff_prevention`, on by
+//!   default) disarms a Quad whose PID sum on any axis stays at 600 or more
+//!   with the gyro moving for 75 ms, until half a second of normal flight
+//!   switches it off. It guards against wiring and orientation mistakes the
+//!   sim can't have, so it comes later (#21); the Tune lists it as not
+//!   simulated yet.
 
 use opendrone_maths::{Attitude, Fingerprinter, Vec3, functions};
 

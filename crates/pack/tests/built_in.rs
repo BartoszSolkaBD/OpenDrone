@@ -242,7 +242,8 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
     // anti-gravity, TPA, throttle boost, the D-term low-passes and the yaw P
     // low-pass; src/main/sensors/gyro.h and gyro.c for the gyro low-passes;
     // src/main/pg/dyn_notch.c for the dynamic notch; src/main/pg/rx.c for RC
-    // smoothing).
+    // smoothing; src/main/flight/pid.c pidConfig for runaway takeoff
+    // prevention).
     const DEFAULTS: &[(&str, &str)] = &[
         ("f_roll", "120"),
         ("f_pitch", "125"),
@@ -264,6 +265,7 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
         ("dterm_lpf2_static_hz", "150"),
         ("yaw_lowpass_hz", "100"),
         ("rc_smoothing", "ON"),
+        ("runaway_takeoff_prevention", "ON"),
     ];
     let five = quad("opendrone/freestyle-5");
     let later = opendrone_flight_controller::Tune::not_simulated_yet();

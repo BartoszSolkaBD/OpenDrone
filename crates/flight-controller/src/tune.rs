@@ -247,6 +247,11 @@ const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
     ("yaw_lowpass_hz", Kind::Number(0, 500), "#49"),
     // Receiver: RC smoothing.
     ("rc_smoothing", Kind::OffOn, "#49"),
+    // CLI only: runaway takeoff prevention, which disarms a Quad whose PID
+    // sum stays at 60% of the motor range for 75 ms before half a second of
+    // normal flight switches it off. It guards against wiring and orientation
+    // mistakes the sim can't have, so it comes later (#21).
+    ("runaway_takeoff_prevention", Kind::OffOn, "later"),
 ];
 
 /// Betaflight's words for every value of the two lookups read here, so a

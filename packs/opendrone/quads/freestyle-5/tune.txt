@@ -59,7 +59,7 @@ set mixer_type = LEGACY                # 2026.6.2 default
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands: the filters, RC smoothing and
 # feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA and
-# throttle boost with #50 (ADR-0015).
+# throttle boost with #50; runaway takeoff prevention later (ADR-0015).
 # PID Tuning
 set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
 set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
@@ -83,3 +83,6 @@ set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#4
 set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)
+# CLI only: runaway takeoff prevention guards against wiring and orientation
+# mistakes the sim can't have (#21)
+set runaway_takeoff_prevention = ON    # 2026.6.2 default; not simulated yet (later)
