@@ -1,0 +1,145 @@
+# A Whoop 65, level, sinks straight down at 5 m/s into its own air, its
+# motors settled and held there. Inside the band where a rotor sinks into
+# its own air, Prop Wash takes some of each rotor's thrust and makes it
+# flicker, each rotor its own way, so the Quad is shaken in roll and pitch.
+# With no Flight Controller to catch it, the shaking grows. Proves E19 in #10
+# (ADR-0005): Prop Wash appears inside the published descent band.
+#
+# The working (crates/physics/src/prop_wash.rs, "Where it acts"):
+#
+# - Settled, each rotor carries a quarter of the weight less a quarter of
+#   the body drag on its 17 cm² top: (0.0312 kg × 9.81 m/s² − ½ × 1.225
+#   kg/m³ × 17 cm² × (5 m/s)²) / 4 = 0.070010 N, 7.139 gf.
+# - That is the thrust after Prop Wash's average loss. v_h is measured from
+#   momentum theory's thrust before it, T0, which pushes the air down
+#   through a 35 mm prop's 9.6211 cm² disc: v_h = √(T0 / 2ρA), with
+#   T0 × (1 − 0.1911) = 0.070010 N, so T0 = 0.086553 N, 8.826 gf, and
+#   v_h = √(0.086553 / (2 × 1.225 × 9.6211 × 10⁻⁴)) = 6.0596 m/s.
+# - So 5 m/s is a descent of 0.825 v_h: inside Johnson's band of 0.4 to 1.4
+#   v_h (research §4.4), near its middle, 0.9 v_h, where Prop Wash acts with
+#   95.6% of its strength, (4 × 0.425 × 0.575)² (the share is 0.9557). The
+#   average loss is 20% × 0.9557 = 0.1911, the 0.1911 above.
+#
+# Level, not turning and sinking straight down, every rotor is in the same
+# air, so with the same thrust on all four nothing could roll or pitch the
+# Quad: without Prop Wash it sinks dead level (see
+# without-prop-wash-a-whoop-sinks-through-its-own-air-level.toml). Only
+# rotors whose thrusts differ can tip it.
+#
+# The settled motors make up Prop Wash's average loss: they spin at 21,147
+# RPM, against 18,752 RPM with Prop Wash off. The motors are held at 33.66%,
+# their settled drive. How hard it shakes comes from the Whoop 65's feel
+# numbers, prop_wash_strength 20% and prop_wash_flicker 15 Hz, which are
+# Estimates for a Feel Test to tune: so its size is Observed.
+format = 1
+name   = "Sinking through the middle of its band, a Whoop 65 is shaken by Prop Wash"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s north, 0 m/s east, -5 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "33.66%" },
+  { at = "0.5 s", motors = "33.66%" },
+]
+
+[[expect]]
+what    = "roll rate"
+over    = "0 s to 0.5 s"
+highest = "between 1 °/s and 10000 °/s"
+basis   = "source: research §4.4 (Johnson, S10): 0.825 v_h of descent is inside the band of 0.4 to 1.4 v_h, so Prop Wash acts; every rotor is in the same air, so only its flicker, each rotor its own way, can roll the Quad, and it rolls right"
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 0.5 s"
+lowest = "between -10000 °/s and -1 °/s"
+basis  = "source: research §4.4 (Johnson, S10): inside the band Prop Wash shakes the Quad, so it rolls left as well as right"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 0.5 s"
+highest = "between 1 °/s and 10000 °/s"
+basis   = "source: research §4.4 (Johnson, S10): inside the band Prop Wash's flicker pitches the Quad too, nose up"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 0.5 s"
+lowest = "between -10000 °/s and -1 °/s"
+basis  = "source: research §4.4 (Johnson, S10): inside the band Prop Wash shakes the Quad, so it pitches nose down as well as up"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "21147 RPM ± 0.1%"
+basis = "observed: the settled motors make up Prop Wash's average loss, a fifth of the thrust here, so they spin 12.8% faster than the 18,752 RPM that holds the same descent with Prop Wash off"
+
+[[expect]]
+what   = "motor 1 thrust"
+over   = "0 s to 0.1 s"
+lowest = "between 5.774 gf and 8.504 gf"
+basis  = "rule: while it still sinks level at 5 m/s, momentum theory gives the rotor 8.826 gf, Prop Wash takes 0.1911 of it on average (20% × 0.9557 of its strength at 0.825 v_h, measured from that thrust before Prop Wash) and its flicker moves it up to 0.1911 of what is left either way: 7.139 gf × (1 ± 0.1911), 5.774 to 8.504 gf"
+
+[[expect]]
+what    = "motor 1 thrust"
+over    = "0 s to 0.1 s"
+highest = "between 5.774 gf and 8.504 gf"
+basis   = "rule: 7.139 gf × (1 ± 0.1911), 5.774 to 8.504 gf, as above: Prop Wash's flicker never takes the thrust outside its strength"
+
+[[expect]]
+what   = "motor 1 thrust"
+over   = "0 s to 0.5 s"
+lowest = "5.83 gf ± 0.3 gf"
+basis  = "observed: how far down the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz"
+
+[[expect]]
+what    = "motor 1 thrust"
+over    = "0 s to 0.5 s"
+highest = "7.93 gf ± 0.3 gf"
+basis   = "observed: how far up the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz"
+
+[[expect]]
+what  = "roll"
+at    = "0.5 s"
+value = "-4.61° ± 5°"
+basis = "observed: with nothing to catch it, the shaking has rolled it 4.61° left in half a second (was 15.5° when the rotors shared one generator: the flicker now draws per rotor)"
+
+[[expect]]
+what  = "pitch"
+at    = "0.5 s"
+value = "4.18° ± 5°"
+basis = "observed: and pitched it 4.18° nose up (was 13.7° nose down: the flicker now draws per rotor)"
+
+[[expect]]
+what  = "vertical speed"
+at    = "0.5 s"
+value = "-4.92 m/s ± 0.1 m/s"
+basis = "observed: on average its settled motors still hold the descent, a little slower as it tips"

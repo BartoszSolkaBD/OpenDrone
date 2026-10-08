@@ -1,0 +1,111 @@
+# The same descent as prop-wash-shakes-a-whoop-sinking-through-the-middle-of-
+# its-band.toml, on the Whoop 65 with Prop Wash off (test/whoop-65-no-prop-wash,
+# its drag and everything else its own): level, sinking straight down at
+# 5 m/s, 0.917 v_h, inside the band, its motors settled and held there. With
+# every rotor in the same air and nothing to make their thrusts differ, it
+# sinks dead level, at a steady speed: what shakes the Whoop 65 there is
+# Prop Wash alone.
+#
+# The working:
+#
+# - Settled, each rotor carries a quarter of the weight less a quarter of
+#   the body drag on its 17 cm² top: (0.0312 kg × 9.81 m/s² − ½ × 1.225
+#   kg/m³ × 17 cm² × (5 m/s)²) / 4 = 0.070010 N, 7.139 gf. With no Prop Wash
+#   taking its fifth, that takes 18,752 RPM (21,147 RPM with it).
+# - The motors are held at 29.07%, their settled drive. Its pack sags a
+#   little under the load, so the thrust eases smoothly and the descent
+#   speeds up a little.
+format = 1
+name   = "Without Prop Wash, a Whoop 65 sinking through its own air stays level"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-prop-wash"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s north, 0 m/s east, -5 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "29.07%" },
+  { at = "1 s", motors = "29.07%" },
+]
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.000001 °/s"
+basis  = "rule: level, not turning and sinking straight down, every rotor is in the same air and gives the same thrust, so nothing rolls or pitches the Quad"
+
+[[expect]]
+what    = "roll rate"
+over    = "0 s to 1 s"
+highest = "0 °/s ± 0.000001 °/s"
+basis   = "rule: level, not turning and sinking straight down, every rotor is in the same air and gives the same thrust, so nothing rolls or pitches the Quad"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.000001 °/s"
+basis  = "rule: level, not turning and sinking straight down, every rotor is in the same air and gives the same thrust, so nothing rolls or pitches the Quad"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 1 s"
+highest = "0 °/s ± 0.000001 °/s"
+basis   = "rule: level, not turning and sinking straight down, every rotor is in the same air and gives the same thrust, so nothing rolls or pitches the Quad"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "0 s"
+value = "7.139 gf ± 0.1%"
+basis = "rule: settled, a quarter of the weight less a quarter of the body drag at 5 m/s, (0.30607 N − 0.026031 N) / 4 = 7.139 gf"
+
+[[expect]]
+what    = "motor 1 thrust"
+over    = "0 s to 1 s"
+highest = "7.139 gf ± 0.1%"
+basis   = "rule: with no flicker, nothing lifts the thrust above where it settled; it only eases as the pack sags under the load"
+
+[[expect]]
+what   = "motor 1 thrust"
+over   = "0 s to 1 s"
+lowest = "7.08 gf ± 0.02 gf"
+basis  = "observed: the pack's sag under the load eases it by 0.8% in a second, smoothly, with no flicker"
+
+[[expect]]
+what  = "vertical speed"
+at    = "1 s"
+value = "-5.06 m/s ± 0.02 m/s"
+basis = "observed: the descent speeds up a little as the pack sags"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "18752 RPM ± 0.1%"
+basis = "observed: momentum theory's thrust at this descent, 7.139 gf, with no Prop Wash loss to make up"

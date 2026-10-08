@@ -2,15 +2,15 @@
 //! the scripted-motors stand-in. What the Quads do in flight is proved by the
 //! Scenarios in `scenarios/`.
 
-use opendrone_maths::Fingerprinter;
 use opendrone_maths::{Attitude, Mat3, Vec3};
+use opendrone_maths::{Fingerprinter, functions};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
-    FlightControllerSeam, FlightInput, GroundAndCeiling, MapShape, MotorCommands, MotorParameters,
-    Mount, OurFlightController, PacketRate, PhysicsRate, PropDirection, PropParameters,
-    QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, Rates, RotorLayout, ScriptedMotors,
-    SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors,
-    Tune, World,
+    FlightControllerSeam, FlightInput, GroundAndCeiling, InputDeviceFacts, MapShape, MotorCommands,
+    MotorParameters, Mount, OurFlightController, PacketRate, PhysicsRate, PropDirection,
+    PropParameters, PropWash, QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, Rates,
+    ReportRate, RotorLayout, ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem,
+    Simulation, SimulationTime, StartingMotors, Tune, World,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,6 +32,7 @@ fn parameters() -> QuadParameters {
             duct_ram: 0.0,
             duct_offset: 0.0,
         },
+        prop_wash: PropWash::NONE,
         rotors: RotorLayout {
             diagonal: 0.066,
             rotor_height: 0.008,
@@ -110,6 +111,8 @@ fn quad_at(height: f64) -> QuadSetUp {
         battery: 1.0,
         mount: Mount::Free,
         packet_rate: PacketRate::from_hz(250).unwrap(),
+        input_device: None,
+        input_smoothing: false,
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }
@@ -560,4 +563,216 @@ impl FlightControllerSeam for EscListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+/// A whoop with the Whoop 65's Prop Wash numbers, level and sinking straight
+/// down at 5 m/s, in the middle of the band where a rotor sinks into its own
+/// air, its motors settled and held there.
+fn whoop_sinking_through_its_own_air(east: f64) -> QuadSetUp {
+    let mut quad = quad_at(100.0);
+    quad.parameters.prop_wash = PropWash {
+        strength: 0.2,
+        flicker: 15.0,
+    };
+    quad.start.position.x = east;
+    quad.start.velocity = Vec3::new(0.0, 0.0, -5.0);
+    quad.motors = StartingMotors::Settled;
+    quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+        SimulationTime::START,
+        MotorCommands::all(0.355),
+    )]));
+    quad
+}
+
+#[test]
+fn each_quad_flickers_its_own_way_and_the_seed_decides_how() {
+    // Each Quad's Prop Wash flicker is seeded from the Simulation's seed in
+    // turn, so two Quads flying the same way are shaken differently, and the
+    // same set-up shakes them the same way again.
+    let flown = |seed| {
+        let quads = vec![
+            whoop_sinking_through_its_own_air(0.0),
+            whoop_sinking_through_its_own_air(5.0),
+        ];
+        let mut sim = Simulation::new(set_up(8000, seed, quads)).unwrap();
+        for _ in 0..800 {
+            sim.step();
+        }
+        [sim.quad_state(0).rotation, sim.quad_state(1).rotation]
+    };
+    let [first, second] = flown(1);
+    assert!(first != Vec3::ZERO && second != Vec3::ZERO);
+    assert_ne!(first, second);
+    assert_eq!(flown(1), [first, second]);
+    assert_ne!(flown(2), [first, second]);
+}
+
+/// A stand-in for the Flight Controller that writes down every Radio Link
+/// frame it is handed, whole, with its step.
+struct FrameListener {
+    heard: Rc<RefCell<Vec<(u64, Channels)>>>,
+}
+
+impl FlightControllerSeam for FrameListener {
+    fn step(
+        &mut self,
+        time: SimulationTime,
+        _readings: &SensorReadings,
+        frame: Option<&Channels>,
+    ) -> MotorCommands {
+        if let Some(channels) = frame {
+            self.heard.borrow_mut().push((time.ticks(), *channels));
+        }
+        MotorCommands::STOPPED
+    }
+
+    fn power_up(&mut self, _readings: &SensorReadings) {}
+
+    fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+/// Runs a Quad set up by `set` (10 m up, Radio Link at 250 Hz) for `ticks`
+/// steps at 8 kHz with these Flight Inputs, giving back every frame its
+/// Flight Controller heard, and the Simulation.
+fn frames_heard(
+    set: impl FnOnce(&mut QuadSetUp),
+    inputs: &[(u64, FlightInput)],
+    ticks: u64,
+) -> (Vec<(u64, Channels)>, Simulation) {
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let mut quad = quad_at(10.0);
+    quad.flight_controller = Box::new(FrameListener {
+        heard: Rc::clone(&heard),
+    });
+    set(&mut quad);
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    for (tick, input) in inputs {
+        sim.flight_input(0, SimulationTime::from_ticks(*tick), *input);
+    }
+    for _ in 0..ticks {
+        sim.step();
+    }
+    (heard.take(), sim)
+}
+
+/// The sticks at rest, then at 8 ms roll and yaw full right, pitch full back
+/// and the throttle full up.
+fn stick_jump() -> [(u64, FlightInput); 2] {
+    let full = Channels {
+        roll: Channel::HIGH,
+        pitch: Channel::LOW,
+        yaw: Channel::HIGH,
+        throttle: Channel::HIGH,
+        ..Channels::RESTING
+    };
+    [
+        (0, FlightInput::Channels(Channels::RESTING)),
+        (64, FlightInput::Channels(full)),
+    ]
+}
+
+/// The frame at `tick`.
+fn frame_at(frames: &[(u64, Channels)], tick: u64) -> Channels {
+    frames
+        .iter()
+        .find(|(t, _)| *t == tick)
+        .map(|(_, channels)| *channels)
+        .unwrap_or_else(|| panic!("no frame at step {tick}"))
+}
+
+#[test]
+fn input_smoothing_takes_roll_pitch_and_yaw_1_minus_e_to_the_minus_2_pi_15_hz_t_of_the_way_and_leaves_the_throttle()
+ {
+    // Basis: Rule (#21: Input smoothing is one fixed gentle 15 Hz low-pass on
+    // roll, pitch and yaw before the Radio Link; the throttle is untouched).
+    // A first-order low-pass at 15 Hz has covered 1 − e^(−2π × 15 Hz × t) of
+    // a jump t seconds later; each frame carries that, rounded to the
+    // receiver's nearest step. The jump arrives at step 64, with a frame.
+    let (frames, _) = frames_heard(|q| q.input_smoothing = true, &stick_jump(), 16_000);
+    assert_eq!(frames.len(), 500);
+    for (tick, channels) in &frames {
+        let t = tick.saturating_sub(64) as f64 / 8000.0;
+        let covered = -functions::exp_m1(-2.0 * core::f64::consts::PI * 15.0 * t);
+        let expected = |from: f64, to: f64| (from + (to - from) * covered).round() as u16;
+        assert_eq!(channels.roll.step(), expected(992.0, 1811.0), "step {tick}");
+        assert_eq!(channels.pitch.step(), expected(992.0, 172.0), "step {tick}");
+        assert_eq!(channels.yaw.step(), expected(992.0, 1811.0), "step {tick}");
+        let throttle = if *tick >= 64 { 1811 } else { 172 };
+        assert_eq!(channels.throttle.step(), throttle, "step {tick}");
+    }
+    // The frame at the jump still carries the sticks at rest. The one 12 ms
+    // on, at step 160, carries 1 − e^(−2π × 15 Hz × 12 ms) = 67.7% of the
+    // way: step 992 + 0.677 × 819 = 1547.
+    assert_eq!(frame_at(&frames, 64).roll, Channel::CENTRE);
+    assert_eq!(frame_at(&frames, 160).roll.step(), 1547);
+    // After 1 s the sticks have arrived.
+    let (_, last) = frames.last().unwrap();
+    assert_eq!(
+        (last.roll, last.pitch, last.yaw),
+        (Channel::HIGH, Channel::LOW, Channel::HIGH)
+    );
+}
+
+#[test]
+fn without_input_smoothing_the_sticks_reach_the_next_frame_as_they_came() {
+    // Basis: Rule (#21: Input smoothing is an Assist, off unless chosen).
+    let (frames, _) = frames_heard(|_| {}, &stick_jump(), 200);
+    let jumped = frame_at(&frames, 64);
+    assert_eq!((jumped.roll, jumped.pitch), (Channel::HIGH, Channel::LOW));
+}
+
+#[test]
+fn input_smoothing_starts_where_the_pilot_holds_the_sticks() {
+    // Basis: Rule (#21): the first Channels are taken as they are, not
+    // ramped to from centre.
+    let held = Channels {
+        roll: Channel::HIGH,
+        ..Channels::RESTING
+    };
+    let (frames, _) = frames_heard(
+        |q| q.input_smoothing = true,
+        &[(0, FlightInput::Channels(held))],
+        100,
+    );
+    assert!(!frames.is_empty());
+    assert!(frames.iter().all(|(_, f)| f.roll == Channel::HIGH));
+}
+
+#[test]
+fn the_input_devices_facts_come_with_the_set_up_and_lock_the_radio_link_to_its_beat() {
+    // Basis: Rule (ADR-0020, #27). A DualSense's facts: 250 Hz, reports at
+    // rest. Reports every 4 ms from step 5 to step 3 973: each frame leaves
+    // 6 steps after one, the output says the link is locked, and 1 s after
+    // the last report the device counts as lost.
+    let inputs: Vec<(u64, FlightInput)> = (0..125u16)
+        .map(|k| {
+            (
+                5 + 32 * u64::from(k),
+                FlightInput::Channels(rolled(992 + k)),
+            )
+        })
+        .collect();
+    let (frames, mut sim) = frames_heard(
+        |q| {
+            q.input_device = Some(InputDeviceFacts {
+                report_rate: ReportRate::from_hz(250),
+                reports_at_rest: true,
+            });
+        },
+        &inputs,
+        4_000,
+    );
+    for (k, (tick, channels)) in frames.iter().enumerate().take(125) {
+        assert_eq!(*tick, 11 + 32 * k as u64);
+        assert_eq!(channels.roll.step(), 992 + k as u16);
+    }
+    let output = sim.quad_output(0).radio_link;
+    assert!(output.locked && !output.lost);
+    assert_eq!(output.last_frame.map(|c| c.roll.step()), Some(992 + 124));
+    while sim.time().ticks() < 3_973 + 8_000 {
+        sim.step();
+        assert!(!sim.quad_output(0).radio_link.lost);
+    }
+    sim.step();
+    assert!(sim.quad_output(0).radio_link.lost);
 }

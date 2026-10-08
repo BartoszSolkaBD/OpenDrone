@@ -13,7 +13,8 @@
 //!
 //! 1. reads the file with the shared unit list, refusing any starting state
 //!    that leaves an item out (ADR-0002) and naming the file and line of every
-//!    problem ([`read_scenario`]);
+//!    problem ([`read_scenario`]), and the Input Track it plays back, if it
+//!    plays one, from a CSV file beside it ([`Scenario::read_input_track`]);
 //! 2. builds the Simulation (or the Flight Controller alone) from the
 //!    starting state and the Packs, turns the sticks in percent into
 //!    whole-number Channels, and steps it at the physics rate up to the last
@@ -44,6 +45,7 @@ mod rates;
 mod read;
 mod results;
 mod run;
+mod track;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,16 +53,17 @@ use std::path::{Path, PathBuf};
 use opendrone_pack::{Packs, Problems};
 
 pub use format::{SCENARIO_FORMAT, SCENARIO_STEPS};
-pub use measure::{Axis, Event, Measure, Sample, Term};
+pub use measure::{Axis, Event, Measure, Sample, Stick as ChannelStick, Term};
 pub use opendrone_sim::StartingMotors;
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
     Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, Expecting, FlightMode,
-    InputDevice, Inputs, Kind, Named, OtherRun, PilotChanges, PilotEntry, Scenario, Start,
-    StartingFlightController, Statistic, Stick, When, read_scenario,
+    InputDevice, InputTrack, Inputs, Kind, Named, OtherRun, PilotChanges, PilotEntry, Scenario,
+    Start, StartingFlightController, Statistic, Stick, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, run};
+pub use track::INPUT_TRACK_HEADER;
 
 /// The ending of every Results file, beside its Scenario.
 pub const RESULTS_ENDING: &str = ".results.toml";
@@ -252,13 +255,27 @@ pub fn run_one(
             return report;
         }
     };
-    let scenario = match read_scenario(&file.label(), &text) {
+    let mut scenario = match read_scenario(&file.label(), &text) {
         Ok(scenario) => scenario,
         Err(found) => {
             problems(&mut report, found);
             return report;
         }
     };
+    if let Some(name) = scenario.input_track().map(str::to_string) {
+        let label = match file.relative.rsplit_once('/') {
+            Some((folder, _)) => format!("scenarios/{folder}/{name}"),
+            None => format!("scenarios/{name}"),
+        };
+        let read = fs::read_to_string(file.path.with_file_name(&name))
+            .map_err(|error| Problems::of_file(&label, format!("can't be read: {error}")))
+            .and_then(|track| scenario.read_input_track(&label, &track));
+        if let Err(found) = read {
+            report.name = Some(scenario.name.clone());
+            problems(&mut report, found);
+            return report;
+        }
+    }
     report.name = Some(scenario.name.clone());
     let (first, second) = match (run(&scenario, packs), run(&scenario, packs)) {
         (Ok(first), Ok(second)) => (first, second),

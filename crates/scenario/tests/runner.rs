@@ -186,7 +186,7 @@ fn an_unknown_measurement_is_refused_listing_what_the_runner_measures() {
     assert_eq!(
         failures(&report(&file, ResultsFile::Write)),
         [format!(
-            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag, roll setpoint, pitch setpoint, yaw setpoint, roll P term, roll I term, roll D term, roll PID sum, pitch P term, pitch I term, pitch D term, pitch PID sum, yaw P term, yaw I term, yaw D term, yaw PID sum, mixer throttle, motor N DShot; and it sees when these happen: the Quad arms, the Quad disarms, Failsafe's stage 2 starts, Failsafe ends, the ESCs are ready, FAILSAFE blocks arming, FAILSAFE stops blocking arming, RXLOSS blocks arming, RXLOSS stops blocking arming, NOT_DISARMED blocks arming, NOT_DISARMED stops blocking arming, THROTTLE blocks arming, THROTTLE stops blocking arming, ANGLE blocks arming, ANGLE stops blocking arming, BOOTGRACE blocks arming, BOOTGRACE stops blocking arming, ARM_SWITCH blocks arming, ARM_SWITCH stops blocking arming"
+            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag, roll setpoint, pitch setpoint, yaw setpoint, roll P term, roll I term, roll D term, roll PID sum, pitch P term, pitch I term, pitch D term, pitch PID sum, yaw P term, yaw I term, yaw D term, yaw PID sum, mixer throttle, motor N DShot, reports in the frame, frame age, roll channel, pitch channel, yaw channel, throttle channel; and it sees when these happen: the Quad arms, the Quad disarms, Failsafe's stage 2 starts, Failsafe ends, the ESCs are ready, FAILSAFE blocks arming, FAILSAFE stops blocking arming, RXLOSS blocks arming, RXLOSS stops blocking arming, NOT_DISARMED blocks arming, NOT_DISARMED stops blocking arming, THROTTLE blocks arming, THROTTLE stops blocking arming, ANGLE blocks arming, ANGLE stops blocking arming, BOOTGRACE blocks arming, BOOTGRACE stops blocking arming, ARM_SWITCH blocks arming, ARM_SWITCH stops blocking arming, the Flying Input Device is lost, the Flying Input Device is back"
         )]
     );
 }
@@ -392,6 +392,70 @@ fn an_expectation_can_compare_with_the_same_run_at_another_physics_rate() {
 }
 
 #[test]
+fn an_expectation_can_compare_with_the_same_run_on_another_random_seed() {
+    // Basis: Rule. Falling with its motors stopped, nothing draws on the
+    // seed's flicker, so another seed changes nothing.
+    let text = free_fall()
+        + "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\nagainst = { random_seed = 2 }\ncompare = \"difference\"\nvalue = \"0 m ± 0 m\"\nbasis = \"rule: with its motors stopped nothing feels the flicker\"\n";
+    let report = report(&fixture("compared-seed", &text), ResultsFile::Write);
+    assert!(report.passed(), "{:#?}", failures(&report));
+    let lines: Vec<&String> = report.checks.iter().map(|(_, line)| line).collect();
+    assert!(
+        lines.iter().any(|line| line
+            .starts_with("height at 1 s, minus the same run with random seed 2: measured 0 m")),
+        "{lines:#?}"
+    );
+}
+
+#[test]
+fn a_gap_is_how_far_apart_the_two_runs_are_whichever_is_higher() {
+    // Basis: Rule. At 4 kHz the free fall lands 0.613125 mm lower than at
+    // 8 kHz (see the physics-rate comparison above): from the 4 kHz run, the
+    // difference is -0.613125 mm and the gap 0.613125 mm.
+    let text = free_fall().replacen(
+        "physics_rate      = \"8 kHz\"",
+        "physics_rate      = \"4 kHz\"",
+        1,
+    ) + "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\nagainst = { physics_rate = \"8 kHz\" }\ncompare = \"difference\"\nvalue = \"-0.613125 mm ± 0.000001 mm\"\nbasis = \"rule: x\"\n"
+        + "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\nagainst = { physics_rate = \"8 kHz\" }\ncompare = \"gap\"\nvalue = \"0.613125 mm ± 0.000001 mm\"\nbasis = \"rule: x\"\n";
+    // The free fall's own Expectations are written for 8 kHz, so only the
+    // two comparisons are looked at.
+    let report = report(&fixture("compared-gap", &text), ResultsFile::Write);
+    let passed: Vec<&String> = report
+        .checks
+        .iter()
+        .filter(|(passed, _)| *passed)
+        .map(|(_, line)| line)
+        .collect();
+    for start in [
+        "height at 1 s, minus the same run at 8 kHz: measured -0.613 mm",
+        "height at 1 s, how far from the same run at 8 kHz: measured 0.613 mm",
+    ] {
+        assert!(
+            passed.iter().any(|line| line.starts_with(start)),
+            "{start}: {:#?}",
+            report.checks
+        );
+    }
+}
+
+#[test]
+fn a_random_seed_to_compare_with_must_be_a_whole_number() {
+    let text = free_fall()
+        + "\n[[expect]]\nwhat = \"height\"\nat = \"1 s\"\nagainst = { random_seed = \"two\" }\ncompare = \"gap\"\nvalue = \"0 m ± 1 m\"\nbasis = \"rule: x\"\n";
+    let found = failures(&report(
+        &fixture("compared-seed-badly", &text),
+        ResultsFile::Write,
+    ));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0]
+            .ends_with("`random_seed` must be a whole number of 0 or more, written without quotes"),
+        "{found:#?}"
+    );
+}
+
+#[test]
 fn a_comparison_needs_both_its_other_run_and_how_to_compare() {
     let expect = |extra: &str| {
         format!(
@@ -406,10 +470,10 @@ fn a_comparison_needs_both_its_other_run_and_how_to_compare() {
     let found = failures(&report(&fixture("comparisons", &text), ResultsFile::Write));
     let ends = [
         "`compare` needs `against`: the other run to compare with, such as `against = { physics_rate = \"4 kHz\" }`",
-        "an Expectation `against` another run needs `compare`: `compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's)",
-        "`wind` isn't something OpenDrone reads in [expect[8].against]; it reads `physics_rate`, `battery`, `sticks`",
-        "`against` names what the other run changes: `physics_rate`, `battery` or `sticks`, written as in [start], or `sticks = \"mirrored\"`",
-        "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's), not \"sum\"",
+        "an Expectation `against` another run needs `compare`: `compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's), \"ratio\" (this run's as a share of the other's) or \"gap\" (how far apart the two are, whichever is higher)",
+        "`wind` isn't something OpenDrone reads in [expect[8].against]; it reads `physics_rate`, `battery`, `random_seed`, `sticks`",
+        "`against` names what the other run changes: `physics_rate`, `battery` or `random_seed`, written as in [start], or `sticks = \"mirrored\"`",
+        "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's), \"ratio\" (this run's as a share of the other's) or \"gap\" (how far apart the two are, whichever is higher), not \"sum\"",
     ];
     assert_eq!(found.len(), ends.len(), "{found:#?}");
     for (found, end) in found.iter().zip(ends) {

@@ -1,0 +1,70 @@
+# Results of input-smoothing-eases-roll-pitch-and-yaw.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Input smoothing eases roll, pitch and yaw with a gentle 15 Hz low-pass and leaves the throttle"
+
+[[expect]]
+what     = "roll channel at 1.000125 s"
+basis    = "Rule"
+expected = "0.06% ± 0.01%"
+measured = "0.0610%"
+
+[[expect]]
+what     = "throttle channel at 1.000125 s"
+basis    = "Rule"
+expected = "50% ± 0.1%"
+measured = "50.0%"
+
+[[expect]]
+what     = "roll channel at 1.012125 s"
+basis    = "Rule"
+expected = "67.73% ± 0.15%"
+measured = "67.8%"
+
+[[expect]]
+what     = "pitch channel at 1.012125 s"
+basis    = "Rule"
+expected = "-67.73% ± 0.15%"
+measured = "-67.7%"
+
+[[expect]]
+what     = "yaw channel at 1.012125 s"
+basis    = "Rule"
+expected = "67.73% ± 0.15%"
+measured = "67.8%"
+
+[[expect]]
+what     = "roll channel at 1.032125 s"
+basis    = "Rule"
+expected = "95.10% ± 0.15%"
+measured = "95.1%"
+
+[[expect]]
+what     = "roll channel at 1.100125 s"
+basis    = "Rule"
+expected = "100% ± 0.1%"
+measured = "100%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "66432d6ed6e18159"   # the whole state after each of 8801 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.11 s" = "41f6dd33f7a2c32c"
+"0.22 s" = "51132c4f76bfbacb"
+"0.33 s" = "a4947f5a8dd9f98f"
+"0.44 s" = "6fd9096a2aace0de"
+"0.55 s" = "56e2e29345401b0f"
+"0.66 s" = "b11e71a0c420fdd5"
+"0.77 s" = "cc7c107f5b71f4ba"
+"0.88 s" = "9ab463cdca50696f"
+"0.99 s" = "c6bea660d2405a5f"
+"1.100125 s" = "6c9f4e8788797a36"

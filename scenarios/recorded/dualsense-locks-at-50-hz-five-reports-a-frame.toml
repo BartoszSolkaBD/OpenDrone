@@ -1,0 +1,55 @@
+# At a Packet Rate of 50 Hz, which also divides a DualSense's 250 Hz Report
+# Rate, the Radio Link locks to its report beat too (ADR-0020): a frame
+# every five reports, 0.75 ms after the fifth is due, so each frame carries
+# exactly five fresh reports, the newest at most 0.75 ms old.
+#
+# The same Input Track as at 250 Hz: the maintainer's DualSense on the desk,
+# untouched, its motion sensors reporting every 4 ms (dualsense-at-rest.csv).
+# The first frame, 0.75 ms after the first report, carries that report
+# alone, so the stretches start after it.
+format = 1
+name   = "A DualSense's Radio Link frames at 50 Hz each carry exactly five fresh reports"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "50 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "dualsense-at-rest.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = true }
+
+[[expect]]
+what   = "reports in the frame"
+over   = "0.01 s to 6 s"
+lowest = "5 ± 0"
+basis  = "rule: ADR-0020: 50 Hz divides 250 Hz, so each frame leaves 0.75 ms after every fifth report is due, past the 0–0.5 ms the reports arrive in: it carries the five reports due since the last frame"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0.01 s to 6 s"
+highest = "5 ± 0"
+basis   = "rule: ADR-0020: as above, never six"
+
+[[expect]]
+what    = "frame age"
+over    = "0 s to 6 s"
+highest = "0.75 ms ± 0.000001 ms"
+basis   = "rule: ADR-0020: each frame leaves 0.75 ms (6 steps at 8 kHz) after its newest report is due, and no report arrives before it is due"

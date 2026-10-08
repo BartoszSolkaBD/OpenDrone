@@ -1,0 +1,150 @@
+# Prop Wash's flicker comes from the Simulation's random seed (ADR-0005,
+# ADR-0001): the same seed gives the same flicker, to the last bit, and a
+# different seed a different flicker. The flight is the one in
+# prop-wash-shakes-a-whoop-sinking-through-the-middle-of-its-band.toml: a
+# Whoop 65, level, sinking straight down at 5 m/s, 0.825 v_h, in the middle
+# of its band, where each rotor's thrust flickers between 5.774 and 8.504 gf
+# (the working is there). It is compared with itself run again three ways:
+# with the same seed, with seed 2, and at 4 kHz.
+#
+# Each rotor's flicker glides between random levels drawn from its own
+# generator, seeded from the Quad's seed, and timed in seconds of Simulation
+# Time (crates/physics/src/prop_wash.rs, "The flicker"), so at 4 kHz each rotor
+# draws the same levels at the same moments, to within rounding in the timing
+# (a readable check sweeps seeds 0 to 199 at 1, 4 and 8 kHz).
+format = 1
+name   = "Prop Wash's flicker comes from the random seed"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s north, 0 m/s east, -5 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "33.66%" },
+  { at = "0.5 s", motors = "33.66%" },
+]
+
+[[expect]]
+what    = "motor 1 thrust"
+at      = "0.25 s"
+against = { random_seed = 1 }
+compare = "difference"
+value   = "0 gf ± 0 gf"
+basis   = "rule: the same seed draws the same flicker, so the run is the same to the last bit (ADR-0001)"
+
+[[expect]]
+what    = "motor 2 thrust"
+at      = "0.25 s"
+against = { random_seed = 1 }
+compare = "difference"
+value   = "0 gf ± 0 gf"
+basis   = "rule: the same seed draws the same flicker, so the run is the same to the last bit (ADR-0001)"
+
+[[expect]]
+what    = "motor 3 thrust"
+at      = "0.25 s"
+against = { random_seed = 1 }
+compare = "difference"
+value   = "0 gf ± 0 gf"
+basis   = "rule: the same seed draws the same flicker, so the run is the same to the last bit (ADR-0001)"
+
+[[expect]]
+what    = "motor 4 thrust"
+at      = "0.25 s"
+against = { random_seed = 1 }
+compare = "difference"
+value   = "0 gf ± 0 gf"
+basis   = "rule: the same seed draws the same flicker, so the run is the same to the last bit (ADR-0001)"
+
+[[expect]]
+what    = "roll rate"
+at      = "0.5 s"
+against = { random_seed = 1 }
+compare = "difference"
+value   = "0 °/s ± 0 °/s"
+basis   = "rule: the same seed draws the same flicker, so the Quad is shaken the same way to the last bit"
+
+[[expect]]
+what    = "motor 1 thrust"
+at      = "0.1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
+
+[[expect]]
+what    = "motor 2 thrust"
+at      = "0.1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
+
+[[expect]]
+what    = "motor 3 thrust"
+at      = "0.1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
+
+[[expect]]
+what    = "motor 4 thrust"
+at      = "0.1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "between 0.001 gf and 2.73 gf"
+basis   = "rule: another seed draws another flicker, so the thrust differs; by no more than the flicker's whole swing, 8.504 − 5.774 = 2.73 gf, while the Quad still sinks level"
+
+[[expect]]
+what    = "roll rate"
+at      = "0.5 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "between 1 °/s and 10000 °/s"
+basis   = "rule: another seed draws another flicker, so the Quad is shaken another way"
+
+[[expect]]
+what    = "motor 1 thrust"
+at      = "0.1 s"
+against = { physics_rate = "4 kHz" }
+compare = "ratio"
+value   = "100% ± 1%"
+basis   = "rule: the flicker is timed in seconds and each rotor draws its levels from its own generator, so at 4 kHz the rotor flickers the same, to within rounding in the timing"
+
+[[expect]]
+what    = "motor 2 thrust"
+at      = "0.1 s"
+against = { physics_rate = "4 kHz" }
+compare = "ratio"
+value   = "100% ± 1%"
+basis   = "rule: the flicker is timed in seconds and each rotor draws its levels from its own generator, so at 4 kHz the rotor flickers the same, to within rounding in the timing"

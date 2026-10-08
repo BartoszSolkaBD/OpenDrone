@@ -1,0 +1,100 @@
+# A drag-free Whoop 65, level, sinks at 3.5 m/s, inside the band where a
+# rotor sinks into its own air, while flying north at 10.5 m/s: three times
+# its descent. Air crossing the disc that fast carries the rotors out of
+# their own air, so Prop Wash doesn't act, and it flies on dead level. Proves
+# E19 in #10 (ADR-0005): Prop Wash is gone above about 2.75 times the
+# descent rate in forward speed.
+#
+# The working (crates/physics/src/prop_wash.rs, "Where it acts"):
+#
+# - With no drag, nothing slows it, so it keeps its speed across the props,
+#   and its settled motors carry exactly a quarter of its weight each,
+#   0.0312 kg × 9.81 m/s² / 4 = 0.076518 N, 7.8027 gf (the air crossing the
+#   disc lets slower rotors give it).
+# - That thrust pushes the air down through the 9.6211 cm² disc at v_h =
+#   √(0.076518 / (2 × 1.225 × 9.6211 × 10⁻⁴)) = 5.6975 m/s, so 3.5 m/s is a
+#   descent of 0.614 v_h: inside Johnson's band of 0.4 to 1.4 v_h (research
+#   §4.4).
+# - Level and not turning, every rotor is in the same air, so with the same
+#   thrust on all four nothing rolls or pitches it.
+# - Across the disc the air comes at 10.5 m/s, 3 times the descent: past
+#   Talaeizadeh et al.'s 2.75 times (research §4.4), where it is gone.
+#
+# The motors are held at 4.88%, their settled drive: so much air crossing a
+# sinking disc lets it carry the weight turning slowly, at 3,781 RPM.
+format = 1
+name   = "Flying forward at 3 times its descent, a Whoop 65 escapes Prop Wash"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "10.5 m/s north, 0 m/s east, -3.5 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "4.88%" },
+  { at = "1 s", motors = "4.88%" },
+]
+
+[[expect]]
+what   = "roll rate"
+over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.000001 °/s"
+basis  = "source: research §4.4 (Talaeizadeh et al., S11): forward speed of 2.75 times the descent or more escapes Prop Wash, and this is 3 times, so all four rotors give the same thrust and nothing rolls or pitches the Quad"
+
+[[expect]]
+what    = "roll rate"
+over    = "0 s to 1 s"
+highest = "0 °/s ± 0.000001 °/s"
+basis   = "source: research §4.4 (Talaeizadeh et al., S11): forward speed of 2.75 times the descent or more escapes Prop Wash, and this is 3 times, so all four rotors give the same thrust and nothing rolls or pitches the Quad"
+
+[[expect]]
+what   = "pitch rate"
+over   = "0 s to 1 s"
+lowest = "0 °/s ± 0.000001 °/s"
+basis  = "source: research §4.4 (Talaeizadeh et al., S11): forward speed of 2.75 times the descent or more escapes Prop Wash, and this is 3 times, so all four rotors give the same thrust and nothing rolls or pitches the Quad"
+
+[[expect]]
+what    = "pitch rate"
+over    = "0 s to 1 s"
+highest = "0 °/s ± 0.000001 °/s"
+basis   = "source: research §4.4 (Talaeizadeh et al., S11): forward speed of 2.75 times the descent or more escapes Prop Wash, and this is 3 times, so all four rotors give the same thrust and nothing rolls or pitches the Quad"
+
+[[expect]]
+what  = "vertical speed"
+at    = "1 s"
+value = "-3.5 m/s ± 0.01 m/s"
+basis = "rule: with no drag and no Prop Wash loss, the settled motors hold the weight, so the descent holds"
+
+[[expect]]
+what  = "speed north"
+at    = "1 s"
+value = "10.5 m/s ± 0.001 m/s"
+basis = "rule: level, with no drag, nothing pushes it along: it keeps its speed across the props"

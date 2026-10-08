@@ -1,0 +1,64 @@
+# A DualSense whose motion sensors didn't start has no heartbeat: like a
+# Radio, it reports only when a value changes, so a quiet one can't be told
+# from resting sticks. It then counts as a device that reports only changes,
+# lost only when unplugged, never for silence (#27; the input layer gives the
+# Simulation `reports_at_rest = false` for it, #61).
+#
+# The Input Track is the maintainer's DualSense over USB, its motion sensors
+# off: the end of fast circles on both sticks, then hands off
+# (dualsense-fast-circles.csv). Its last report is at 4.512 s; the run goes
+# on for 3 s of silence. During the circles every frame at 250 Hz, locked to
+# its 4 ms beat, carries at most one fresh report: a report that changed
+# nothing sends no Flight Input, so a few frames carry none.
+format = 1
+name   = "A DualSense without its heartbeat is never lost for silence"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "dualsense-fast-circles.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = false }
+
+[[expect]]
+what  = "the Flying Input Device is lost"
+over  = "0 s to 7.5 s"
+first = "never"
+basis = "source: #27, decision 3: a device that reports only changes is lost only when unplugged; this one is never unplugged, and says nothing for the last 3 s"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0 s to 1.9 s"
+highest = "1 ± 0"
+basis   = "rule: ADR-0020: locked at 250 Hz, each frame leaves 0.75 ms after a report is due, so no frame carries two of the DualSense's 4 ms reports"
+
+[[expect]]
+what   = "reports in the frame"
+over   = "0 s to 1.9 s"
+mean   = "0.99 ± 0.01"
+basis  = "observed: through the fast circles nearly every report changed a Channel; four that didn't left a frame with none"
+
+[[expect]]
+what    = "frame age"
+over    = "0 s to 1.9 s"
+highest = "0.75 ms ± 0.000001 ms"
+basis   = "rule: ADR-0020: a report is due where the earliest of the last second's arrived, and its frame leaves 0.75 ms (6 steps at 8 kHz) later, so no fresh report is older than that when its frame leaves"

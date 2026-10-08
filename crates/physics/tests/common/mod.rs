@@ -6,7 +6,8 @@
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_physics::{
     BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters, Mount,
-    PropDirection, PropParameters, QuadParameters, QuadShape, QuadStart, QuadState, RotorLayout,
+    PropDirection, PropParameters, PropWash, QuadParameters, QuadShape, QuadStart, QuadState,
+    RotorLayout,
     StartingMotors, World,
 };
 
@@ -31,6 +32,7 @@ pub fn whoop() -> QuadParameters {
             duct_ram: 0.0,
             duct_offset: 0.0,
         },
+        prop_wash: PropWash::NONE,
         rotors: RotorLayout {
             diagonal: 0.066,
             rotor_height: 0.008,
