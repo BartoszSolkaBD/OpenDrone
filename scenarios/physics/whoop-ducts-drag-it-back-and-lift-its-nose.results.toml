@@ -1,0 +1,58 @@
+# Results of whoop-ducts-drag-it-back-and-lift-its-nose.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65's ducts drag it back and lift its nose"
+
+[[expect]]
+what     = "acceleration north at 0.000125 s"
+basis    = "Rule"
+expected = "between -1000 m/s² and -0.1 m/s²"
+measured = "-9.60 m/s²"
+
+[[expect]]
+what     = "pitch rate at 0.000125 s"
+basis    = "Rule"
+expected = "between 0.01 °/s and 1000 °/s"
+measured = "5.01 °/s"
+
+[[expect]]
+what     = "acceleration north at 0.000125 s"
+basis    = "Observed"
+expected = "-9.60 m/s² ± 1%"
+measured = "-9.60 m/s²"
+
+[[expect]]
+what     = "pitch rate at 0.000125 s"
+basis    = "Observed"
+expected = "5.01 °/s ± 1%"
+measured = "5.01 °/s"
+
+[[expect]]
+what     = "pitch at 0.05 s"
+basis    = "Observed"
+expected = "47.8° ± 2°"
+measured = "47.8°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "1fcd1b6350fd5738"   # test/whoop-65-ducts-only: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "c1d3ae362240e7b5"   # the whole state after each of 400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.005 s" = "08dee81ab81a445b"
+"0.01 s" = "519413134aaf47d1"
+"0.015 s" = "bed195388541607c"
+"0.02 s" = "7bfe1d0aaf452e06"
+"0.025 s" = "9151999ea78fa568"
+"0.03 s" = "991d14a0a3c3baf6"
+"0.035 s" = "c9c674978cc68d38"
+"0.04 s" = "190f3d0fc9838217"
+"0.045 s" = "89e938801b96d422"
+"0.05 s" = "650bd77beca6269f"

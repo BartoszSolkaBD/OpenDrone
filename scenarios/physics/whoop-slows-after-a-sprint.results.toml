@@ -1,0 +1,52 @@
+# Results of whoop-slows-after-a-sprint.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65 sprinting at 8 m/s slows at once when it lets go"
+
+[[expect]]
+what     = "acceleration north at 0.000125 s"
+basis    = "Rule"
+expected = "-13.560 m/s² ± 0.5%"
+measured = "-13.6 m/s²"
+
+[[expect]]
+what     = "speed north, highest over 0 s to 0.1 s"
+basis    = "Rule"
+expected = "between 0 m/s and 8 m/s"
+measured = "8.00 m/s"
+
+[[expect]]
+what     = "speed north at 0.1 s"
+basis    = "Observed"
+expected = "6.50 m/s ± 0.1 m/s"
+measured = "6.50 m/s"
+
+[[expect]]
+what     = "pitch at 0.1 s"
+basis    = "Observed"
+expected = "35.5° ± 2°"
+measured = "35.5°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "598b4c12d962b95e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "6c05500d8d5bc27e"   # the whole state after each of 800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.01 s" = "ab4196c7b6921676"
+"0.02 s" = "5caf2c1362b1c8a8"
+"0.03 s" = "61fad1218205e6a3"
+"0.04 s" = "9b8f309fa29b719a"
+"0.05 s" = "df618043eef3183e"
+"0.06 s" = "b17c61bc974fcb19"
+"0.07 s" = "45c94ac9bca32953"
+"0.08 s" = "0b20b07a2a86661b"
+"0.09 s" = "5dc1a0d735c0a8bc"
+"0.1 s" = "46e03741c4645012"

@@ -74,6 +74,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 body_area: Vec3::ZERO,
                 rotor: 0.0,
                 duct_ram: 0.0,
+                duct_offset: 0.0,
             },
             rotors: RotorLayout {
                 diagonal: 0.066,

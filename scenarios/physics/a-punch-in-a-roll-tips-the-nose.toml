@@ -1,0 +1,73 @@
+# A Whoop 65 rolling right at 1,000 °/s on settled motors punches its
+# anticlockwise pair (motors 2 and 3) to 100%. Proves E8 in #10: the rotors'
+# spin pushes at right angles to a flip, a faint pitch–yaw coupling.
+#
+# While all four rotors turn at one speed, their spins cancel. Once the
+# anticlockwise pair turns faster, the rotors together spin anticlockwise,
+# and a roll turns that spin, pushing the nose down (rolling right: the
+# rotors' spin, pointing up, is tipped towards the right, and the frame is
+# pushed the other way about the pitch axis). Their speeding up also yaws
+# the frame clockwise ("A punch on its anticlockwise pair twitches a Whoop
+# 65's nose right at once"), and a frame that rolls and yaws at once pitches
+# by its own inertia, nose up; but by angular momentum that yaw holds the
+# rotors' spin over the yaw inertia, so it pushes back only roll inertia over
+# yaw inertia of it, 70 of 140 g·cm²: the nose still goes down, at half the
+# push. The props' drag, which also yaws it, builds slower.
+format = 1
+name   = "Rolling, a punch on its anticlockwise pair tips a Whoop 65's nose down"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "roll 1000 °/s, pitch 0 °/s, yaw 0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# Motors in Betaflight's order: rear right, front right, rear left, front left.
+timeline = [
+  { at = "0 s", motors = "37.3%, 100%, 100%, 37.3%" },
+]
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.01 s"
+value = "between -1000 °/s and -0.1 °/s"
+basis = "rule: rolling right while the anticlockwise rotors speed up, their spin is turned by the roll and pushes the nose down; the frame's own roll-and-yaw coupling pushes it up by only half as much (working above)"
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.01 s"
+value = "-8.32 °/s ± 0.3 °/s"
+basis = "observed: 10 ms into the punch the nose is going down at 8.3 °/s: faint, as #10 says"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.01 s"
+value = "137 °/s ± 5 °/s"
+basis = "observed: the punch yaws it right as it does in a hover"

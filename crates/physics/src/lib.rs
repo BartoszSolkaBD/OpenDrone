@@ -17,11 +17,18 @@
 //!   no cutoff (E13, E14; [`battery`]);
 //! - collisions with the Map (E29, #43; see "Collisions" below);
 //! - the thrust stand: a Quad held still, its motors, ESCs and battery working
-//!   as in flight ([`Mount::ThrustStand`]).
+//!   as in flight ([`Mount::ThrustStand`]);
+//! - the air: thrust falling in a climb and rising in a descent and at speed,
+//!   rotor drag and the nose lifting at speed, body drag that changes with
+//!   attitude, and a whoop's duct drag and nose-up moment (E10, E11, E16–E18,
+//!   E25, E26; [`air`]);
+//! - the rotors' own spin: the frame turning against a rotor that speeds up or
+//!   slows down, and their spin's gyroscopic push in a flip (E7, E8; step 6
+//!   below).
 //!
-//! The other effects arrive with their own tickets and Scenarios: drag, the
-//! rest of the air and the rotors' own spin effects (#42), Prop Strikes and
-//! stalled motors' restarts (#45), and so on.
+//! The other effects arrive with their own tickets and Scenarios: ground and
+//! ceiling effect (#44), Prop Strikes and stalled motors' restarts (#45),
+//! Prop Wash (#46), and so on.
 //!
 //! # How one step moves the Quad
 //!
@@ -33,15 +40,26 @@
 //!    step ([`motor`]).
 //! 3. The battery gives the power the ESCs drew: its voltage sags and its
 //!    charge goes down ([`battery`]).
-//! 4. The forces on the Quad give its acceleration: the Map's gravity and each
-//!    rotor's thrust, along the body's up axis.
+//! 4. The forces on the Quad give its acceleration: the Map's gravity, each
+//!    rotor's thrust along the body's up axis in the air the rotor moves
+//!    through, and the air's drag ([`air`]). They are worked out from where
+//!    the step started, with the motors' new speeds.
 //! 5. Semi-implicit Euler: the speed changes first, then the position moves
 //!    with the new speed.
-//! 6. The rotation changes by Euler's equation for a rigid body,
-//!    `J·dω/dt = M − ω × J·ω`, with `J` the inertia, `ω` the rotation in body
-//!    axes and `M` the torques: each rotor's thrust about the centre of mass,
-//!    and each prop's drag torque, which twists the frame against the prop's
-//!    spin. The `ω × J·ω` part is the gyroscopic coupling between the axes.
+//! 6. The rotation changes by Euler's equation for a rigid body carrying
+//!    spinning rotors, `J·dω/dt = M − dh/dt − ω × (J·ω + h)`, with `J` the
+//!    inertia, `ω` the rotation in body axes, `h` the rotors' own spin (each
+//!    rotor's inertia times its speed, along the body's up axis, one way or
+//!    the other as it turns) and `M` the torques: each rotor's thrust and
+//!    drag about the centre of mass, and each prop's drag torque, which twists
+//!    the frame against the prop's spin.
+//!    - `dh/dt`: a motor speeding its rotor up turns the frame the other way,
+//!      as hard as it speeds it up, and slowing it down turns the frame with
+//!      it (E7): the yaw twitch of a punch.
+//!    - `ω × h`: the rotors' spin, turned by a flip, pushes the frame at right
+//!      angles to the flip (E8). With the four at the same speed their spins
+//!      cancel; it shows only while one pair turns faster.
+//!    - `ω × J·ω` is the gyroscopic coupling between the frame's own axes.
 //! 7. The attitude turns by the new rotation over the step, with the
 //!    exponential map, which is exact for a steady rotation and never drifts
 //!    (flight-dynamics research §2.3).
@@ -136,6 +154,7 @@
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 //! [ADR-0004]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0004-parry3d-geometry-only-f64.md
 
+pub mod air;
 mod collide;
 mod geometry;
 mod map;
@@ -201,21 +220,34 @@ pub struct QuadParameters {
     pub shape: QuadShape,
 }
 
-/// The Quad's drag numbers.
-///
-/// They are part of the set-up the Simulation receives, so the Quad's
-/// fingerprint covers them, but no drag force acts yet: drag arrives with the
-/// air ticket (#42). Scenarios that must stay free of drag when it does, such
-/// as free fall, use a Test Quad with all of these set to zero.
+/// The Quad's drag numbers ([`air`] says how each acts). Scenarios that must
+/// stay free of drag, such as free fall, use a Test Quad with all of these
+/// set to zero.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Drag {
     /// Body drag area (drag coefficient × area) facing forward, sideways and
     /// up, in m².
     pub body_area: Vec3,
-    /// Rotor drag, in s⁻¹.
+    /// Rotor drag, in s⁻¹: per kilogram of the Quad, per m/s of air across
+    /// the props, with the rotors at the speed that hovers the Quad.
     pub rotor: f64,
-    /// Whoop duct ram drag, in s⁻¹; zero for a Quad without ducts.
+    /// Whoop duct ram drag, in s⁻¹, counted the same way; zero for a Quad
+    /// without ducts.
     pub duct_ram: f64,
+    /// How far above the props' plane the ducts' ram drag acts, in metres: a
+    /// ducted rotor's centre of pressure sits that much higher than an open
+    /// rotor's. Zero for a Quad without ducts.
+    pub duct_offset: f64,
+}
+
+impl Drag {
+    /// No drag of any kind.
+    pub const NONE: Drag = Drag {
+        body_area: Vec3::ZERO,
+        rotor: 0.0,
+        duct_ram: 0.0,
+        duct_offset: 0.0,
+    };
 }
 
 /// Where a Quad is and how it moves.
@@ -272,11 +304,14 @@ pub enum StartingMotors {
     /// Stopped, with the ESCs already powered up and ready, so each starts its
     /// motor on its first command above zero, after the start wait.
     Stopped,
-    /// Spinning at the speed whose thrust carries the weight along the
-    /// motors' axis, with the ESCs running (ADR-0002): the same speed on
-    /// every motor, `m·g·cos(tilt) / 4` of thrust each, and none upside down.
-    /// Level, that holds the stated motion; tilted, nothing but drag could,
-    /// and drag arrives with the air ticket (#42).
+    /// Spinning at the speed that holds the Quad's height at the stated
+    /// motion, with the ESCs running (ADR-0002): the same speed on every
+    /// motor, whose thrust's upward part, with the air's push at that motion,
+    /// carries the weight. Tilted, that is more thrust than the weight, and
+    /// the thrust's sideways part holds the speed only where the air's drag
+    /// matches it. Never more than full drive gives: tilted further than that
+    /// can hold, full drive. None upside down or past its side, where thrust
+    /// would only push it down.
     Settled,
 }
 
@@ -312,7 +347,8 @@ pub enum SetUpProblem {
 pub struct MotorOutput {
     /// In rad/s, positive the normal way.
     pub speed: f64,
-    /// Along the body's up axis, in newtons: negative spinning backwards.
+    /// Along the body's up axis, in newtons, over the last step, in the air
+    /// the rotor moved through: negative spinning backwards.
     pub thrust: f64,
     /// The air's drag torque on the prop, in N·m, with the speed's sign. The
     /// frame feels it the other way round the prop's axis.
@@ -338,6 +374,8 @@ pub struct QuadBody {
     battery: Battery,
     positions: [Vec3; 4],
     turning: [f64; 4],
+    /// Each rotor's thrust over the last step, in newtons.
+    thrusts: [f64; 4],
     /// The air density the motors were last worked out in.
     air_density: f64,
     /// The collision shape's simple shapes, built once.
@@ -388,20 +426,41 @@ impl QuadBody {
 
         let battery = Battery::new(&parameters.battery, start.battery);
         let model = Model::new(&parameters.motors, &parameters.props, world.air_density);
+        let positions = parameters.rotors.positions();
+        let turning = parameters.rotors.turning();
         let (motors, escs) = match start.motors {
             StartingMotors::PoweringUp => ([Motor::STOPPED; 4], [Esc::powering_up(); 4]),
             StartingMotors::Stopped => ([Motor::STOPPED; 4], [Esc::ready(); 4]),
             StartingMotors::Settled => {
-                let up = start.state.attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0));
-                let along_axis = opendrone_maths::functions::max(up.z, 0.0);
-                let thrust = parameters.mass * world.gravity * along_axis / 4.0;
-                let speed = model.settled_speed(thrust);
+                let most = model.steady_speed(1.0, battery.voltage(), SpinDirection::Normal);
+                let speed = settled_speed(
+                    &airframe(&parameters, &positions),
+                    &model,
+                    &start.state,
+                    world,
+                    most,
+                );
                 let motor = Motor::steady(&model, speed, battery.voltage());
                 ([motor; 4], [Esc::running(); 4])
             }
         };
-        let positions = parameters.rotors.positions();
-        let turning = parameters.rotors.turning();
+        let speeds = motors.map(|motor| motor.speed);
+        let thrusts = match start.mount {
+            Mount::ThrustStand => speeds.map(|speed| model.thrust(speed)),
+            Mount::Free => {
+                let state = &start.state;
+                air::push(
+                    &airframe(&parameters, &positions),
+                    &model,
+                    state.attitude.world_to_body(state.velocity),
+                    state.rotation,
+                    speeds,
+                    world.air_density,
+                    world.gravity,
+                )
+                .thrusts
+            }
+        };
         let parts = parameters.shape.parts();
         let reach = parts
             .iter()
@@ -417,6 +476,7 @@ impl QuadBody {
             battery,
             positions,
             turning,
+            thrusts,
             air_density: world.air_density,
             parts,
             reach,
@@ -445,7 +505,7 @@ impl QuadBody {
             let motor = &self.motors[k];
             MotorOutput {
                 speed: motor.speed,
-                thrust: model.thrust(motor.speed),
+                thrust: self.thrusts[k],
                 torque: model.drag_torque(motor.speed),
                 current: motor.current,
                 supply_current: if volts > 0.0 {
@@ -487,6 +547,7 @@ impl QuadBody {
 
         // 1–3: the ESCs, the motors and the battery.
         let volts = self.battery.voltage();
+        let speeds_before = self.motors.map(|motor| motor.speed);
         let mut power = 0.0;
         for ((motor, esc), command) in self.motors.iter_mut().zip(&mut self.escs).zip(commands.0) {
             let drive = esc.step(
@@ -502,15 +563,18 @@ impl QuadBody {
         self.battery.step(&self.parameters.battery, power, dt);
 
         if self.mount == Mount::ThrustStand {
+            // Held still, in still air: each rotor gives its thrust-stand
+            // thrust.
+            self.thrusts = self.motors.map(|motor| model.thrust(motor.speed));
             return;
         }
 
-        // 4–7: the free move, with the motors' thrust and torques. 8: the
-        // collision stage starts from the speeds the free move gave, so the
-        // motors' push is in them, and redoes the move from where the step
-        // started.
+        // 4–7: the free move, with the rotors' thrust and torques and the
+        // air. 8: the collision stage starts from the speeds the free move
+        // gave, so their push is in them, and redoes the move from where the
+        // step started.
         let before = self.state;
-        self.move_freely(world, &model, dt);
+        self.move_freely(world, &model, speeds_before, dt);
         let collider = Collider {
             mass: self.parameters.mass,
             inertia_inverse: self.inertia_inverse,
@@ -529,31 +593,48 @@ impl QuadBody {
         );
     }
 
-    /// Steps 4 to 7: the move as if nothing were in the way, under gravity
-    /// and the motors' thrust and torques.
-    fn move_freely(&mut self, world: &World, model: &Model, dt: f64) {
+    /// Steps 4 to 7: the move as if nothing were in the way, under gravity,
+    /// the rotors' thrust and torques, and the air. `speeds_before` are the
+    /// motors' speeds before this step's.
+    fn move_freely(&mut self, world: &World, model: &Model, speeds_before: [f64; 4], dt: f64) {
+        let speeds = self.motors.map(|motor| motor.speed);
         let state = &mut self.state;
-        let mut thrust = 0.0;
-        let mut torque = Vec3::ZERO;
+        let push = air::push(
+            &airframe(&self.parameters, &self.positions),
+            model,
+            state.attitude.world_to_body(state.velocity),
+            state.rotation,
+            speeds,
+            world.air_density,
+            world.gravity,
+        );
+        self.thrusts = push.thrusts;
+
+        // Each prop's drag torque, and the rotors' own spin (step 6).
+        let rotor_inertia = self.parameters.props.rotor_inertia;
+        let mut torque = push.torque;
+        let mut spin = 0.0;
+        let mut spin_change = 0.0;
         for k in 0..4 {
-            let speed = self.motors[k].speed;
-            let force = model.thrust(speed);
-            thrust += force;
-            torque += self.positions[k].cross(Vec3::new(0.0, 0.0, force));
-            torque += Vec3::new(0.0, 0.0, -self.turning[k] * model.drag_torque(speed));
+            let turning = self.turning[k];
+            torque += Vec3::new(0.0, 0.0, -turning * model.drag_torque(speeds[k]));
+            spin += turning * rotor_inertia * speeds[k];
+            spin_change += turning * rotor_inertia * (speeds[k] - speeds_before[k]) / dt;
         }
+        let spin = Vec3::new(0.0, 0.0, spin);
 
         let gravity = Vec3::new(0.0, 0.0, -world.gravity);
-        let lift = state
+        let pushed = state
             .attitude
-            .body_to_world(Vec3::new(0.0, 0.0, thrust / self.parameters.mass));
-        let acceleration = gravity + lift;
+            .body_to_world(push.force / self.parameters.mass);
+        let acceleration = gravity + pushed;
         state.velocity += acceleration * dt;
         state.position += state.velocity * dt;
 
         let inertia = self.parameters.inertia;
         let w = state.rotation;
-        let angular_acceleration = self.inertia_inverse * (torque - w.cross(inertia * w));
+        let angular_acceleration = self.inertia_inverse
+            * (torque - Vec3::new(0.0, 0.0, spin_change) - w.cross(inertia * w + spin));
         state.rotation += angular_acceleration * dt;
         state.attitude = state.attitude.turned_by(state.rotation * dt);
     }
@@ -594,5 +675,75 @@ impl QuadBody {
             esc.write_fingerprint(f);
         }
         self.battery.write_fingerprint(f);
+    }
+}
+
+/// What the air needs to know about a Quad.
+fn airframe<'a>(parameters: &'a QuadParameters, positions: &'a [Vec3; 4]) -> air::Airframe<'a> {
+    let diameter = parameters.props.diameter;
+    air::Airframe {
+        mass: parameters.mass,
+        drag: &parameters.drag,
+        positions,
+        disc_area: core::f64::consts::PI * diameter * diameter / 4.0,
+    }
+}
+
+/// The speed "settled" motors spin at (see [`StartingMotors::Settled`]): the
+/// same on all four, whose thrust's upward part, with the air's push at the
+/// starting motion, carries the weight; at most `most`, the speed full drive
+/// holds; none upside down or past its side.
+fn settled_speed(
+    airframe: &air::Airframe,
+    model: &Model,
+    state: &QuadState,
+    world: &World,
+    most: f64,
+) -> f64 {
+    if state.attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0)).z <= 0.0 {
+        return 0.0;
+    }
+    let velocity = state.attitude.world_to_body(state.velocity);
+    // How much more than the weight the thrust and the air hold up, in
+    // newtons, with every rotor at `speed`.
+    let held_up = |speed: f64| {
+        let push = air::push(
+            airframe,
+            model,
+            velocity,
+            state.rotation,
+            [speed; 4],
+            world.air_density,
+            world.gravity,
+        );
+        state.attitude.body_to_world(push.force).z - airframe.mass * world.gravity
+    };
+    // With the motors stopped, the air alone (falling fast) may hold it up.
+    let stopped = held_up(0.0);
+    if stopped.is_nan() || stopped >= 0.0 {
+        return 0.0;
+    }
+    let flat_out = held_up(most);
+    if flat_out.is_nan() || flat_out <= 0.0 {
+        return most;
+    }
+    // Halve the gap between a speed too slow and one too fast until no
+    // number lies between them, then take the closer of the two.
+    let (mut slow, mut fast) = (0.0, most);
+    loop {
+        let middle = slow + (fast - slow) / 2.0;
+        if middle <= slow || middle >= fast {
+            break;
+        }
+        if held_up(middle) < 0.0 {
+            slow = middle;
+        } else {
+            fast = middle;
+        }
+    }
+    if -held_up(slow) <= held_up(fast) {
+        slow
+    } else {
+        fast
     }
 }

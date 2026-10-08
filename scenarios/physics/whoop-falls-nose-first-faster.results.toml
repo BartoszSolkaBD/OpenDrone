@@ -1,0 +1,40 @@
+# Results of whoop-falls-nose-first-faster.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65 falling nose first reaches a faster terminal speed, 18.3 m/s"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Rule"
+expected = "-8.9631 m/s ± 0.1%"
+measured = "-8.96 m/s"
+
+[[expect]]
+what     = "vertical speed at 10 s"
+basis    = "Rule"
+expected = "-18.251 m/s ± 0.1%"
+measured = "-18.3 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "598b4c12d962b95e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "eb3011ba966058eb"   # the whole state after each of 80000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1 s" = "2654e82940934cf5"
+"2 s" = "ca83b666a45faa36"
+"3 s" = "25c38daadea7d61a"
+"4 s" = "d34a9a0b6bcb129b"
+"5 s" = "abd9e9a70af9fa93"
+"6 s" = "116641df327765b8"
+"7 s" = "6e12642cae89bdf0"
+"8 s" = "417153062aa6359c"
+"9 s" = "159f7e821d7944d7"
+"10 s" = "11974f7f9d797d72"

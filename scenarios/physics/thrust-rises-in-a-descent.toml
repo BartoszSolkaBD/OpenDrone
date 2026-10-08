@@ -1,0 +1,91 @@
+# A Whoop 65 with no drag and no Prop Wash, hovering on settled motors, is
+# commanded 38% and held there. Its motors settle at one speed and its thrust
+# starts out below its weight, so it sinks; but the faster it sinks, the more
+# thrust the same rotor speed gives, until it gives exactly the weight and the
+# descent holds steady. With no drag, only the inflow can stop it speeding up.
+# Proves E10 in #10: at a fixed command, thrust rises in a descent.
+#
+# The working (momentum theory at the same power, flight-dynamics research
+# §4.3; crates/physics/src/air.rs, "Inflow"):
+#
+# - On the 4.0 V bench supply, 38% holds each motor at 2,282.46 rad/s,
+#   21,795.9 RPM (the motor model, crates/physics/src/motor.rs). Its thrust
+#   on the thrust stand is k_f·ω² = 1.3503 × 10⁻⁸ × 2,282.46² = 0.070346 N a
+#   rotor, 28.694 gf for four: 0.919367 times the weight, 31.211 gf.
+# - In still air that rotor pushes air down through its disc at
+#   v_h = √(T₀ / 2ρA) = 5.4630 m/s.
+# - Sinking steadily, its thrust is the weight: T₀ / ū = W / 4, so ū =
+#   0.919367, and (ū − x)·ū² = 1 gives x = ū − 1/ū² = −0.263736: a descent of
+#   0.263736 × 5.4630 m/s = 1.4408 m/s.
+#
+# That is about a quarter of v_h, below the band where a rotor sinks into its
+# own air (0.4 to 1.4 v_h, research §4.4), where Prop Wash takes over.
+format = 1
+name   = "At a fixed command, a drag-free Whoop 65's thrust rises as it sinks, until it sinks steadily"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag-bench-supply"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 30 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "38%" },
+]
+
+[[expect]]
+what   = "motor 1 speed"
+over   = "0.5 s to 12 s"
+lowest = "21795.9 RPM ± 0.01%"
+basis  = "rule: on the bench supply 38% holds the motor at 21,795.9 RPM (the motor model's steady speed); the prop's torque doesn't change with the air, so the descent never changes it"
+
+[[expect]]
+what    = "motor 1 speed"
+over    = "0.5 s to 12 s"
+highest = "21795.9 RPM ± 0.01%"
+basis   = "rule: on the bench supply 38% holds the motor at 21,795.9 RPM (the motor model's steady speed); the prop's torque doesn't change with the air, so the descent never changes it"
+
+[[expect]]
+what  = "total thrust"
+at    = "0.5 s"
+value = "between 28.694 gf and 31.211 gf"
+basis = "rule: sinking slowly, the rotors give more than their 28.694 gf on the thrust stand, since less air flows through them, but still less than the weight, 31.211 gf, since the descent is still speeding up"
+
+[[expect]]
+what  = "total thrust"
+at    = "12 s"
+value = "31.211 gf ± 0.1%"
+basis = "rule: once the descent is steady, with no drag, the thrust is the weight, 0.0312 kg × 9.81 m/s² = 31.211 gf: 8.8% more than the same rotor speed gave in a hover"
+
+[[expect]]
+what  = "vertical speed"
+at    = "12 s"
+value = "-1.4408 m/s ± 0.3%"
+basis = "rule: momentum theory at the same power: the flow through the disc ū = 0.919367 v_h, so the climb is (ū − 1/ū²)·v_h = −0.263736 × 5.4630 m/s = −1.4408 m/s, a descent (working above); 12 s is 99.9% of the way there"

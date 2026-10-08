@@ -51,7 +51,11 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/freestyle-5-bench-supply",
             "test/freestyle-5-no-drag",
             "test/whoop-65-bench-supply",
-            "test/whoop-65-no-drag"
+            "test/whoop-65-body-drag-only",
+            "test/whoop-65-ducts-only",
+            "test/whoop-65-no-drag",
+            "test/whoop-65-no-drag-bench-supply",
+            "test/whoop-65-rotor-drag-only"
         ]
     );
 }
@@ -67,6 +71,9 @@ fn the_whoop_65_weighs_its_dry_mass_plus_its_lava_ii_pack() {
         (roll - 7e-6).abs() < 1e-18 && (pitch - 9e-6).abs() < 1e-18 && (yaw - 1.4e-5).abs() < 1e-18
     );
     assert!(whoop.parameters.drag.duct_ram > 0.0);
+    // The ducts' ram drag acts 0.75 × the 17.5 mm rotor radius above the
+    // props' plane.
+    assert!((whoop.parameters.drag.duct_offset - 0.013).abs() < 1e-15);
 }
 
 #[test]
@@ -77,6 +84,7 @@ fn the_freestyle_5_weighs_about_650_g_with_its_pack() {
     assert!((five.parameters.mass - 0.652).abs() < 1e-12);
     assert!(five.ducts.is_none());
     assert_eq!(five.parameters.drag.duct_ram, 0.0);
+    assert_eq!(five.parameters.drag.duct_offset, 0.0);
 }
 
 #[test]

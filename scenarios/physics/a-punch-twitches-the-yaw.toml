@@ -1,0 +1,93 @@
+# A Whoop 65 hovering on settled motors punches its anticlockwise pair: motors
+# 2 and 3 (front right and rear left, which turn anticlockwise seen from above
+# with the props in) go to 100% for 0.2 s, then back. Proves E7 in #10: a
+# punch twitches the yaw the right way.
+#
+# A motor speeding its rotor up turns the frame the other way, as hard as it
+# speeds the rotor up: the anticlockwise rotors speeding up turn the Quad
+# clockwise, nose right, at once. Slowing them turns it back, nose left, at
+# once. The props' drag yaws it the same way as the punch too (E4, "A Whoop
+# 65 yaws against its rotors' net spin"), but only as their speed builds:
+#
+# - On the first step after the punch (0.125 ms), a 35 ms spin-up moves each
+#   rotor 1/280 of the way from its hover speed, 2,380 rad/s, towards full
+#   speed, about 5,070 rad/s: about 9.6 rad/s. Its spin reaction is its
+#   inertia times that over the step: 2.5 × 10⁻⁸ kg·m² × 9.6 rad/s / 0.125 ms
+#   ≈ 1.9 × 10⁻³ N·m a rotor, twice that for the pair, which over the yaw
+#   inertia, 140 g·cm², turns it at about 2 °/s.
+# - The pair's extra drag over that step is k_m·(2,390² − 2,380²) ≈
+#   3.1 × 10⁻⁶ N·m a rotor: 600 times less.
+format = 1
+name   = "A punch on its anticlockwise pair twitches a Whoop 65's nose right at once, and the chop twitches it back"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# 37.3%: the drive that holds a hover on this pack once it has sagged under
+# the hover's load. Motors in Betaflight's order: rear right, front right,
+# rear left, front left.
+timeline = [
+  { at = "0 s",   motors = "37.3%" },
+  { at = "0.1 s", motors = "37.3%, 100%, 100%, 37.3%" },
+  { at = "0.3 s", motors = "37.3%" },
+]
+
+[[expect]]
+what   = "yaw rate"
+over   = "0 s to 0.1 s"
+lowest = "0 °/s ± 0.05 °/s"
+basis  = "rule: before the punch all four rotors turn at one speed, so their drags and spins cancel"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.100125 s"
+value = "between 1 °/s and 3 °/s"
+basis = "rule: one step after the punch, the pair's spin reaction turns the nose right at about 2 °/s, while their extra drag could have done only a six-hundredth of that (working above)"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.11 s"
+value = "137 °/s ± 5 °/s"
+basis = "observed: 10 ms into the punch it yaws right at 137 °/s"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.3 s"
+value = "1290 °/s ± 30 °/s"
+basis = "observed: after 0.2 s of the punch the pair's drag has it yawing at 1,290 °/s"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.31 s"
+value = "1180 °/s ± 30 °/s"
+basis = "observed: 10 ms after the chop it yaws 110 °/s slower, though the pair still turns faster than the other two, so their drag still yaws it right: the slowing rotors' spin reaction twitches it back"
