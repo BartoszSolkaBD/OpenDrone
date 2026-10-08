@@ -155,7 +155,7 @@ fn a_step_adding_an_assist_to_every_scenario_keeps_every_comment_and_every_resul
 }
 
 #[test]
-fn a_scenario_step_rewrites_only_scenarios() {
+fn a_scenario_step_rewrites_every_scenario_and_only_scenarios() {
     let labels: Vec<String> = repo()
         .files_to_migrate(Family::Scenarios)
         .unwrap()
@@ -165,11 +165,23 @@ fn a_scenario_step_rewrites_only_scenarios() {
             file.label
         })
         .collect();
-    assert!(labels.contains(&"scenarios/physics/free-fall-is-exactly-g.toml".to_string()));
+    for scenario in [
+        "scenarios/physics/free-fall-is-exactly-g.toml",
+        // A fixture the Scenario catalogue's checks read: Scenarios are never
+        // upgraded in memory, so the checks' own Scenarios move too.
+        "crates/xtask/tests/fixtures/scenarios/physics/free-fall.toml",
+    ] {
+        assert!(
+            labels.contains(&scenario.to_string()),
+            "{scenario} in {labels:?}"
+        );
+    }
     for label in &labels {
         assert!(
-            !label.ends_with(".results.toml") && !label.starts_with("scenarios/test-quads/"),
-            "{label}: Results files are written by the runner, and Test Quads are Pack files"
+            !label.ends_with(".results.toml")
+                && !label.starts_with("scenarios/test-quads/")
+                && !label.starts_with("crates/pack/"),
+            "{label}: Results files are written by the runner, and Test Quads, Test Maps and the Pack checker's fixtures are Pack files"
         );
     }
 }

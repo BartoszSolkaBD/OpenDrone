@@ -9,6 +9,7 @@
 mod common;
 
 use common::{Fixture, LOG, MANIFEST, QUAD, TEST_QUAD, TUNE};
+use opendrone_pack::document::FORMAT;
 use opendrone_pack::{Confidence, PropDirection, read_quad_file};
 
 fn at(file: &str, line: usize, sentence: &str) -> String {
@@ -95,7 +96,7 @@ fn the_broken_fixture_packs_list_every_problem_at_once_and_load_what_passes() {
     assert_eq!(
         packs.problems().0.iter().map(ToString::to_string).collect::<Vec<_>>(),
         [
-            "packs/broken/quads/from-a-newer-opendrone/quad.toml line 2: this file is format 2, so it needs a newer OpenDrone: this one reads format 1".to_string(),
+            format!("packs/broken/quads/from-a-newer-opendrone/quad.toml line 2: this file is format 1000, so it needs a newer OpenDrone: this one reads format {FORMAT}"),
             at(quad, line("no Confidence"), "[frame] inertia needs a Confidence: add confidence = \"Measured\", \"Manufacturer\", \"Derived\" or \"Estimate\""),
             at(quad, line("without a range"), "[frame] rotor_height is an Estimate, so it needs the `range` it may move within, such as range = \"×0.5–×2\""),
             at(quad, line("4.7 in"), "`pitch` isn't something OpenDrone reads in [props]; it reads `diameter`, `blades`, `direction`, `thrust_coefficient`, `power_coefficient`, `rotor_drag`, `rotor_inertia`, `reverse_thrust`, `reverse_torque`, `grip`"),
@@ -753,26 +754,17 @@ fn only_test_quads_live_in_the_test_quad_folder() {
 
 #[test]
 fn a_newer_format_is_refused_as_needing_a_newer_opendrone() {
+    // One newer than the newest, which this OpenDrone reads.
+    let newer = FORMAT + 1;
     let fixture = Fixture::new("newer")
-        .change(QUAD, "format = 1", "format = 2")
-        .change(TEST_QUAD, "format   = 1", "format   = 2");
+        .change(QUAD, "format = 1", &format!("format = {newer}"))
+        .change(TEST_QUAD, "format   = 1", &format!("format   = {newer}"));
     let problems = fixture.problems();
-    assert_eq!(
-        problems[0],
-        at(
-            QUAD,
-            2,
-            "this file is format 2, so it needs a newer OpenDrone: this one reads format 1"
-        )
+    let sentence = format!(
+        "this file is format {newer}, so it needs a newer OpenDrone: this one reads format {FORMAT}"
     );
-    assert_eq!(
-        problems[1],
-        at(
-            TEST_QUAD,
-            2,
-            "this file is format 2, so it needs a newer OpenDrone: this one reads format 1"
-        )
-    );
+    assert_eq!(problems[0], at(QUAD, 2, &sentence));
+    assert_eq!(problems[1], at(TEST_QUAD, 2, &sentence));
 }
 
 #[test]
@@ -787,7 +779,9 @@ fn every_file_starts_with_its_format() {
         [at(
             QUAD,
             fixture.line_of(QUAD, "format = 1"),
-            "every file starts with `format = 1`, before anything else but comments"
+            &format!(
+                "every file starts with `format = {FORMAT}`, before anything else but comments"
+            )
         )]
     );
 }

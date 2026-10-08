@@ -8,10 +8,13 @@
 //! Scenario. Every Results file must stay the same. The steps themselves are
 //! `opendrone_pack::migration`'s, shared with the Pack files.
 
+use std::fs;
+
+use opendrone_pack::document::Document;
 use opendrone_pack::migration::{Family, FileKind, MigrationFile, Step, pack_files, toml_files};
 use opendrone_pack::{Problems, TEST_MAPS_FOLDER};
 
-use crate::Repo;
+use crate::{RESULTS_ENDING, Repo, walk};
 
 /// The steps that bring an older Scenario up to date, one format each, in
 /// order: the first upgrades format 1, the next format 2, and so on.
@@ -25,25 +28,52 @@ pub const SCENARIO_STEPS: &[Step] = &[];
 pub const SCENARIO_FORMAT: i64 = 1 + SCENARIO_STEPS.len() as i64;
 
 impl Repo {
-    /// Every file a step of `family` rewrites: every Scenario in
-    /// `scenarios/`; or every Pack file in `packs/`, every Test Quad in
-    /// `scenarios/test-quads/` and every built-in Test Map in
-    /// `crates/pack/test-maps/`. Results files are never migrated: the
-    /// runner writes them.
+    /// Every file a step of `family` rewrites:
+    ///
+    /// - for Scenarios, every Scenario in `scenarios/`, then every Scenario
+    ///   the checks keep as a fixture under `crates/`, found by its
+    ///   `[start]` table. Scenarios are never upgraded in memory, so a
+    ///   fixture left in an older format would be refused;
+    /// - for Pack files, every Pack file in `packs/`, every Test Quad in
+    ///   `scenarios/test-quads/` and every built-in Test Map in
+    ///   `crates/pack/test-maps/`. The checks' fixture Packs are left as
+    ///   they are: the Pack reader upgrades them in memory.
+    ///
+    /// Results files are never migrated: the runner writes them.
     pub fn files_to_migrate(&self, family: Family) -> Result<Vec<MigrationFile>, Problems> {
         match family {
             Family::Scenarios => {
                 let files = self.scenario_files().map_err(|error| {
                     Problems::of_file("scenarios", format!("can't be read: {error}"))
                 })?;
-                Ok(files
+                let mut files: Vec<MigrationFile> = files
                     .into_iter()
                     .map(|file| MigrationFile {
                         label: file.label(),
                         path: file.path,
                         kind: FileKind::Scenario,
                     })
-                    .collect())
+                    .collect();
+                let mut fixtures = Vec::new();
+                walk(
+                    &self.root.join("crates"),
+                    "crates/",
+                    &mut |relative, path| {
+                        if relative.ends_with(".toml")
+                            && !relative.ends_with(RESULTS_ENDING)
+                            && fs::read_to_string(path).is_ok_and(|text| is_a_scenario(&text))
+                        {
+                            fixtures.push(MigrationFile {
+                                path: path.to_path_buf(),
+                                label: relative.to_string(),
+                                kind: FileKind::Scenario,
+                            });
+                        }
+                    },
+                )
+                .map_err(|error| Problems::of_file("crates", format!("can't be read: {error}")))?;
+                files.extend(fixtures);
+                Ok(files)
             }
             Family::Packs => {
                 let mut files = pack_files(&self.root.join("packs"), "packs")?;
@@ -61,4 +91,13 @@ impl Repo {
             }
         }
     }
+}
+
+/// Whether a TOML file is a Scenario: it has a `format` line and a `[start]`
+/// table, which no other file OpenDrone reads has.
+fn is_a_scenario(text: &str) -> bool {
+    Document::parse("file", text).is_ok_and(|doc| {
+        let root = doc.root();
+        root.get("format").is_some() && root.get("start").is_some_and(|start| start.is_table())
+    })
 }
