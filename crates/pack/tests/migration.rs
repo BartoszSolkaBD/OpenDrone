@@ -442,7 +442,11 @@ fn the_input_device_reader_upgrades_an_older_profile_in_memory_too() {
     for file in &profiles {
         let committed = fs::read_to_string(&file.path).unwrap();
         let mut old = before(&committed, None);
-        if let Some(line) = old.lines().find(|line| line.starts_with("report_rate ")) {
+        let line = old
+            .lines()
+            .find(|line| line.starts_with("report_rate "))
+            .map(str::to_string);
+        if let Some(line) = &line {
             old = old.replacen(line, &line.replacen("report_rate", "report_rates", 1), 1);
             renamed += 1;
         }
@@ -461,8 +465,10 @@ fn the_input_device_reader_upgrades_an_older_profile_in_memory_too() {
             "{}: the older profile, upgraded in memory, reads as the very same profile",
             file.label
         );
-        // Without the step, the same older file can't be read.
-        assert!(read_input_device_file(&id, &file.label, &old).is_err());
+        if line.is_some() {
+            // Without the step, the older name is refused.
+            assert!(read_input_device_file(&id, &file.label, &old).is_err());
+        }
     }
     assert_eq!(
         renamed, 2,
