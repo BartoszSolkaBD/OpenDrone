@@ -1,0 +1,105 @@
+# A Whoop 65 with body drag as its only drag starts pitched 20° nose down,
+# flying north at the speed where its body drag matches its thrust's forward
+# part, with its motors "settled": spinning at the speed that holds its
+# height at that motion. Tilted, holding the height takes more thrust than
+# the weight, and that thrust's forward part is what holds the speed against
+# the drag. Proves mid-air starts with settled motors (#10 §1, ADR-0002) once
+# drag acts: a tilted, moving start holds its height and its speed at the
+# first step.
+#
+# The working (crates/physics/src/air.rs, "Body drag"): the thrust points
+# along the tilted up axis and the drag against the motion, level, so
+#
+# - height: thrust × cos 20° = weight, so the thrust is 31.211 gf / cos 20° =
+#   33.214 gf;
+# - speed: thrust × sin 20° = weight × tan 20° = 0.30607 N × 0.36397 =
+#   0.11140 N must equal the body drag, ½ρ·|A·v|·v. Pitched 20°, the air
+#   meets the Quad's front (15 cm²) at cos 20° and its top (17 cm²) at
+#   sin 20°, so it shows the air √((15 cos 20°)² + (17 sin 20°)²) =
+#   15.248 cm², and ½ × 1.225 kg/m³ × 0.0015248 m² × v² = 0.11140 N at
+#   v = 10.922 m/s.
+#
+# Its rotors see the air too (the climb along their tilted axes, and the air
+# across them), so the settled speed is not a hover's; but the thrust it
+# gives is what the working needs.
+format = 1
+name   = "Settled motors hold a tilted, moving Whoop 65's height and speed from the first step"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-body-drag-only"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "roll 0°, pitch -20°, heading 0°"
+speed             = "0 m/s east, 10.922 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "40.7%" },
+]
+
+[[expect]]
+what  = "total thrust"
+at    = "0 s"
+value = "33.214 gf ± 0.01%"
+basis = "rule: holding the height pitched 20°, the thrust is the weight over cos 20°: 31.211 gf / 0.93969 = 33.214 gf"
+
+[[expect]]
+what  = "vertical acceleration"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.02 m/s²"
+basis = "rule: the thrust's upward part carries the weight, and body drag, against a level motion, has no upward part; a motor moves only 1/280 of the way towards a new command in one step"
+
+[[expect]]
+what  = "acceleration north"
+at    = "0.000125 s"
+value = "0 m/s² ± 0.02 m/s²"
+basis = "rule: at 10.922 m/s the body drag equals the thrust's forward part, 0.11140 N (working above)"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "0 s"
+value = "24300 RPM ± 0.5%"
+basis = "observed: faster than a hover's 22,732 RPM: tilted, it needs 6.4% more thrust, and the air arriving along its tilted rotors' axes takes more than the air across them gives"
+
+[[expect]]
+what   = "height"
+over   = "0 s to 1 s"
+lowest = "2 m ± 0.005 m"
+basis  = "observed: held at 40.7%, the drive that holds the settled speed once the pack has sagged under the load, it keeps its height within 5 mm for a second"
+
+[[expect]]
+what    = "height"
+over    = "0 s to 1 s"
+highest = "2 m ± 0.005 m"
+basis   = "observed: held at 40.7%, the drive that holds the settled speed once the pack has sagged under the load, it keeps its height within 5 mm for a second"
+
+[[expect]]
+what  = "speed north"
+at    = "1 s"
+value = "10.922 m/s ± 0.005 m/s"
+basis = "observed: and its speed within 5 mm/s"

@@ -1,0 +1,91 @@
+# A Whoop 65 with no drag, hovering on settled motors, is commanded 45% and
+# held there. Its motors settle at one speed and its thrust starts out above
+# its weight, so it climbs; but the faster it climbs, the less thrust the same
+# rotor speed gives, until it gives exactly the weight and the climb holds
+# steady. With no drag, only the inflow can stop it speeding up. Proves E10 in
+# #10: at a fixed command, thrust drops in a climb.
+#
+# The working (momentum theory at the same power, flight-dynamics research
+# §4.3; crates/physics/src/air.rs, "Inflow"):
+#
+# - On the 4.0 V bench supply, 45% holds each motor at the speed where its
+#   torque meets the prop's: 2,613.47 rad/s, 24,956.8 RPM (the motor model,
+#   crates/physics/src/motor.rs). Its thrust on the thrust stand is then
+#   k_f·ω² = 1.3503 × 10⁻⁸ × 2,613.47² = 0.092228 N a rotor, 37.620 gf for
+#   four: 1.20536 times the weight, 31.211 gf.
+# - In still air that rotor pushes air down through its disc (35 mm across,
+#   A = 9.6211 × 10⁻⁴ m²) at v_h = √(T₀ / 2ρA) = 6.2552 m/s.
+# - Climbing steadily, its thrust is the weight: T₀ / ū = W / 4, so the flow
+#   through the disc is ū = 1.20536 (in units of v_h), and the climb x solves
+#   (ū − x)·ū² = 1: x = ū − 1/ū² = 0.517078. The climb is x·v_h = 3.2345 m/s.
+#
+# It gets there as a lag: about 99.9% of the way by 12 s.
+format = 1
+name   = "At a fixed command, a drag-free Whoop 65's thrust falls as it climbs, until it climbs steadily"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag-bench-supply"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "45%" },
+]
+
+[[expect]]
+what   = "motor 1 speed"
+over   = "0.5 s to 12 s"
+lowest = "24956.8 RPM ± 0.01%"
+basis  = "rule: on the bench supply 45% holds the motor at 24,956.8 RPM (the motor model's steady speed); the prop's torque doesn't change with the air, so the climb never changes it"
+
+[[expect]]
+what    = "motor 1 speed"
+over    = "0.5 s to 12 s"
+highest = "24956.8 RPM ± 0.01%"
+basis   = "rule: on the bench supply 45% holds the motor at 24,956.8 RPM (the motor model's steady speed); the prop's torque doesn't change with the air, so the climb never changes it"
+
+[[expect]]
+what  = "total thrust"
+at    = "0.5 s"
+value = "between 31.211 gf and 37.620 gf"
+basis = "rule: climbing slowly, the rotors give less than their 37.620 gf on the thrust stand, since air already flows faster through them, but still more than the weight, 31.211 gf, since the climb is still speeding up"
+
+[[expect]]
+what  = "total thrust"
+at    = "12 s"
+value = "31.211 gf ± 0.1%"
+basis = "rule: once the climb is steady, with no drag, the thrust is the weight, 0.0312 kg × 9.81 m/s² = 31.211 gf: a fifth less than the same rotor speed gave at the start"
+
+[[expect]]
+what  = "vertical speed"
+at    = "12 s"
+value = "3.2345 m/s ± 0.3%"
+basis = "rule: momentum theory at the same power: the flow through the disc ū = 1.20536 v_h, so the climb is (ū − 1/ū²)·v_h = 0.517078 × 6.2552 m/s = 3.2345 m/s (working above); 12 s is 99.9% of the way there"

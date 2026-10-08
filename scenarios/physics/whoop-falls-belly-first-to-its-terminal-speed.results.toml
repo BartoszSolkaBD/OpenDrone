@@ -1,0 +1,46 @@
+# Results of whoop-falls-belly-first-to-its-terminal-speed.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65 falling belly first reaches its terminal speed, 17.1 m/s"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Rule"
+expected = "-8.8632 m/s ± 0.1%"
+measured = "-8.86 m/s"
+
+[[expect]]
+what     = "vertical speed at 10 s"
+basis    = "Rule"
+expected = "-17.145 m/s ± 0.1%"
+measured = "-17.1 m/s"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.000001°"
+measured = "0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "a6f68eee46424839"   # the whole state after each of 80000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1 s" = "0d2a9be61e516f88"
+"2 s" = "6280fee284821dce"
+"3 s" = "de94140b15919c79"
+"4 s" = "0e9a52b3e51ba16b"
+"5 s" = "f93d373aaeefa73d"
+"6 s" = "04e260c416fba79e"
+"7 s" = "10dba5591d2bcf1b"
+"8 s" = "ec18360e7d6175e6"
+"9 s" = "072447181ddbdff5"
+"10 s" = "d8c35cb22c1482d0"

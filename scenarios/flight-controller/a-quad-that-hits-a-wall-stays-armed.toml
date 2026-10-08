@@ -11,8 +11,17 @@
 # (60% of the motor range) with the gyro moving for 75 ms, until half a
 # second of normal flight switches it off (src/main/fc/core.c). A mid-air
 # start skips that half second, so the Expectations below also check that the
-# hit holds the PID sums there for less than 75 ms: the pitch sum is above
-# 600 from about 0.486 s to 0.517 s, about 31 ms.
+# hit holds the PID sums there for less than 75 ms.
+#
+# What the hit does (since the air, #42): rotor and body drag slow the Quad
+# from 10 m/s to 7.8 m/s before it reaches the wall at about 0.555 s. The
+# pitch sum is above 600 from then to about 0.587 s, about 32 ms. The hit
+# tips its nose 47° into the wall, and Acro holds it there, so its thrust
+# drives it up the wall's face, and from about 1.04 s to 1.33 s it scrapes
+# over the wall's top, 5 m up, in many short knocks: the pitch sum keeps
+# reaching past 600 and falling back below within 30 ms, the roll sum's
+# spikes last 15 ms at most and the yaw sum's 30 ms. After that it flies on
+# east, clear of the wall.
 #
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with
@@ -61,8 +70,8 @@ basis   = "rule: the wall's face is at 5 m east and the Quad never passes throug
 [[expect]]
 what  = "speed east"
 at    = "1 s"
-value = "0.374 m/s ± 0.5 m/s"
-basis = "observed: the wall stopped the Quad, from 10 m/s east to almost nothing"
+value = "1.36 m/s ± 0.5 m/s"
+basis = "observed: the wall stopped the Quad, from the 7.8 m/s the air had slowed it to; at 1 s it is sliding up the wall's face, nose into it, about to scrape over the top (it was 0.374 m/s with no air, #42)"
 
 [[expect]]
 what  = "the Quad disarms"
@@ -81,42 +90,156 @@ basis  = "source: armed, Betaflight's mixer with Airmode never drops a motor bel
 
 [[expect]]
 what    = "pitch PID sum"
-over    = "0 s to 0.485 s"
+over    = "0 s to 0.55 s"
 highest = "between -600 and 600"
 basis   = "observed: before the hit, level flight asks next to nothing"
 
 [[expect]]
 what    = "pitch PID sum"
-over    = "0.52 s to 3 s"
+over    = "0.59 s to 1.04 s"
 highest = "between -600 and 600"
-basis   = "observed: the hit at about 0.486 s drives the pitch PID sum above 600 for about 31 ms; from 0.52 s on it stays below, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis   = "observed: the hit at about 0.555 s drives the pitch PID sum above 600 for about 32 ms; from 0.59 s it stays below until the Quad reaches the wall's top"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "0.52 s to 3 s"
 lowest = "between -600 and 600"
-basis  = "observed: nor below -600 after the hit"
+basis  = "observed: it never goes below -600"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.04 s to 1.07 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.07 s to 1.10 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.10 s to 1.13 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.13 s to 1.16 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.16 s to 1.19 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.19 s to 1.22 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.22 s to 1.25 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.25 s to 1.28 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.28 s to 1.31 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "1.31 s to 1.34 s"
+lowest = "between -600 and 600"
+basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what    = "pitch PID sum"
+over    = "1.34 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: clear of the wall, it stays below 600"
 
 [[expect]]
 what    = "roll PID sum"
-over    = "0 s to 3 s"
+over    = "0 s to 0.55 s"
 highest = "between -600 and 600"
-basis   = "observed: the hit is square on, so roll asks next to nothing"
+basis   = "observed: before the hit, level flight asks next to nothing"
 
 [[expect]]
 what   = "roll PID sum"
-over   = "0 s to 3 s"
+over   = "0 s to 0.55 s"
 lowest = "between -600 and 600"
-basis  = "observed: the hit is square on, so roll asks next to nothing"
+basis  = "observed: before the hit, level flight asks next to nothing"
+
+[[expect]]
+what    = "roll PID sum"
+over    = "0.59 s to 1.04 s"
+highest = "between -600 and 600"
+basis   = "observed: the hit is square on: after its first knock, roll asks next to nothing until the wall's top"
+
+[[expect]]
+what   = "roll PID sum"
+over   = "0.59 s to 1.04 s"
+lowest = "between -600 and 600"
+basis  = "observed: the hit is square on: after its first knock, roll asks next to nothing until the wall's top"
+
+[[expect]]
+what    = "roll PID sum"
+over    = "1.34 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: clear of the wall, roll asks next to nothing"
+
+[[expect]]
+what   = "roll PID sum"
+over   = "1.34 s to 3 s"
+lowest = "between -600 and 600"
+basis  = "observed: clear of the wall, roll asks next to nothing"
 
 [[expect]]
 what    = "yaw PID sum"
-over    = "0 s to 3 s"
+over    = "0 s to 0.55 s"
 highest = "between -600 and 600"
-basis   = "observed: the hit is square on, so yaw asks next to nothing"
+basis   = "observed: before the hit, level flight asks next to nothing"
 
 [[expect]]
 what   = "yaw PID sum"
-over   = "0 s to 3 s"
+over   = "0 s to 0.55 s"
 lowest = "between -600 and 600"
-basis  = "observed: the hit is square on, so yaw asks next to nothing"
+basis  = "observed: before the hit, level flight asks next to nothing"
+
+[[expect]]
+what    = "yaw PID sum"
+over    = "0.59 s to 1.04 s"
+highest = "between -600 and 600"
+basis   = "observed: the hit is square on: after its first knock, yaw asks next to nothing until the wall's top"
+
+[[expect]]
+what   = "yaw PID sum"
+over   = "0.59 s to 1.04 s"
+lowest = "between -600 and 600"
+basis  = "observed: the hit is square on: after its first knock, yaw asks next to nothing until the wall's top"
+
+[[expect]]
+what    = "yaw PID sum"
+over    = "1.34 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: clear of the wall, yaw asks next to nothing"
+
+[[expect]]
+what   = "yaw PID sum"
+over   = "1.34 s to 3 s"
+lowest = "between -600 and 600"
+basis  = "observed: clear of the wall, yaw asks next to nothing"

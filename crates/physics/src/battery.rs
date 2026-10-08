@@ -127,7 +127,10 @@ impl Battery {
     pub(crate) fn step(&mut self, parameters: &BatteryParameters, power: f64, dt: f64) {
         let cells = f64::from(parameters.cells);
         let resting = cells * parameters.resting_cell_voltage(self.charge(parameters));
-        let open = resting - cells * self.slow_sag;
+        // The slow sag can outgrow what is left of a pack far past empty; its
+        // open voltage then stops at nothing, so it never drives a current
+        // the wrong way.
+        let open = functions::max(resting - cells * self.slow_sag, 0.0);
         let resistance = parameters.resistance + parameters.connector;
         let (voltage, current) = if resistance > 0.0 {
             // V² − E·V + R·P = 0, and the current is P / V. When the load asks
@@ -174,5 +177,31 @@ impl Battery {
             self.voltage,
             self.current,
         ]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_pack_whose_slow_sag_outgrows_its_voltage_gives_no_current_never_a_negative_one() {
+        let parameters = BatteryParameters {
+            cells: 1,
+            capacity: 0.320 * 3600.0,
+            voltage_curve: vec![(1.0, 4.2), (0.0, 3.3)],
+            resistance: 0.029,
+            connector: 0.010,
+            recovery: 3.3,
+            slow_sag: 3.6,
+        };
+        // Twice the capacity past empty, the curve's last stretch carried on
+        // down gives 1.5 V at rest; a slow sag of 2 V is more than that.
+        let mut battery = Battery::new(&parameters, -2.0);
+        assert!((battery.voltage() - 1.5).abs() < 1e-12);
+        battery.slow_sag = 2.0;
+        battery.step(&parameters, 5.0, 1e-3);
+        assert_eq!(battery.current, 0.0);
+        assert_eq!(battery.voltage, 0.0);
     }
 }

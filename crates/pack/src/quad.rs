@@ -1303,6 +1303,7 @@ fn definition(
             rotor: props.rotor_drag,
             // A Quad without ducts has no duct drag.
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
+            duct_offset: ducts.as_ref().map_or(0.0, |d| d.nose_up_offset),
         },
         rotors: RotorLayout {
             diagonal: frame.diagonal,

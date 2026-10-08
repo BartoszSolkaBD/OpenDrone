@@ -33,7 +33,7 @@ dry_mass     = { value = "23.0 g", confidence = "Manufacturer", source = "betafp
 diagonal     = { value = "66 mm",  confidence = "Manufacturer", source = "wheelbase" }   # motor to motor
 inertia      = { value = "roll 70, pitch 90, yaw 140 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "dynamics" }
 rotor_height = { value = "8 mm", confidence = "Estimate", range = "0–15 mm", source = "layout" }   # the props' plane above the centre of mass
-drag_area    = { value = "front 9, side 9, top 25 cm²", confidence = "Estimate", range = "×0.5–×2", source = "first-guess" }
+drag_area    = { value = "front 15, side 17, top 17 cm²", confidence = "Estimate", range = "×0.5–×2", source = "drag-areas" }
 
 [collision]   # simple shapes (#16 §4, #26 §1); each box is front to back × side to side × top to bottom
 body        = { value = "box 35 × 30 × 20 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "layout" }   # frame and canopy
@@ -49,7 +49,7 @@ blades             = 3            # a count: no Confidence
 direction          = "props-in"   # a choice; the Tune's yaw_motors_reversed must match
 thrust_coefficient = { value = "0.29", confidence = "Estimate", range = "0.2–0.46", source = "thrust-35mm" }
 power_coefficient  = { value = "0.26", confidence = "Estimate", range = "0.18–0.37", source = "motor-model" }
-rotor_drag         = { value = "0.3 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "first-guess" }
+rotor_drag         = { value = "0.3 s⁻¹", confidence = "Estimate", range = "0.1–0.6 s⁻¹", source = "rotor-drag" }
 rotor_inertia      = { value = "0.25 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "rotor-inertia" }   # prop and motor bell
 reverse_thrust     = { value = "50%", confidence = "Estimate", range = "25–75%", source = "crashes" }    # of forward, at the same speed
 reverse_torque     = { value = "100%", confidence = "Estimate", range = "50–100%", source = "crashes" }
@@ -143,6 +143,8 @@ motor-model     = "docs/research/quad-definitions.md: worked from BetaFPV's 30.6
 rotor-inertia   = "docs/research/quad-definitions.md: a 0.25 g 35 mm prop plus an 0802 motor's bell; it gives a spin-up of about 30 ms, inside the motor lag's range"
 layout          = "docs/research/quad-definitions.md: estimated from the frame's layout in BetaFPV's photos; nothing measured"
 first-guess     = "a first guess with no source yet, from #16's sample Quad file; the effect's own ticket (motors #41, air #42) works out the real value"
+drag-areas      = "docs/research/quad-definitions.md: each the silhouette of the collision shapes (frame and canopy, pack, duct rings) seen from the front, the side and above, times a drag coefficient of 1, as for the Freestyle 5″; seen from above, the prop discs are left out, since the air through them is the rotors' own. flight-dynamics.md §4.1 says to estimate them from the frame, then fit them to top speed and terminal speed: a Feel Test settles them"
+rotor-drag      = "docs/research/flight-dynamics.md §4.2: 0.24–0.54 s⁻¹ measured on a 610 g quad with six-inch props (Faessler et al. [S5]); nothing is measured on a whoop, whose ducts add their own ram drag on top ([ducts]). #16's 0.3 s⁻¹ is kept, inside that span, until a Feel Test"
 crashes         = "#26's resolution §3 and §5: reverse thrust and torque, and prop grip"
 bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before a restart, at most 3 restarts after a stall, and start-up power capped at Startup Power Max, 5 of 255 (1.96%)"
 battery-window  = "docs/research/flight-dynamics.md §5.3: a LiHV cell runs from 4.35 V down to about 3.3 V"

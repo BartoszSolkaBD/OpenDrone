@@ -1,0 +1,70 @@
+# Results of settled-motors-hold-a-tilted-moving-start.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Settled motors hold a tilted, moving Whoop 65's height and speed from the first step"
+
+[[expect]]
+what     = "total thrust at 0 s"
+basis    = "Rule"
+expected = "33.214 gf ± 0.01%"
+measured = "33.2 gf"
+
+[[expect]]
+what     = "vertical acceleration at 0.000125 s"
+basis    = "Rule"
+expected = "0 m/s² ± 0.02 m/s²"
+measured = "0.000916 m/s²"
+
+[[expect]]
+what     = "acceleration north at 0.000125 s"
+basis    = "Rule"
+expected = "0 m/s² ± 0.02 m/s²"
+measured = "0.000170 m/s²"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Observed"
+expected = "24300 RPM ± 0.5%"
+measured = "24300 RPM"
+
+[[expect]]
+what     = "height, lowest over 0 s to 1 s"
+basis    = "Observed"
+expected = "2 m ± 0.005 m"
+measured = "2.00 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 1 s"
+basis    = "Observed"
+expected = "2 m ± 0.005 m"
+measured = "2.00 m"
+
+[[expect]]
+what     = "speed north at 1 s"
+basis    = "Observed"
+expected = "10.922 m/s ± 0.005 m/s"
+measured = "10.9 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "5a077a760388ae0e"   # test/whoop-65-body-drag-only: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "76993175f8fc1a44"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "cfe3cad2276e6a0b"
+"0.2 s" = "8c8a817309a1fcbc"
+"0.3 s" = "ee2ef83997d57a8c"
+"0.4 s" = "e80de1fd56458f42"
+"0.5 s" = "b51c6a1610f753ce"
+"0.6 s" = "03e323264cbd2efd"
+"0.7 s" = "addaafa01fc86d18"
+"0.8 s" = "a6cc108fd75162c2"
+"0.9 s" = "d9d53d03887b2e0a"
+"1 s" = "73e7df0a5a180a87"

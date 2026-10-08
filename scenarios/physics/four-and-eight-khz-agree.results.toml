@@ -8,13 +8,13 @@ scenario = "The same flight at 4 kHz and 8 kHz gives nearly the same result"
 what     = "height at 2 s, minus the same run at 4 kHz"
 basis    = "Rule"
 expected = "0 m ± 0.006 m"
-measured = "-0.00189 m"
+measured = "-0.00132 m"
 
 [[expect]]
 what     = "vertical speed at 2 s, minus the same run at 4 kHz"
 basis    = "Rule"
 expected = "0 m/s ± 0.004 m/s"
-measured = "-0.000543 m/s"
+measured = "-0.000201 m/s"
 
 [[expect]]
 what     = "motor 1 speed at 0.6 s, as a share of the same run at 4 kHz"
@@ -43,16 +43,16 @@ measured = "none broken"
 [fingerprints]
 quad = "bb331df5a141eda0"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "c18ca848cc82c867"   # the whole state after each of 16000 steps at 8000 Hz, in order
+run  = "5194f9600d498dca"   # the whole state after each of 16000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.2 s" = "d3202e95e8b89ec7"
-"0.4 s" = "23447a5a5d34cf5b"
-"0.6 s" = "c38503bb8eb6403c"
-"0.8 s" = "f94c4a6345800237"
-"1 s" = "3cb6486d28872b59"
-"1.2 s" = "9ec02b3af211cd78"
-"1.4 s" = "6f8bfd7753d6a6d7"
-"1.6 s" = "b13bbcc8e226791e"
-"1.8 s" = "1f4c07ae47574a65"
-"2 s" = "85690a40696d51dd"
+"0.2 s" = "757314073cc60eb6"
+"0.4 s" = "8300570c9fd71ef0"
+"0.6 s" = "82599d38ed4e30f4"
+"0.8 s" = "b3d75b5db097f56f"
+"1 s" = "15ee55292b1c62fd"
+"1.2 s" = "5b2eb9555b9fafea"
+"1.4 s" = "912db8d134e95d00"
+"1.6 s" = "f45be0e161e7f7fc"
+"1.8 s" = "e1f245c42c0fbf07"
+"2 s" = "d81323c072a09bd2"

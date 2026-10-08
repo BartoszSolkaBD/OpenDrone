@@ -4,3 +4,4 @@ Every Estimate a Feel Test moves in this Quad's `quad.toml` gets one row here, o
 
 | Date | Number | Old → new | Why |
 |---|---|---|---|
+| 2026-10-08 | [frame] drag_area | front 9, side 9, top 25 cm² → front 15, side 17, top 17 cm² | New source: worked out from the collision shapes (#42), in place of #16's first guess; each is the silhouette of the frame and canopy, the pack and the duct rings seen from the front, the side and above, times a drag coefficient of 1, leaving out the prop discs from above (see docs/research/quad-definitions.md) |

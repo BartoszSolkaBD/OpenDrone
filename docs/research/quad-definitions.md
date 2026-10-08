@@ -37,7 +37,7 @@ Sea-level air (1.225 kg/m³) and g = 9.81 m/s² throughout. The prop coefficient
 
 **From the research's §9.1 and #10 §5, unchanged:** inertia (0.7, 0.9, 1.4) × 10⁻⁵ kg·m², motor lag 20–50 ms (35 ms both ways), duct ram drag 1.2 s⁻¹ (range 0.6–2.4) and the ducted rotor's centre of pressure 0.75 × 17.5 mm ≈ 13 mm higher (range 9–18 mm).
 
-**Still placeholders from #16's sample,** marked "first guess": body drag areas (front 9, side 9, top 25 cm²), rotor drag 0.3 s⁻¹ and the no-load current. The air ticket (#42) and the motor ticket (#41) set them.
+**#16's first guesses, since replaced or re-sourced:** the air ticket (#42) worked the body drag areas out from the collision shapes, and re-sourced the rotor drag (see [The air](#the-air-42) below); the motor ticket (#41) kept the no-load current, still marked "first guess".
 
 ## Freestyle 5″ (Nazgul Evoque F5 V2 class, Velox V2207 V3 1750KV, T5147, 6S 1400 mAh LiPo)
 
@@ -73,7 +73,7 @@ A least-squares fit of thrust against n² over all five rows gives 0.187, so k_f
 
 **Battery:** 6S, LiPo, charged to 4.20 V a cell, 1400 mAh (all from GNB). The pack's resistance is #10's "about 30 mΩ with leads", an Estimate, split here into 28 mΩ for the pack (range 15–45 mΩ) and 2 mΩ for the XT60 (range 1–5 mΩ); GNB publishes none. The curve is a typical LiPo curve ending at `full` and `empty` (3.50 V, Estimate 3.3–3.6 V); recovery is 3.3 s as for the whoop. Its slow sag is Bauersfeld & Scaramuzza's own fit, 1.048 mV·Ah/W, an Estimate within ×0.5–×2: their packs were 4S–6S LiPos like this one, and the 28 mΩ is a plain resistance with no slow part read into it.
 
-**Shapes and drag (Estimates from the layout):** the plates and stack as a box of 80 × 45 × 35 mm; the pack's box (GNB's 80 × 38 × 40 mm, Manufacturer) with its centre 26 mm above the centre of mass (the 233 g pack on top lifts the centre of mass about 14 mm above the frame's); the props' plane about 5 mm below the centre of mass; body drag areas front 45, side 45 and top 100 cm² (each silhouette with a drag coefficient of 1). The air ticket fits the drag to the TII logs.
+**Shapes and drag (Estimates from the layout):** the plates and stack as a box of 80 × 45 × 35 mm; the pack's box (GNB's 80 × 38 × 40 mm, Manufacturer) with its centre 26 mm above the centre of mass (the 233 g pack on top lifts the centre of mass about 14 mm above the frame's); the props' plane about 5 mm below the centre of mass; body drag areas front 45, side 45 and top 100 cm² (each silhouette with a drag coefficient of 1, motors and arms included). The TII logs ticket (#47) fits the drag to those logs.
 
 **Inertia: (14, 15, 25) kg·cm², Estimate, range ×0.7–×1.8:** #10's (1.4, 1.5, 2.5) × 10⁻³ kg·m². The range reaches NeuroBEM's heavier 6″ quad, (2.5, 2.1, 4.3) × 10⁻³ kg·m².
 
@@ -95,6 +95,38 @@ The motor ticket checks both Quads' motor numbers against their makers' tables w
 
 **Bluejay's start-up power limit.** Read in Bluejay's code (`crates/physics/src/esc.rs` has the file and line for each step): `motor_start` caps every frame's drive at Startup Power Max, 5 of 255, the 1.96% in the Quad definition. The cap holds through the start-up phase, 24 commutations (four electrical turns), and the initial-run phase after it, a countdown of 12 turns that starts on the fourth; only when that reaches nought, on the 15th electrical turn, is it lifted ("lift startup power restrictions", Bluejay.asm L945–951). So a motor starts at 1.96% for 15 electrical turns: 2.1 turns of the 5″'s 14-pole motor (about 0.2 s at its start-up speed of about 800 RPM) and 2.5 of the whoop's 12-pole one (about 0.15 s). Then it runs as commanded. Bluejay also limits power at low speed after the start-up phase (`Pgm_Rpm_Power_Slope`); the model leaves that out, since the measured spin-up times already include whatever a real ESC does. Stalled motors' restarts come with the Prop Strike ticket (#45).
 
+## The air (#42)
+
+The air ticket makes the drag numbers act (crates/physics/src/air.rs explains each effect, and the Physics Scenarios in `scenarios/physics/` prove them). It adds no number to the Quad definition: every effect's strength comes from numbers already there.
+
+| Effect | Numbers it uses |
+|---|---|
+| Thrust falling in a climb, rising in a descent and at speed (E10, E11) | The props' diameter and thrust coefficient, through momentum theory |
+| Rotor drag, and the nose lifting at speed (E16, E18) | `rotor_drag`, acting in the props' plane, `rotor_height` above the centre of mass |
+| Body drag (E17) | `drag_area` |
+| Duct ram drag and nose-up moment (E25, E26) | `ram_drag`, acting `nose_up_offset` above the props' plane |
+| The rotors' own spin: the frame turning against a rotor that speeds up, and their spin pushing at right angles to a flip (E7, E8) | `rotor_inertia` |
+
+**The Whoop 65's body drag areas: front 15, side 17, top 17 cm², Estimate, range ×0.5–×2.** The research (§4.1) gives no drag numbers for any FPV frame and says to estimate them from the frame, then fit them to top speed and terminal speed. #16's first guess was front 9, side 9, top 25 cm². Worked out from the Quad definition's own collision shapes, each silhouette with a drag coefficient of 1, as the Freestyle 5″'s first guess used:
+
+- **Front:** the duct rings, two side by side (each 40 mm across outside and 14 mm tall, their centres 23.3 mm either side of the middle), 11.2 cm²; the frame and canopy box (30 mm wide, 20 mm tall) adds the 3.9 cm² the rings don't cover; the pack hides behind it. About 15 cm².
+- **Side:** the rings again, 11.2 cm²; the box (35 mm long) adds 4.4 cm²; the pack, longer than the box (64 mm), adds 1.7 cm² below the rings. About 17 cm².
+- **Top:** the four rings' walls, 7.3 cm², plus the box and the pack where they lie outside the rings, 9.3 cm². The prop discs inside the rings are left out: the air through them is the rotors' own, which the inflow handles. About 17 cm².
+
+They moved with a new source, logged in the Whoop 65's Feel Test log; a Feel Test settles them. The terminal speeds they give (17.1 m/s belly first, 18.3 m/s nose first) are in two Physics Scenarios.
+
+**The Whoop 65's rotor drag: 0.3 s⁻¹, Estimate, range 0.1–0.6 s⁻¹, unchanged.** Faessler et al. measured 0.24–0.54 s⁻¹ on a 610 g quad with six-inch props (research §4.2). Nothing has been measured on a whoop, and its ducts add their own ram drag on top, 1.2 s⁻¹, four times as much. #16's 0.3 s⁻¹ sits inside the measured span, so it stays, re-sourced, until a Feel Test.
+
+**The Freestyle 5″'s drag areas stay as they were,** a first guess from the frame's size; the TII logs ticket (#47) fits them, with its rotor drag, to those logs.
+
+**What to watch in Feel Tests and the TII fit:**
+
+- **Translational lift is momentum theory's ideal one.** Hoffmann et al.'s momentum theory at the same power (research §4.3) gives a whoop's rotor turning at its hover speed 26.9% more thrust with 8 m/s of air across its disc, and 7.8% with 4 m/s (at the 19,659 RPM that holds its weight at 8 m/s, 33.7% more than on the thrust stand). Faessler et al.'s fit to their quad (`k_h = 0.009 m⁻¹`) gives 5.9% and 1.5%: momentum theory gives 4.6 to 5.3 times as much, so Faessler's is about a fifth of it. Some of the difference is the pitch their quad flew at, which this model counts as a climb along the rotors' axes. If the whoop balloons too much at speed in a Feel Test, an Estimate for how much of the ideal lift a real rotor gets would be the fix; it would be a new number.
+- **The ducts' nose-up moment is strong.** At 8 m/s level, the Whoop 65's ram drag (1.2 s⁻¹) acting 21 mm above its centre of mass lifts the nose with about 40% of the most its motors can pitch it the other way (rear pair at full drive, front pair stopped). Pereira's "much larger nose-up pitching moments" agree in kind; both numbers behind it are Estimates.
+- **The Freestyle 5″'s props sit 5 mm below its centre of mass,** so its rotor drag dips its nose slightly at speed instead of lifting it.
+- **The thrust guard has no source.** Where air arrives down through a rotor and across it at once, both far faster than the rotor's own still-air flow, momentum theory lets the thrust grow with both speeds multiplied. The air ticket caps it at the same descent's thrust plus ½ρA·(v_c² + μ²), an ideal windmill's most. The cap is a modelling choice the research doesn't give. It acts only in that corner: in units of the still-air flow, it trims about 2% at a descent of 1 across 1.2, 19% at 2 across 2, and 32% at 3 across 3. Fast dives with the motors low reach those.
+- **Nearly stopped props still lift.** Descending with air across the disc, momentum theory's thrust stops depending on the rotor's speed as its power goes to nothing. It tends to the smaller of 2ρA·|v_c|·μ and ½ρA·(v_c² + μ²), an ideal autorotation. Only a prop at exactly 0 RPM gives none, and a coasting motor in the motor model never quite reaches 0. The Reviewer probed it: a Whoop 65 pitched 20° nose down and cut from a hover to 0% had its props at 25.8 RPM after 3 s, yet they gave 3.5 gf, 11% of its weight. It fell at 14.3 m/s against 16.2 m/s for a "stopped" start, and levelled itself. That may stand in roughly for windmilling props, which the motor model can't drive. Watch it in Prop Wash (#46), Failsafe and disarm (#52), Prop Strikes (#45) and Feel Tests.
+
 ## Both Quads
 
 - **ESC numbers** (#26 §5, from Bluejay v0.21.0's source): a 100 ms wait before a restart (`wait100ms` between stall restarts), at most 3 restarts (the stall count is checked against 3), and start-up power capped at the default Startup Power Max, 5 on Bluejay's 0–255 scale, which is 1.96% of full drive while the motor starts. They are Manufacturer numbers: Bluejay's own defaults.
@@ -107,7 +139,7 @@ The motor ticket checks both Quads' motor numbers against their makers' tables w
 
 Every Estimate above may move in a Feel Test (the whoop) or a fit to the TII logs (the 5″), inside its range. These rest on the least:
 
-- **Placeholders from #16's sample:** both Quads' body drag areas, the whoop's rotor drag and the whoop's no-load current (which meets BetaFPV's table as it is).
+- **First guesses:** the Freestyle 5″'s body drag areas (the TII logs ticket fits them), the whoop's no-load current (which meets BetaFPV's table as it is), and the whoop's body drag areas and rotor drag, worked out or re-sourced by the air ticket but measured on no whoop.
 - **Made from photos and frame sizes, with nothing measured:** every collision shape except the two pack boxes (each from its maker), both props' heights, both packs' heights, the duct rings, and both camera positions.
 - **The battery curves:** typical LiPo and LiHV curves, not these packs' own.
 - **The whoop's C_T and C_P,** until a Feel Test or the maintainer's recording settles the hover pitch.

@@ -1,0 +1,58 @@
+# Results of thrust-rises-in-a-descent.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "At a fixed command, a drag-free Whoop 65's thrust rises as it sinks, until it sinks steadily"
+
+[[expect]]
+what     = "motor 1 speed, lowest over 0.5 s to 12 s"
+basis    = "Rule"
+expected = "21795.9 RPM ± 0.01%"
+measured = "21800 RPM"
+
+[[expect]]
+what     = "motor 1 speed, highest over 0.5 s to 12 s"
+basis    = "Rule"
+expected = "21795.9 RPM ± 0.01%"
+measured = "21800 RPM"
+
+[[expect]]
+what     = "total thrust at 0.5 s"
+basis    = "Rule"
+expected = "between 28.694 gf and 31.211 gf"
+measured = "29.3 gf"
+
+[[expect]]
+what     = "total thrust at 12 s"
+basis    = "Rule"
+expected = "31.211 gf ± 0.1%"
+measured = "31.2 gf"
+
+[[expect]]
+what     = "vertical speed at 12 s"
+basis    = "Rule"
+expected = "-1.4408 m/s ± 0.3%"
+measured = "-1.44 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "a3333f84946034ef"   # test/whoop-65-no-drag-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "c6519b9d721be597"   # the whole state after each of 96000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1.2 s" = "2d2198ec829a461e"
+"2.4 s" = "20d19e198a7aad9c"
+"3.6 s" = "9d999fe2621149f2"
+"4.8 s" = "1ef35765eb82d599"
+"6 s" = "1bd3d005c827bd35"
+"7.2 s" = "bf2f58ade8236797"
+"8.4 s" = "2ffc4b8bf360c286"
+"9.6 s" = "15834e2b7715acd0"
+"10.8 s" = "6b4086e9fc820bb9"
+"12 s" = "568b3a8beb205c11"

@@ -1,0 +1,15 @@
+# The Whoop 65 with body drag as its only drag.    id: test/whoop-65-body-drag-only
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No rotor drag and no duct drag, so only its body drag pushes on it, through its centre of mass"
+
+# Deliberate test values: no Confidence or source.
+[props]
+rotor_drag = "0 s⁻¹"
+
+[ducts]
+ram_drag = "0 s⁻¹"

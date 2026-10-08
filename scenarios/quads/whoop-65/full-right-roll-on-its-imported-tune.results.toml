@@ -11,58 +11,58 @@ expected = "670 °/s ± 0.01 °/s"
 measured = "670 °/s"
 
 [[expect]]
-what     = "roll rate, mean over 1.3 s to 1.5 s"
+what     = "roll rate, mean over 2 s to 3 s"
 basis    = "Source"
 expected = "670 °/s ± 3%"
-measured = "671 °/s"
-
-[[expect]]
-what     = "roll rate at 1.25 s"
-basis    = "Source"
-expected = "670 °/s ± 3%"
-measured = "677 °/s"
+measured = "669 °/s"
 
 [[expect]]
 what     = "roll rate at 0.9 s"
 basis    = "Observed"
 expected = "0 °/s ± 0.5 °/s"
-measured = "0.133 °/s"
+measured = "0.148 °/s"
 
 [[expect]]
-what     = "pitch rate, lowest over 1 s to 1.5 s"
+what     = "roll rate, highest over 1.5 s to 3 s"
+basis    = "Observed"
+expected = "829 °/s ± 3%"
+measured = "829 °/s"
+
+[[expect]]
+what     = "roll rate, lowest over 1.5 s to 3 s"
+basis    = "Observed"
+expected = "530 °/s ± 3%"
+measured = "530 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 1 s to 3 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.129 °/s"
+measured = "-0.328 °/s"
 
 [[expect]]
-what     = "pitch rate, highest over 1 s to 1.5 s"
+what     = "pitch rate, highest over 1 s to 3 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.0634 °/s"
+measured = "0.104 °/s"
 
 [[expect]]
-what     = "yaw rate, lowest over 1 s to 1.5 s"
+what     = "yaw rate, lowest over 1 s to 3 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.0824 °/s"
+measured = "-0.0362 °/s"
 
 [[expect]]
-what     = "yaw rate, highest over 1 s to 1.5 s"
+what     = "yaw rate, highest over 1 s to 3 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.138 °/s"
+measured = "0.274 °/s"
 
 [[expect]]
-what     = "roll rate, highest over 1 s to 1.5 s"
+what     = "roll rate at 3.5 s"
 basis    = "Observed"
-expected = "803 °/s ± 2%"
-measured = "803 °/s"
-
-[[expect]]
-what     = "roll rate at 1.8 s"
-basis    = "Observed"
-expected = "-2.6 °/s ± 1 °/s"
-measured = "-2.57 °/s"
+expected = "0 °/s ± 1 °/s"
+measured = "-0.367 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "6ec0d81ccdaa4fde"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "bd1a99f53aa4f96d"   # the whole state after each of 14400 steps at 8000 Hz, in order
+run  = "f3fa9af1c39632e0"   # the whole state after each of 28000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.18 s" = "56e8e40c9c9a47e8"
-"0.36 s" = "88376f82a0ef34db"
-"0.54 s" = "2d3517b974cf4ca1"
-"0.72 s" = "062e1487bde14706"
-"0.9 s" = "7b1264e3f13cb6af"
-"1.08 s" = "9d81b1238108a5eb"
-"1.26 s" = "c649217df9626182"
-"1.44 s" = "85a293a7317db18c"
-"1.62 s" = "e61300254e2d1c52"
-"1.8 s" = "988b8926e1551fc7"
+"0.35 s" = "62496a9ce763e95b"
+"0.7 s" = "557ce7dbcacdb680"
+"1.05 s" = "d106f065ab2b420d"
+"1.4 s" = "f71cbec8e2af1824"
+"1.75 s" = "1f8c05638bcebb1c"
+"2.1 s" = "a2c0bd953f6ac2c5"
+"2.45 s" = "79e9c6bc5a4ddf2c"
+"2.8 s" = "59b8f727918e50e4"
+"3.15 s" = "956e288e95d93b1a"
+"3.5 s" = "4f7cf6f17ce579df"

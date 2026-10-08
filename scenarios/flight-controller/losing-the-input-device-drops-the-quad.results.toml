@@ -43,8 +43,8 @@ measured = "140 RPM"
 [[expect]]
 what     = "vertical speed at 4 s"
 basis    = "Observed"
-expected = "-20.6 m/s ± 0.5 m/s"
-measured = "-20.6 m/s"
+expected = "-18.8 m/s ± 0.5 m/s"
+measured = "-18.8 m/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -55,16 +55,16 @@ measured = "none broken"
 [fingerprints]
 quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "a9568350b1e419ca"   # the whole state after each of 32000 steps at 8000 Hz, in order
+run  = "a915c52018e9213f"   # the whole state after each of 32000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.4 s" = "8232fdce8be0a104"
-"0.8 s" = "106cdf314678020e"
-"1.2 s" = "ba1a9f30920a5526"
-"1.6 s" = "d066d8b6810275e8"
-"2 s" = "5ca554ef8c41cbdd"
-"2.4 s" = "06f439c9f89a84a1"
-"2.8 s" = "4658e8f3924a7ba9"
-"3.2 s" = "429eae1f26650dc1"
-"3.6 s" = "8bc9451c4645c0e3"
-"4 s" = "ad05f434c466adec"
+"0.4 s" = "bec52162f33c2e54"
+"0.8 s" = "f7f0eb5ae64623d5"
+"1.2 s" = "31a13bf8d44c2675"
+"1.6 s" = "737a03c7e71d3096"
+"2 s" = "6e5f6cfc49d84d3a"
+"2.4 s" = "9896aa15d5987758"
+"2.8 s" = "293a7f12f19b14d8"
+"3.2 s" = "f38596f903784aa2"
+"3.6 s" = "dae936f0beaa9301"
+"4 s" = "1ced83f77536e982"

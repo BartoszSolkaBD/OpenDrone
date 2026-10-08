@@ -1,0 +1,37 @@
+# Results of lift-grows-with-speed.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Flying level at 8 m/s, a Whoop 65 holds its height with its rotors 13.5% slower than hovering"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Rule"
+expected = "19659.1 RPM ± 0.01%"
+measured = "19700 RPM"
+
+[[expect]]
+what     = "total thrust at 0 s"
+basis    = "Rule"
+expected = "31.211 gf ± 0.01%"
+measured = "31.2 gf"
+
+[[expect]]
+what     = "vertical acceleration at 0.000125 s"
+basis    = "Rule"
+expected = "0 m/s² ± 0.02 m/s²"
+measured = "0.000471 m/s²"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "39b0e5a5b192890e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "077dd224c02385ed"   # the whole state after each of 1 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.000125 s" = "4809d58111fa2af1"

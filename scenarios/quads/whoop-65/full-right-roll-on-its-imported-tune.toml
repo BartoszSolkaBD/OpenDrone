@@ -1,17 +1,22 @@
 # The Whoop 65 flies on its own Tune, imported from the Meteor65 Pro's diff
 # all (Betaflight 4.3.0, translated into 2026.6 settings by the Betaflight
-# CLI translator, #53): P/I/D 40/64/45 on roll, the D being 4.3's d_min. The
-# same flight as the Freestyle 5″'s tracer, scenarios/flight-controller/
+# CLI translator, #53): P/I/D 40/64/45 on roll, the D being 4.3's d_min. It
+# starts as the Freestyle 5″'s tracer does, scenarios/flight-controller/
 # full-right-roll-reaches-the-max-rate.toml: mid-air, armed, motors
-# "settled", the throttle at 30% so Airmode has started (25%), then half a
-# second of full right roll on Betaflight's default Rates, Actual 70/670/0.
+# "settled", the throttle at 30% so Airmode has started (25%). Then it holds
+# full right roll for two seconds on Betaflight's default Rates, Actual
+# 70/670/0, about three and a half turns.
+#
+# At 30% throttle the whoop sinks, about 13 m in the three seconds, with
+# the air acting on it (#108). Its roll rate swings above and below the max
+# rate as it rolls on, and the PID loop pulls it back: over a whole second
+# it holds the max rate.
 #
 # The Flight Controller flies the Tune's "Not simulated yet" settings as off
 # until their tickets land: feedforward and the filters (#49), Dynamic D and
 # I-term relax (#50). So the roll spins up on P, I and D, without
-# feedforward, and overshoots.
-# The Source Expectations hold either way; the Observed overshoot and
-# bounce-back will move when those land.
+# feedforward. The Source Expectations hold either way; the Observed swings
+# will move when those land.
 format = 1
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
 
@@ -47,7 +52,7 @@ quickrates_rc_expo = "off"
 timeline = [
   { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
   { at = "1 s",   roll = "100%" },
-  { at = "1.5 s", roll = "0%" },
+  { at = "3 s",   roll = "0%" },
 ]
 
 [[expect]]
@@ -58,14 +63,8 @@ basis = "source: applyActualRates (Betaflight 2026.6.2, src/main/fc/rc.c): full 
 
 [[expect]]
 what  = "roll rate"
-over  = "1.3 s to 1.5 s"
+over  = "2 s to 3 s"
 mean  = "670 °/s ± 3%"
-basis = "source: Betaflight's Actual rates: full right roll holds the max rate, 670 °/s"
-
-[[expect]]
-what  = "roll rate"
-at    = "1.25 s"
-value = "670 °/s ± 3%"
 basis = "source: Betaflight's Actual rates: full right roll holds the max rate, 670 °/s, as the Betaflight App shows it"
 
 [[expect]]
@@ -75,37 +74,43 @@ value = "0 °/s ± 0.5 °/s"
 basis = "observed: with the sticks centred the whoop holds still; a centred stick reaches Betaflight at 1500.77 µs over CRSF, which asks for only 0.11 °/s"
 
 [[expect]]
-what    = "pitch rate"
-over    = "1 s to 1.5 s"
-lowest  = "0 °/s ± 1 °/s"
-basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
-
-[[expect]]
-what    = "pitch rate"
-over    = "1 s to 1.5 s"
-highest = "0 °/s ± 1 °/s"
-basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
-
-[[expect]]
-what    = "yaw rate"
-over    = "1 s to 1.5 s"
-lowest  = "0 °/s ± 1 °/s"
-basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
-
-[[expect]]
-what    = "yaw rate"
-over    = "1 s to 1.5 s"
-highest = "0 °/s ± 1 °/s"
-basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
+what    = "roll rate"
+over    = "1.5 s to 3 s"
+highest = "829 °/s ± 3%"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); feedforward (#49) and I-term relax (#50) will change how far"
 
 [[expect]]
 what    = "roll rate"
-over    = "1 s to 1.5 s"
-highest = "803 °/s ± 2%"
-basis   = "observed: the roll overshoots the max rate, less than the 5″'s 869 °/s: the I term winds up while the roll spins up, as Betaflight's would without I-term relax and feedforward, which come with #50 and #49"
+over    = "1.5 s to 3 s"
+lowest  = "530 °/s ± 3%"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); feedforward (#49) and I-term relax (#50) will change how far"
+
+[[expect]]
+what    = "pitch rate"
+over    = "1 s to 3 s"
+lowest  = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "pitch rate"
+over    = "1 s to 3 s"
+highest = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in pitch, and the PID loop holds pitch near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "yaw rate"
+over    = "1 s to 3 s"
+lowest  = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
+
+[[expect]]
+what    = "yaw rate"
+over    = "1 s to 3 s"
+highest = "0 °/s ± 1 °/s"
+basis   = "observed: full right roll asks for nothing in yaw, and the PID loop holds yaw near what the centred stick asks, 0.11 °/s"
 
 [[expect]]
 what  = "roll rate"
-at    = "1.8 s"
-value = "-2.6 °/s ± 1 °/s"
-basis = "observed: after the stick is let go the roll stops and bounces back a little, the wound-up I term unwinding; I-term relax (#50) is what stops that bounce"
+at    = "3.5 s"
+value = "0 °/s ± 1 °/s"
+basis = "observed: half a second after the stick is let go, the roll has stopped"
