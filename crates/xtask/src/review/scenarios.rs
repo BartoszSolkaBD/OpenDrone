@@ -36,8 +36,9 @@ const TEST_QUADS: &str = "scenarios/test-quads/";
 const QUAD_FIELD: &str = "start.quad";
 
 /// The keys that hold an Expectation's expected value, one per kind: at a
-/// moment, or a statistic over a stretch.
-const VALUE_KEYS: [&str; 5] = ["value", "mean", "lowest", "highest", "final"];
+/// moment, or a statistic over a stretch (`first` for when something
+/// happens).
+const VALUE_KEYS: [&str; 6] = ["value", "mean", "lowest", "highest", "final", "first"];
 
 /// Whether a path is a Scenario file.
 pub fn is_scenario(path: &str) -> bool {

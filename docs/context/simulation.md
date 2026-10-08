@@ -23,6 +23,8 @@ _Avoid_: Front door (informal only), event, command
 - The Simulation never sees the computer's clock and never opens a file.
 - Camera Tilt, FOV, Pause and anything purely visual never enter the Simulation.
 - An Input Device counts as lost when the computer reports it removed. A device that only reports changes is never counted as lost just because it goes quiet. Values that arrive in the same instant as the removal are thrown away.
+- While the Flying Input Device is lost, the Radio Link sends no frames, and the Flight Controller's Failsafe follows. When it is back, the next frame on the link's own beat carries the newest Channels.
+- Reset puts the Quad on the Launch Spot, landed, still and disarmed, and powers it up fresh: a full battery, a fresh Flight Controller, and ESCs starting up. The Radio Link belongs to the pilot's radio, so it keeps its beat.
 - World values, such as wind, come only from the Map.
 - Game modes and scripts change a flight only through Flight Inputs, settings, Assists and the choice of Map. They never change physics rules.
 - The Simulation can hold several Quads, stepped in a fixed order. The alpha flies one.

@@ -55,7 +55,8 @@ Commands:
   core-maths [--with <package>]... [--target <triple>] [--manifest-path <Cargo.toml>]
       Build the core crates (with the packages named, so their features are
       merged as in the real build; for this computer, or the target named)
-      and check the compiled code of every library the core is built with:
+      and check the compiled code of every library the core is built with,
+      and of the core's functions compiled into other crates and programs:
       none may call the operating system's maths library (ADR-0001), except
       where crates/xtask/walls.toml allows it with a reason.
   book
@@ -94,6 +95,11 @@ Commands:
       left out. --print prints the Tune instead of writing it.";
 
 fn main() -> ExitCode {
+    // `core-maths` has cargo run xtask as its compiler wrapper, to keep each
+    // program's compiled code.
+    if let Some(code) = core_maths::compile_keeping_programs() {
+        return code;
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some((command, rest)) = args.split_first() else {
         eprintln!("{USAGE}\n{}", review::usage());

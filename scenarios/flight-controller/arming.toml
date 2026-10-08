@@ -2,8 +2,13 @@
 # further than the Tune's `small_angle`, and once arming was refused, the
 # switch must go off before it can arm, as in Betaflight 2026.6.2
 # (`processRcStickPositions`, src/main/fc/rc_controls.c; `tryArm` and
-# `updateArmingStatus`, src/main/fc/core.c). The full arming rules and
-# power-up come with #52.
+# `updateArmingStatus`, src/main/fc/core.c). Each refusal is named as
+# Betaflight 2026.6.2 names it: THROTTLE, ANGLE and ARM_SWITCH (the bases of
+# the DShot checks below say ARMSWITCH, its name in older Betaflight, for the
+# same flag). The checks that come
+# with power-up and the Radio Link (BOOTGRACE, RXLOSS, NOT_DISARMED and
+# FAILSAFE) have their own Scenarios: arming-waits-for-the-escs-after-reset,
+# arm-switch-on-at-power-up and failsafe.
 #
 # The Flight Controller alone, disarmed at the start, with the Arm switch on
 # AUX1 (ADR-0017). How a Betaflight board takes each Radio Link frame (every
@@ -11,7 +16,9 @@
 # frame before left it, then updates the table. So the Quad arms one frame
 # after the switch goes on, and disarms more than three frames after it goes
 # off (`rcDisarmTicks`). Armed, the motors idle at DShot 158 (48 + 5.5% × 1999
-# = 157.9); disarmed, the Flight Controller sends 0, DShot's "stop".
+# = 157.9); disarmed, the Flight Controller sends 0, DShot's "stop". Each
+# loop's state is the one after its 125 µs step, so the frame at 1 s shows
+# at 1.000125 s.
 #
 # On arming, Betaflight first sends each ESC the DShot command "spin the
 # normal way" (`setMotorSpinDirection`, src/main/fc/core.c): after a 10 ms
@@ -126,3 +133,41 @@ what  = "motor 1 DShot"
 at    = "2.8 s"
 value = "158 ± 0"
 basis = "source: updateArmingStatus, isUpright and tryArm: off at 2.6 s and on at 2.7 s, tilted 20°: cos 20° = 0.940 is above cos 25° = 0.906, so it arms"
+
+# Why arming is refused, each named as Betaflight names it.
+
+[[expect]]
+what  = "THROTTLE blocks arming"
+over  = "1 s to 1.1 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 1 s brings the throttle up to 1500.77 µs, not below min_check (1050 µs): THROTTLE"
+
+[[expect]]
+what  = "ARM_SWITCH blocks arming"
+over  = "1.1 s to 1.2 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 1.1 s turns the Arm switch on while THROTTLE blocks arming: ARM_SWITCH"
+
+[[expect]]
+what  = "THROTTLE stops blocking arming"
+over  = "1.3 s to 1.4 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 1.3 s brings the throttle back below min_check"
+
+[[expect]]
+what  = "ARM_SWITCH stops blocking arming"
+over  = "1.5 s to 1.6 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: ARM_SWITCH clears with the frame at 1.5 s, which reads the switch off"
+
+[[expect]]
+what  = "ANGLE blocks arming"
+over  = "2.1 s to 2.2 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus and isUpright: the frame at 2.1 s finds the Quad tilted 30°, further than small_angle (25°): ANGLE"
+
+[[expect]]
+what  = "ANGLE stops blocking arming"
+over  = "2.4 s to 2.5 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus and isUpright: the frame at 2.4 s finds it tilted 20°, within small_angle"

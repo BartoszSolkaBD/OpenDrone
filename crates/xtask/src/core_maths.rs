@@ -16,104 +16,170 @@
 //!    only run while building.
 //! 2. It builds the core crates, plus any packages named with `--with`, in one
 //!    `cargo build`, so the features every package turns on are merged as they
-//!    are in the real build. The game's ticket runs it `--with opendrone`, so
-//!    Bevy's features count.
+//!    are in the real build. CI runs it `--with opendrone --with
+//!    opendrone-scenario`, so the game's and the Scenario runner's features
+//!    count.
 //! 3. It reads every one of those libraries' compiled code (each `.rlib`) and
 //!    lists every call to a maths function the code leaves for the operating
-//!    system to supply, with the functions that make it.
+//!    system to supply, with the functions that make it. A call inside one of
+//!    std's maths methods, which the compiler copies into each crate that uses
+//!    it, counts as made by the function that calls the method.
+//! 4. A generic or `#[inline]` function is compiled into the crate that uses
+//!    it, so a core library's function can sit in another crate's compiled
+//!    code: the game's, say, when it calls a generic function of the physics.
+//!    And a crate built without optimisation shares its generic copies: a
+//!    crate built later reuses one instead of building its own, so the
+//!    game's copy of a physics function may call glamx's copy built in a
+//!    crate that uses only glamx. So the check also reads the compiled code
+//!    of every other crate in the build that uses any library the core is
+//!    built with, including the `--with` packages' programs (kept from the
+//!    same build, so with the same features), and counts the calls made
+//!    there by a core library's functions. Symbol names say whose function
+//!    each one is ([`owner`]). A crate's own use of a core library's generic
+//!    maths counts too, which fails safe.
 //!
 //! Any call not allowed in `walls.toml`'s `[core-platform-maths]`, with its
 //! reason, fails the check with a plain sentence naming the library, the
-//! maths function and where it is called from.
+//! maths function, the Rust operation behind it and where it is called from.
+//! Two more things fail it:
+//!
+//! - A reference to a maths function from outside any function, such as a
+//!   table of function pointers. No allowance covers one, because nothing
+//!   says what calls through it.
+//! - Compiled code that is LLVM bitcode instead of machine code, which
+//!   link-time optimisation makes. This check can't read it.
+//!
+//! What it can't see: a core function that the compiler writes straight into
+//! another crate's function (inlines) has no name of its own there, so a call
+//! it makes counts as that crate's. The game and the Scenario runner are
+//! built without optimisation in the development builds this check makes,
+//! and those inline only functions marked `#[inline(always)]`. Nor does it
+//! follow a core function compiled into another crate when only a table of
+//! function pointers, such as a trait object's, leads to it.
 //!
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+mod build;
+mod code;
+mod owner;
 
-use object::read::archive::ArchiveFile;
-use object::{Object, ObjectSection, ObjectSymbol, RelocationTarget, SymbolKind};
-use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
+use std::path::PathBuf;
+use std::process::ExitCode;
 
 use crate::walls::{RULES_FILE, Rules};
+pub(crate) use build::compile_keeping_programs;
+use build::{Packages, build, cargo_metadata, host_triple};
+use code::{Code, Depth, Place};
 
-/// The C maths library's functions, double and single precision: every one
-/// whose result can differ from one operating system's library to another.
-/// Exact operations (`sqrt`, `fabs`, `floor`, `ceil`, `trunc`, `round`,
-/// `copysign`) aren't listed: every library gives the same bits for them.
-const PLATFORM_MATHS: &[&str] = &[
-    "acos",
-    "acosf",
-    "acosh",
-    "acoshf",
-    "asin",
-    "asinf",
-    "asinh",
-    "asinhf",
-    "atan",
-    "atanf",
-    "atan2",
-    "atan2f",
-    "atanh",
-    "atanhf",
-    "cbrt",
-    "cbrtf",
-    "cos",
-    "cosf",
-    "cosh",
-    "coshf",
-    "erf",
-    "erff",
-    "erfc",
-    "erfcf",
-    "exp",
-    "expf",
-    "exp2",
-    "exp2f",
-    "exp10",
-    "exp10f",
-    "expm1",
-    "expm1f",
-    "fdim",
-    "fdimf",
-    "fma",
-    "fmaf",
-    "fmod",
-    "fmodf",
-    "hypot",
-    "hypotf",
-    "lgamma",
-    "lgammaf",
-    "lgamma_r",
-    "lgammaf_r",
-    "log",
-    "logf",
-    "log10",
-    "log10f",
-    "log1p",
-    "log1pf",
-    "log2",
-    "log2f",
-    "pow",
-    "powf",
-    "remainder",
-    "remainderf",
-    "sin",
-    "sinf",
-    "sincos",
-    "sincosf",
-    "__sincos_stret",
-    "__sincosf_stret",
-    "sinh",
-    "sinhf",
-    "tan",
-    "tanf",
-    "tanh",
-    "tanhf",
-    "tgamma",
-    "tgammaf",
+/// The C maths library's functions whose results can differ from one
+/// operating system's library to another, as compiled code names them: in
+/// double precision, in single precision, and the Rust operation behind them
+/// (`{}` stands for `f64` or `f32`).
+///
+/// Operations whose every bit IEEE 754 fixes aren't listed, because every
+/// library gives the same bits for them: `sqrt`, `fabs`, `floor`, `ceil`,
+/// `trunc`, `round`, `copysign`, `fmod` (Rust's `%`), `fma` (Rust's
+/// `mul_add`) and `remainder`. The core crates' `clippy.toml` allows `%` and
+/// `mul_add` too. `fdim` is exact as well, but it is listed because
+/// `clippy.toml` bans the Rust operation behind it, the old `abs_sub`. Nor is
+/// `__powidf2`, which `powi` calls: it is Rust's own code, the same on every
+/// operating system.
+const PLATFORM_MATHS: &[(&str, &str, &str)] = &[
+    ("acos", "acosf", "Rust's `{}::acos`"),
+    ("acosh", "acoshf", "Rust's `{}::acosh`"),
+    ("asin", "asinf", "Rust's `{}::asin`"),
+    ("asinh", "asinhf", "Rust's `{}::asinh`"),
+    ("atan", "atanf", "Rust's `{}::atan`"),
+    ("atan2", "atan2f", "Rust's `{}::atan2`"),
+    ("atanh", "atanhf", "Rust's `{}::atanh`"),
+    ("cbrt", "cbrtf", "Rust's `{}::cbrt`"),
+    ("cos", "cosf", "Rust's `{}::cos`"),
+    ("cosh", "coshf", "Rust's `{}::cosh`"),
+    ("erf", "erff", "Rust's `{}::erf`"),
+    ("erfc", "erfcf", "Rust's `{}::erfc`"),
+    ("exp", "expf", "Rust's `{}::exp`"),
+    ("exp2", "exp2f", "Rust's `{}::exp2`"),
+    ("exp10", "exp10f", "Rust's `{}::powf` with a base of 10"),
+    ("expm1", "expm1f", "Rust's `{}::exp_m1`"),
+    ("fdim", "fdimf", "Rust's `{}::abs_sub`"),
+    ("hypot", "hypotf", "Rust's `{}::hypot`"),
+    ("lgamma", "lgammaf", "Rust's `{}::ln_gamma`"),
+    ("lgamma_r", "lgammaf_r", "Rust's `{}::ln_gamma`"),
+    ("log", "logf", "Rust's `{}::ln` or `{}::log`"),
+    ("log10", "log10f", "Rust's `{}::log10`"),
+    ("log1p", "log1pf", "Rust's `{}::ln_1p`"),
+    ("log2", "log2f", "Rust's `{}::log2`"),
+    ("pow", "powf", "Rust's `{}::powf`"),
+    ("sin", "sinf", "Rust's `{}::sin`"),
+    (
+        "sincos",
+        "sincosf",
+        "Rust's `{}::sin_cos`, or `{}::sin` and `{}::cos` of one number",
+    ),
+    ("sinh", "sinhf", "Rust's `{}::sinh`"),
+    ("tan", "tanf", "Rust's `{}::tan`"),
+    ("tanh", "tanhf", "Rust's `{}::tanh`"),
+    ("tgamma", "tgammaf", "Rust's `{}::gamma`"),
+    // Names only Apple's maths library has.
+    (
+        "__exp10",
+        "__exp10f",
+        "Rust's `{}::powf` with a base of 10, as the compiler writes it for Apple's systems",
+    ),
+    (
+        "__sincos_stret",
+        "__sincosf_stret",
+        "Rust's `{}::sin_cos`, or `{}::sin` and `{}::cos` of one number, as the compiler \
+         writes it for Apple's systems",
+    ),
+    (
+        "__sinpi",
+        "__sinpif",
+        "Apple's sin(πx), which no Rust operation calls",
+    ),
+    (
+        "__cospi",
+        "__cospif",
+        "Apple's cos(πx), which no Rust operation calls",
+    ),
+    (
+        "__tanpi",
+        "__tanpif",
+        "Apple's tan(πx), which no Rust operation calls",
+    ),
+    (
+        "__sincospi_stret",
+        "__sincospif_stret",
+        "Apple's sin(πx) and cos(πx) together, which no Rust operation calls",
+    ),
 ];
+
+/// Whether compiled code calling `name` calls one of the operating system's
+/// maths functions.
+fn is_platform_maths(name: &str) -> bool {
+    PLATFORM_MATHS
+        .iter()
+        .any(|(double, single, _)| name == *double || name == *single)
+}
+
+/// The Rust operation that calls the operating system's maths function
+/// `name`, in words.
+fn rust_operation(name: &str) -> String {
+    PLATFORM_MATHS
+        .iter()
+        .find_map(|(double, single, operation)| {
+            if name == *double {
+                Some(operation.replace("{}", "f64"))
+            } else if name == *single {
+                Some(operation.replace("{}", "f32"))
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default()
+}
 
 const USAGE: &str = "Usage: cargo xtask core-maths [--with <package>]... [--target <triple>] \
                      [--manifest-path <Cargo.toml>]";
@@ -139,27 +205,41 @@ pub fn run(args: &[String]) -> ExitCode {
             Some(target) => target,
             None => host_triple()?,
         };
-        let calls = platform_maths_calls(&rules, &with, manifest_path.as_deref(), &target)?;
-        Ok((rules, calls))
+        let found = check(&rules, &with, manifest_path.as_deref(), &target)?;
+        Ok((rules, found))
     });
-    let (rules, (libraries, calls)) = match checked {
-        Ok(found) => found,
+    let (rules, found) = match checked {
+        Ok(checked) => checked,
         Err(error) => {
             eprintln!("Could not check the core's maths: {error}");
             return ExitCode::from(2);
         }
     };
-    let (allowed, refused): (Vec<&Call>, Vec<&Call>) = calls
+    let (allowed, refused): (Vec<&Call>, Vec<&Call>) = found
+        .calls
         .iter()
         .partition(|call| rules.platform_maths_reason(call).is_some());
-    if refused.is_empty() {
+    if refused.is_empty() && found.bitcode.is_empty() {
+        let others = match found.others_read {
+            0 => String::new(),
+            1 => format!(
+                ", and 1 other crate's compiled code read for the core's functions (found in {})",
+                found.others_holding
+            ),
+            read => format!(
+                ", and {read} other crates' compiled code read for the core's functions (found in \
+                 {})",
+                found.others_holding
+            ),
+        };
+        let with = if with.is_empty() {
+            String::new()
+        } else {
+            format!(", built together with {}", with.join(", "))
+        };
         println!(
-            "The core calls none of the operating system's maths: {libraries} libraries checked{}.",
-            if with.is_empty() {
-                String::new()
-            } else {
-                format!(", built together with {}", with.join(", "))
-            }
+            "The core calls none of the operating system's maths: {} libraries checked{others}{with}.",
+            found.libraries
         );
         for call in allowed {
             println!(
@@ -172,18 +252,42 @@ pub fn run(args: &[String]) -> ExitCode {
         }
         return ExitCode::SUCCESS;
     }
-    println!(
-        "The core calls the operating system's maths, whose results differ from one operating \
-         system to another; the core must take every maths function from libm (ADR-0001):"
-    );
-    for call in refused {
+    if !found.bitcode.is_empty() {
         println!(
-            "- `{}` calls the operating system's `{}` (from {}). If it can never run in the \
-             Simulation, allow it under [core-platform-maths] in {RULES_FILE} with the reason; \
-             otherwise stop it being called.",
+            "This check can't read all of the core's compiled code, so it can't tell whether the \
+             core calls the operating system's maths (ADR-0001):"
+        );
+        for crate_name in &found.bitcode {
+            println!(
+                "- `{crate_name}` was compiled to LLVM bitcode, not machine code. Link-time \
+                 optimisation does that (`lto` in a Cargo profile, or `-C linker-plugin-lto` in \
+                 RUSTFLAGS): run this check without it."
+            );
+        }
+    }
+    if !refused.is_empty() {
+        println!(
+            "The core calls the operating system's maths, whose results differ from one operating \
+             system to another; the core must take every maths function from libm (ADR-0001):"
+        );
+    }
+    for call in refused {
+        let advice = if call.callers.iter().any(Caller::is_outside) {
+            "No allowance can cover a reference from outside any function, such as a table of \
+             function pointers, because nothing says what calls through it: stop it being made."
+                .to_owned()
+        } else {
+            format!(
+                "If it can never run in the Simulation, allow it under [core-platform-maths] in \
+                 {RULES_FILE} with the reason; otherwise stop it being called."
+            )
+        };
+        println!(
+            "- `{}` calls the operating system's `{}` ({}) from {}. {advice}",
             call.library,
             call.function,
-            call.callers()
+            rust_operation(&call.function),
+            call.callers(),
         );
     }
     ExitCode::FAILURE
@@ -194,21 +298,79 @@ pub fn run(args: &[String]) -> ExitCode {
 pub(crate) struct Call {
     pub library: String,
     pub function: String,
-    /// The functions in the library that make the call, demangled.
-    pub callers: BTreeSet<String>,
+    pub callers: BTreeSet<Caller>,
+}
+
+/// Where a call to the operating system's maths is made from.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum Caller {
+    /// A reference from outside any function, such as a table of function
+    /// pointers: the data's name when it has one, and the section of compiled
+    /// code it sits in.
+    Outside {
+        data: Option<String>,
+        section: String,
+    },
+    /// A function, demangled, with the crate or program whose compiled code
+    /// holds it when that isn't the library's own (a generic or `#[inline]`
+    /// function is compiled into the crate that uses it), in words.
+    Function {
+        name: String,
+        compiled_into: Option<String>,
+    },
+}
+
+impl Caller {
+    /// The function's name, if the call is made from a function.
+    pub(crate) fn function_name(&self) -> Option<&str> {
+        match self {
+            Caller::Function { name, .. } => Some(name),
+            Caller::Outside { .. } => None,
+        }
+    }
+
+    fn is_outside(&self) -> bool {
+        matches!(self, Caller::Outside { .. })
+    }
+}
+
+impl fmt::Display for Caller {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Caller::Function {
+                name,
+                compiled_into: None,
+            } => write!(out, "{name}"),
+            Caller::Function {
+                name,
+                compiled_into: Some(place),
+            } => write!(out, "{name} (compiled into {place})"),
+            Caller::Outside {
+                data: Some(data),
+                section,
+            } => write!(
+                out,
+                "`{data}`, data outside any function (in section `{section}`)"
+            ),
+            Caller::Outside {
+                data: None,
+                section,
+            } => write!(out, "outside any function (in section `{section}`)"),
+        }
+    }
 }
 
 impl Call {
     fn callers(&self) -> String {
         const SHOWN: usize = 3;
-        let mut names: Vec<&str> = self
+        let mut names: Vec<String> = self
             .callers
             .iter()
-            .map(String::as_str)
             .take(SHOWN)
+            .map(Caller::to_string)
             .collect();
         if names.is_empty() {
-            names.push("code this check couldn't name");
+            names.push("code this check couldn't name".to_owned());
         }
         let more = self.callers.len().saturating_sub(SHOWN);
         let mut text = names.join(", ");
@@ -219,280 +381,314 @@ impl Call {
     }
 }
 
-/// How many libraries the core is built with, and every call any of them
-/// makes to the operating system's maths, in order of library and function.
-fn platform_maths_calls(
+/// What the check found.
+struct Found {
+    /// How many libraries the core is built with.
+    libraries: usize,
+    /// How many other crates' (and programs') compiled code was read for the
+    /// core's functions.
+    others_read: usize,
+    /// How many of those hold any of the core's functions.
+    others_holding: usize,
+    /// Every call to the operating system's maths, in order of library and
+    /// function.
+    calls: Vec<Call>,
+    /// The crates whose compiled code is LLVM bitcode, which this check
+    /// can't read.
+    bitcode: Vec<String>,
+}
+
+/// Builds the core with `with` and reads the compiled code.
+fn check(
     rules: &Rules,
     with: &[String],
     manifest_path: Option<&str>,
     target: &str,
-) -> Result<(usize, Vec<Call>), String> {
-    let metadata = cargo_metadata(manifest_path)?;
-    let core_libraries = core_closure(&metadata, &rules.core)?;
-    let rlibs = build(&rules.core, with, manifest_path, target)?;
-    let mut calls = Vec::new();
-    for (id, name) in &core_libraries {
-        let mut found: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        for rlib in rlibs.get(id).into_iter().flatten() {
-            let bytes = std::fs::read(rlib)
-                .map_err(|error| format!("can't read {}: {error}", rlib.display()))?;
-            read_rlib(&bytes, &mut found)
-                .map_err(|error| format!("can't read {}: {error}", rlib.display()))?;
-        }
-        for (function, callers) in found {
-            calls.push(Call {
-                library: name.clone(),
-                function,
-                callers,
-            });
-        }
-    }
-    Ok((core_libraries.len(), calls))
-}
+) -> Result<Found, String> {
+    let packages = Packages::read(&cargo_metadata(manifest_path)?)?;
+    let core = packages.core_closure(&rules.core);
+    let built = build(&packages, &rules.core, with, manifest_path, target)?;
+    let mut calls: BTreeMap<(String, String), BTreeSet<Caller>> = BTreeMap::new();
+    let mut bitcode = Vec::new();
 
-fn cargo_metadata(manifest_path: Option<&str>) -> Result<Value, String> {
-    let mut command = cargo();
-    command.args(["metadata", "--format-version", "1"]);
-    if let Some(path) = manifest_path {
-        command.args(["--manifest-path", path]);
+    // The core's own libraries first: their code also says which crates are
+    // the core's, for finding the core's functions in other crates' code.
+    let mut owners = Owners::default();
+    let mut core_code = Vec::new();
+    for (id, name) in &core {
+        let code = read_code(
+            built.rlibs.get(id).map(Vec::as_slice).unwrap_or_default(),
+            Depth::Calls,
+        )?;
+        if code.bitcode {
+            bitcode.push(name.clone());
+        }
+        owners.learn(packages.crate_name(id), name, &code);
+        core_code.push((name, code));
     }
-    let output = command
-        .output()
-        .map_err(|error| format!("couldn't run cargo metadata: {error}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "cargo metadata failed:\n{}",
-            String::from_utf8_lossy(&output.stderr)
+    for (name, code) in &core_code {
+        core_calls(name, code, &owners, &mut calls);
+    }
+
+    // Then every other crate in the build that uses any library the core is
+    // built with, and the `--with` packages' programs: the core's generic and
+    // inline functions are compiled into them, and a crate built without
+    // optimisation may hold a generic copy that the game's copy of a core
+    // function calls.
+    let mut others: Vec<(String, String, &[PathBuf])> = Vec::new();
+    for (id, rlibs) in &built.rlibs {
+        if !core.contains_key(id) && packages.uses_any(id, &core) {
+            let name = packages.name(id);
+            others.push((name.to_owned(), format!("`{name}`"), rlibs));
+        }
+    }
+    for (id, program, object) in &built.programs {
+        others.push((
+            packages.name(id).to_owned(),
+            format!("the program `{program}`"),
+            std::slice::from_ref(object),
         ));
     }
-    serde_json::from_slice(&output.stdout)
-        .map_err(|error| format!("cargo metadata gave unreadable output: {error}"))
-}
+    let mut others_read = 0;
+    let mut others_holding = 0;
+    if bitcode.is_empty() {
+        for (name, place, files) in others {
+            // Its names first, quickly: most crates name no maths function.
+            let code = read_code(files, Depth::Names)?;
+            others_read += 1;
+            if code
+                .functions
+                .iter()
+                .any(|function| owners.library(function).is_some())
+            {
+                others_holding += 1;
+            }
+            if code.bitcode {
+                bitcode.push(name);
+            } else if !code.maths.is_empty() {
+                other_calls(
+                    &place,
+                    &read_code(files, Depth::Calls)?,
+                    &owners,
+                    &mut calls,
+                );
+            }
+        }
+    }
 
-/// Every package the core crates are built with (their normal dependencies,
-/// all the way down, and themselves), by id, with its name. Code-writing
-/// macros and build scripts' libraries only run while building, so they are
-/// left out.
-fn core_closure(metadata: &Value, core: &[String]) -> Result<BTreeMap<String, String>, String> {
-    let packages = metadata["packages"]
-        .as_array()
-        .ok_or("cargo metadata has no packages")?;
-    let mut names = BTreeMap::new();
-    let mut macros = BTreeSet::new();
-    for package in packages {
-        let id = package["id"].as_str().unwrap_or_default().to_owned();
-        let is_macro = package["targets"].as_array().is_some_and(|targets| {
-            targets.iter().any(|target| {
-                target["kind"]
-                    .as_array()
-                    .is_some_and(|kinds| kinds.iter().any(|kind| kind == "proc-macro"))
+    Ok(Found {
+        libraries: core.len(),
+        others_read,
+        others_holding,
+        calls: calls
+            .into_iter()
+            .map(|((library, function), callers)| Call {
+                library,
+                function,
+                callers,
             })
-        });
-        if is_macro {
-            macros.insert(id.clone());
-        }
-        names.insert(id, package["name"].as_str().unwrap_or_default().to_owned());
-    }
-    let nodes = metadata["resolve"]["nodes"]
-        .as_array()
-        .ok_or("cargo metadata has no resolve graph")?;
-    let mut uses: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for node in nodes {
-        let id = node["id"].as_str().unwrap_or_default().to_owned();
-        let normal = node["deps"].as_array().into_iter().flatten().filter(|dep| {
-            dep["dep_kinds"]
-                .as_array()
-                .is_some_and(|kinds| kinds.iter().any(|kind| kind["kind"].is_null()))
-        });
-        uses.insert(
-            id,
-            normal
-                .filter_map(|dep| dep["pkg"].as_str().map(str::to_owned))
-                .collect(),
-        );
-    }
-    let members = metadata["workspace_members"]
-        .as_array()
-        .ok_or("cargo metadata has no workspace members")?;
-    let mut queue: VecDeque<String> = members
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|id| names.get(*id).is_some_and(|name| core.contains(name)))
-        .map(str::to_owned)
-        .collect();
-    let mut reached: BTreeMap<String, String> = BTreeMap::new();
-    while let Some(id) = queue.pop_front() {
-        if macros.contains(&id) || reached.contains_key(&id) {
-            continue;
-        }
-        reached.insert(id.clone(), names.get(&id).cloned().unwrap_or_default());
-        for next in uses.get(&id).into_iter().flatten() {
-            queue.push_back(next.clone());
-        }
-    }
-    let mut by_name: Vec<(String, String)> = reached.into_iter().collect();
-    by_name.sort_by(|a, b| (&a.1, &a.0).cmp(&(&b.1, &b.0)));
-    Ok(by_name.into_iter().collect())
+            .collect(),
+        bitcode,
+    })
 }
 
-/// The computer's own target, such as `aarch64-apple-darwin`. The core is
-/// built for it by name, so the libraries built for the program land in
-/// their own folder, apart from those built for build scripts and macros.
-fn host_triple() -> Result<String, String> {
-    let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
-    let output = Command::new(rustc)
-        .arg("-vV")
-        .output()
-        .map_err(|error| format!("couldn't run rustc: {error}"))?;
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .find_map(|line| line.strip_prefix("host: "))
-        .map(str::to_owned)
-        .ok_or_else(|| "rustc -vV names no host".to_owned())
+/// Reads compiled code: `.rlib` archives, or a program's object file.
+fn read_code(files: &[PathBuf], depth: Depth) -> Result<Code, String> {
+    let mut code = Code::default();
+    for file in files {
+        let bytes = std::fs::read(file)
+            .map_err(|error| format!("can't read {}: {error}", file.display()))?;
+        if file.extension().is_some_and(|ext| ext == "rlib") {
+            code.read_rlib(&bytes, depth)
+        } else {
+            code.read_object_file(&bytes, depth)
+        }
+        .map_err(|error| format!("can't read {}: {error}", file.display()))?;
+    }
+    Ok(code)
 }
 
-/// Builds the core crates and `with` together, and gives every library's
-/// compiled `.rlib` files built for the program, by package id.
-fn build(
-    core: &[String],
-    with: &[String],
-    manifest_path: Option<&str>,
-    host: &str,
-) -> Result<BTreeMap<String, Vec<PathBuf>>, String> {
-    let mut command = cargo();
-    command.args(["build", "--message-format=json", "--target", host]);
-    if let Some(path) = manifest_path {
-        command.args(["--manifest-path", path]);
-    }
-    // Only the core crates the workspace has (a test's small workspace may
-    // hold a few).
-    let metadata = cargo_metadata(manifest_path)?;
-    let present: BTreeSet<&str> = metadata["packages"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|package| package["name"].as_str())
-        .collect();
-    for package in core.iter().filter(|name| present.contains(name.as_str())) {
-        command.args(["-p", package]);
-    }
-    for package in with {
-        command.args(["-p", package]);
-    }
-    let output = command
-        .stderr(Stdio::inherit())
-        .output()
-        .map_err(|error| format!("couldn't run cargo build: {error}"))?;
-    if !output.status.success() {
-        return Err("cargo build failed (its messages are above)".to_owned());
-    }
-    let mut rlibs: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Ok(message) = serde_json::from_str::<Value>(line) else {
-            continue;
-        };
-        if message["reason"] != "compiler-artifact" {
-            continue;
+/// Adds the calls in one core library's compiled code. A call inside a
+/// function of another crate's (such as std's `f64::acos`, copied in) counts
+/// as made by the core's functions that lead to it, or by that function
+/// itself when none does. Each core function's call counts as its own
+/// library's, wherever the compiler put its code: an optimised library's
+/// small functions are compiled into the crates that call them, too.
+fn core_calls(
+    library: &str,
+    code: &Code,
+    owners: &Owners,
+    calls: &mut BTreeMap<(String, String), BTreeSet<Caller>>,
+) {
+    for (function, places) in &code.maths {
+        // Even with no reference found, a maths function the code names
+        // counts, from code this check couldn't name.
+        if places.is_empty() {
+            calls
+                .entry((library.to_owned(), function.clone()))
+                .or_default();
         }
-        let Some(id) = message["package_id"].as_str() else {
-            continue;
-        };
-        for file in message["filenames"].as_array().into_iter().flatten() {
-            let Some(file) = file.as_str().map(Path::new) else {
+        for place in places {
+            match place {
+                Place::Function(name) => {
+                    let (core, uncalled) = owners.functions_leading_to(code, name);
+                    let mut theirs: BTreeSet<&str> = uncalled;
+                    if core.is_empty() && theirs.is_empty() {
+                        theirs.insert(name);
+                    }
+                    for name in core {
+                        let owner = owners.library(name).unwrap_or(library);
+                        calls
+                            .entry((owner.to_owned(), function.clone()))
+                            .or_default()
+                            .insert(Caller::Function {
+                                name: demangle(name),
+                                compiled_into: (owner != library).then(|| format!("`{library}`")),
+                            });
+                    }
+                    for name in theirs {
+                        calls
+                            .entry((library.to_owned(), function.clone()))
+                            .or_default()
+                            .insert(Caller::Function {
+                                name: demangle(name),
+                                compiled_into: None,
+                            });
+                    }
+                }
+                Place::Outside { data, section } => {
+                    calls
+                        .entry((library.to_owned(), function.clone()))
+                        .or_default()
+                        .insert(Caller::Outside {
+                            data: data.as_deref().map(demangle),
+                            section: section.clone(),
+                        });
+                }
+            }
+        }
+    }
+}
+
+/// Adds the calls made by core libraries' functions compiled into another
+/// crate's code. The crate's own calls are its business.
+fn other_calls(
+    compiled_into: &str,
+    code: &Code,
+    owners: &Owners,
+    calls: &mut BTreeMap<(String, String), BTreeSet<Caller>>,
+) {
+    for (function, places) in &code.maths {
+        for place in places {
+            let Place::Function(name) = place else {
                 continue;
             };
-            let for_the_program = file
-                .components()
-                .any(|part| part.as_os_str() == std::ffi::OsStr::new(host));
-            if for_the_program && file.extension().is_some_and(|ext| ext == "rlib") {
-                rlibs
-                    .entry(id.to_owned())
+            let (core, _) = owners.functions_leading_to(code, name);
+            for name in core {
+                let Some(library) = owners.library(name) else {
+                    continue;
+                };
+                calls
+                    .entry((library.to_owned(), function.clone()))
                     .or_default()
-                    .push(file.to_path_buf());
+                    .insert(Caller::Function {
+                        name: demangle(name),
+                        compiled_into: Some(compiled_into.to_owned()),
+                    });
             }
         }
     }
-    Ok(rlibs)
 }
 
-fn cargo() -> Command {
-    Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+fn demangle(symbol: &str) -> String {
+    format!("{:#}", rustc_demangle::demangle(symbol))
 }
 
-/// Adds every call in one `.rlib` (an archive of object files) to one of
-/// the operating system's maths functions, with the functions that make it.
-pub(crate) fn read_rlib(
-    bytes: &[u8],
-    found: &mut BTreeMap<String, BTreeSet<String>>,
-) -> Result<(), String> {
-    let archive = ArchiveFile::parse(bytes).map_err(|error| error.to_string())?;
-    for member in archive.members() {
-        let member = member.map_err(|error| error.to_string())?;
-        let data = member.data(bytes).map_err(|error| error.to_string())?;
-        // The archive also holds Rust's own metadata, which isn't code.
-        let Ok(file) = object::File::parse(data) else {
-            continue;
-        };
-        read_object(&file, found);
-    }
-    Ok(())
+/// Which core library each function in compiled code comes from, by the
+/// crate its symbol name gives ([`owner`]).
+#[derive(Default)]
+struct Owners {
+    /// Core libraries by their crate's name and number, as their own compiled
+    /// code names them.
+    numbered: BTreeMap<(String, u64), String>,
+    /// Core libraries whose compiled code gave no number (it may hold no
+    /// function of its own), by their crate's name.
+    by_name: BTreeMap<String, String>,
 }
 
-/// A symbol's plain name: Mach-O puts an underscore before every C name.
-fn plain_name<'a>(file: &object::File<'_>, name: &'a str) -> &'a str {
-    if file.format() == object::BinaryFormat::MachO {
-        name.strip_prefix('_').unwrap_or(name)
-    } else {
-        name
-    }
-}
-
-fn read_object(file: &object::File<'_>, found: &mut BTreeMap<String, BTreeSet<String>>) {
-    let maths: BTreeMap<usize, String> = file
-        .symbols()
-        .filter(|symbol| symbol.is_undefined())
-        .filter_map(|symbol| {
-            let name = plain_name(file, symbol.name().ok()?);
-            PLATFORM_MATHS
-                .contains(&name)
-                .then(|| (symbol.index().0, name.to_owned()))
-        })
-        .collect();
-    if maths.is_empty() {
-        return;
-    }
-    for name in maths.values() {
-        found.entry(name.clone()).or_default();
-    }
-    // Which function each call is in: the last function symbol at or before
-    // the call, in the same section.
-    for section in file.sections() {
-        let mut functions: Vec<(u64, String)> = file
-            .symbols()
-            .filter(|symbol| {
-                symbol.section_index() == Some(section.index())
-                    && matches!(symbol.kind(), SymbolKind::Text)
-            })
-            .filter_map(|symbol| Some((symbol.address(), symbol.name().ok()?.to_owned())))
-            .collect();
-        functions.sort();
-        for (offset, relocation) in section.relocations() {
-            let RelocationTarget::Symbol(index) = relocation.target() else {
-                continue;
-            };
-            let Some(name) = maths.get(&index.0) else {
-                continue;
-            };
-            let at = section.address() + offset;
-            // Every name at that start: identical functions may be merged into
-            // one, which then answers to each of their names.
-            let Some((start, _)) = functions.iter().rev().find(|(start, _)| *start <= at) else {
-                continue;
-            };
-            for (_, caller) in functions.iter().filter(|(address, _)| address == start) {
-                let caller = format!("{:#}", rustc_demangle::demangle(plain_name(file, caller)));
-                found.entry(name.clone()).or_default().insert(caller);
+impl Owners {
+    /// Learns how one core library's crate is named from its compiled code.
+    fn learn(&mut self, crate_name: &str, library: &str, code: &Code) {
+        let mut learned = false;
+        for function in &code.functions {
+            if let Some(owner::Owner {
+                name,
+                disambiguator: Some(number),
+            }) = owner::owner(function)
+                && name == crate_name
+            {
+                self.numbered.insert((name, number), library.to_owned());
+                learned = true;
             }
         }
+        if !learned {
+            self.by_name
+                .insert(crate_name.to_owned(), library.to_owned());
+        }
+    }
+
+    /// The core library a function comes from, if it's one of the core's.
+    fn library(&self, symbol: &str) -> Option<&str> {
+        let owner = owner::owner(symbol)?;
+        if let Some(number) = owner.disambiguator
+            && let Some(library) = self.numbered.get(&(owner.name.clone(), number))
+        {
+            return Some(library);
+        }
+        if let Some(library) = self.by_name.get(&owner.name) {
+            return Some(library);
+        }
+        // An older-style name carries no number: any core crate of its name.
+        if owner.disambiguator.is_none() {
+            return self
+                .numbered
+                .iter()
+                .find(|((name, _), _)| *name == owner.name)
+                .map(|(_, library)| library.as_str());
+        }
+        None
+    }
+
+    /// The core's functions that lead to a call made inside `function`:
+    /// `function` itself when it's one of them, or else the core's functions
+    /// that call it, through other crates' functions such as std's. Then the
+    /// other crates' functions on those ways that nothing in this code calls.
+    fn functions_leading_to<'a>(
+        &self,
+        code: &'a Code,
+        function: &'a str,
+    ) -> (BTreeSet<&'a str>, BTreeSet<&'a str>) {
+        let mut core = BTreeSet::new();
+        let mut uncalled = BTreeSet::new();
+        let mut seen = BTreeSet::new();
+        let mut waiting = vec![function];
+        while let Some(name) = waiting.pop() {
+            if !seen.insert(name) {
+                continue;
+            }
+            if self.library(name).is_some() {
+                core.insert(name);
+                continue;
+            }
+            match code.callers.get(name) {
+                Some(callers) if !callers.is_empty() => {
+                    waiting.extend(callers.iter().map(String::as_str));
+                }
+                _ => {
+                    uncalled.insert(name);
+                }
+            }
+        }
+        (core, uncalled)
     }
 }

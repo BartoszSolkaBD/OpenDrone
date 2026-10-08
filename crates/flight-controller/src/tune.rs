@@ -27,6 +27,22 @@ use opendrone_maths::Fingerprinter;
 pub struct Tune {
     /// `small_angle`: the most the Quad may be tilted to arm, in degrees.
     pub small_angle: u8,
+    /// `rx_min_usec`: a Channel below this, in µs, is invalid. It is also
+    /// the throttle Failsafe's stage 1 sets.
+    pub rx_min_usec: u16,
+    /// `rx_max_usec`: a Channel above this, in µs, is invalid.
+    pub rx_max_usec: u16,
+    /// `failsafe_delay`: how long after the last good frame Failsafe's stage
+    /// 2 starts (DROP: the Quad disarms), in tenths of a second.
+    pub failsafe_delay: u8,
+    /// `failsafe_procedure`: only DROP is simulated; a Tune set to AUTO-LAND
+    /// or GPS-RESCUE flies DROP ([`Tune::not_simulated_values`]).
+    pub failsafe_procedure: FailsafeProcedure,
+    /// `failsafe_throttle`: the throttle during stage 2, in µs.
+    pub failsafe_throttle: u16,
+    /// `failsafe_recovery_delay`: how long frames must arrive again before
+    /// the link counts as back, in tenths of a second.
+    pub failsafe_recovery_delay: u8,
     /// `p_roll`, `i_roll`, `d_roll`, then pitch and yaw.
     pub pid: [Gains; 3],
     /// `motor_output_limit`: the top of the motors' range, in percent.
@@ -73,6 +89,28 @@ pub struct Gains {
     pub d: u8,
 }
 
+/// `failsafe_procedure`, in Betaflight's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FailsafeProcedure {
+    /// `AUTO-LAND`: not simulated yet, so it flies DROP.
+    AutoLand,
+    /// `DROP`: the Quad disarms and falls.
+    Drop,
+    /// `GPS-RESCUE`: not simulated yet, so it flies DROP.
+    GpsRescue,
+}
+
+impl FailsafeProcedure {
+    /// Betaflight's word for it.
+    pub fn word(self) -> &'static str {
+        match self {
+            FailsafeProcedure::AutoLand => "AUTO-LAND",
+            FailsafeProcedure::Drop => "DROP",
+            FailsafeProcedure::GpsRescue => "GPS-RESCUE",
+        }
+    }
+}
+
 /// `mixer_type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MixerType {
@@ -113,14 +151,28 @@ enum Kind {
     /// One of these words; any other Betaflight word is refused with the
     /// reason.
     Choice(&'static [&'static str], &'static str),
+    /// One of these words: every one Betaflight knows. Those OpenDrone
+    /// doesn't simulate yet are read all the same, and
+    /// [`Tune::not_simulated_values`] says what flies instead.
+    Word(&'static [&'static str]),
 }
 
 /// Every setting this Flight Controller reads, grouped as Betaflight's App
-/// shows them, tab by tab (Configuration, PID Tuning, Receiver, Motors), with
-/// each tab's settings that only the CLI holds after the ones it shows. The
-/// ranges are Betaflight 2026.6.2's (`src/main/cli/settings.c`).
+/// shows them, tab by tab (Configuration, Failsafe, PID Tuning, Receiver,
+/// Motors), with each tab's settings that only the CLI holds after the ones
+/// it shows. The ranges are Betaflight 2026.6.2's
+/// (`src/main/cli/settings.c`).
 const SPECS: &[(&str, Kind)] = &[
     ("small_angle", Kind::Number(0, 180)),
+    ("rx_min_usec", Kind::Number(750, 2250)),
+    ("rx_max_usec", Kind::Number(750, 2250)),
+    ("failsafe_delay", Kind::Number(1, 200)),
+    (
+        "failsafe_procedure",
+        Kind::Word(&["AUTO-LAND", "DROP", "GPS-RESCUE"]),
+    ),
+    ("failsafe_throttle", Kind::Number(750, 2250)),
+    ("failsafe_recovery_delay", Kind::Number(1, 200)),
     ("p_roll", Kind::Number(0, 250)),
     ("i_roll", Kind::Number(0, 250)),
     ("d_roll", Kind::Number(0, 250)),
@@ -201,6 +253,11 @@ const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
     ("yaw_lowpass_hz", Kind::Number(0, 500), "#49"),
     // Receiver: RC smoothing.
     ("rc_smoothing", Kind::OffOn, "#49"),
+    // CLI only: runaway takeoff prevention, which disarms a Quad whose PID
+    // sum stays at 60% of the motor range for 75 ms before half a second of
+    // normal flight switches it off. It guards against wiring and orientation
+    // mistakes the sim can't have, so it comes later (#21).
+    ("runaway_takeoff_prevention", Kind::OffOn, "later"),
 ];
 
 /// Betaflight's words for every value of the two lookups read here, so a
@@ -300,6 +357,16 @@ impl Tune {
         };
         Ok(Tune {
             small_angle: small("small_angle"),
+            rx_min_usec: n("rx_min_usec") as u16,
+            rx_max_usec: n("rx_max_usec") as u16,
+            failsafe_delay: small("failsafe_delay"),
+            failsafe_procedure: match n("failsafe_procedure") {
+                0 => FailsafeProcedure::AutoLand,
+                1 => FailsafeProcedure::Drop,
+                _ => FailsafeProcedure::GpsRescue,
+            },
+            failsafe_throttle: n("failsafe_throttle") as u16,
+            failsafe_recovery_delay: small("failsafe_recovery_delay"),
             pid: [gains("roll"), gains("pitch"), gains("yaw")],
             motor_output_limit: small("motor_output_limit"),
             pidsum_limit: n("pidsum_limit") as u16,
@@ -323,9 +390,38 @@ impl Tune {
         })
     }
 
+    /// The settings whose value this Flight Controller reads but doesn't
+    /// simulate yet, each with a plain sentence saying what flies instead:
+    /// so far, a `failsafe_procedure` of AUTO-LAND or GPS-RESCUE, which flies
+    /// DROP (#21).
+    pub fn not_simulated_values(&self) -> Vec<(&'static str, String)> {
+        match self.failsafe_procedure {
+            FailsafeProcedure::Drop => Vec::new(),
+            other => vec![(
+                "failsafe_procedure",
+                format!(
+                    "`failsafe_procedure` is {}, which isn't simulated yet: the Quad flies DROP, disarming as Failsafe's stage 2 starts",
+                    other.word()
+                ),
+            )],
+        }
+    }
+
     /// Feeds every setting into a fingerprint, in [`Tune::settings`] order.
     pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
-        let mut numbers: Vec<u64> = vec![u64::from(self.small_angle)];
+        let mut numbers: Vec<u64> = vec![
+            u64::from(self.small_angle),
+            u64::from(self.rx_min_usec),
+            u64::from(self.rx_max_usec),
+            u64::from(self.failsafe_delay),
+            match self.failsafe_procedure {
+                FailsafeProcedure::AutoLand => 0,
+                FailsafeProcedure::Drop => 1,
+                FailsafeProcedure::GpsRescue => 2,
+            },
+            u64::from(self.failsafe_throttle),
+            u64::from(self.failsafe_recovery_delay),
+        ];
         for gains in self.pid {
             numbers.extend([gains.p, gains.i, gains.d].map(u64::from));
         }
@@ -372,6 +468,13 @@ fn value(name: &str, kind: &Kind, text: &str) -> Result<u32, String> {
             "OFF" => Ok(0),
             "ON" => Ok(1),
             _ => Err(format!("`{name}` is OFF or ON, not \"{text}\"")),
+        },
+        Kind::Word(words) => match words.iter().position(|w| *w == text) {
+            Some(place) => Ok(place as u32),
+            None => Err(format!(
+                "`{name}` must be one of {}, not \"{text}\"",
+                words.join(", ")
+            )),
         },
         Kind::Choice(words, why) => {
             if let Some(place) = words.iter().position(|w| *w == text) {

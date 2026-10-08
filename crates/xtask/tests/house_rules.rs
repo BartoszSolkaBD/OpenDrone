@@ -5,7 +5,8 @@
 //! Clippy quietly ignores a rule whose name it can't find, so the last two
 //! checks run Clippy on a crate that breaks every rule
 //! (`house_rules/breaks_every_rule.rs`), once with the core's settings and
-//! once without.
+//! once without. It uses the real parry3d, the version the workspace pins, so
+//! the rules naming parry3d's functions are proved against the real paths.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,6 +51,44 @@ fn the_house_rules_apply_to_the_core_crates_only() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn the_house_rules_ban_the_parry3d_functions_that_would_run_its_allowed_operating_system_maths() {
+    // walls.toml lets parry3d keep its calls to the operating system's
+    // `acos` (a mesh's pseudo-normals) and `log2` (rebalancing a tree of
+    // moving shapes) only because the Simulation never runs them. These are
+    // every public way into them in parry3d 0.31.1; the check below proves
+    // Clippy flags each one.
+    let settings: toml::Table = read(&crates().join("maths/clippy.toml"))
+        .parse()
+        .expect("clippy.toml is valid TOML");
+    let entries = settings["disallowed-methods"]
+        .as_array()
+        .expect("a list of rules");
+    for path in [
+        "parry3d_f64::shape::TriMesh::set_flags",
+        "parry3d_f64::shape::TriMesh::with_flags",
+        "parry3d_f64::shape::TriMesh::update_vertices",
+        "parry3d_f64::shape::TriMesh::set_vertices",
+        "parry3d_f64::shape::SharedShape::trimesh_with_flags",
+        "parry3d_f64::shape::TriMesh::connected_component_meshes",
+        "parry3d_f64::shape::TriMeshConnectedComponents::to_meshes",
+        "parry3d_f64::shape::TriMesh::append",
+        "parry3d_f64::transformation::volume_mesh",
+        "parry3d_f64::partitioning::Bvh::optimize_incremental",
+    ] {
+        let entry = entries
+            .iter()
+            .find(|entry| entry["path"].as_str() == Some(path))
+            .unwrap_or_else(|| panic!("the house rules don't ban {path}"));
+        let reason = entry["reason"].as_str().unwrap_or_default();
+        assert!(
+            reason.contains("operating system's") && reason.contains("(ADR-0001)"),
+            "the rule banning {path} needs a reason naming the operating system's maths and \
+             ADR-0001, not {reason:?}"
+        );
     }
 }
 
@@ -100,10 +139,11 @@ fn house_rules() -> Vec<String> {
 
 /// Runs Clippy on a scratch crate holding `breaks_every_rule.rs`, with or
 /// without the core's `clippy.toml` beside it, and returns what Clippy said.
+/// The crate uses parry3d as the workspace does, with the workspace's
+/// `Cargo.lock`, so nothing is downloaded.
 fn clippy_on_the_rule_breaker(case: &str, with_house_rules: bool) -> String {
-    let folder = Path::new(env!("CARGO_TARGET_TMPDIR"))
-        .join("house-rules")
-        .join(case);
+    let scratch = Path::new(env!("CARGO_TARGET_TMPDIR")).join("house-rules");
+    let folder = scratch.join(case);
     match fs::remove_dir_all(&folder) {
         Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
             panic!("can't clear {}: {error}", folder.display())
@@ -111,9 +151,19 @@ fn clippy_on_the_rule_breaker(case: &str, with_house_rules: bool) -> String {
         _ => {}
     }
     fs::create_dir_all(&folder).expect("can make the scratch folder");
-    let manifest = "[package]\nname = \"rule-breaker\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\
-                    publish = false\n\n[lib]\npath = \"lib.rs\"\n\n[workspace]\n";
+    let workspace: toml::Table = read(&repo().join("Cargo.toml"))
+        .parse()
+        .expect("the workspace's Cargo.toml is valid TOML");
+    let parry = &workspace["workspace"]["dependencies"]["parry3d-f64"];
+    // Each case's crate has its own name: the two share a target folder,
+    // where two crates of one name would share Clippy's saved findings.
+    let manifest = format!(
+        "[package]\nname = \"rule-breaker-{case}\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\
+         publish = false\n\n[lib]\npath = \"lib.rs\"\n\n[dependencies]\nparry3d-f64 = {parry}\n\n\
+         [workspace]\n"
+    );
     fs::write(folder.join("Cargo.toml"), manifest).expect("can write Cargo.toml");
+    fs::copy(repo().join("Cargo.lock"), folder.join("Cargo.lock")).expect("can copy Cargo.lock");
     fs::write(
         folder.join("lib.rs"),
         include_str!("house_rules/breaks_every_rule.rs"),
@@ -132,7 +182,8 @@ fn clippy_on_the_rule_breaker(case: &str, with_house_rules: bool) -> String {
         .args(["clippy", "--quiet", "--offline", "--manifest-path"])
         .arg(folder.join("Cargo.toml"))
         .current_dir(&folder)
-        .env("CARGO_TARGET_DIR", folder.join("target"))
+        // Both cases share one target folder, so parry3d is checked once.
+        .env("CARGO_TARGET_DIR", scratch.join("target"))
         .env_remove("CLIPPY_CONF_DIR")
         .output()
         .expect("cargo clippy runs");

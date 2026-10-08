@@ -51,13 +51,13 @@ use std::path::{Path, PathBuf};
 use opendrone_pack::{Packs, Problems};
 
 pub use format::{SCENARIO_FORMAT, SCENARIO_STEPS};
-pub use measure::{Axis, Measure, Sample, Term};
+pub use measure::{Axis, Event, Measure, Sample, Term};
 pub use opendrone_sim::StartingMotors;
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
-    Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, FlightMode, Inputs, Kind,
-    Named, OtherRun, PilotChanges, PilotEntry, Scenario, Start, StartingFlightController,
-    Statistic, Stick, When, read_scenario,
+    Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, Expecting, FlightMode,
+    InputDevice, Inputs, Kind, Named, OtherRun, PilotChanges, PilotEntry, Scenario, Start,
+    StartingFlightController, Statistic, Stick, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, run};

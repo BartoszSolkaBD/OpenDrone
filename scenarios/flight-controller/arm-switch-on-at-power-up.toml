@@ -1,0 +1,82 @@
+# A Freestyle 5″ powered up on the floor with its Arm switch already on, as
+# when a pack is plugged in with the switch left up: it never arms by
+# surprise. Arming is refused while the ESCs start up (BOOTGRACE), and since
+# the switch was on while arming was refused, Betaflight 2026.6.2 refuses it
+# until the switch goes off and on again (ARM_SWITCH; updateArmingStatus,
+# src/main/fc/core.c), even after the ESCs' ready beep at 1.662 s.
+#
+# A landed start with a "fresh" Flight Controller is exactly Reset, so its
+# motors start "powering up". The body box is 35 mm tall, so the Quad rests
+# with its centre 17.5 mm above the floor.
+format = 1
+name   = "An Arm switch already on at power-up must be flipped off and on again"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on" },
+  { at = "2.5 s", arm = "off" },
+  { at = "2.7 s", arm = "on" },
+]
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0 s to 2.5 s"
+first = "never"
+basis = "source: updateArmingStatus: the switch reads on while BOOTGRACE blocks arming, which raises ARM_SWITCH, and ARM_SWITCH clears only with the switch off, so the ESCs' ready beep alone doesn't arm"
+
+[[expect]]
+what  = "BOOTGRACE stops blocking arming"
+over  = "0 s to 2.5 s"
+first = "between 1.662 s and 1.6672 s"
+basis = "source: Bluejay's ready beep at 1.662 s, then the next Radio Link frame"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.4 s"
+value = "0 ± 0"
+basis = "source: still disarmed, so Betaflight sends DShot 0, stop"
+
+[[expect]]
+what  = "ARM_SWITCH stops blocking arming"
+over  = "2.5 s to 2.6 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 2.5 s reads the switch off, which clears ARM_SWITCH"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "2.7 s to 3 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and tryArm: the frame at 2.7 s turns Arm on in the Modes table, and the next, at 2.704 s, arms"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.8 s"
+value = "158 ± 1"
+basis = "source: armed at zero throttle, the motors idle at 48 + 5.5% × 1999 = 157.9, sent as 158, give or take the PID loop's corrections on the floor; 96 ms after arming, past the spin-direction command Betaflight sends on arming, about 21 ms (dshot_command.c; not sent yet, #54)"

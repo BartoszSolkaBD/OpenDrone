@@ -129,6 +129,12 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
             attitude: Attitude::BODY_IS_WORLD,
             rotation: Vec3::ZERO,
         },
+        launch_spot: QuadState {
+            position,
+            velocity: Vec3::ZERO,
+            attitude: Attitude::BODY_IS_WORLD,
+            rotation: Vec3::ZERO,
+        },
         motors: StartingMotors::Stopped,
         battery: 1.0,
         mount: Mount::Free,

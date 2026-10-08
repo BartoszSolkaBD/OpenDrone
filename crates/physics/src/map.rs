@@ -261,7 +261,8 @@ impl Solid {
                 // whatever parry3d's features, and the operating systems'
                 // `acos` differ (ADR-0001). They stay off until parry3d
                 // computes them with libm (`cargo xtask core-maths` lists
-                // that call as allowed only while it can't run).
+                // that call as allowed only while it can't run, and the
+                // house rules in clippy.toml ban setting flags).
                 let mesh = TriMesh::new(
                     corners.iter().map(|c| to_parry(*c)).collect(),
                     triangles.clone(),

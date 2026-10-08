@@ -14,8 +14,8 @@ use opendrone_sim::{
 
 use crate::measure::{Sample, angle_near};
 use crate::read::{
-    BasisKind, Case, Comparison, Expectation, FlightMode, Inputs, Kind, Named, PilotChanges,
-    PilotEntry, Scenario, Start, Statistic, Stick, When,
+    BasisKind, Case, Comparison, Expectation, Expecting, FlightMode, InputDevice, Inputs, Kind,
+    Named, PilotChanges, PilotEntry, Scenario, Start, Statistic, Stick, When,
 };
 
 /// What one run of a Scenario measured.
@@ -254,6 +254,7 @@ fn simulate(
                     start.rates.clone(),
                     plan.physics_rate,
                     start.armed,
+                    start.assists.auto_arm,
                     &state,
                 )),
                 Some(PilotTrack::new(entries, start)),
@@ -270,6 +271,10 @@ fn simulate(
         quads: vec![QuadSetUp {
             parameters: quad.parameters.clone(),
             start: state,
+            // A Scenario's Launch Spot is where it starts: only a Scenario
+            // that starts as Reset leaves the Quad, landed and still, may
+            // press Reset (the reader checks), and Reset puts it back there.
+            launch_spot: state,
             motors: start
                 .motors
                 .expect("every kind but the Flight Controller's says how its motors start"),
@@ -335,9 +340,13 @@ fn simulate(
     let mut last_channels: Option<Channels> = None;
     for tick in 0..=plan.length.ticks() {
         if tick > 0 {
-            // The pilot's Channels for the step that starts now enter the
-            // Simulation as Flight Inputs, whenever they change.
+            // The pilot's Flight Inputs for the step that starts now enter the
+            // Simulation: the Flying Input Device lost or back, Reset, and
+            // the Channels whenever they change.
             if let Some(track) = &track {
+                for input in track.events_at(tick - 1) {
+                    sim.flight_input(0, SimulationTime::from_ticks(tick - 1), input);
+                }
                 let channels = track.channels(tick - 1);
                 if last_channels != Some(channels) {
                     sim.flight_input(
@@ -473,6 +482,14 @@ fn loop_alone(
         };
         if tick > 0 {
             let t = tick - 1;
+            for input in track.events_at(t) {
+                match input {
+                    FlightInput::InputDeviceLost => link.lose(),
+                    FlightInput::InputDeviceBack => link.back(),
+                    // The reader keeps Reset to Flight Scenarios.
+                    FlightInput::Reset | FlightInput::Channels(_) => {}
+                }
+            }
             let channels = track.channels(t);
             if last_channels != Some(channels) {
                 link.hear(channels);
@@ -522,6 +539,9 @@ struct PilotTrack {
     arm: Vec<(u64, bool)>,
     rotation: Vec<(u64, Vec3)>,
     attitude: Vec<(u64, Attitude)>,
+    /// The Flight Inputs besides the Channels, each at its step, in order:
+    /// the Flying Input Device lost or back, and Reset.
+    events: Vec<(u64, FlightInput)>,
     /// AUX2, from the start's Flight Mode: no Flight Mode switch is bound in
     /// a Scenario, so the pilot's Flight Mode setting drives it (ADR-0017).
     flight_mode: Channel,
@@ -534,6 +554,7 @@ impl PilotTrack {
             arm: Vec::new(),
             rotation: vec![(0, start.rotation)],
             attitude: vec![(0, start.attitude)],
+            events: Vec::new(),
             flight_mode: match start.flight_mode {
                 FlightMode::Acro => Channel::LOW,
                 FlightMode::Horizon => Channel::CENTRE,
@@ -550,7 +571,17 @@ impl PilotTrack {
                 arm,
                 rotation,
                 attitude,
+                input_device,
+                reset,
             } = entry.changes;
+            match input_device {
+                Some(InputDevice::Lost) => track.events.push((tick, FlightInput::InputDeviceLost)),
+                Some(InputDevice::Back) => track.events.push((tick, FlightInput::InputDeviceBack)),
+                None => {}
+            }
+            if reset {
+                track.events.push((tick, FlightInput::Reset));
+            }
             for (keys, stick) in track.sticks.iter_mut().zip([roll, pitch, yaw, throttle]) {
                 if let Some(stick) = stick {
                     keys.push((tick, stick));
@@ -584,11 +615,23 @@ impl PilotTrack {
         }
     }
 
-    /// The sensor readings at a step, for the Flight Controller alone.
+    /// The Flight Inputs besides the Channels that arrive at a step, in the
+    /// file's order.
+    fn events_at(&self, tick: u64) -> impl Iterator<Item = FlightInput> + '_ {
+        self.events
+            .iter()
+            .filter(move |(at, _)| *at == tick)
+            .map(|(_, input)| *input)
+    }
+
+    /// The sensor readings at a step, for the Flight Controller alone. It
+    /// has no ESCs to wait for: a Flight Controller Scenario's ESCs count as
+    /// ready.
     fn readings(&self, tick: u64) -> SensorReadings {
         SensorReadings {
             gyro: held(&self.rotation, tick).unwrap_or(Vec3::ZERO),
             attitude: held(&self.attitude, tick).unwrap_or(Attitude::BODY_IS_WORLD),
+            escs_ready: true,
         }
     }
 }
@@ -649,6 +692,9 @@ struct Tally<'s> {
     /// How many of the samples were roll or heading read with the nose
     /// straight up or down (see `see`).
     straight_up_or_down: u64,
+    /// For something that happens: how long after the stretch's start it
+    /// first did, in seconds.
+    first: Option<f64>,
 }
 
 impl<'s> Tally<'s> {
@@ -663,6 +709,7 @@ impl<'s> Tally<'s> {
             last: None,
             no_single_answer: false,
             straight_up_or_down: 0,
+            first: None,
         }
     }
 
@@ -677,6 +724,18 @@ impl<'s> Tally<'s> {
         let Some(mut value) = self.expectation.measure.read(before, now, step) else {
             return;
         };
+        // Something that happens reads 1 on the step it happens.
+        if let When::Over {
+            from,
+            statistic: Statistic::First,
+            ..
+        } = self.when
+        {
+            if value == 1.0 && self.first.is_none() {
+                self.first = Some((tick - from) as f64 * step);
+            }
+            return;
+        }
         // Every angle is taken the short way round from the expected value
         // before it counts, so a heading that crosses north (359.5° to 1.5°)
         // or a roll that crosses upside down (179.5° to -178.5°) has the
@@ -700,8 +759,10 @@ impl<'s> Tally<'s> {
         // A jump of a quarter turn or more counts: a real turn that fast in
         // one step would be 720,000 °/s at 8 kHz. The far side counts to
         // within rounding.
-        if self.expectation.measure.is_an_angle() {
-            let centre = self.expectation.expected.centre();
+        if self.expectation.measure.is_an_angle()
+            && let Expecting::Value(expected) = &self.expectation.expected
+        {
+            let centre = expected.centre();
             value = angle_near(value, centre);
             let jumped = self
                 .last
@@ -763,11 +824,15 @@ impl<'s> Tally<'s> {
         }
         let value = match self.when {
             When::At(_) => self.last,
+            When::Over {
+                statistic: Statistic::First,
+                ..
+            } => return self.first.ok_or_else(|| "never".to_string()),
             When::Over { statistic, .. } if self.count > 0 => Some(match statistic {
                 Statistic::Mean => self.sum / self.count as f64,
                 Statistic::Lowest => self.lowest,
                 Statistic::Highest => self.highest,
-                Statistic::Final => self.last.unwrap_or(f64::NAN),
+                Statistic::Final | Statistic::First => self.last.unwrap_or(f64::NAN),
             }),
             When::Over { .. } => None,
         };
@@ -778,6 +843,30 @@ impl<'s> Tally<'s> {
     /// run's value, for an Expectation that compares with one.
     fn finish(self, other: Option<Result<f64, String>>) -> Measured {
         let e = self.expectation;
+        let expected = match &e.expected {
+            Expecting::Value(expected) => expected,
+            // Something that should never happen in its stretch.
+            Expecting::Never => {
+                let (measured, passed) = match self.first {
+                    None => ("never".to_string(), true),
+                    Some(after) => (
+                        format!(
+                            "after {} s",
+                            opendrone_pack::units::significant_figures(after, 3)
+                        ),
+                        false,
+                    ),
+                };
+                return Measured {
+                    description: e.description.clone(),
+                    basis: e.basis.kind,
+                    expected: e.expected.text(),
+                    measured,
+                    passed,
+                    line: e.line,
+                };
+            }
+        };
         let value = match (e.compared, self.value(), other) {
             (None, value, _) => value,
             (Some(_), Err(why), _) => Err(why),
@@ -788,14 +877,14 @@ impl<'s> Tally<'s> {
                 Comparison::Ratio if that != 0.0 => Ok(this / that),
                 Comparison::Ratio => Err(format!(
                     "none: the other run measured {}, and a share of nothing has no answer",
-                    e.expected.unit().write(that)
+                    expected.unit().write(that)
                 )),
             },
         };
         let (measured, passed) = match value {
             Ok(value) => (
-                e.expected.unit().write(value),
-                value.is_finite() && e.expected.accepts(value),
+                expected.unit().write(value),
+                value.is_finite() && expected.accepts(value),
             ),
             Err(why) => (why, false),
         };

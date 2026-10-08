@@ -1,0 +1,94 @@
+# Results of a-quad-that-hits-a-wall-stays-armed.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Quad that hits a wall stays armed"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "between 4.7 m and 5 m"
+measured = "4.86 m"
+
+[[expect]]
+what     = "speed east at 1 s"
+basis    = "Observed"
+expected = "0.374 m/s ± 0.5 m/s"
+measured = "0.374 m/s"
+
+[[expect]]
+what     = "the Quad disarms, first over 0 s to 3 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "motor 1 DShot, lowest over 0.5 s to 3 s"
+basis    = "Source"
+expected = "between 158 and 2047"
+measured = "158"
+
+[[expect]]
+what     = "pitch PID sum, highest over 0 s to 0.485 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "0.0303"
+
+[[expect]]
+what     = "pitch PID sum, highest over 0.52 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "244"
+
+[[expect]]
+what     = "pitch PID sum, lowest over 0.52 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "-205"
+
+[[expect]]
+what     = "roll PID sum, highest over 0 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "111"
+
+[[expect]]
+what     = "roll PID sum, lowest over 0 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "-0.314"
+
+[[expect]]
+what     = "yaw PID sum, highest over 0 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "1.96"
+
+[[expect]]
+what     = "yaw PID sum, lowest over 0 s to 3 s"
+basis    = "Observed"
+expected = "between -600 and 600"
+measured = "-2.13"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "f6d31125cc5e95c3"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "89c61755d43729bd"
+"0.6 s" = "aa013c8865fcad44"
+"0.9 s" = "96d582dede49df69"
+"1.2 s" = "bf48569b08ae541d"
+"1.5 s" = "249e105bcfec3980"
+"1.8 s" = "1378b6917aa315c7"
+"2.1 s" = "1d55af61e0c1d6e2"
+"2.4 s" = "501ee4789ac15467"
+"2.7 s" = "7274eb8b8cf88f80"
+"3 s" = "6a149e6c5dde27f3"
