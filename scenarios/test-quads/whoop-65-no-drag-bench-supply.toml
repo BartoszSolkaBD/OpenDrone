@@ -1,0 +1,35 @@
+# The Whoop 65 with no drag and no Prop Wash, on a 4.0 V bench supply.
+#                                    id: test/whoop-65-no-drag-bench-supply
+#
+# With no drag of any kind, only the rotors' thrust and gravity move it, so
+# the way its thrust changes as it climbs or sinks shows on its own. On a
+# bench supply, as in its Thrust Stand Scenarios, the voltage never sags or
+# runs down, so a fixed command holds its motors at one speed. With no Prop
+# Wash, a descent stays free of its flicker.
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No drag and no Prop Wash, on a 4.0 V bench supply: its motors hold one speed at a fixed command, and only its thrust and gravity move it"
+
+# Deliberate test values: no Confidence or source.
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0 s⁻¹"
+
+[battery]
+voltage_curve = "4.35 V at 100%, 4.00 V at 50%, 3.30 V at 0%"
+capacity      = "1000 Ah"
+resistance    = "0 mΩ"
+slow_sag      = "0 mV·Ah/W"
+connector     = "0 mΩ"
+
+[ducts]
+ram_drag = "0 s⁻¹"
+
+[feel]
+prop_wash_strength = "0%"

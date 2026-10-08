@@ -20,7 +20,7 @@ measured = "-100%"
 what     = "pitch rate at 0.9 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 °/s ± 0.001 °/s"
-measured = "0.00000000000127 °/s"
+measured = "0.000000000000227 °/s"
 
 [[expect]]
 what     = "distance east at 1 s, as a share of the same run with roll and yaw mirrored"
@@ -32,13 +32,13 @@ measured = "-100%"
 what     = "distance north at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "0.0000000000000213 m"
+measured = "0.0000000000000164 m"
 
 [[expect]]
 what     = "height at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "-0.0000000000000284 m"
+measured = "0.0000000000000142 m"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -49,16 +49,16 @@ measured = "none broken"
 [fingerprints]
 quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "51fc97338accee82"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "254a544a7eef772c"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "1f6e6b35078259fc"
-"0.2 s" = "f254a091924dd652"
-"0.3 s" = "bf9cfeac476a2dde"
-"0.4 s" = "610a016a9414c31c"
-"0.5 s" = "aee0bde6730c95fe"
-"0.6 s" = "17c0cd3d7764d201"
-"0.7 s" = "3822130f241ba4c1"
-"0.8 s" = "57b80083d119513a"
-"0.9 s" = "f256e1cf0b0cefe0"
-"1 s" = "5551787f2795df44"
+"0.1 s" = "5afa35a0631942ae"
+"0.2 s" = "65f32a7ca6b7d797"
+"0.3 s" = "1de31a1e1a4bddf3"
+"0.4 s" = "fb27ed98f8e33d98"
+"0.5 s" = "cd69159905b8f07a"
+"0.6 s" = "2ac3463a8d6a9c2f"
+"0.7 s" = "26f25aa757da5308"
+"0.8 s" = "537f082eb498b595"
+"0.9 s" = "b34604bd78d07342"
+"1 s" = "dae3a3ede55228e0"

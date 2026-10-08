@@ -1,0 +1,64 @@
+# Results of whoop-yaws-against-its-rotors-net-spin.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Whoop 65 yaws against its rotors' net spin"
+
+[[expect]]
+what     = "yaw rate, lowest over 0.001 s to 1 s"
+basis    = "Rule"
+expected = "between 0.01 °/s and 10000 °/s"
+measured = "5.03 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0.0000000000000776 °/s"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "-0.0000000000000258 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0.00000000000000780 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "-0.0000000000000327 °/s"
+
+[[expect]]
+what     = "yaw rate at 1 s"
+basis    = "Observed"
+expected = "546 °/s ± 10 °/s"
+measured = "546 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "598b4c12d962b95e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "da68f5de02c23b32"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "ddf245ff91e2f1d7"
+"0.2 s" = "9f6b6b3077306053"
+"0.3 s" = "57ca778fd9a93701"
+"0.4 s" = "af76bcae0a396648"
+"0.5 s" = "fc2f62ae5d38ed22"
+"0.6 s" = "a6fe99a00fbbb526"
+"0.7 s" = "61105e869e7a4ff1"
+"0.8 s" = "b810be331c8b2232"
+"0.9 s" = "86664dd2d131bf21"
+"1 s" = "572def777e35b497"

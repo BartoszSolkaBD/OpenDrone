@@ -53,6 +53,10 @@ pub enum Measure {
     /// How much the vertical speed changed over the last step, divided by the
     /// step's length. Up is positive.
     VerticalAcceleration,
+    /// The same for the speed east. East is positive.
+    AccelerationEast,
+    /// The same for the speed north. North is positive.
+    AccelerationNorth,
     /// Rolling right is positive.
     RollRate,
     /// Nose up is positive.
@@ -279,7 +283,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 60] = [
+const ALL: [(&str, Measure); 62] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -289,6 +293,8 @@ const ALL: [(&str, Measure); 60] = [
     ("horizontal speed", Measure::HorizontalSpeed),
     ("speed", Measure::Speed),
     ("vertical acceleration", Measure::VerticalAcceleration),
+    ("acceleration east", Measure::AccelerationEast),
+    ("acceleration north", Measure::AccelerationNorth),
     ("roll rate", Measure::RollRate),
     ("pitch rate", Measure::PitchRate),
     ("yaw rate", Measure::YawRate),
@@ -412,7 +418,9 @@ impl Measure {
             | Measure::SpeedNorth
             | Measure::HorizontalSpeed
             | Measure::Speed => Dimension::SPEED,
-            Measure::VerticalAcceleration => Dimension::ACCELERATION,
+            Measure::VerticalAcceleration
+            | Measure::AccelerationEast
+            | Measure::AccelerationNorth => Dimension::ACCELERATION,
             Measure::RollRate | Measure::PitchRate | Measure::YawRate => Dimension::ROTATION_SPEED,
             Measure::Roll | Measure::Pitch | Measure::Heading => Dimension::ANGLE,
             Measure::MotorSpeed(_) => Dimension::ROTATION_SPEED,
@@ -450,7 +458,10 @@ impl Measure {
 
     /// True when it compares a step with the one before.
     pub fn needs_a_step_before(self) -> bool {
-        self == Measure::VerticalAcceleration
+        matches!(
+            self,
+            Measure::VerticalAcceleration | Measure::AccelerationEast | Measure::AccelerationNorth
+        )
     }
 
     /// True when this is roll or heading and the nose is within about
@@ -493,6 +504,8 @@ impl Measure {
             Measure::HorizontalSpeed => (v.x * v.x + v.y * v.y).sqrt(),
             Measure::Speed => v.length(),
             Measure::VerticalAcceleration => (v.z - before?.state.velocity.z) / step,
+            Measure::AccelerationEast => (v.x - before?.state.velocity.x) / step,
+            Measure::AccelerationNorth => (v.y - before?.state.velocity.y) / step,
             Measure::RollRate => rates().roll,
             Measure::PitchRate => rates().pitch,
             Measure::YawRate => rates().yaw,

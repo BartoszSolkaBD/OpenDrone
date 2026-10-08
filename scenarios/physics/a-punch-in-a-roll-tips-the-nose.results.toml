@@ -1,0 +1,46 @@
+# Results of a-punch-in-a-roll-tips-the-nose.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Rolling, a punch on its anticlockwise pair tips a Whoop 65's nose down"
+
+[[expect]]
+what     = "pitch rate at 0.01 s"
+basis    = "Rule"
+expected = "between -1000 °/s and -0.1 °/s"
+measured = "-8.32 °/s"
+
+[[expect]]
+what     = "pitch rate at 0.01 s"
+basis    = "Observed"
+expected = "-8.32 °/s ± 0.3 °/s"
+measured = "-8.32 °/s"
+
+[[expect]]
+what     = "yaw rate at 0.01 s"
+basis    = "Observed"
+expected = "137 °/s ± 5 °/s"
+measured = "137 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "598b4c12d962b95e"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "e7ae503b85dc9b7f"   # the whole state after each of 80 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.001 s" = "3d41039ae444ce21"
+"0.002 s" = "92dfacf32bd2d731"
+"0.003 s" = "4f1eb1a7f0e5c59a"
+"0.004 s" = "1f888bf7bdb9e9cb"
+"0.005 s" = "07d34da14a6b9527"
+"0.006 s" = "95cc810796e861b1"
+"0.007 s" = "1eccc87b7c49b94c"
+"0.008 s" = "7d14b177fc5f0ab7"
+"0.009 s" = "aa1ee616871e1f0f"
+"0.01 s" = "4c4adfed0d2a5f11"

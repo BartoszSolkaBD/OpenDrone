@@ -26,6 +26,7 @@ const NO_DRAG: Drag = Drag {
     body_area: Vec3::ZERO,
     rotor: 0.0,
     duct_ram: 0.0,
+    duct_offset: 0.0,
 };
 
 /// The Whoop 65: 31.2 g, its body box 20 mm tall round the centre of mass.

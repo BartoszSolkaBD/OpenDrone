@@ -1,0 +1,83 @@
+# A Whoop 65 with rotor drag as its only drag flies level at 8 m/s, its motors
+# "settled" at the speed that holds its height there. Air crossing each rotor
+# drags it back (rotor drag), and since the props spin 8 mm above the centre
+# of mass, that drag also lifts the nose. Proves E16 and E18 in #10, alone:
+# rotor drag slows the Quad, and its nose lifts at speed.
+#
+# The working on the first step (crates/physics/src/air.rs, "Rotor drag"):
+#
+# - Rotor drag is 0.3 s⁻¹ in a hover, in step with the rotors' speed, here
+#   0.864838 of the hover speed ("Flying level at 8 m/s, a Whoop 65 holds its
+#   height with its rotors 13.5% slower than hovering"). Per kilogram:
+#   0.3 × 0.864838 × 8 m/s = 2.0756 m/s², so 0.0312 kg × 2.0756 = 0.064759 N
+#   against the motion.
+# - It acts in the props' plane, 8 mm above the centre of mass, so it turns
+#   the nose up with 0.008 m × 0.064759 N = 5.1807 × 10⁻⁴ N·m. With a pitch
+#   inertia of 90 g·cm², that is 57.564 rad/s², and after one step of
+#   0.125 ms a pitch rate of 0.0071955 rad/s, 0.41227 °/s.
+# - The nose lifts in step with the speed: twice as fast, twice the moment.
+format = 1
+name   = "Rotor drag slows a Whoop 65 at 8 m/s and lifts its nose"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-rotor-drag-only"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s east, 8 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# 31.1%: the drive that holds the settled 19,659 RPM on this pack once it has
+# sagged under that load.
+timeline = [
+  { at = "0 s", motors = "31.1%" },
+]
+
+[[expect]]
+what  = "acceleration north"
+at    = "0.000125 s"
+value = "-2.0756 m/s² ± 0.5%"
+basis = "rule: rotor drag, 0.3 s⁻¹ × 0.864838 × 8 m/s = 2.0756 m/s² against the motion (working above)"
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.000125 s"
+value = "0.41227 °/s ± 0.5%"
+basis = "rule: the rotor drag acts 8 mm above the centre of mass: 5.1807 × 10⁻⁴ N·m over 90 g·cm² is 57.564 rad/s² nose up, 0.41227 °/s after one step (working above)"
+
+[[expect]]
+what  = "pitch rate"
+at    = "0.2 s"
+value = "453 °/s ± 20 °/s"
+basis = "observed: with nothing to hold it level, the nose-up moment keeps turning it: 453 °/s after 0.2 s"
+
+[[expect]]
+what  = "speed north"
+at    = "0.2 s"
+value = "6.87 m/s ± 0.1 m/s"
+basis = "observed: slower than rotor drag alone would leave it (7.58 m/s), since the lifted nose tips its thrust back"

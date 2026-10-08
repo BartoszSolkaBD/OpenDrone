@@ -1,0 +1,67 @@
+# A Whoop 65 with its motors stopped falls belly first from rest, high above
+# nothing. Its body drag grows with the square of its speed until it equals
+# its weight: its terminal speed. With the props stopped there is no rotor
+# drag and the ducts swallow no air, so body drag is the only drag. Proves
+# E17 in #10: terminal speed.
+#
+# The working (crates/physics/src/air.rs, "Body drag"): body drag is
+# ½ρ·A·v², with A the area the Quad shows the air, here its top: 17 cm².
+# Falling, m·dv/dt = m·g − ½ρ·A·v², so the speed is v_t·tanh(g·t / v_t),
+# with the terminal speed v_t = √(2·m·g / (ρ·A)) =
+# √(2 × 0.0312 kg × 9.81 m/s² / (1.225 kg/m³ × 0.0017 m²)) = 17.145 m/s.
+format = 1
+name   = "A Whoop 65 falling belly first reaches its terminal speed, 17.1 m/s"
+
+[start]
+kind              = "physics"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 1000 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what  = "vertical speed"
+at    = "1 s"
+value = "-8.8632 m/s ± 0.1%"
+basis = "rule: v_t·tanh(g·t / v_t) = 17.145 m/s × tanh(9.81 m/s² × 1 s / 17.145 m/s) = 8.8632 m/s, downward (working above)"
+
+[[expect]]
+what  = "vertical speed"
+at    = "10 s"
+value = "-17.145 m/s ± 0.1%"
+basis = "rule: the terminal speed, √(2·m·g / (ρ·A)) = 17.145 m/s with its 17 cm² top facing the air; by 10 s tanh has reached 0.99998 (working above)"
+
+[[expect]]
+what    = "pitch"
+over    = "0 s to 10 s"
+highest = "0° ± 0.000001°"
+basis   = "rule: body drag acts through the centre of mass, so it never turns the Quad"
