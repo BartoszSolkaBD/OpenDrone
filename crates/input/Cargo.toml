@@ -8,5 +8,20 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[dependencies]
+# Input Device profiles, as the Pack checker reads and checks them.
+opendrone-pack.workspace = true
+# SDL 3.4, built from source and statically linked, with only its joystick and
+# HIDAPI parts. On Linux it is a no-window build, so it needs no X11 or Wayland
+# headers (ADR-0018). Building it needs CMake and a C compiler.
+sdl3-sys = { workspace = true, features = [
+    "build-from-source",
+    "link-static",
+    "no-default-subsystems",
+    "sdl-joystick",
+    "sdl-hidapi",
+    "sdl-unix-console-build",
+] }
+
 # No `[lints] workspace = true` here: this crate may use `unsafe`, because
 # it talks to SDL and the operating system (#15 §4). Every other crate forbids it.

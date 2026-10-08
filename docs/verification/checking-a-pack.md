@@ -1,8 +1,8 @@
 # Checking a Pack
 
-A **Pack** is a folder of data and assets, never code: Quads, Maps and Input Device profiles ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)). The **Pack checker** reads a Pack the way the game will, and refuses anything that breaks the rules on this page. The game's own content, `packs/opendrone/`, goes through the same checker as a Pack a pilot drops in. The terms are in the [World and content](../context/world.md), [Flying](../context/flying.md) and [Verification](../context/verification.md) deep dives.
+A **Pack** is a folder of data and assets, never code: Quads, Maps and Input Device profiles ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)). The **Pack checker** reads a Pack the way the game will, and refuses anything that breaks the rules on this page. The game's own content, `packs/opendrone/`, goes through the same checker as a Pack a pilot drops in. The terms are in the [World and content](../context/world.md), [Flying](../context/flying.md), [Input](../context/input.md) and [Verification](../context/verification.md) deep dives.
 
-So far the checker reads manifests and Quads. Maps and Input Device profiles arrive with their own tickets.
+So far the checker reads manifests, Quads and Input Device profiles. Maps arrive with their own ticket.
 
 ## Running it
 
@@ -32,7 +32,7 @@ packs/opendrone/                 the Pack; its id comes from pack.toml
     picture.png                  for the Quad picker
     feel-tests.md                its Feel Test log
   maps/…                         Maps (not read yet)
-  input-devices/…                Input Device profiles (not read yet)
+  input-devices/dualsense.toml   one Input Device profile: its id is opendrone/dualsense
 ```
 
 - Items are found by their folder, so there's no list to keep in step. Each is named `<pack>/<item>`, such as `opendrone/whoop-65`.
@@ -166,6 +166,52 @@ The values are written with their units, as `quad.toml` writes them; they're com
 - a number added to a Quad that already existed, such as a 5″ given `[ducts]`, with its Confidence and source.
 
 Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, and names every new Quad, so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
+
+## An Input Device profile, `input-devices/<id>.toml`
+
+A profile turns one Input Device model's axes, buttons and switches into Channels and Actions ([#19](https://github.com/BartoszSolkaBD/OpenDrone/issues/19) §8). The built-in Pack carries four: the Radiomaster Pocket, the DualSense, and the fallbacks "Any Radio" and "Any Gamepad". A Pack's profile is only a starting point: the pilot's own copy, made by setup and Calibration, is kept with their settings and never written back into a Pack.
+
+```toml
+format = 1
+name   = "Radiomaster Pocket"
+kind   = "Radio"            # or "Gamepad"
+match  = { usb_vendor = "1209", usb_product = "4F54", product_name = "Radiomaster Pocket Joystick" }
+report_rate     = { usb = "1000 Hz" }   # optional, per connection: usb or bluetooth
+reports_at_rest = { usb = false }       # optional, per connection
+
+[channels]
+roll     = { channel = 1 }              # add reverse = true for a channel that runs backwards
+pitch    = { channel = 2 }
+throttle = { channel = 3 }
+yaw      = { channel = 4 }
+
+[switches]            # optional; each of the three is optional
+arm         = { channel = 5, on = "high" }
+flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
+crash_flip  = { channel = 7, on = "high" }
+
+[actions]             # optional
+reset = { channel = 9, on = "pressed" }
+
+[calibration]
+roll     = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+pitch    = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+yaw      = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+throttle = { min = "-100 %", max = "+100 %" }
+```
+
+- **The device's facts** come only from the Pack: `name`, `match`, `report_rate` (in reports a second, only where measured) and `reports_at_rest` (a device that keeps reporting at rest is lost after 1 s of silence; a connection left out counts as reporting only changes, so only an unplug loses it).
+- **`match`** is the USB vendor and product ids, as four hex digits, plus a product name found anywhere in the device's name, ignoring case. `match = "any"` makes a fallback for its kind, like "Any Radio".
+- **A Radio** names its controls by channel, as EdgeTX sends them: CH1–CH8 are axes and CH9–CH32 buttons. The four sticks each need their own channel among CH1–CH8.
+- **A Gamepad** names its sticks `left_x`, `left_y`, `right_x` and `right_y`, and its buttons and triggers by SDL's positions (`south`, `right_shoulder`, `left_trigger`, …) or by its own labels, listed in an optional `[labels]` section (`R1 = "right_shoulder"`). Its throttle is `{ stick = "left_y", zero = "at rest" }` (the default style: rest is no throttle and pulling down does nothing), `zero = "at bottom"` (full travel), or `{ trigger = "R2" }`. Its calibration lists each stick's `centre` and `deadband`, with `min` and `max` optional, and optionally each trigger's `min` and `max`.
+- **Switches** are Arm, Flight Mode and Crash Flip, which reach the Flight Controller on AUX1, AUX2 and AUX3 ([ADR-0017](../adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md)). Each has exactly one source:
+  - a Radio channel: `on = "low"`, `"middle"` or `"high"` on CH1–CH8 (read by thirds of travel), or `on = "pressed"` on CH9–CH32. Flight Mode needs a switch on CH1–CH8, with a mode for each position;
+  - a Gamepad `button`, with `press = "toggle"` or `"hold"` (Flight Mode steps through its `modes` on each press: Acro and Angle unless listed);
+  - a keyboard `key` (a letter A–Z, a digit, F1–F12, or Space, Enter, Tab, Backspace, Escape, the arrow keys, Shift, Ctrl or Alt by side), with the same press styles. No profile in the built-in Pack binds a key.
+- **Actions** are `pause`, `reset`, `camera_tilt_up`, `camera_tilt_down`, `fov_wider`, `fov_narrower` and `save_flight`. On a Radio an Action uses a CH5–CH8 position or a CH9–CH32 button, never a stick's channel or a channel a switch already uses. On a Gamepad it uses a button.
+- **Calibration** is written in percent of travel, from −100 % to +100 % (a trigger from 0 % to 100 %). Each stick's centre must lie between its ends, and its deadband must fit inside its travel on both sides.
+
+The checker refuses an unknown key, section, kind, button, key name, Action or Flight Mode; a switch with two sources or none; a Radio switch on a Gamepad button or the other way round; a trigger used as a button; two sticks on one channel or stick axis; `[labels]` on a Radio; and a calibration that doesn't fit. A file in `input-devices/` that isn't `<id>.toml` is reported, and a broken profile is skipped while the rest of its Pack loads.
 
 ## Fingerprints
 

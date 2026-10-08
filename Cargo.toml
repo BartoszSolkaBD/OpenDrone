@@ -32,6 +32,9 @@ opendrone-sound = { path = "crates/sound" }
 libm = "=0.2.16"
 # Only xtask uses it, to find the links in the docs when it builds the book.
 pulldown-cmark = { version = "=0.13.4", default-features = false }
+# SDL 3.4, built from source and statically linked with only its joystick and
+# HIDAPI parts (ADR-0018). Zlib licence. Only opendrone-input uses it.
+sdl3-sys = { version = "=0.7.2", default-features = false }
 serde_json = "=1.0.151"
 toml = "=1.1.6"
 # The format migration steps rewrite Scenario and Pack files with it, keeping
