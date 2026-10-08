@@ -1,0 +1,758 @@
+//! The `diff all` importer: a `diff`, `diff all` or `dump` from Betaflight
+//! 4.3 or newer, imported as a Betaflight 2026.6 Tune ([ADR-0008],
+//! [ADR-0015], #21's resolution).
+//!
+//! 1. The export's own settings are gathered: those before any profile, and
+//!    the active PID profile's (the last `profile` line's), plus, for 4.3,
+//!    TPA from the active rate profile ([`table::TUNE_IN_RATE_PROFILE`]).
+//!    Other PID profiles, the rate profiles (Rates belong to the pilot), the
+//!    `simplified_*` sliders, hardware-only settings, settings 2026.6 has no
+//!    counterpart for, and every command other than `set` are left out, each
+//!    with its reason.
+//! 2. Every row of [`table::SETTINGS`] is worked out: renamed settings take
+//!    their new name, settings the export doesn't set take their own
+//!    version's default, and settings the version lacked take ADR-0008's
+//!    value. Each carries its mark.
+//! 3. The Tune spells out every setting the Flight Controller reads
+//!    ([`crate::Tune::settings`]), under its tab. The other settings the
+//!    export sets stay, under "Not simulated yet": the table's in its order,
+//!    then the rest in the export's.
+//!
+//! [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
+//! [ADR-0015]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md
+
+use std::collections::BTreeMap;
+
+use super::table::{self, Place, Rule, Source};
+use super::{CliText, Command, Family, Refusal, Section, Version};
+use crate::Tune;
+
+/// A Betaflight export imported as a 2026.6 Tune.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TuneImport {
+    pub version: Version,
+    pub family: Family,
+    /// The command the export came from, as the CLI echoed it, such as
+    /// `diff all`.
+    pub command: Option<String>,
+    /// The quad's craft name in the export.
+    pub craft_name: Option<String>,
+    /// The day the configuration was saved, where the export says (4.3 does).
+    pub configured: Option<String>,
+    /// The day the firmware was built.
+    pub built: Option<String>,
+    /// The active PID profile, the one read.
+    pub profile: u8,
+    /// Every setting worked out: each row of the table, then the export's
+    /// settings the table doesn't know, in the export's order.
+    pub settings: Vec<ImportedSetting>,
+    /// The export's lines that don't reach the Tune, each with its reason.
+    pub left_out: Vec<LeftOut>,
+    /// Values of settings the Flight Controller reads that it can't read, as
+    /// [`Tune::check`] says. The Tune is still written; the Pack checker
+    /// refuses it until they're fixed by hand (`hand-set: <reason>`).
+    pub problems: Vec<String>,
+    /// What the person importing should know, in plain sentences: that a
+    /// 4.3 or 4.4 `diff` not taken `bare` is relative to the board's own
+    /// defaults, and
+    /// any value the Flight Controller reads but doesn't simulate yet, such as
+    /// a `failsafe_procedure` of AUTO-LAND, which flies DROP (#21).
+    pub warnings: Vec<String>,
+}
+
+/// One setting of the imported Tune.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImportedSetting {
+    /// Its Betaflight 2026.6 name.
+    pub name: String,
+    pub value: String,
+    /// Where its value came from (ADR-0015), such as `diff (was d_min_roll)`.
+    pub mark: String,
+    /// The note the Tune writes after its mark, such as its unit, or "".
+    pub note: String,
+    /// Its place in the Tune, if the table knows it.
+    pub place: Option<Place>,
+    /// The export's line it came from, if one.
+    pub line: Option<usize>,
+    pub written: Where,
+}
+
+/// Whether and where a setting is written into the Tune.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Where {
+    /// Under its tab: the Flight Controller reads it, or the Pack checker
+    /// compares it with the Quad definition.
+    UnderItsTab,
+    /// Under "Not simulated yet", always: the Flight Controller knows it and
+    /// checks its value, but flies as if it were off until its ticket lands
+    /// ([`Tune::not_simulated_yet`]).
+    FlownAsOff,
+    /// Under "Not simulated yet", after those: a setting the translator
+    /// knows that the Flight Controller doesn't yet, spelled out all the
+    /// same, from the export, its version's default or ADR-0008.
+    NotSimulatedYet,
+    /// Last: a setting the export sets that the translator doesn't know,
+    /// kept as the real quad had it.
+    OnlyInTheExport,
+}
+
+/// A line of the export that doesn't reach the Tune.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LeftOut {
+    /// Its line number, from 1.
+    pub line: usize,
+    pub text: String,
+    pub why: Why,
+}
+
+/// Why a line doesn't reach the Tune.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Why {
+    /// It describes the board or its other hardware, or names the quad.
+    HardwareOnly,
+    /// A `simplified_*` slider: the importer reads the numbers it set.
+    Slider,
+    /// A setting of a PID profile (or battery profile) that isn't the
+    /// active one.
+    OtherProfile,
+    /// A rate profile's setting: Rates belong to the pilot (ADR-0015).
+    RateProfile,
+    /// 2026.6 has no counterpart, for this reason.
+    Retired(&'static str),
+    /// A command other than `set`, such as `aux`, `feature` or `serial`.
+    NotASetting,
+}
+
+/// The old version's value of one setting: the export's, or its default.
+#[derive(Clone, Copy, Debug)]
+struct Old<'a> {
+    name: &'a str,
+    value: &'a str,
+    /// The export's line that set it, if it did.
+    line: Option<usize>,
+}
+
+impl Old<'_> {
+    /// `diff`, or the version's default, such as `4.3 default`.
+    fn mark(&self, family: Family) -> String {
+        match self.line {
+            Some(_) => "diff".into(),
+            None => format!("{} default", family.name()),
+        }
+    }
+
+    fn number(&self) -> Result<u32, String> {
+        self.value
+            .parse()
+            .map_err(|_| format!("`{}` is a whole number, not \"{}\"", self.name, self.value))
+    }
+}
+
+/// Imports a `diff`, `diff all` or `dump` from Betaflight 4.3 or newer as a
+/// 2026.6 Tune. Refused, with plain sentences, when the version is older
+/// than 4.3 or one the table doesn't know, or the export holds no PID
+/// profile.
+pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
+    let cli = CliText::read(text);
+    let (version, family) = cli.family()?;
+    let Some(profile) = cli.active_profile() else {
+        return Err(Refusal::one(
+            "There's no `profile` line, so this export holds none of Betaflight's PID profiles: export the quad's settings with `diff` (`diff bare` on 4.3 and 4.4) or `diff all`.",
+        ));
+    };
+    let rate_profile = cli.active_rate_profile();
+    let battery_profile = cli.active_battery_profile();
+    if !cli.names_active_profile() {
+        return Err(Refusal::one(
+            "This export lists each of Betaflight's PID profiles but doesn't say which one is active: a `diff all bare` or `dump all bare` leaves out the line that selects it again. Export with `diff` (`diff bare` on 4.3 and 4.4), which holds just the active profiles, or `diff all`.",
+        ));
+    }
+    // In 4.3 and 4.4, a `diff` without `bare` compares with the board's own
+    // defaults (`backupAndResetConfigs` applies them first). From 4.5 on, a
+    // board's defaults are built into its firmware, and a `dump` lists every
+    // value whatever its defaults.
+    let mut warnings = Vec::new();
+    if matches!(family, Family::V4_3 | Family::V4_4) && cli.is_diff() && !cli.bare() {
+        warnings.push(format!(
+            "In Betaflight 4.3 and 4.4, a `diff` without `bare` lists what differs from the board's own defaults, not Betaflight's: a setting the board's defaults change that the pilot left alone isn't in this `{}`, so it imports at Betaflight {}'s default. Export with `diff bare` to compare with Betaflight's own defaults.",
+            cli.echo.unwrap_or("diff"),
+            family.name()
+        ));
+    }
+    let read_in_rate_profile = |name: &str| {
+        table::TUNE_IN_RATE_PROFILE
+            .iter()
+            .any(|(f, n)| *f == family && *n == name)
+    };
+
+    // 1. The export's own settings, by their names in its version.
+    let mut given: BTreeMap<&'t str, (&'t str, usize)> = BTreeMap::new();
+    let mut order: Vec<&'t str> = Vec::new();
+    let mut left_out = Vec::new();
+    for line in &cli.lines {
+        let leave = |why| LeftOut {
+            line: line.number,
+            text: line.text.to_string(),
+            why,
+        };
+        let (name, value) = match line.command {
+            Command::Set { name, value } => (name, value),
+            Command::Profile(_) | Command::RateProfile(_) | Command::BatteryProfile(_) => {
+                continue;
+            }
+            Command::Other(_) => {
+                left_out.push(leave(Why::NotASetting));
+                continue;
+            }
+        };
+        let in_tune = match line.section {
+            Section::Master => true,
+            Section::Profile(n) => n == profile,
+            Section::RateProfile(n) => Some(n) == rate_profile && read_in_rate_profile(name),
+            Section::BatteryProfile(n) => Some(n) == battery_profile,
+        };
+        let why = if !in_tune {
+            Some(match line.section {
+                Section::RateProfile(_) => Why::RateProfile,
+                _ => Why::OtherProfile,
+            })
+        } else if table::is_slider(name) {
+            Some(Why::Slider)
+        } else if table::is_hardware_only(name) {
+            Some(Why::HardwareOnly)
+        } else {
+            table::RETIRED
+                .iter()
+                .find(|r| r.name == name && r.versions.contains(&family))
+                .map(|r| Why::Retired(r.why))
+        };
+        match why {
+            Some(why) => left_out.push(leave(why)),
+            None => {
+                if given.insert(name, (value, line.number)).is_none() {
+                    order.push(name);
+                }
+            }
+        }
+    }
+
+    // 2. Every row of the table, worked out.
+    let reads = Tune::settings();
+    let later = Tune::not_simulated_yet();
+    let mut settings = Vec::new();
+    let mut problems = Vec::new();
+    let mut used: Vec<&'t str> = Vec::new();
+    for setting in table::SETTINGS {
+        let mut take = |name: &'static str, default: &'static str| -> Old<'t> {
+            used.push(name);
+            match given.get(name) {
+                Some(&(value, line)) => Old {
+                    name,
+                    value,
+                    line: Some(line),
+                },
+                None => Old {
+                    name,
+                    value: default,
+                    line: None,
+                },
+            }
+        };
+        let worked_out = match setting.source(family) {
+            Source::Same(default) => {
+                let value = take(setting.name, default);
+                Ok((value.value.to_string(), value.mark(family), value.line))
+            }
+            Source::Was(was, default) => {
+                let value = take(was, default);
+                Ok((
+                    value.value.to_string(),
+                    format!("{} (was {was})", value.mark(family)),
+                    value.line,
+                ))
+            }
+            Source::Adr0008(value) => Ok((value.to_string(), "ADR-0008".to_string(), None)),
+            Source::Newer => Ok((
+                setting.default_2026().to_string(),
+                format!("{} default", Family::V2026_6.name()),
+                None,
+            )),
+            Source::Rule(rule, inputs) => {
+                let inputs: Vec<Old<'t>> = inputs
+                    .iter()
+                    .map(|&(name, default)| take(name, default))
+                    .collect();
+                let line = inputs.iter().find_map(|input| input.line);
+                apply(rule, family, &inputs).map(|(value, mark)| (value, mark, line))
+            }
+        };
+        let (value, mark, line) = match worked_out {
+            Ok(found) => found,
+            Err(sentence) => {
+                problems.push(sentence);
+                continue;
+            }
+        };
+        let flown_as_off = later.iter().find(|(name, _)| *name == setting.name);
+        let (written, note) = if reads.contains(&setting.name)
+            || table::CHECKED_AGAINST_THE_QUAD.contains(&setting.name)
+        {
+            (Where::UnderItsTab, setting.note.to_string())
+        } else if let Some((_, ticket)) = flown_as_off {
+            (Where::FlownAsOff, format!("not simulated yet ({ticket})"))
+        } else {
+            (Where::NotSimulatedYet, setting.note.to_string())
+        };
+        if matches!(written, Where::UnderItsTab | Where::FlownAsOff)
+            && let Err(sentence) = Tune::check(setting.name, &value)
+        {
+            problems.push(sentence);
+        }
+        settings.push(ImportedSetting {
+            name: setting.name.to_string(),
+            value,
+            mark,
+            note,
+            place: Some(setting.place),
+            line,
+            written,
+        });
+    }
+
+    // 3. The export's settings the table doesn't know: kept, not simulated.
+    for name in order {
+        if used.contains(&name) {
+            continue;
+        }
+        let (value, line) = given[name];
+        settings.push(ImportedSetting {
+            name: name.to_string(),
+            value: value.to_string(),
+            mark: "diff".into(),
+            note: String::new(),
+            place: None,
+            line: Some(line),
+            written: Where::OnlyInTheExport,
+        });
+    }
+
+    // Values the Flight Controller reads but flies otherwise for now: noted
+    // on their line, and said in the report (#21).
+    let read = settings
+        .iter()
+        .filter(|s| matches!(s.written, Where::UnderItsTab | Where::FlownAsOff));
+    if let Ok(tune) = Tune::read(read.map(|s| (s.name.as_str(), s.value.as_str()))) {
+        for (name, sentence) in tune.not_simulated_values() {
+            if let Some(setting) = settings.iter_mut().find(|s| s.name == name) {
+                setting.note = match setting.note.as_str() {
+                    "" => "not simulated yet (#21)".to_string(),
+                    note => format!("{note}; not simulated yet (#21)"),
+                };
+            }
+            warnings.push(sentence);
+        }
+    }
+
+    Ok(TuneImport {
+        version,
+        family,
+        command: cli.echo.map(str::to_string),
+        craft_name: cli.craft_name.map(str::to_string),
+        configured: cli.configured.clone(),
+        built: cli.built.clone(),
+        profile,
+        settings,
+        left_out,
+        problems,
+        warnings,
+    })
+}
+
+/// Works out a setting whose meaning changed, from the old version's
+/// settings: its value and mark.
+fn apply(rule: Rule, family: Family, inputs: &[Old<'_>]) -> Result<(String, String), String> {
+    let version = family.name();
+    match rule {
+        Rule::DBase | Rule::DPeak => {
+            let (d, d_min) = (inputs[0], inputs[1]);
+            let (d_value, d_min_value) = (d.number()?, d_min.number()?);
+            let dynamic = d_min_value > 0 && d_min_value < d_value;
+            let was = |old: &Old<'_>| format!("{} (was {})", old.mark(family), old.name);
+            Ok(match (rule, dynamic) {
+                (Rule::DBase, true) => (d_min.value.into(), was(&d_min)),
+                (Rule::DBase, false) => (d.value.into(), d.mark(family)),
+                (_, true) => (d.value.into(), was(&d)),
+                (_, false) if d_min_value <= d_value => (d_min.value.into(), was(&d_min)),
+                (_, false) => (
+                    "0".into(),
+                    format!(
+                        "ADR-0008; Dynamic D was off in {version}: {} {d_min_value} isn't below {} {d_value}",
+                        d_min.name, d.name
+                    ),
+                ),
+            })
+        }
+        Rule::DMaxAdvance => {
+            let (gain, advance) = (inputs[0].number()?, inputs[1].number()?);
+            let value = ((gain * advance + 50) / 100).min(200);
+            Ok((
+                value.to_string(),
+                format!(
+                    "ADR-0008; {version}'s stick boost: {} {gain} × {} {advance} ÷ 100",
+                    inputs[0].name, inputs[1].name
+                ),
+            ))
+        }
+        Rule::RecoveryDelay => {
+            let delay = inputs[0];
+            let tenths = delay.number()?;
+            if tenths >= 2 {
+                return Ok((delay.value.into(), delay.mark(family)));
+            }
+            Ok((
+                "2".into(),
+                format!(
+                    "ADR-0008; {version} waited at least 200 ms, so its {} {tenths} acted as 2",
+                    delay.name
+                ),
+            ))
+        }
+        Rule::ItermWindup => {
+            let (limit, pidsum, pidsum_yaw) = (
+                inputs[0].number()?,
+                inputs[1].number()?,
+                inputs[2].number()?,
+            );
+            if pidsum == 0 {
+                return Err(format!("`{}` can't be 0", inputs[1].name));
+            }
+            let percent = (limit * 100 + pidsum / 2) / pidsum;
+            let held = percent.clamp(20, 100);
+            let within = if held == percent {
+                String::new()
+            } else {
+                format!(", held within 2026.6's 20 to 100 from {percent}")
+            };
+            // Yaw's limit was iterm_limit too; now it's the same percentage
+            // of pidsum_limit_yaw.
+            let yaw = held * pidsum_yaw / 100;
+            let yaw = if yaw == limit {
+                String::new()
+            } else {
+                format!(" (yaw's I limit becomes {yaw}, was {limit})")
+            };
+            Ok((
+                held.to_string(),
+                format!(
+                    "ADR-0008; {version}'s {} {limit} is {percent}% of {} {pidsum}{within}{yaw}",
+                    inputs[0].name, inputs[1].name
+                ),
+            ))
+        }
+    }
+}
+
+/// Marks are written from this column on, as in the built-in Tunes.
+const MARK_COLUMN: usize = 39;
+
+impl TuneImport {
+    /// The setting by its 2026.6 name.
+    pub fn setting(&self, name: &str) -> Option<&ImportedSetting> {
+        self.settings.iter().find(|s| s.name == name)
+    }
+
+    /// `diff` or `dump`, as the export's own word.
+    fn export_word(&self) -> &'static str {
+        match &self.command {
+            Some(command) if command.starts_with("dump") => "dump",
+            _ => "diff",
+        }
+    }
+
+    /// The Tune, as `tune.txt` holds it: the header saying where it came
+    /// from, then every setting written, one `set` line each with its mark.
+    /// `quad` is the Quad's on-screen name and `source` names the file the
+    /// export was read from.
+    pub fn tune_txt(&self, quad: &str, source: &str) -> String {
+        let mut out = String::new();
+        let mut line = |text: &str| {
+            out.push_str(text);
+            out.push('\n');
+        };
+        let version = self.family.name();
+        let command = self.command.as_deref().unwrap_or("CLI export");
+        let quad_name = match &self.craft_name {
+            Some(name) => format!(" of the quad named \"{name}\""),
+            None => String::new(),
+        };
+        let day = match (&self.configured, &self.built) {
+            (Some(day), _) => format!("configured {day} "),
+            (None, Some(day)) => format!("firmware built {day} "),
+            (None, None) => String::new(),
+        };
+        line(&format!(
+            "# {quad} Tune: Betaflight 2026.6 names and units."
+        ));
+        line(&format!(
+            "# Imported from the {command}{quad_name}: Betaflight {},",
+            self.version
+        ));
+        line(&format!("# {day}({source}),"));
+        line("# by `cargo xtask import-tune`.");
+        line("# Each line's mark says where its value came from:");
+        let written: Vec<&ImportedSetting> = self.settings.iter().collect();
+        let uses = |test: &dyn Fn(&str) -> bool| written.iter().any(|s| test(&s.mark));
+        let own_default = format!("{version} default");
+        let newer_default = format!("{} default", Family::V2026_6.name());
+        let export = self.export_word();
+        let mut legend: Vec<(String, String)> = Vec::new();
+        if uses(&|m| m.starts_with("diff")) {
+            legend.push(("diff".into(), "set on the real quad".into()));
+        }
+        if uses(&|m| m.starts_with(&own_default)) {
+            legend.push((
+                own_default.clone(),
+                format!(
+                    "not in the {export}, so Betaflight {}'s default",
+                    self.family.defaults_from()
+                ),
+            ));
+        }
+        if uses(&|m| m.starts_with("ADR-0008")) {
+            legend.push((
+                "ADR-0008".into(),
+                format!("{version} had no such setting (or it meant something else); set to behave like {version}"),
+            ));
+        }
+        if self.family != Family::V2026_6 && uses(&|m| m.starts_with(&newer_default)) {
+            legend.push((
+                newer_default.clone(),
+                format!(
+                    "{version} had no such setting and no value behaves like {version}: Betaflight {}'s default",
+                    Family::V2026_6.defaults_from()
+                ),
+            ));
+        }
+        if uses(&|m| m.contains("(was ")) {
+            legend.push(("(was …)".into(), format!("the setting's {version} name")));
+        }
+        legend.push((
+            "hand-set: …".into(),
+            "changed by hand, with the reason".into(),
+        ));
+        let width = legend
+            .iter()
+            .map(|(m, _)| m.chars().count())
+            .max()
+            .unwrap_or(0);
+        for (mark, meaning) in &legend {
+            let pad = width - mark.chars().count();
+            line(&format!("#   {mark}{}  {meaning}", " ".repeat(pad)));
+        }
+        line("#");
+        line("# It spells out every setting the Flight Controller reads so far, grouped by");
+        line("# the Betaflight App's tabs in their order, with each tab's CLI-only settings");
+        line("# after the ones the tab shows (ADR-0015). The settings it doesn't simulate");
+        line("# yet come last, under their own heading: first those it knows but flies as");
+        line("# off, then the rest OpenDrone's Betaflight CLI translator knows, then any");
+        line(&format!(
+            "# others the {export} sets. As the Flight Controller reads more settings, run"
+        ));
+        line("# the importer again.");
+
+        // A blank line before each tab; its CLI-only settings follow at once.
+        let mut heading: Option<&str> = None;
+        for setting in written.iter().filter(|s| s.written == Where::UnderItsTab) {
+            let place = setting.place.map_or("", Place::heading);
+            if Some(place) != heading {
+                let same_tab = heading.is_some_and(|tab| place == format!("{tab}, CLI only"));
+                if !same_tab {
+                    line("");
+                }
+                line(&format!("# {place}"));
+                heading = Some(place);
+            }
+            line(&set_line(setting));
+        }
+        // What the Flight Controller knows but flies as off, in the order it
+        // lists them, by tab; then the rest the export sets.
+        let later = Tune::not_simulated_yet();
+        let mut flown_as_off: Vec<&&ImportedSetting> = written
+            .iter()
+            .filter(|s| s.written == Where::FlownAsOff)
+            .collect();
+        flown_as_off.sort_by_key(|s| later.iter().position(|(name, _)| *name == s.name));
+        if !flown_as_off.is_empty() {
+            line("");
+            line("# Not simulated yet. The Flight Controller checks these values but flies as");
+            line("# if each were off until its ticket lands (ADR-0015).");
+            let mut tab = None;
+            for setting in flown_as_off {
+                let this = setting.place.map(Place::tab);
+                if this != tab {
+                    line(&format!("# {}", this.unwrap_or("")));
+                    tab = this;
+                }
+                line(&set_line(setting));
+            }
+        }
+        let rest: Vec<&&ImportedSetting> = written
+            .iter()
+            .filter(|s| s.written == Where::NotSimulatedYet)
+            .collect();
+        if !rest.is_empty() {
+            line("");
+            line("# Not simulated yet either: settings the Flight Controller doesn't know");
+            line("# yet, which later tickets read or the alpha leaves out.");
+            let mut tab = None;
+            for setting in rest {
+                let this = setting.place.map(Place::tab);
+                if this != tab {
+                    line(&format!("# {}", this.unwrap_or("")));
+                    tab = this;
+                }
+                line(&set_line(setting));
+            }
+        }
+        let only_in_the_export: Vec<&&ImportedSetting> = written
+            .iter()
+            .filter(|s| s.written == Where::OnlyInTheExport)
+            .collect();
+        if !only_in_the_export.is_empty() {
+            line("");
+            line(&format!(
+                "# Not simulated yet, and not known to OpenDrone: the other settings the {export} sets."
+            ));
+            for setting in only_in_the_export {
+                line(&set_line(setting));
+            }
+        }
+        out
+    }
+
+    /// What the import did, in plain sentences, for the person running it.
+    pub fn report(&self) -> String {
+        let mut out = String::new();
+        let quad = match &self.craft_name {
+            Some(name) => format!(" of \"{name}\""),
+            None => String::new(),
+        };
+        out.push_str(&format!(
+            "Imported the {}{quad}: Betaflight {}, its PID profile {}.\n",
+            self.command.as_deref().unwrap_or("CLI export"),
+            self.version,
+            self.profile
+        ));
+        for warning in &self.warnings {
+            out.push_str(&format!("- Note: {warning}\n"));
+        }
+        let count = |w: Where| self.settings.iter().filter(|s| s.written == w).count();
+        out.push_str(&format!(
+            "- {} settings the Flight Controller reads (or the Pack checker compares with the Quad), under their tabs.\n",
+            count(Where::UnderItsTab)
+        ));
+        out.push_str(&format!(
+            "- {} settings the Flight Controller knows but flies as off until their tickets land, under \"Not simulated yet\".\n",
+            count(Where::FlownAsOff)
+        ));
+        let renamed: Vec<String> = self
+            .settings
+            .iter()
+            .filter_map(|s| {
+                let (_, was) = s.mark.split_once("(was ")?;
+                let was = was.split(')').next()?;
+                Some(format!("{was} → {}", s.name))
+            })
+            .collect();
+        if !renamed.is_empty() {
+            out.push_str(&format!("- Renamed: {}.\n", renamed.join(", ")));
+        }
+        out.push_str(&format!(
+            "- {} more settings the translator knows, spelled out under \"Not simulated yet\" until the Flight Controller reads them.\n",
+            count(Where::NotSimulatedYet)
+        ));
+        let unknown: Vec<&str> = self
+            .settings
+            .iter()
+            .filter(|s| s.written == Where::OnlyInTheExport)
+            .map(|s| s.name.as_str())
+            .collect();
+        if !unknown.is_empty() {
+            out.push_str(&format!(
+                "- Settings the export sets that the translator doesn't know, kept as not simulated yet: {}.\n",
+                unknown.join(", ")
+            ));
+        }
+        let names = |why: &dyn Fn(Why) -> bool| -> Vec<String> {
+            self.left_out
+                .iter()
+                .filter(|l| why(l.why))
+                .map(|l| {
+                    l.text
+                        .strip_prefix("set ")
+                        .and_then(|rest| rest.split('=').next())
+                        .unwrap_or_else(|| l.text.split_whitespace().next().unwrap_or(""))
+                        .trim()
+                        .to_string()
+                })
+                .collect()
+        };
+        let mut list = |label: &str, items: Vec<String>| {
+            if !items.is_empty() {
+                let mut unique: Vec<String> = Vec::new();
+                for item in items {
+                    if !unique.contains(&item) {
+                        unique.push(item);
+                    }
+                }
+                out.push_str(&format!("- Left out, {label}: {}.\n", unique.join(", ")));
+            }
+        };
+        list(
+            "hardware only (or GPS and altitude features)",
+            names(&|w| w == Why::HardwareOnly),
+        );
+        list(
+            "the simplified_* sliders (their numbers are read instead)",
+            names(&|w| w == Why::Slider),
+        );
+        list(
+            "other PID and battery profiles' settings",
+            names(&|w| w == Why::OtherProfile),
+        );
+        list(
+            "rate profiles' settings (Rates belong to the pilot)",
+            names(&|w| w == Why::RateProfile),
+        );
+        list(
+            "commands other than `set`",
+            names(&|w| w == Why::NotASetting),
+        );
+        for left in &self.left_out {
+            if let Why::Retired(why) = left.why {
+                out.push_str(&format!(
+                    "- Left out, line {}: `{}`: {why}.\n",
+                    left.line, left.text
+                ));
+            }
+        }
+        for problem in &self.problems {
+            out.push_str(&format!(
+                "- The Flight Controller can't read this yet: {problem}.\n"
+            ));
+        }
+        out
+    }
+}
+
+/// `set <name> = <value>`, with its mark (and note) from the mark column on.
+fn set_line(setting: &ImportedSetting) -> String {
+    let set = format!("set {} = {}", setting.name, setting.value);
+    let pad = MARK_COLUMN.saturating_sub(set.chars().count()).max(1);
+    let note = if setting.note.is_empty() {
+        String::new()
+    } else {
+        format!("; {}", setting.note)
+    };
+    format!("{set}{}# {}{note}", " ".repeat(pad), setting.mark)
+}

@@ -60,6 +60,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 - [Proving the physics](book/proving-the-physics.md)
 - [Reading a Scenario and its Results](verification/reading-a-scenario.md)
 - [Checking a Pack](verification/checking-a-pack.md)
+- [Importing a Tune from Betaflight](verification/importing-a-tune.md)
 - [Watching Input Devices](verification/watching-input-devices.md)
 - [The Scenario catalogue](book/scenario-catalogue.md)
 - [The Feel Test checklist](feel-test-checklist.md)

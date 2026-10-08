@@ -1,17 +1,160 @@
 # Whoop 65 Tune: Betaflight 2026.6 names and units.
-# Imported from the Meteor65 Pro's diff all: Betaflight 4.3.0, dated 2023-01-16
-#   (docs/research/quad-settings/meteor65-pro.diff-all.txt)
+# Imported from the diff all of the quad named "Meteor65 pro": Betaflight 4.3.0,
+# configured 2023-01-16 (docs/research/quad-settings/meteor65-pro.diff-all.txt),
+# by `cargo xtask import-tune`.
 # Each line's mark says where its value came from:
-#   diff         set on the real quad
-#   4.3 default  not in the diff, so Betaflight 4.3.0's default
-#   ADR-0008     4.3 had no such setting; set to behave like 4.3
-#   (was …)      the setting's 4.3 name
-#   hand-set: …  changed by hand, with the reason
+#   diff            set on the real quad
+#   4.3 default     not in the diff, so Betaflight 4.3.0's default
+#   ADR-0008        4.3 had no such setting (or it meant something else); set to behave like 4.3
+#   2026.6 default  4.3 had no such setting and no value behaves like 4.3: Betaflight 2026.6.2's default
+#   (was …)         the setting's 4.3 name
+#   hand-set: …     changed by hand, with the reason
 #
-# So far this holds only the settings the Pack checker compares with the Quad
-# definition. The Flight Controller tickets spell out every other setting
-# (ADR-0015).
+# It spells out every setting the Flight Controller reads so far, grouped by
+# the Betaflight App's tabs in their order, with each tab's CLI-only settings
+# after the ones the tab shows (ADR-0015). The settings it doesn't simulate
+# yet come last, under their own heading: first those it knows but flies as
+# off, then the rest OpenDrone's Betaflight CLI translator knows, then any
+# others the diff sets. As the Flight Controller reads more settings, run
+# the importer again.
+
+# Configuration
+set small_angle = 180                  # diff; degrees: the most it may tilt and still arm
+
+# Failsafe
+set rx_min_usec = 885                  # 4.3 default; µs
+set rx_max_usec = 2115                 # 4.3 default; µs
+set failsafe_delay = 15                # 4.3 default; tenths of a second
+set failsafe_procedure = DROP          # 4.3 default
+set failsafe_throttle = 1000           # 4.3 default; µs
+# Failsafe, CLI only
+set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
+
+# PID Tuning
+set p_roll = 40                        # diff
+set i_roll = 64                        # diff
+set d_roll = 45                        # diff (was d_min_roll)
+set p_pitch = 39                       # diff
+set i_pitch = 64                       # diff
+set d_pitch = 49                       # diff (was d_min_pitch)
+set p_yaw = 35                         # diff
+set i_yaw = 50                         # diff
+set d_yaw = 0                          # 4.3 default
+set motor_output_limit = 100           # 4.3 default; percent
+# PID Tuning, CLI only
+set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
+set pidsum_limit_yaw = 400             # 4.3 default
+set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500 (yaw's I limit becomes 320, was 400); the I limit, in percent of the PID-sum limit
+set pid_at_min_throttle = ON           # 4.3 default
+
+# Receiver
+set min_check = 1050                   # 4.3 default; µs
+set mid_rc = 1500                      # 4.3 default; µs
+set deadband = 0                       # 4.3 default; µs
+set yaw_deadband = 0                   # 4.3 default; µs
+# Receiver, CLI only
+set yaw_control_reversed = OFF         # 4.3 default
+set airmode_start_throttle_percent = 25 # 4.3 default
 
 # Motors
+set motor_pwm_protocol = DSHOT300      # diff
+set motor_idle = 600                   # diff (was dshot_idle_value); hundredths of a percent
 set motor_poles = 12                   # diff; must match [motors] poles
-set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction, props-in
+set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
+# Motors, CLI only
+set mixer_type = LEGACY                # 4.3 default
+
+# Not simulated yet. The Flight Controller checks these values but flies as
+# if each were off until its ticket lands (ADR-0015).
+# PID Tuning
+set f_roll = 125                       # diff; not simulated yet (#49)
+set f_pitch = 124                      # diff; not simulated yet (#49)
+set f_yaw = 100                        # diff; not simulated yet (#49)
+set d_max_roll = 48                    # diff (was d_roll); not simulated yet (#50)
+set d_max_pitch = 52                   # diff (was d_pitch); not simulated yet (#50)
+set d_max_yaw = 0                      # 4.3 default (was d_min_yaw); not simulated yet (#50)
+set iterm_relax = RP                   # 4.3 default; not simulated yet (#50)
+set anti_gravity_gain = 80             # 2026.6 default; not simulated yet (#50)
+set tpa_rate = 70                      # diff; not simulated yet (#50)
+set tpa_low_rate = 0                   # ADR-0008; not simulated yet (#50)
+set throttle_boost = 5                 # 4.3 default; not simulated yet (#50)
+# PID Tuning, filters
+set gyro_lpf1_static_hz = 0            # diff; not simulated yet (#49)
+set gyro_lpf1_dyn_min_hz = 287         # diff; not simulated yet (#49)
+set gyro_lpf2_static_hz = 575          # diff; not simulated yet (#49)
+set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)
+set dterm_lpf1_static_hz = 82          # diff; not simulated yet (#49)
+set dterm_lpf1_dyn_min_hz = 82         # diff; not simulated yet (#49)
+set dterm_lpf2_static_hz = 165         # diff; not simulated yet (#49)
+set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
+# Receiver
+set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
+# Configuration
+set runaway_takeoff_prevention = ON    # 4.3 default; not simulated yet (later)
+
+# Not simulated yet either: settings the Flight Controller doesn't know
+# yet, which later tickets read or the alpha leaves out.
+# Configuration
+set yaw_spin_recovery = AUTO           # 4.3 default
+set yaw_spin_threshold = 1950          # 4.3 default; °/s
+# Failsafe
+set failsafe_switch_mode = STAGE1      # 4.3 default
+set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
+set failsafe_stick_threshold = 30      # 4.3 default; percent
+# PID Tuning
+set feedforward_transition = 0         # 4.3 default
+set feedforward_averaging = 2_POINT    # diff
+set feedforward_smooth_factor = 25     # 4.3 default
+set feedforward_jitter_factor = 9      # diff
+set feedforward_boost = 15             # 4.3 default
+set feedforward_max_rate_limit = 90    # 4.3 default
+set d_max_gain = 37                    # 4.3 default
+set d_max_advance = 7                  # ADR-0008; 4.3's stick boost: d_max_gain 37 × d_max_advance 20 ÷ 100
+set iterm_relax_type = SETPOINT        # 4.3 default
+set iterm_relax_cutoff = 15            # 4.3 default; Hz
+set tpa_mode = D                       # 4.3 default
+set tpa_breakpoint = 1350              # 4.3 default; µs
+set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
+set angle_limit = 55                   # 4.3 default (was level_limit); degrees
+set horizon_level_strength = 50        # 4.3 default
+set feedforward_yaw_hold_gain = 0      # ADR-0008
+set feedforward_yaw_hold_time = 100    # 2026.6 default; ms
+set anti_gravity_cutoff_hz = 5         # 2026.6 default; Hz
+set anti_gravity_p_gain = 100          # 2026.6 default
+set tpa_low_breakpoint = 1050          # 2026.6 default; µs
+set tpa_low_always = OFF               # 2026.6 default
+set throttle_boost_cutoff = 15         # 4.3 default; Hz
+set angle_feedforward = 50             # 2026.6 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
+set angle_earth_ref = 0                # ADR-0008; percent
+set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
+set horizon_limit_degrees = 135        # 2026.6 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6 default
+set horizon_delay_ms = 500             # 2026.6 default; ms
+# PID Tuning, filters
+set gyro_lpf1_type = PT1               # 4.3 default
+set gyro_lpf1_dyn_max_hz = 575         # diff; Hz
+set gyro_lpf2_type = PT1               # 4.3 default
+set dyn_notch_q = 350                  # diff
+set dyn_notch_min_hz = 130             # diff; Hz
+set dyn_notch_max_hz = 600             # 4.3 default; Hz
+set dterm_lpf1_type = PT1              # 4.3 default
+set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
+set dterm_lpf2_type = PT1              # 4.3 default
+set gyro_lpf1_dyn_expo = 5             # 4.3 default
+set dterm_lpf1_dyn_expo = 5            # 4.3 default
+# Receiver
+set rc_smoothing_auto_factor = 30      # 4.3 default
+set rc_smoothing_auto_factor_throttle = 30 # 4.3 default
+set rc_smoothing_setpoint_cutoff = 0   # 4.3 default; Hz; 0 is automatic
+set rc_smoothing_throttle_cutoff = 0   # 4.3 default; Hz; 0 is automatic
+# Motors
+set crashflip_motor_percent = 0        # 4.3 default; percent
+set crashflip_rate = 0                 # ADR-0008; °/s; 0 is off
+set crashflip_auto_rearm = OFF         # 2026.6 default
+# Blackbox
+set blackbox_sample_rate = 1/2         # diff
+
+# Not simulated yet, and not known to OpenDrone: the other settings the diff sets.
+set dshot_bidir = ON                   # diff
+set vbat_max_cell_voltage = 435        # diff

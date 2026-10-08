@@ -41,7 +41,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "1fcd1b6350fd5738"   # test/whoop-65-ducts-only: what the Simulation receives from it
+quad = "765504c4f5730a8c"   # test/whoop-65-ducts-only: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
 run  = "426322e68d0bffda"   # the whole state after each of 400 steps at 8000 Hz, in order
 
