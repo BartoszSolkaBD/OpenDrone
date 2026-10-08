@@ -257,7 +257,11 @@ impl<'a> CliText<'a> {
                         cli.built = built;
                     }
                 } else if let Some(name) = comment.strip_prefix("name:") {
-                    cli.craft_name.get_or_insert(name.trim());
+                    // Betaflight writes "-" for a quad with no name.
+                    let name = name.trim();
+                    if !name.is_empty() && name != "-" {
+                        cli.craft_name.get_or_insert(name);
+                    }
                 } else if let Some((_, after)) = comment.split_once("date: ") {
                     let day = after.split('T').next().unwrap_or(after).trim();
                     cli.configured.get_or_insert(day.to_string());
