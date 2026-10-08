@@ -30,9 +30,17 @@ _Avoid_: Second agent, code review bot
 The last line of a Reviewer's comment, either pass or changes needed, together with the commit it reviewed.
 _Avoid_: Approval (an approval is a GitHub review from a person)
 
+**Delegator**:
+The agent session that works through the ready tickets. It starts authors and Reviewers, each on the model its job needs, and merges what passes. It never writes or reviews code itself. Its rules: [The delegator](../agents/delegator.md).
+_Avoid_: Orchestrator, manager agent
+
 **Area**:
 A named part of the repo, such as Physics, Scenarios or Repo rules, with its folders. CODEOWNERS, PR labels and the Review Report all use the same Areas.
 _Avoid_: Module, component, team
+
+**Lane**:
+A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time.
+_Avoid_: Track, queue, stream
 
 **Work Count**:
 A count, not a timing, of how much work a fixed recorded flight takes. For physics, that's instructions run. For rendering, it's draw calls, triangles, render passes and the pixels they cover and shade, shader pipelines and GPU memory. It repeats exactly on every run on the same kind of machine.
