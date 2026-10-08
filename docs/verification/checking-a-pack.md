@@ -39,7 +39,7 @@ packs/opendrone/                 the Pack; its id comes from pack.toml
 - Ids are lowercase words joined by dashes. The id `test` is kept for Test Quads and Test Maps.
 - Two Packs can't share an id: the second is skipped.
 - A folder of a kind the game doesn't know, such as `modifiers/`, is skipped and reported.
-- **A folder whose name starts with a dot, and a symbolic link, are refused** anywhere in `packs/` or the Test Quad folder, and nothing in them is read. Most computers hide such a folder, and git keeps a link as one small file holding where it points, so either would let a Pack or a Quad quietly leave every check. A file whose name starts with a dot, such as the `.DS_Store` macOS leaves in every folder, holds nothing the checker reads, so it's still skipped.
+- **A folder whose name starts with a dot, and a symbolic link, are refused** anywhere in `packs/` or the Test Quad folder, and nothing in them is read. Most computers hide such a folder, and git keeps a link as one small file holding where it points, so either would let a Pack or a Quad quietly leave every check. That goes for `packs/` and `scenarios/test-quads/` themselves too: when either is a link, it's refused and no Pack, or no Test Quad, is read through it. A file whose name starts with a dot, such as the `.DS_Store` macOS leaves in every folder, holds nothing the checker reads, so it's still skipped.
 
 ## The manifest, `pack.toml`
 
@@ -61,7 +61,7 @@ licence     = "CC0-1.0"
 
 Every key is required except `[licences]` and `[retired]`, and nothing else may appear. Licences are standard SPDX names. Anything under a CC BY licence needs a credit line.
 
-`[retired]` names each Quad the Pack took out by its folder, `quads/<id>`, with a sentence saying why. The folder must be gone. A change that takes a Quad out says so here, as the Feel Test log rules below explain. So far only Quads can be retired.
+`[retired]` names each Quad the Pack took out by its folder, `quads/<id>`, with a sentence saying why, on one line: CI prints it for the Reviewer, so a line break, tab or invisible formatting character in it is refused. The folder must be gone. A change that takes a Quad out says so here, as the Feel Test log rules below explain. So far only Quads can be retired.
 
 ## A Quad definition, `quad.toml`
 
@@ -172,7 +172,7 @@ The values are written with their units, as `quad.toml` writes them; they're com
 - a number taken out;
 - a number added to a Quad that already existed, such as a 5″ given `[ducts]`, with its Confidence and source.
 
-Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, names every new Quad, and names every Quad the change takes out with what became of it (renamed or moved, and where to, or retired, and why), so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
+Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, names every new Quad (one whose id was retired before is listed as new and previously retired, with where and why, so the Reviewer compares it with its old numbers), and names every Quad the change takes out with what became of it (renamed or moved, and where to, or retired, and why), so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
 
 ## An Input Device profile, `input-devices/<id>.toml`
 
