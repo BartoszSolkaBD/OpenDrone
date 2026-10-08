@@ -38,19 +38,19 @@ measured = "-0.163 °/s"
 what     = "pitch rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.0731 °/s"
+measured = "-0.0730 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.0248 °/s"
+measured = "-0.0257 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.230 °/s"
+measured = "0.233 °/s"
 
 [[expect]]
 what     = "roll rate, highest over 1 s to 1.5 s"
@@ -62,7 +62,7 @@ measured = "869 °/s"
 what     = "roll rate at 1.8 s"
 basis    = "Observed"
 expected = "-1.8 °/s ± 1 °/s"
-measured = "-1.80 °/s"
+measured = "-1.79 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "4a98eca614a7780c"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "7e44d6e56de6a105"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "65958fb6fb6e4350"   # the whole state after each of 14400 steps at 8000 Hz, in order
+run  = "55e2b120edc1ba61"   # the whole state after each of 14400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.18 s" = "0fc79feafeadef5b"
-"0.36 s" = "e94d1b6f7cf38156"
-"0.54 s" = "57f97d6055486a91"
-"0.72 s" = "9be9ead7f9017055"
-"0.9 s" = "9e420e80f590bafe"
-"1.08 s" = "a5f24778283b5339"
-"1.26 s" = "aeb7cc7680d7da9f"
-"1.44 s" = "aef90c29dcbb0e26"
-"1.62 s" = "3c0aa7b8b7278e38"
-"1.8 s" = "1f37bfafe76d6617"
+"0.18 s" = "004db54f8d1ed8f6"
+"0.36 s" = "5d533fbf660292f8"
+"0.54 s" = "497e0e1df0f5ae75"
+"0.72 s" = "80a45a4fef57f4cd"
+"0.9 s" = "617ecabbb4830597"
+"1.08 s" = "bb7485c3658f5885"
+"1.26 s" = "b33197dd585be38f"
+"1.44 s" = "46629837510b55d3"
+"1.62 s" = "9cc2da6e571dfcbd"
+"1.8 s" = "65462412936c2b98"
