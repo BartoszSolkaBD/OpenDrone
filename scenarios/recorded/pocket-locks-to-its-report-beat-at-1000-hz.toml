@@ -1,0 +1,64 @@
+# A Radiomaster Pocket over USB with its RF module off reports on a 1 ms
+# beat, 1000 Hz. At a Packet Rate of 1000 Hz the Radio Link locks to it
+# (ADR-0020): each frame leaves 0.75 ms after a report is due, so no frame
+# ever carries two of them. The Pocket's reports reach the input thread over
+# 0.625 ms, more than half its period, and now and then one report arrives
+# in two polls, a few tenths of a millisecond apart, with some of its
+# values in each: the link counts the two as the one report they are.
+#
+# The Input Track is the maintainer's Pocket, its ADC filter Off as its setup
+# asks, during two seconds of slow circles (pocket-slow-circles.csv). The
+# Pocket reports only changes, and in slow circles most of its reports
+# change a stick.
+format = 1
+name   = "A Pocket's Radio Link frames at 1000 Hz never carry two reports"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "1000 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "pocket-slow-circles.csv"
+input_device = { report_rate = "1000 Hz", reports_at_rest = false }
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0 s to 2.09 s"
+highest = "1 ± 0"
+basis   = "rule: ADR-0020: locked at 1000 Hz, each frame leaves 0.75 ms after a report is due, past the arrivals' wobble and before the next report is due, 1 ms later, so no frame carries two reports"
+
+[[expect]]
+what  = "reports in the frame"
+over  = "0 s to 2.09 s"
+mean  = "0.865 ± 0.01"
+basis = "observed: in slow circles most of the Pocket's reports change a stick; the rest send nothing, and leave a frame with none"
+
+[[expect]]
+what    = "frame age"
+over    = "0 s to 2.09 s"
+highest = "0.75 ms ± 0.000001 ms"
+basis   = "rule: ADR-0020: a report is due where the earliest of the last second's arrived, and its frame leaves 0.75 ms (6 steps at 8 kHz) later, so no fresh report is older than that when its frame leaves"
+
+[[expect]]
+what   = "frame age"
+over   = "0 s to 2.09 s"
+lowest = "0.125 ms ± 0.000001 ms"
+basis  = "observed: the Pocket's reports arrive over 0.625 ms, so the latest ones are only 0.125 ms old when their frame leaves"

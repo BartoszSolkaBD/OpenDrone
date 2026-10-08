@@ -20,10 +20,18 @@
 //! - Flight Inputs, the one way in: [`Simulation::flight_input`] takes them,
 //!   stamped with Simulation Time ([`FlightInput`]): Channels, the Flying
 //!   Input Device lost or back, and Reset.
-//! - The Radio Link: each Quad's Channels reach its Flight Controller in
-//!   regular frames at the pilot's [`PacketRate`], like an ELRS link on CRSF
-//!   (ADR-0007). While the Flying Input Device is lost, it sends no frames,
-//!   and the Flight Controller's Failsafe follows.
+//! - The Radio Link ([`RadioLink`]): each Quad's Channels reach its Flight
+//!   Controller in frames at the pilot's [`PacketRate`], like an ELRS link on
+//!   CRSF (ADR-0007). When the Packet Rate divides the Flying Input Device's
+//!   Report Rate, the frames follow the device's report beat, learnt from
+//!   the Flight Inputs' stamps (ADR-0020); otherwise, and for scripted
+//!   sticks, they come on the link's own clock. The device's facts come with
+//!   the set-up ([`QuadSetUp::input_device`]). While the device is lost
+//!   (unplugged, or, if it reports at rest, silent for 1 s), it sends no
+//!   frames, and the Flight Controller's Failsafe follows.
+//! - Input smoothing, the Assist that smooths roll, pitch and yaw with a
+//!   gentle 15 Hz low-pass before the Radio Link ([`InputSmoothing`]), set
+//!   with [`QuadSetUp::input_smoothing`].
 //! - Reset: the Quad back on its Launch Spot ([`QuadSetUp::launch_spot`]),
 //!   landed and disarmed, powered up fresh as a new battery does: a full
 //!   charge, a fresh Flight Controller, and ESCs playing their start-up
@@ -54,7 +62,8 @@
 //!
 //! Each tick, for every Quad in order: the Flight Inputs stamped with this
 //! moment arrive (Reset powering the Quad up there and then); the Radio Link
-//! sends a frame if one is due; the Flight Controller seam reads the sensors
+//! sends a frame if one is due, its sticks as Input smoothing has them; Input
+//! smoothing moves on by a step; the Flight Controller seam reads the sensors
 //! (the state at the tick's start, and whether the ESCs have beeped ready)
 //! and the frame and gives the motor commands; the physics moves the Quad on
 //! by one step with them.
@@ -62,8 +71,8 @@
 //! A crash never disarms or resets the Quad on its own: only the pilot's
 //! Arm switch, Failsafe or Reset do.
 //!
-//! Input smoothing and the rest of the Radio Link (#56), Endless Battery
-//! (#57) and the rest of the session state arrive with their tickets.
+//! Endless Battery (#57) and the rest of the session state arrive with their
+//! tickets.
 //!
 //! # House rules
 //!
@@ -88,6 +97,7 @@
 
 pub mod auto_arm;
 mod flight_controller;
+mod input_smoothing;
 mod motors;
 mod radio_link;
 mod time;
@@ -96,6 +106,7 @@ use opendrone_maths::{Fingerprint, Fingerprinter, Random, Vec3};
 use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 
 pub use flight_controller::{OurFlightController, sensor_readings};
+pub use input_smoothing::{INPUT_SMOOTHING_HZ, InputSmoothing};
 pub use motors::{FlightControllerSeam, ScriptedMotors};
 pub use opendrone_flight_controller::{
     ArmingBlocks, Channel, Channels, DebugRecord, FailsafePhase, FailsafeReadings, Rates,
@@ -110,7 +121,10 @@ pub use opendrone_physics::{
     Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
 };
 pub use opendrone_physics::{Flicker, PropWash};
-pub use radio_link::{FlightInput, PacketRate, RadioLink};
+pub use radio_link::{
+    FlightInput, Frame, InputDeviceFacts, LOCK_MARGIN_MICROS, PacketRate, RadioLink, ReportRate,
+    SILENT_FOR_SECONDS,
+};
 pub use time::{PhysicsRate, SimulationTime};
 
 /// What a Simulation starts from.
@@ -146,6 +160,12 @@ pub struct QuadSetUp {
     /// The pilot's Packet Rate: how often the Radio Link carries this Quad's
     /// Channels to its Flight Controller.
     pub packet_rate: PacketRate,
+    /// The Flying Input Device's facts, from its Input Device profile: its
+    /// Report Rate and whether it reports at rest. `None` for scripted
+    /// sticks, such as a Scenario's Timeline, which get plain regular frames.
+    pub input_device: Option<InputDeviceFacts>,
+    /// Input smoothing, the Assist, on or off.
+    pub input_smoothing: bool,
     /// What plugs into the Flight Controller seam for this Quad.
     pub flight_controller: Box<dyn FlightControllerSeam>,
 }
@@ -164,6 +184,36 @@ pub struct QuadOutput {
     /// What our Flight Controller's loop did on the tick; `None` before the
     /// first and for anything else in the seam.
     pub flight_controller: Option<DebugRecord>,
+    /// What the Radio Link did on the tick.
+    pub radio_link: RadioLinkOutput,
+}
+
+/// What a Radio Link did on a tick.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RadioLinkOutput {
+    /// The frame that left on the tick, if one did, with its Channels as the
+    /// Flight Controller got them (Input smoothing's, if on).
+    pub frame: Option<Frame>,
+    /// The Channels of the last frame to leave, on this tick or before;
+    /// `None` before the first.
+    pub last_frame: Option<Channels>,
+    /// Whether the Flying Input Device counts as lost: unplugged, or silent
+    /// for too long.
+    pub lost: bool,
+    /// Whether the frames follow the device's report beat (ADR-0020).
+    pub locked: bool,
+}
+
+impl RadioLinkOutput {
+    /// The output after a tick on which `frame` left, or none did.
+    pub fn after(&self, frame: Option<Frame>, link: &RadioLink) -> RadioLinkOutput {
+        RadioLinkOutput {
+            frame,
+            last_frame: frame.map(|f| f.channels).or(self.last_frame),
+            lost: link.is_lost(),
+            locked: link.is_locked(),
+        }
+    }
 }
 
 /// A set-up the Simulation can't start from.
@@ -200,6 +250,10 @@ struct SimulatedQuad {
     flight_controller: Box<dyn FlightControllerSeam>,
     motor_commands: MotorCommands,
     radio_link: RadioLink,
+    /// Input smoothing, when the pilot has it on.
+    input_smoothing: Option<InputSmoothing>,
+    /// What the Radio Link did on the last tick.
+    radio_link_output: RadioLinkOutput,
     /// Flight Inputs not yet arrived, in the order of their moments.
     inputs: Vec<(SimulationTime, FlightInput)>,
     /// Whether the seam has run a loop yet.
@@ -256,7 +310,15 @@ impl Simulation {
                 launch_spot: quad.launch_spot,
                 flight_controller: quad.flight_controller,
                 motor_commands: MotorCommands::STOPPED,
-                radio_link: RadioLink::new(quad.packet_rate, set_up.physics_rate),
+                radio_link: RadioLink::new(
+                    quad.packet_rate,
+                    set_up.physics_rate,
+                    quad.input_device,
+                ),
+                input_smoothing: quad
+                    .input_smoothing
+                    .then(|| InputSmoothing::new(set_up.physics_rate)),
+                radio_link_output: RadioLinkOutput::default(),
                 inputs: Vec::new(),
                 stepped: false,
             });
@@ -283,32 +345,43 @@ impl Simulation {
     }
 
     /// One tick: for every Quad in order, the Flight Inputs stamped up to now
-    /// arrive, the Radio Link sends a frame if one is due, the Flight
-    /// Controller seam reads the sensors and the frame and gives the motor
-    /// commands, then the physics moves the Quad on by one step with them,
-    /// colliding with the Map. Then Simulation Time moves on by one step.
+    /// arrive, the Radio Link sends a frame if one is due (its sticks as Input
+    /// smoothing has them, if on), Input smoothing moves on by a step, the
+    /// Flight Controller seam reads the sensors and the frame and gives the
+    /// motor commands, then the physics moves the Quad on by one step with
+    /// them, colliding with the Map. Then Simulation Time moves on by one
+    /// step.
     pub fn step(&mut self) {
         let dt = self.physics_rate.step_length();
         for quad in &mut self.quads {
             let arrived = quad.inputs.partition_point(|(time, _)| *time <= self.time);
-            let inputs: Vec<FlightInput> = quad
-                .inputs
-                .drain(..arrived)
-                .map(|(_, input)| input)
-                .collect();
-            for input in inputs {
+            let inputs: Vec<(SimulationTime, FlightInput)> = quad.inputs.drain(..arrived).collect();
+            for (at, input) in inputs {
                 match input {
-                    FlightInput::Channels(channels) => quad.radio_link.hear(channels),
-                    FlightInput::InputDeviceLost => quad.radio_link.lose(),
-                    FlightInput::InputDeviceBack => quad.radio_link.back(),
+                    FlightInput::Channels(channels) => {
+                        quad.radio_link.hear(at, channels);
+                        if let Some(smoothing) = &mut quad.input_smoothing {
+                            smoothing.hear(&channels);
+                        }
+                    }
+                    FlightInput::InputDeviceLost => quad.radio_link.lose(at),
+                    FlightInput::InputDeviceBack => quad.radio_link.back(at),
                     FlightInput::Reset => quad.reset(&self.world),
                 }
             }
-            let frame = quad.radio_link.frame(self.time);
+            let mut frame = quad.radio_link.frame(self.time);
+            if let Some(smoothing) = &mut quad.input_smoothing {
+                if let Some(frame) = &mut frame {
+                    frame.channels = smoothing.smooth(frame.channels);
+                }
+                smoothing.step();
+            }
+            quad.radio_link_output = quad.radio_link_output.after(frame, &quad.radio_link);
+            let channels = frame.map(|frame| frame.channels);
             let readings = sensor_readings(quad.body.state(), quad.body.escs_ready());
-            quad.motor_commands = quad
-                .flight_controller
-                .step(self.time, &readings, frame.as_ref());
+            quad.motor_commands =
+                quad.flight_controller
+                    .step(self.time, &readings, channels.as_ref());
             quad.stepped = true;
             quad.body
                 .step(&self.world, &self.map, &quad.motor_commands, dt);
@@ -354,6 +427,7 @@ impl Simulation {
             } else {
                 None
             },
+            radio_link: quad.radio_link_output,
         }
     }
 
@@ -389,8 +463,8 @@ impl Simulation {
     /// A fingerprint of the whole state, in a fixed order: Simulation Time,
     /// the physics rate, the world, the random seed, then every Quad's state
     /// (with its motors, ESCs, battery and Prop Wash flicker, the random
-    /// generator's place included), motor commands, Radio Link and Flight
-    /// Controller seam. Two runs, or two computers,
+    /// generator's place included), motor commands, Radio Link, Input
+    /// smoothing and Flight Controller seam. Two runs, or two computers,
     /// that give the same fingerprint are in exactly the same state.
     ///
     /// The Map's solid parts never change, so they are left out, as the
@@ -409,6 +483,13 @@ impl Simulation {
             quad.body.write_fingerprint(&mut f);
             quad.motor_commands.write_fingerprint(&mut f);
             quad.radio_link.write_fingerprint(&mut f);
+            match &quad.input_smoothing {
+                None => f.write_u64(0),
+                Some(smoothing) => {
+                    f.write_u64(1);
+                    smoothing.write_fingerprint(&mut f);
+                }
+            }
             quad.flight_controller.write_fingerprint(&mut f);
         }
         f.finish()

@@ -4,11 +4,15 @@ use opendrone_maths::{Attitude, DEGREE, PilotAngles, PilotRates, Vec3};
 use opendrone_pack::document::{Document, Item, Table};
 use opendrone_pack::units::{self, Dimension, Expected, Quantity};
 use opendrone_pack::{Problem, Problems};
-use opendrone_sim::{MotorCommands, PhysicsRate, SimulationTime, StartingMotors};
+use opendrone_sim::{
+    FlightInput, InputDeviceFacts, MotorCommands, PhysicsRate, ReportRate, SimulationTime,
+    StartingMotors,
+};
 
 use crate::format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 use crate::measure::Measure;
 use crate::rates::{self, Rates};
+use crate::track::{TrackRules, read_input_track};
 
 /// A Scenario, read and checked.
 #[derive(Clone, Debug)]
@@ -33,6 +37,37 @@ pub struct Scenario {
     pub other_runs: Vec<OtherRun>,
 }
 
+impl Scenario {
+    /// The Input Track file it plays back, as it names it: a CSV file
+    /// beside it. `None` for a Timeline.
+    pub fn input_track(&self) -> Option<&str> {
+        match &self.inputs {
+            Inputs::Track(track) => Some(&track.file),
+            Inputs::Motors(_) | Inputs::Pilot(_) => None,
+        }
+    }
+
+    /// Reads the Input Track it plays back from its file's text, naming the
+    /// file `file` in problems. The run then lasts at least to its last row.
+    /// A Scenario with a Timeline is left as it is.
+    pub fn read_input_track(&mut self, file: &str, text: &str) -> Result<(), Problems> {
+        let Inputs::Track(track) = &mut self.inputs else {
+            return Ok(());
+        };
+        let rules = TrackRules {
+            rate: self.start.physics_rate,
+            reset: self.start.kind == Kind::Flight
+                && self.start.motors == Some(StartingMotors::PoweringUp),
+        };
+        track.inputs = read_input_track(file, text, rules)?;
+        track.read = true;
+        if let Some((last, _)) = track.inputs.last() {
+            self.length = self.length.max(*last);
+        }
+        Ok(())
+    }
+}
+
 /// A Timeline, in a run's own steps, in time order.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Inputs {
@@ -42,6 +77,28 @@ pub enum Inputs {
     /// A Flight or Flight Controller Scenario's sticks, switches and sensor
     /// readings, each moment with what changes then.
     Pilot(Vec<PilotEntry>),
+    /// A Flight or Flight Controller Scenario's recorded Input Track.
+    Track(InputTrack),
+}
+
+/// A recorded Input Track a Scenario plays back (#11 §2): the Flight Inputs
+/// an Input Device sent, from a CSV file beside the Scenario, with the
+/// device's facts. The format is in `track.rs` and in
+/// `docs/verification/reading-a-scenario.md`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct InputTrack {
+    /// The file, as the Scenario names it.
+    pub file: String,
+    /// The Scenario's line that names it.
+    pub line: usize,
+    /// The facts of the Input Device it was recorded from, which the
+    /// Simulation gets with its set-up.
+    pub device: InputDeviceFacts,
+    /// Every Flight Input in it, at its step, in order: empty until the file
+    /// is read ([`Scenario::read_input_track`]).
+    pub inputs: Vec<(SimulationTime, FlightInput)>,
+    /// Whether the file has been read.
+    pub read: bool,
 }
 
 /// One moment of a pilot's Timeline: what changes then. Anything left out
@@ -395,6 +452,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         start: start.clone(),
         moments: Vec::new(),
         other_runs: Vec::new(),
+        track: false,
     };
     let has_cases = root.get("case").is_some();
     let inputs = if kind == Kind::FlightController && has_cases {
@@ -431,6 +489,8 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
     let last_input = match &inputs {
         Inputs::Motors(timeline) => timeline.iter().map(|(time, _)| time.ticks()).max(),
         Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
+        // Read with the file, beside the Scenario.
+        Inputs::Track(_) => None,
     };
     let length = last_input
         .into_iter()
@@ -618,7 +678,8 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         let mut on = |key| {
             let on = choice(&table, key, &[("on", true), ("off", false)], problems);
             let refusal = match key {
-                "input_smoothing" => Some("Input smoothing doesn't run yet, so `input_smoothing` must be \"off\": Input smoothing arrives with the Radio Link ticket (#56)"),
+                "input_smoothing" if alone => Some("Input smoothing is an Assist of the Simulation, in front of the Radio Link, and a Flight Controller Scenario runs the Flight Controller alone, so `input_smoothing` must be \"off\""),
+                "input_smoothing" => None,
                 "auto_arm" if alone => Some("Auto-arm is an Assist of the Simulation, in front of the Flight Controller, and a Flight Controller Scenario runs the Flight Controller alone, so `auto_arm` must be \"off\""),
                 "auto_arm" => None,
                 _ => Some("Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"),
@@ -956,6 +1017,8 @@ struct Reader<'p> {
     /// Every Timeline moment.
     moments: Vec<Moment>,
     other_runs: Vec<OtherRun>,
+    /// True when the inputs are an Input Track.
+    track: bool,
 }
 
 impl Reader<'_> {
@@ -996,7 +1059,23 @@ impl Reader<'_> {
                 .timeline_at(self.rate, false)
                 .unwrap_or(Inputs::Motors(Vec::new()));
         };
-        inputs.refuse_unknown(&["timeline"], self.problems);
+        inputs.refuse_unknown(&["timeline", "input_track", "input_device"], self.problems);
+        if let Some(track) = inputs.get("input_track") {
+            if let Some(timeline) = inputs.get("timeline") {
+                self.problems.push(
+                    timeline
+                        .problem("a Scenario's inputs are a Timeline or an Input Track, not both"),
+                );
+            }
+            return self
+                .input_track(&inputs, &track)
+                .map_or(Inputs::Motors(Vec::new()), Inputs::Track);
+        }
+        if let Some(device) = inputs.get("input_device") {
+            self.problems.push(device.problem(
+                "`input_device` gives the facts of the Input Device an Input Track was recorded from; a Timeline's sticks are scripted, with no device",
+            ));
+        }
         let Some(timeline) = inputs
             .require("timeline", self.problems)
             .and_then(|t| t.array(self.problems))
@@ -1095,6 +1174,80 @@ impl Reader<'_> {
         }
         self.timeline_at(self.rate, false)
             .unwrap_or(Inputs::Motors(Vec::new()))
+    }
+
+    /// `input_track`, a CSV file beside the Scenario, and `input_device`, the
+    /// facts of the Input Device it was recorded from: its Report Rate (or
+    /// "unknown") and whether it reports at rest.
+    fn input_track(&mut self, inputs: &Table<'_, '_>, track: &Item<'_, '_>) -> Option<InputTrack> {
+        if self.kind.scripts_motors() {
+            self.problems.push(track.problem(
+                "an Input Track holds a pilot's Flight Inputs, so it feeds a Flight or Flight Controller Scenario; a Physics or Thrust Stand Scenario scripts its motors in a Timeline",
+            ));
+            return None;
+        }
+        self.track = true;
+        let name = track.text(self.problems);
+        let named = name.filter(|name| {
+            let plain = name.len() > 4
+                && name.ends_with(".csv")
+                && !name.starts_with('.')
+                && !name.contains(['/', '\\']);
+            if !plain {
+                self.problems.push(track.problem(format!(
+                    "`input_track` names a CSV file beside the Scenario, such as \"dualsense-at-rest.csv\", not \"{name}\""
+                )));
+            }
+            plain
+        });
+        let device = inputs
+            .table("input_device", self.problems)
+            .and_then(|device| {
+                device.refuse_unknown(&["report_rate", "reports_at_rest"], self.problems);
+                let report_rate = match device.text("report_rate", self.problems) {
+                    Some(("unknown", _)) => Some(None),
+                    Some((text, item)) => {
+                        match units::parse_quantity(text).and_then(|q| q.as_a(Dimension::PER_SECOND)) {
+                            Ok(hz) if hz >= 1.0 && hz.fract() == 0.0 && hz <= f64::from(u32::MAX) => {
+                                Some(ReportRate::from_hz(hz as u32))
+                            }
+                            Ok(_) => {
+                                self.problems.push(item.problem(
+                                    "a Report Rate is a whole number of reports a second, such as \"250 Hz\", or \"unknown\"",
+                                ));
+                                None
+                            }
+                            Err(p) => {
+                                self.problems.push(item.problem(p.0));
+                                None
+                            }
+                        }
+                    }
+                    None => None,
+                };
+                let at_rest = device
+                    .require("reports_at_rest", self.problems)
+                    .and_then(|item| {
+                        let at_rest = item.boolean();
+                        if at_rest.is_none() {
+                            self.problems.push(item.problem(
+                                "`reports_at_rest` is true for a device that keeps reporting while its sticks rest (and so counts as lost after 1 s of silence), or false",
+                            ));
+                        }
+                        at_rest
+                    });
+                Some(InputDeviceFacts {
+                    report_rate: report_rate?,
+                    reports_at_rest: at_rest?,
+                })
+            });
+        Some(InputTrack {
+            file: named?.to_string(),
+            line: track.line(),
+            device: device?,
+            inputs: Vec::new(),
+            read: false,
+        })
     }
 
     /// A pilot's Timeline must set every stick and the Arm switch at 0 s, so
@@ -1562,20 +1715,27 @@ impl Reader<'_> {
             )));
             return None;
         };
+        let scripted = if self.kind == Kind::Physics {
+            "Physics"
+        } else {
+            "Thrust Stand"
+        };
         let refusal = match self.kind {
-            Kind::FlightController if !measure.of_the_flight_controller() => Some(format!(
-                "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller does, not {text}"
-            )),
-            Kind::Physics | Kind::ThrustStand if measure.of_the_flight_controller() => {
+            Kind::FlightController
+                if !measure.of_the_flight_controller() && !measure.of_the_radio_link() =>
+            {
                 Some(format!(
-                    "{text} is our Flight Controller's, but a {} Scenario's motors are scripted",
-                    if self.kind == Kind::Physics {
-                        "Physics"
-                    } else {
-                        "Thrust Stand"
-                    }
+                    "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller and its Radio Link do, not {text}"
                 ))
             }
+            Kind::Physics | Kind::ThrustStand if measure.of_the_flight_controller() => {
+                Some(format!(
+                    "{text} is our Flight Controller's, but a {scripted} Scenario's motors are scripted"
+                ))
+            }
+            Kind::Physics | Kind::ThrustStand if measure.of_the_radio_link() => Some(format!(
+                "{text} is the Radio Link's, but a {scripted} Scenario's motors are scripted, so no sticks reach a Flight Controller"
+            )),
             _ => None,
         };
         if let Some(sentence) = refusal {
@@ -1769,6 +1929,13 @@ impl Reader<'_> {
             )));
             return None;
         }
+        if measure.of_the_radio_link() && when == When::At(0) {
+            self.problems.push(expected_item.problem(format!(
+                "{} is what the Radio Link did, and its first frame leaves during the first step, so it can't be measured at 0 s",
+                measure.name()
+            )));
+            return None;
+        }
         let mut description = match when {
             When::At(_) => format!("{} {description_time}", measure.name()),
             When::Over { .. } => format!("{}, {description_time}", measure.name()),
@@ -1839,6 +2006,12 @@ impl Reader<'_> {
     /// The other run `against` names, added to the Scenario's other runs
     /// unless an earlier Expectation named the same one.
     fn other_run(&mut self, against: &Item<'_, '_>) -> Option<usize> {
+        if self.track {
+            self.problems.push(against.problem(
+                "an Input Track plays back as it was recorded, at the physics rate it was recorded at, so a Scenario that plays one can't be compared with another run yet",
+            ));
+            return None;
+        }
         let table = against.table(self.problems)?;
         table.refuse_unknown(
             &["physics_rate", "battery", "random_seed", "sticks"],
@@ -1975,6 +2148,7 @@ impl Reader<'_> {
         let length = match &inputs {
             Inputs::Motors(timeline) => timeline.iter().map(|(t, _)| t.ticks()).max(),
             Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
+            Inputs::Track(_) => None,
         }
         .unwrap_or(0);
         self.other_runs.push(OtherRun {

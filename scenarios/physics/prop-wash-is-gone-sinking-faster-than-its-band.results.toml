@@ -49,16 +49,16 @@ measured = "none broken"
 [fingerprints]
 quad = "82483f34b7795fd0"   # test/whoop-65-bench-supply: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "4b8bcec3666060de"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "e359fd064961639f"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "6cb5e4e581795d31"
-"0.2 s" = "b1280997ee8eab98"
-"0.3 s" = "98b865961aad6045"
-"0.4 s" = "2baed9d95373bb98"
-"0.5 s" = "ab63176ff9e2cc85"
-"0.6 s" = "0991702e2c2fcc4c"
-"0.7 s" = "661ed0e11d7f1782"
-"0.8 s" = "5f42ed1eaf0958da"
-"0.9 s" = "130bc63cc6f82b8f"
-"1 s" = "ade49f8f4181ebe2"
+"0.1 s" = "adf8c6699a53b1a9"
+"0.2 s" = "6e3b116b68b356b0"
+"0.3 s" = "4309cdbd5ce180fd"
+"0.4 s" = "3ac7a57676dc82b0"
+"0.5 s" = "7e4786a67b491ebd"
+"0.6 s" = "b179bccfb693d664"
+"0.7 s" = "0bfdfd4b92a78bda"
+"0.8 s" = "d667fdf562b26732"
+"0.9 s" = "53aafe1175170e87"
+"1 s" = "6377b66f1d7f02fa"

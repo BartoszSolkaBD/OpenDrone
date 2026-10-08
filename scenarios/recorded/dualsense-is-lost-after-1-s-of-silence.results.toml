@@ -1,0 +1,58 @@
+# Results of dualsense-is-lost-after-1-s-of-silence.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A DualSense that stops reporting is lost after 1 s of silence"
+
+[[expect]]
+what     = "the Flying Input Device is lost, first over 0 s to 6.999 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "the Flying Input Device is lost, first over 6 s to 8 s"
+basis    = "Source"
+expected = "1.000125 s ± 0.000001 s"
+measured = "1.00 s"
+
+[[expect]]
+what     = "reports in the frame, highest over 6.01 s to 6.99 s"
+basis    = "Rule"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "RXLOSS blocks arming, first over 6 s to 8 s"
+basis    = "Source"
+expected = "between 1.146 s and 1.1505 s"
+measured = "1.15 s"
+
+[[expect]]
+what     = "the Flying Input Device is back, first over 6 s to 9 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "c4ffae309ab9de9e"   # the whole state after each of 72000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.9 s" = "e289c10801b70622"
+"1.8 s" = "c7d4eb48eb7e4ec2"
+"2.7 s" = "485874fb9f0129a6"
+"3.6 s" = "ed9b9215991cc3bf"
+"4.5 s" = "8197f4b49c62497b"
+"5.4 s" = "9e34005cd0e8aaa7"
+"6.3 s" = "f563f1ef116660d8"
+"7.2 s" = "6c37d4f02c36f5de"
+"8.1 s" = "adbc1aff5ffe3cff"
+"9 s" = "390fb5a64864f3e4"

@@ -1,0 +1,70 @@
+# Results of input-smoothing-eases-roll-pitch-and-yaw.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Input smoothing eases roll, pitch and yaw with a gentle 15 Hz low-pass and leaves the throttle"
+
+[[expect]]
+what     = "roll channel at 1.000125 s"
+basis    = "Rule"
+expected = "0.06% ± 0.01%"
+measured = "0.0610%"
+
+[[expect]]
+what     = "throttle channel at 1.000125 s"
+basis    = "Rule"
+expected = "50% ± 0.1%"
+measured = "50.0%"
+
+[[expect]]
+what     = "roll channel at 1.012125 s"
+basis    = "Rule"
+expected = "67.73% ± 0.15%"
+measured = "67.8%"
+
+[[expect]]
+what     = "pitch channel at 1.012125 s"
+basis    = "Rule"
+expected = "-67.73% ± 0.15%"
+measured = "-67.7%"
+
+[[expect]]
+what     = "yaw channel at 1.012125 s"
+basis    = "Rule"
+expected = "67.73% ± 0.15%"
+measured = "67.8%"
+
+[[expect]]
+what     = "roll channel at 1.032125 s"
+basis    = "Rule"
+expected = "95.10% ± 0.15%"
+measured = "95.1%"
+
+[[expect]]
+what     = "roll channel at 1.100125 s"
+basis    = "Rule"
+expected = "100% ± 0.1%"
+measured = "100%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "6b112dadd78f10ad"   # the whole state after each of 8801 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.11 s" = "a9cf4aafd457ef4c"
+"0.22 s" = "ee35944dcc5e8e7a"
+"0.33 s" = "5fd0e653183a9721"
+"0.44 s" = "a337e85f8e04599a"
+"0.55 s" = "d5742fc6f3c5900b"
+"0.66 s" = "20e6b90031aeefff"
+"0.77 s" = "b41ad8420b42a53e"
+"0.88 s" = "eeec322d83174070"
+"0.99 s" = "9fe4e10f496699e0"
+"1.100125 s" = "84e24e2974cd4e0f"

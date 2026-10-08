@@ -1,0 +1,58 @@
+# Results of a-resting-pocket-is-lost-only-when-unplugged.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A resting Pocket is never lost for silence, only when unplugged"
+
+[[expect]]
+what     = "the Flying Input Device is lost, first over 0 s to 45.2 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "reports in the frame, highest over 0.01 s to 11.27 s"
+basis    = "Rule"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "reports in the frame, highest over 11.27 s to 45.2 s"
+basis    = "Rule"
+expected = "4 ± 0"
+measured = "4.00"
+
+[[expect]]
+what     = "the Flying Input Device is lost, first over 45 s to 45.3 s"
+basis    = "Rule"
+expected = "0.21525 s ± 0.000001 s"
+measured = "0.215 s"
+
+[[expect]]
+what     = "RXLOSS blocks arming, first over 45 s to 45.5 s"
+basis    = "Source"
+expected = "between 0.361 s and 0.3655 s"
+measured = "0.362 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "beb6d3ac3bbec838"   # the whole state after each of 364000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"4.55 s" = "337f02b4cc27cd9b"
+"9.1 s" = "7cce0e52f96d1eba"
+"13.65 s" = "ff9a7dc06468f9d5"
+"18.2 s" = "e52075d7a9f19c56"
+"22.75 s" = "25f018b72e0676ba"
+"27.3 s" = "e05e3362aea512fd"
+"31.85 s" = "f9fa602690e0efa8"
+"36.4 s" = "be895c069adc8aed"
+"40.95 s" = "0bf86a69323d639a"
+"45.5 s" = "9f0cbd441e3a71d0"
