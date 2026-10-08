@@ -1,0 +1,158 @@
+# Losing the Flying Input Device runs Betaflight 2026.6's Failsafe, timed
+# from the Freestyle 5″'s Tune (failsafe_delay 15, failsafe_recovery_delay
+# 5): the last values for 150 ms, then stage 1, then DROP at 1.5 s; and to fly
+# again, the link back long enough and the Arm switch off and on.
+# (src/main/rx/rx.c: rxFrameCheck, detectAndApplySignalLossBehaviour;
+# src/main/flight/failsafe.c; src/main/fc/core.c: updateArmingStatus.)
+#
+# The Flight Controller alone, armed, its gyro reading still, with roll at
+# 50% (Actual 70/670/0 asks 70 × 0.51261 + 600 × 0.51261² = 193.54 °/s) and
+# the throttle at 50%. The Radio Link sends a frame every 4 ms at 250 Hz;
+# while the device is lost it sends none, so the last good frame is the one
+# at 0.996 s. Each loop's moment is the start of its 125 µs step, and the
+# state it leaves is the one after that step, so a loop at 1.146125 s shows
+# at 1.14625 s. Betaflight checks Failsafe whenever more than 10 ms have
+# passed since the last check: every 11 ms from power-up, at 11 ms, 22 ms
+# and so on.
+format = 1
+name   = "Losing the Input Device runs Failsafe as Betaflight does, and flying again needs the link back and the Arm switch cycled"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on" },
+  { at = "1 s",   input_device = "lost" },
+  { at = "4 s",   input_device = "back" },
+  # Failsafe has ended by 5.2 s: the throttle down and the Arm switch off,
+  # then the switch on again.
+  { at = "5.2 s", throttle = "0%", arm = "off" },
+  { at = "5.4 s", arm = "on" },
+]
+
+# The first 150 ms: the last values.
+
+[[expect]]
+what  = "roll setpoint"
+at    = "1.14 s"
+value = "193.54 °/s ± 0.01 °/s"
+basis = "source: rxFrameCheck: with no frame, nothing changes until 150 ms after the last one (RXLOSS_TRIGGER_INTERVAL), so 50% roll still asks 193.54 °/s"
+
+[[expect]]
+what  = "RXLOSS blocks arming"
+over  = "1 s to 2 s"
+first = "between 0.146 s and 0.1465 s"
+basis = "source: rxFrameCheck and failsafeOnValidDataFailed: 150 ms after the last frame (0.996 s), on the first loop past it (1.146125 s, shown at 1.14625 s), the signal counts as lost and RXLOSS blocks arming, armed or not"
+
+# Then the Channels hold their last good values until 300 ms after it, and
+# take their stage 1 values: roll, pitch and yaw at mid_rc, the throttle at
+# rx_min_usec, AUX held.
+
+[[expect]]
+what  = "roll setpoint"
+at    = "1.29 s"
+value = "193.54 °/s ± 0.01 °/s"
+basis = "source: detectAndApplySignalLossBehaviour: each Channel holds its last good value for 300 ms after it (MAX_INVALID_PULSE_TIME_MS), to 1.296 s"
+
+[[expect]]
+what  = "roll setpoint"
+at    = "1.3 s"
+value = "0 °/s ± 0.001 °/s"
+basis = "source: detectAndApplySignalLossBehaviour and getRxfailValue: at the 50 ms recheck at 1.296125 s, 300 ms after the last good frame, roll takes its stage 1 value, mid_rc, 1500 µs: exactly centre, so 0 °/s"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.29 s"
+value = "47.3% ± 0.001%"
+basis = "source: the 50% throttle held: CRSF step 992, read as 1500.77 µs, a command of (1500 - 1050) × 1000 ÷ 950 = 473, which the throttle curve's table (points 1455 and 1545 µs either side) makes 1473 µs: 47.3%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.3 s"
+value = "0% ± 0%"
+basis = "source: getRxfailValue: the throttle's stage 1 value is rx_min_usec (885 µs), below the command's bottom (1000 µs), so the mixer's throttle is 0"
+
+# DROP at 1.5 s.
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "1 s to 3 s"
+first = "between 1.497 s and 1.5082 s"
+basis = "source: failsafeCheckDataFailurePeriod and failsafeUpdateState: once more than failsafe_delay (15 tenths, 1.5 s) has passed since the last good frame at 0.996 s, from 2.497 s, the link is down at the next 11 ms check and DROP disarms: here the check at 2.497 s (11 × 227 ms)"
+
+[[expect]]
+what  = "FAILSAFE blocks arming"
+over  = "1 s to 3 s"
+first = "between 1.497 s and 1.5082 s"
+basis = "source: failsafeUpdateState: FAILSAFE_LANDED disarms and blocks arming (ARMING_DISABLED_FAILSAFE) in the same check"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.6 s"
+value = "0 ± 0"
+basis = "source: disarmed, Betaflight sends DShot 0, stop"
+
+# The link back at 4 s: RXLOSS clears 0.5 s later, Failsafe ends another
+# 0.5 s after that, and AUX1 holds its value until it does.
+
+[[expect]]
+what  = "NOT_DISARMED blocks arming"
+over  = "4 s to 4.1 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 4 s brings the signal back with the Arm switch reading on (held during the loss), so NOT_DISARMED blocks arming"
+
+[[expect]]
+what  = "RXLOSS stops blocking arming"
+over  = "4 s to 6 s"
+first = "0.500125 s ± 0.000001 s"
+basis = "source: failsafeOnValidDataReceived: the link is up, and RXLOSS clears, on the first good frame more than failsafe_recovery_delay (5 tenths, 0.5 s) after the last bad recheck at 3.996 s: the frame at 4.5 s"
+
+[[expect]]
+what  = "Failsafe ends"
+over  = "4 s to 6 s"
+first = "1.005125 s ± 0.000001 s"
+basis = "source: failsafeUpdateState: FAILSAFE_RX_LOSS_MONITORING ends once the link has been up for another recovery delay since the last check that found it down (4.499 s): at the first 11 ms check after 4.999 s, 5.005 s (11 × 455 ms)"
+
+[[expect]]
+what  = "FAILSAFE stops blocking arming"
+over  = "4 s to 6 s"
+first = "1.005125 s ± 0.000001 s"
+basis = "source: failsafeUpdateState: FAILSAFE_RX_LOSS_RECOVERED clears ARMING_DISABLED_FAILSAFE as Failsafe ends"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "4 s to 5.4 s"
+first = "never"
+basis = "source: updateArmingStatus: the Arm switch read on while arming was blocked (ARM_SWITCH) and on as the signal came back (NOT_DISARMED); both clear only once the switch reads off"
+
+[[expect]]
+what  = "ARM_SWITCH stops blocking arming"
+over  = "5.2 s to 5.3 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 5.2 s reads the Arm switch off, which clears ARM_SWITCH and NOT_DISARMED"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "5.4 s to 6 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and tryArm: with the throttle low, the frame at 5.4 s turns Arm on in the Modes table, and the next, at 5.404 s, arms"

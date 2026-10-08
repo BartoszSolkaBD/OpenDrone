@@ -1,0 +1,90 @@
+# Losing the Flying Input Device in flight drops the Quad, as a lost link
+# does on a real quad running Betaflight 2026.6 (src/main/rx/rx.c,
+# src/main/flight/failsafe.c): the Radio Link sends no frames, the Quad flies
+# on its last values, then stage 1 brings the throttle down to rx_min_usec,
+# and DROP disarms it 1.5 s after the last frame, so it falls.
+#
+# The Freestyle 5″ starts 50 m up in empty air, armed, its motors "settled",
+# with the sticks centred and the throttle at 30%, past Airmode's start
+# (25%). The device is lost at 1 s, so the last frame is the one at 0.996 s.
+# At 30% the throttle's CRSF step is 664, read as 1295.85 µs: a command of
+# (1295 - 1050) × 1000 ÷ 950 = 257, which the throttle curve's table (its
+# points rounded to whole µs, 1182 and 1273 either side) makes 1257 µs, so the
+# mixer's throttle is 25.7%.
+format = 1
+name   = "Losing the Input Device drops the Quad"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "1 s", input_device = "lost" },
+]
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.29 s"
+value = "25.7% ± 0.001%"
+basis = "source: detectAndApplySignalLossBehaviour: the throttle holds its last good value for 300 ms after the last frame, to 1.296 s: the command 257 through the throttle curve's table, 1257 µs, 25.7%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.3 s"
+value = "0% ± 0%"
+basis = "source: getRxfailValue: from 1.296 s the throttle takes its stage 1 value, rx_min_usec (885 µs), below the command's bottom (1000 µs), so the mixer's throttle is 0"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.3 s"
+value = "between 158 and 200"
+basis = "source: with the throttle at 0, Betaflight's mixer with Airmode holds every motor at idle (48 + 5.5% × 1999 = 157.9, sent as 158) and above"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "1 s to 3 s"
+first = "between 1.497 s and 1.5082 s"
+basis = "source: failsafeCheckDataFailurePeriod and failsafeUpdateState: more than failsafe_delay (1.5 s) after the last frame, from 2.497 s, DROP disarms at the next 11 ms check"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.6 s"
+value = "0 ± 0"
+basis = "source: disarmed, Betaflight sends DShot 0, stop"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "3 s"
+value = "between 0 RPM and 3000 RPM"
+basis = "observed: with the drive off, the motor spins down"
+
+[[expect]]
+what  = "vertical speed"
+at    = "4 s"
+value = "-20.6 m/s ± 0.5 m/s"
+basis = "observed: the Quad sinks at idle from 1.3 s, and once dropped at 2.5 s falls with its motors spinning down (no drag yet, #42)"

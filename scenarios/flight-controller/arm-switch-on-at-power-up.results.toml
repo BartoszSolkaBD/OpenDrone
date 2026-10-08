@@ -1,0 +1,64 @@
+# Results of arm-switch-on-at-power-up.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "An Arm switch already on at power-up must be flipped off and on again"
+
+[[expect]]
+what     = "the Quad arms, first over 0 s to 2.5 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "BOOTGRACE stops blocking arming, first over 0 s to 2.5 s"
+basis    = "Source"
+expected = "between 1.662 s and 1.6672 s"
+measured = "1.66 s"
+
+[[expect]]
+what     = "motor 1 DShot at 2.4 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "ARM_SWITCH stops blocking arming, first over 2.5 s to 2.6 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "the Quad arms, first over 2.7 s to 3 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "motor 1 DShot at 2.8 s"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b62cbcad064b73da"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "c1296a1f79904d95"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "26f32fa509028574"
+"0.6 s" = "e019d12bcf131d00"
+"0.9 s" = "2a41d657e474d26a"
+"1.2 s" = "41ff053485cd14dc"
+"1.5 s" = "d40c3f4e1fe313b3"
+"1.8 s" = "3eaaa13952a0bfe7"
+"2.1 s" = "6b04e2cd4c062b32"
+"2.4 s" = "f780a665a3913922"
+"2.7 s" = "739ec5fa2e790d1c"
+"3 s" = "9a57f6776673d87a"
