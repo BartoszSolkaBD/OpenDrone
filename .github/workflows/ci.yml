@@ -57,6 +57,14 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
+      - name: Install the Linux packages SDL's source build needs
+        # opendrone-input builds SDL 3.4 from source with CMake (preinstalled
+        # on every runner) as a no-window console build, so no X11 or Wayland
+        # headers (ADR-0018). libudev's headers let SDL notice Input Devices
+        # being plugged in and out through udev.
+        if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
       - name: Reuse the build cache
         if: steps.changes.outputs.rust == 'true'
         uses: Swatinem/rust-cache@v2
@@ -80,6 +88,37 @@ jobs:
       - name: Build (unsafe is forbidden outside opendrone-input and the game)
         if: steps.changes.outputs.rust == 'true'
         run: cargo build --workspace --locked
+
+      - name: SDL's Linux build loads libudev and leaves out libusb and D-Bus (ADR-0014)
+        # deny.toml names libudev, which SDL loads from the system while
+        # running, never linked: this fails if SDL stops loading it that way.
+        # libusb and D-Bus are switched off in crates/input/sdl-linux.cmake;
+        # this fails if either crept back in.
+        if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          for config in target/debug/build/sdl3-sys-*/out/build/include-config-*/build_config/SDL_build_config.h; do
+            [[ -f "$config" ]] || continue
+            found=1
+            echo "$config:"
+            grep -E "HAVE_LIBUDEV_H|SDL_UDEV_DYNAMIC|HAVE_LIBUSB|SDL_LIBUSB_DYNAMIC|HAVE_DBUS_DBUS_H" "$config"
+            if grep -qE "^#define (HAVE_LIBUSB|HAVE_DBUS_DBUS_H)" "$config"; then
+              echo "::error::SDL's Linux build turned on libusb or D-Bus; switch it off in crates/input/sdl-linux.cmake, or name it in deny.toml (ADR-0014)"
+              exit 1
+            fi
+            # deny.toml says libudev is loaded from the system and never
+            # linked: SDL must load it by name while running.
+            if ! grep -qE '^#define SDL_UDEV_DYNAMIC "libudev\.so' "$config"; then
+              echo "::error::SDL's Linux build doesn't load libudev from the system while running (SDL_UDEV_DYNAMIC), as deny.toml says it does (ADR-0014)"
+              exit 1
+            fi
+          done
+          if [[ "$found" == 0 ]]; then
+            echo "::error::SDL's build settings weren't found under target/debug/build"
+            exit 1
+          fi
 
       - name: Tests (cargo-nextest)
         if: steps.changes.outputs.rust == 'true'
@@ -236,6 +275,11 @@ jobs:
       - name: Install the pinned Rust (rust-toolchain.toml)
         shell: bash
         run: rustup toolchain install
+
+      - name: Install the Linux packages SDL's source build needs
+        # rustdoc builds opendrone-input, which builds SDL 3.4 from source
+        # (ADR-0018), as the Rust job does.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
 
       - name: Reuse the build cache
         uses: Swatinem/rust-cache@v2

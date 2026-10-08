@@ -1,0 +1,24 @@
+# The fallback for every other EdgeTX or OpenTX radio, and any unknown device
+# SDL doesn't read as a gamepad, with the Pocket's layout (#19 §1). It carries
+# no Report Rate: setup measures it.
+format = 1
+name   = "Any Radio"
+kind   = "Radio"
+match  = "any"
+
+[channels]
+roll     = { channel = 1 }
+pitch    = { channel = 2 }
+throttle = { channel = 3 }
+yaw      = { channel = 4 }
+
+[switches]            # setup asks the pilot to flip each one, since a new EdgeTX model leaves CH5–CH8 at centre
+arm         = { channel = 5, on = "high" }
+flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
+crash_flip  = { channel = 7, on = "high" }
+
+[calibration]
+roll     = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+pitch    = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+yaw      = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+throttle = { min = "-100 %", max = "+100 %" }

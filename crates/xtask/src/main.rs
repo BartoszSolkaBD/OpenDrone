@@ -21,12 +21,15 @@
 //! - `review-report`, `new-libraries`, `review-update` and `merge-check`: the
 //!   Review Report, the Red Flag gate and the Review check, run by CI on every
 //!   pull request ([`review`]).
+//! - `input-monitor`: every connected Input Device live, with its Channels
+//!   and their stamps ([`input_monitor`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
 use std::process::ExitCode;
 
 mod book;
+mod input_monitor;
 mod packs;
 mod review;
 mod scenario_catalogue;
@@ -59,7 +62,12 @@ Commands:
       HEAD^1, the pull request's base): an Estimate that moved needs a new
       row in its feel-tests.md and must stay inside its range, and a
       Measured, Manufacturer or Derived number that changed needs a new
-      source.";
+      source.
+  input-monitor [--seconds <how long>]
+      Show every connected Input Device live, read by SDL on its own thread as
+      the game reads it: what was found and its profile, its Channels in µs,
+      its raw values, and how often they change. Runs until Ctrl+C, or for
+      the seconds given.";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -79,6 +87,7 @@ fn main() -> ExitCode {
         "review-update" => review::run_update(rest),
         "new-libraries" => review::run_new_libraries(rest),
         "merge-check" => review::run_merge_check(rest),
+        "input-monitor" => input_monitor::run(rest),
         _ => {
             eprintln!("{USAGE}\n{}", review::usage());
             ExitCode::from(2)

@@ -43,6 +43,13 @@ unused-allowed-license = "allow"
 # - alsa-lib (Linux): the system sound library. Every Rust sound library needs
 #   it on Linux, so the game loads the copy installed with the operating
 #   system. Linux builds need the `libasound2-dev` package for this.
+# - libudev (Linux, LGPL-2.1-or-later): systemd's device library. SDL, inside
+#   opendrone-input, loads the system's copy when the input thread starts
+#   (SDL_UDEV_DYNAMIC), to notice Input Devices being plugged in and out; it
+#   is never linked or shipped. Linux builds need the `libudev-dev` package
+#   for its headers. SDL's other optional Linux libraries, libusb and D-Bus,
+#   are switched off (crates/input/sdl-linux.cmake), and CI checks they stay
+#   off.
 
 [licenses.private]
 # OpenDrone's own crates are unpublished, but they are checked too: each is
