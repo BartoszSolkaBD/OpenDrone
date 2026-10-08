@@ -8,6 +8,8 @@ use core::ops::Range;
 use toml::Spanned;
 use toml::de::{DeTable, DeValue};
 
+use crate::migration::{PACK_STEPS, Step};
+
 /// One problem in one file, as a plain sentence. `line` 0 means the file as a
 /// whole.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -90,68 +92,11 @@ impl fmt::Display for Problems {
     }
 }
 
-/// The newest file format this OpenDrone reads. Every Scenario and Pack file
-/// starts with `format = N` (ADR-0011).
-pub const FORMAT: i64 = 1;
-
-/// One step that upgrades a file of format `from` to format `from + 1`, in
-/// memory, rewriting its `format` line too. The format migration tool runs the
-/// same steps over the repo's own files in the PR that changes the format, so
-/// a pilot's older Pack and the repo's Packs are upgraded the same way (#16
-/// §9).
-#[derive(Clone, Copy, Debug)]
-pub struct Upgrade {
-    pub from: i64,
-    pub rewrite: fn(&str) -> Result<String, String>,
-}
-
-/// The steps that upgrade older Pack files. Format 1 is the first, so there
-/// are none yet; the PR that brings format 2 adds its step here.
-pub const PACK_UPGRADES: &[Upgrade] = &[];
-
-/// Brings `text`, written in format `from`, up to format `to`, one step at a
-/// time, or says which step is missing or what went wrong.
-pub fn upgrade_text(text: &str, from: i64, to: i64, steps: &[Upgrade]) -> Result<String, String> {
-    let mut text = text.to_string();
-    for format in from..to {
-        let step = steps
-            .iter()
-            .find(|step| step.from == format)
-            .ok_or_else(|| {
-                format!(
-                    "this file is format {format}, and this OpenDrone has no step that upgrades it"
-                )
-            })?;
-        text = (step.rewrite)(&text).map_err(|error| {
-            format!(
-                "upgrading this file from format {format} to {}: {error}",
-                format + 1
-            )
-        })?;
-    }
-    Ok(text)
-}
-
-/// The text to read: `text` itself when its `format` is the newest or can't
-/// be read (then [`Document::check_format`] says why), or `text` upgraded in
-/// memory when it is older.
-pub fn upgraded<'t>(
-    file: &str,
-    text: &'t str,
-    steps: &[Upgrade],
-) -> Result<std::borrow::Cow<'t, str>, Problems> {
-    let doc = Document::parse(file, text)?;
-    let root = doc.root();
-    let Some(item) = root.get("format") else {
-        return Ok(text.into());
-    };
-    match item.integer() {
-        Some(n) if (1..FORMAT).contains(&n) => upgrade_text(text, n, FORMAT, steps)
-            .map(Into::into)
-            .map_err(|sentence| Problems(vec![item.problem(sentence)])),
-        _ => Ok(text.into()),
-    }
-}
+/// The newest Pack file format this OpenDrone reads. Every Pack file starts
+/// with `format = N` (ADR-0011). Format 1 is the first, and each step in
+/// [`PACK_STEPS`] adds one, so the number follows the steps. Scenarios are
+/// numbered apart (`opendrone_scenario::SCENARIO_FORMAT`).
+pub const FORMAT: i64 = 1 + PACK_STEPS.len() as i64;
 
 /// A TOML file read with the place of every key and value.
 pub struct Document<'t> {
@@ -201,14 +146,23 @@ impl<'t> Document<'t> {
         }
     }
 
-    /// Checks the `format = N` line every file starts with.
+    /// Checks the `format = N` line every Pack file starts with, after
+    /// [`crate::migration::upgraded`] has brought an older file up to date.
     pub fn check_format(&self, problems: &mut Problems) {
+        self.check_format_against(FORMAT, PACK_STEPS, problems);
+    }
+
+    /// Checks the `format = N` line every file starts with, against `newest`,
+    /// the newest format this OpenDrone reads for this kind of file. A file
+    /// in an older format is refused, naming the `steps` that bring it up to
+    /// date with `cargo xtask migrate`.
+    pub fn check_format_against(&self, newest: i64, steps: &[Step], problems: &mut Problems) {
         let root = self.root();
         let Some(item) = root.get("format") else {
             problems.push(Problem {
                 file: self.file.clone(),
                 line: 1,
-                sentence: format!("every file starts with `format = {FORMAT}`"),
+                sentence: format!("every file starts with `format = {newest}`"),
             });
             return;
         };
@@ -218,16 +172,17 @@ impl<'t> Document<'t> {
             .is_some_and(|(key, _)| key != "format")
         {
             problems.push(item.problem(format!(
-                "every file starts with `format = {FORMAT}`, before anything else but comments"
+                "every file starts with `format = {newest}`, before anything else but comments"
             )));
         }
         match item.integer() {
-            Some(n) if n == FORMAT => {}
-            Some(n) if n > FORMAT => problems.push(item.problem(format!(
-                "this file is format {n}, so it needs a newer OpenDrone: this one reads format {FORMAT}"
+            Some(n) if n == newest => {}
+            Some(n) if n > newest => problems.push(item.problem(format!(
+                "this file is format {n}, so it needs a newer OpenDrone: this one reads format {newest}"
             ))),
+            Some(n) if n >= 1 => problems.push(item.problem(older(n, newest, steps))),
             _ => problems.push(item.problem(format!(
-                "`format` must be a whole number from 1 to {FORMAT}"
+                "`format` must be a whole number from 1 to {newest}"
             ))),
         }
     }
@@ -241,6 +196,26 @@ impl<'t> Document<'t> {
             .and_then(|item| item.integer())
             .is_some_and(|n| n > FORMAT)
     }
+}
+
+/// Says that a file in format `n` is older than `newest`, and which steps
+/// bring it up to date.
+fn older(n: i64, newest: i64, steps: &[Step]) -> String {
+    let mut commands = Vec::new();
+    for format in n..newest {
+        match steps.iter().find(|step| step.from == format) {
+            Some(step) => commands.push(format!("`cargo xtask migrate {}`", step.name)),
+            None => {
+                return format!(
+                    "this file is format {n}, older than the format {newest} this OpenDrone reads, and no step upgrades format {format}"
+                );
+            }
+        }
+    }
+    format!(
+        "this file is format {n}, older than the format {newest} this OpenDrone reads: bring it up to date with {}",
+        commands.join(", then ")
+    )
 }
 
 fn line_of(text: &str, offset: usize) -> usize {

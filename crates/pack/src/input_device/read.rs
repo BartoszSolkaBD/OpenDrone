@@ -14,7 +14,8 @@ use super::{
     Match, OnOffSwitch, PadStick, Press, PressStyle, RadioCalibration, RadioChannels, RadioSetup,
     RadioStick, Setup, StickCalibration, Switches, ThrottleZero,
 };
-use crate::document::{self, Document, Item, Problems, Table};
+use crate::document::{Document, FORMAT, Item, Problems, Table};
+use crate::migration::{self, FileKind, PACK_STEPS, Step};
 use crate::units::{self, Dimension};
 
 const TOP_KEYS: &[&str] = &[
@@ -38,13 +39,26 @@ const STICKS: &[&str] = &["roll", "pitch", "throttle", "yaw"];
 const SWITCHES: &[&str] = &["arm", "flight_mode", "crash_flip"];
 
 /// Reads and checks one Input Device profile. `id` is its id, such as
-/// `opendrone/dualsense`; `file` is how problems name the file.
+/// `opendrone/dualsense`; `file` is how problems name the file. An older
+/// file is upgraded in memory first, like every Pack file.
 pub fn read_input_device_file(
     id: &str,
     file: &str,
     text: &str,
 ) -> Result<InputDeviceProfile, Problems> {
-    let text = document::upgraded(file, text, document::PACK_UPGRADES)?;
+    read_input_device_file_with_steps(id, file, text, PACK_STEPS)
+}
+
+/// [`read_input_device_file`], upgrading an older file with `steps` instead
+/// of [`PACK_STEPS`]: the steps must lead to the newest format, [`FORMAT`].
+/// The readable checks give it a synthetic step.
+pub fn read_input_device_file_with_steps(
+    id: &str,
+    file: &str,
+    text: &str,
+    steps: &[Step],
+) -> Result<InputDeviceProfile, Problems> {
+    let text = migration::upgraded_with(file, text, FileKind::InputDevice, FORMAT, steps)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
