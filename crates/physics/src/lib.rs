@@ -55,7 +55,10 @@
 //!    the frame against the prop's spin.
 //!    - `dh/dt`: a motor speeding its rotor up turns the frame the other way,
 //!      as hard as it speeds it up, and slowing it down turns the frame with
-//!      it (E7): the yaw twitch of a punch.
+//!      it (E7): the yaw twitch of a punch. It counts only the motors' own
+//!      step (2), never a change the collision stage makes to a rotor's
+//!      speed: a prop slowed by what it touches pushes on that, not on the
+//!      frame.
 //!    - `ω × h`: the rotors' spin, turned by a flip, pushes the frame at right
 //!      angles to the flip (E8). With the four at the same speed their spins
 //!      cancel; it shows only while one pair turns faster.
@@ -547,6 +550,9 @@ impl QuadBody {
 
         // 1–3: the ESCs, the motors and the battery.
         let volts = self.battery.voltage();
+        // The rotors' spin reaction (step 6) counts only what the motors
+        // themselves do to their rotors in this step: from here, after the
+        // last step's collision stage, to just after the motors' own step.
         let speeds_before = self.motors.map(|motor| motor.speed);
         let mut power = 0.0;
         for ((motor, esc), command) in self.motors.iter_mut().zip(&mut self.escs).zip(commands.0) {
