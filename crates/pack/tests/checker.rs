@@ -783,7 +783,8 @@ fn a_quad_whose_tune_lacks_flight_controller_settings_loads_naming_what_it_lacks
     let packs = Fixture::new("tune-lacks").packs();
     let ducted = packs.quad("fixture/ducted").unwrap();
     let missing = ducted.flight_controller.unwrap_err();
-    assert_eq!(missing[0], "p_roll");
+    assert_eq!(missing[0], "rx_min_usec");
+    assert!(missing.contains(&"p_roll") && missing.contains(&"failsafe_delay"));
     assert!(!missing.contains(&"small_angle") && !missing.contains(&"motor_idle"));
     assert!(missing.contains(&"mixer_type"));
 }

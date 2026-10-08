@@ -48,8 +48,8 @@
 //!   the most momentum theory lets any disc take from the air arriving at it,
 //!   `½ρA·(v_c² + μ²)` (an ideal windmill's thrust coefficient of 1). Straight
 //!   up or down, straight across or climbing, it never acts; it acts at all
-//!   only once the descent passes about 0.8 `v_h` with at least 1.1 `v_h`
-//!   across. It trims about 2% at a descent of `v_h` with 1.2 `v_h` across,
+//!   only from about 0.65 `v_h` of descent with about 1.4 `v_h` across (more
+//!   descent needs less across: 0.8 `v_h` with 1.13 `v_h`). It trims about 2% at a descent of `v_h` with 1.2 `v_h` across,
 //!   19% at 2 `v_h` each way and 32% at 3 `v_h`: fast dives with the motors
 //!   low reach that. **The guard has no source**: it is a modelling choice the
 //!   research doesn't give.

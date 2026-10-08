@@ -181,9 +181,18 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     // min_check, mid_rc and airmode_start_throttle_percent;
     // src/main/fc/rc_controls.c for the deadbands and yaw_control_reversed;
     // src/main/pg/motor.c for motor_idle and the DShot600 protocol;
-    // src/main/flight/mixer_init.c for yaw_motors_reversed and mixer_type).
+    // src/main/flight/mixer_init.c for yaw_motors_reversed and mixer_type;
+    // src/main/target/common_defaults_post.h RX_MIN_USEC and RX_MAX_USEC;
+    // src/main/flight/failsafe.c for failsafe_delay, failsafe_procedure,
+    // failsafe_throttle and failsafe_recovery_delay).
     const DEFAULTS: &[(&str, &str)] = &[
         ("small_angle", "25"),
+        ("rx_min_usec", "885"),
+        ("rx_max_usec", "2115"),
+        ("failsafe_delay", "15"),
+        ("failsafe_procedure", "DROP"),
+        ("failsafe_throttle", "1000"),
+        ("failsafe_recovery_delay", "5"),
         ("p_roll", "45"),
         ("i_roll", "80"),
         ("d_roll", "30"),
@@ -211,7 +220,7 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     ];
     let five = quad("opendrone/freestyle-5");
     // Every setting the Flight Controller reads, and in the same order: the
-    // Betaflight App's tabs, Configuration, PID Tuning, Receiver, Motors.
+    // Betaflight App's tabs, Configuration, Failsafe, PID Tuning, Receiver, Motors.
     let reads = opendrone_flight_controller::Tune::settings();
     assert_eq!(
         DEFAULTS.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
@@ -241,7 +250,8 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
     // anti-gravity, TPA, throttle boost, the D-term low-passes and the yaw P
     // low-pass; src/main/sensors/gyro.h and gyro.c for the gyro low-passes;
     // src/main/pg/dyn_notch.c for the dynamic notch; src/main/pg/rx.c for RC
-    // smoothing).
+    // smoothing; src/main/flight/pid.c pidConfig for runaway takeoff
+    // prevention).
     const DEFAULTS: &[(&str, &str)] = &[
         ("f_roll", "120"),
         ("f_pitch", "125"),
@@ -263,6 +273,7 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
         ("dterm_lpf2_static_hz", "150"),
         ("yaw_lowpass_hz", "100"),
         ("rc_smoothing", "ON"),
+        ("runaway_takeoff_prevention", "ON"),
     ];
     let five = quad("opendrone/freestyle-5");
     let later = opendrone_flight_controller::Tune::not_simulated_yet();

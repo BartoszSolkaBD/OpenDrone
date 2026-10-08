@@ -1,0 +1,100 @@
+# Results of auto-arm.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Auto-arm arms on the first throttle raise that passes the arming checks, and only Reset or a Failsafe drop disarms"
+
+[[expect]]
+what     = "the Quad arms, first over 0 s to 2 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "the Quad arms, first over 2 s to 2.1 s"
+basis    = "Rule"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "mixer throttle at 2.005 s"
+basis    = "Rule"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "mixer throttle at 2.009 s"
+basis    = "Rule"
+expected = "15% ± 0.001%"
+measured = "15.0%"
+
+[[expect]]
+what     = "the Quad disarms, first over 2 s to 4 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "the Quad disarms, first over 3.9 s to 4.1 s"
+basis    = "Rule"
+expected = "0.100125 s ± 0.000001 s"
+measured = "0.100 s"
+
+[[expect]]
+what     = "the Quad arms, first over 4 s to 6.5 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "the Quad arms, first over 6.5 s to 6.6 s"
+basis    = "Rule"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "the Quad disarms, first over 7 s to 9 s"
+basis    = "Source"
+expected = "between 1.497 s and 1.5082 s"
+measured = "1.50 s"
+
+[[expect]]
+what     = "Failsafe ends, first over 9 s to 10.5 s"
+basis    = "Source"
+expected = "between 1.0 s and 1.0112 s"
+measured = "1.01 s"
+
+[[expect]]
+what     = "the Quad arms, first over 9 s to 11 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "the Quad arms, first over 11 s to 11.1 s"
+basis    = "Rule"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "eb0c72456aa0e307"   # test/freestyle-5-filters-and-shaping-off: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "26e6c9fd5710ddf4"   # the whole state after each of 88800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1.11 s" = "a2eca64ed812a1a9"
+"2.22 s" = "d98fd7a5d83e1c3f"
+"3.33 s" = "d64fa8ebc6a00eee"
+"4.44 s" = "d2cf491397c25b21"
+"5.55 s" = "ed8208d442f2c15a"
+"6.66 s" = "7b84c323226a2f11"
+"7.77 s" = "58e6d48f099859cf"
+"8.88 s" = "c637e372722643eb"
+"9.99 s" = "026cd1438ba1b4c1"
+"11.1 s" = "75629f21fc2a79ca"

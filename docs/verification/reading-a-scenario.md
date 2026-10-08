@@ -55,8 +55,8 @@ In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `arm
 Where our Flight Controller runs:
 
 - **The Quad's Tune must spell out every setting the Flight Controller reads** ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). The Freestyle 5″'s does. The Whoop 65's gets its settings from the `diff all` importer (#53); until then a Scenario that flies it is refused, naming what its Tune lacks.
-- **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and every Assist must be `"off"` until its ticket: Input smoothing #56, Auto-arm #52, Endless Battery #57.
-- **A Flight Scenario starts mid-air** with `motors = "settled"`. A landed start is Reset, whose ESCs power up first; the arming and power-up ticket (#52) names how it is written.
+- **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and Input smoothing (#56) and Endless Battery (#57) must be `"off"` until their tickets. Auto-arm runs in Flight Scenarios (see [Auto-arm](#auto-arm) below); a Flight Controller Scenario leaves it out, so there it must be `"off"`.
+- **A Flight Scenario starts mid-air or landed.** Mid-air, its motors are `"settled"`. Landed, a "fresh" Flight Controller is exactly Reset: its motors start `"powering up"`, so its ESCs play their start-up tones and arming waits for their ready beep, about 1.7 s, and it starts as Reset leaves the Quad, with `armed = false` and no `speed` or `rotation`. That start is the Scenario's Launch Spot, where Reset puts the Quad back.
 - **`armed = true`** starts the Flight Controller armed, as a mid-air start needs; the Timeline's Arm switch then holds it armed, or disarms it.
 
 A Flight Controller Scenario runs the Flight Controller alone, so its `[start]` leaves out `map`, `position`, `speed`, `motors` and `battery`: it has no Map, place, motors or battery. Its `attitude` and `rotation` are the sensor readings it starts with: the attitude, and the gyro.
@@ -69,7 +69,7 @@ A Flight Controller Scenario runs the Flight Controller alone, so its `[start]` 
 | `"stopped"` | Stopped. | Already powered up and ready: each starts its motor on its first command above 0%, after the start wait. |
 | `"settled"` | Spinning, all at the speed that holds the Quad's height at the stated motion: the thrust's upward part, with the air's push at that motion, carries the weight. Tilted, that takes more thrust than the weight, and the thrust's sideways part holds the speed only at the speed where the air's drag matches it, so a tilted start that should hold its speed states that speed. Never more than full drive (tilted further than full drive can hold, full drive), and none upside down or past its side. | Running. |
 
-`"powering up"` and `"stopped"` are only for Physics and Thrust Stand Scenarios, which script their motors, and a Quad held still on the thrust stand has no motion for `"settled"` motors to hold. Where the Flight Controller runs, a landed start with a "fresh" Flight Controller is exactly Reset, whose ESCs power up first; the arming and power-up ticket (#52) names how its motors are written.
+`"stopped"` is only for Physics and Thrust Stand Scenarios, which script their motors, and a Quad held still on the thrust stand has no motion for `"settled"` motors to hold. Where the Flight Controller runs, a start at rest with a "fresh" Flight Controller is exactly Reset, whose ESCs power up first: a Flight Scenario writes it `"powering up"`, disarmed and still.
 
 Each ESC copies Bluejay v0.21.0 ([`crates/physics/src/esc.rs`](../../crates/physics/src/esc.rs) has the timing, with the firmware's file and line for each step):
 
@@ -148,7 +148,27 @@ timeline = [
 - **`arm`** is the Arm switch on AUX1: `"on"` (high, 2012 µs) or `"off"` (988 µs). Flight Mode on AUX2 comes from `flight_mode` in `[start]`, as the pilot's setting drives it when no switch is bound; Crash Flip on AUX3 is off.
 - **The first moment, at 0 s, sets every stick and the Arm switch,** so the run starts from values the file states.
 - **`"ramp to 60%"`** moves a stick in a straight line, step by step, from the value and moment an earlier entry set it to this value at this moment. A ramp needs an earlier value to ramp from.
-- **A Flight Controller Scenario's Timeline** may also change the sensor readings from a moment on: `rotation` (the gyro, written as in `[start]`) and `attitude`.
+- **A Flight Controller Scenario's Timeline** may also change the sensor readings from a moment on: `rotation` (the gyro, written as in `[start]`) and `attitude`. Its ESCs count as ready: it has none to wait for.
+
+Besides the Channels, a Timeline sends the other Flight Inputs, as in [`failsafe.toml`](../../scenarios/flight-controller/failsafe.toml) and [`arming-waits-for-the-escs-after-reset.toml`](../../scenarios/flight-controller/arming-waits-for-the-escs-after-reset.toml):
+
+```toml
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "1 s",   input_device = "lost" },
+  { at = "4 s",   input_device = "back" },
+  { at = "6 s",   radio_link = "drops out for 0.2 s" },
+  { at = "8 s",   reset = true },
+]
+```
+
+- **`input_device = "lost"`** and **`"back"`**: the Flying Input Device unplugged and plugged back in. While it is lost the Radio Link sends no frames, and the Flight Controller's Failsafe follows; once it is back, the next frame on the link's own beat carries the newest Channels. Lost and back take turns, starting with lost.
+- **`radio_link = "drops out for 0.2 s"`**: a Radio Link drop-out, the frames stopping for a while. It is the device lost at that moment and back that long after, so it is written in whole physics steps.
+- **`reset = true`**, in a Flight Scenario: Reset, as the pilot presses it. The Quad goes back on the Launch Spot, landed and disarmed, with a full battery, a fresh Flight Controller and its ESCs starting up, so arming waits for their ready beep again. A Scenario's Launch Spot is where it starts, so only one that starts as Reset leaves the Quad (motors `"powering up"`) may press it. The Radio Link is the pilot's radio, so it keeps its beat.
+
+#### Auto-arm
+
+With `auto_arm = "on"` in a Flight Scenario, as in [`auto-arm.toml`](../../scenarios/flight-controller/auto-arm.toml), the Quad arms on the first throttle raise from low (below `min_check`) that passes Betaflight's arming checks, and only Reset or a Failsafe drop disarms it. No Arm switch is bound then (it would take over), so `arm` stays `"off"` all through the Timeline. Auto-arm drives the Arm switch in each Radio Link frame itself, through Betaflight's own arming, which arms only on a frame with the throttle low, one frame after the switch goes on: so it turns Arm on with the frame that brings the raise and holds the throttle at the bottom in that frame and the next. The raise reaches the Flight Controller two frames late, 8 ms at 250 Hz.
 
 How the sticks reach the Flight Controller, as on a real quad on ExpressLRS:
 
@@ -200,8 +220,9 @@ basis  = "rule: ..."
   - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length, and acceleration east and north the same for the speeds east and north; none of the three can be measured at 0 s.
   - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it, over the last step: in flight, in the air the rotor moved through, so it falls in a climb and rises in a descent and at speed; on the thrust stand, in still air), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %). **Total thrust** is all four motors' thrust.
   - **the battery:** **battery voltage** (at its terminals, past the connector), **battery current** (drawn from it; negative while braking motors give some back), **battery charge used** (since the start, in mAh) and **battery sag** (how far the voltage sits below the pack's resting voltage at its charge).
-  - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll P term**, **roll I term**, **roll D term** and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; and **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these.
-- **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
+  - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll P term**, **roll I term**, **roll D term** and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle; and **mixer throttle**, the throttle the mixer starts from, from 0% to 100%, before Airmode moves it (Blackbox's throttle), which shows the pilot's throttle through the throttle curve whatever the PID loop does. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these.
+  - **something that happens** (only where our Flight Controller runs, and not in a table of cases): **the Quad arms**, **the Quad disarms**, **Failsafe's stage 2 starts** (with DROP, the Quad disarms), **Failsafe ends**, **the ESCs are ready** (every ESC has played its ready beep; only in a Flight Scenario), and each of Betaflight's reasons for refusing to arm, **FAILSAFE**, **RXLOSS**, **NOT_DISARMED**, **THROTTLE**, **ANGLE**, **BOOTGRACE** and **ARM_SWITCH**, written "RXLOSS blocks arming" or "RXLOSS stops blocking arming". See [When something happens](#when-something-happens) below.
+- **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`** (or **`first`**, for something that happens). A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.
   - Over a stretch, each angle is taken the short way round from the expected value before the lowest, highest, mean or final is worked out, so a heading that passes north or a roll that passes upside down still reads right ([`slow-turn-through-north.toml`](../../scenarios/physics/slow-turn-through-north.toml) shows it).
@@ -223,6 +244,28 @@ basis  = "rule: ..."
   ```
 
 - **`basis`** says where the number comes from: `source:` a cited outside reference, `rule:` worked out from physics with the working shown, or `observed:` what the Simulation did when the Expectation was written. Source and Rule Expectations are locked: if the Simulation disagrees, the Simulation is fixed.
+
+### When something happens
+
+Something that happens, such as the Quad disarming, is checked over a stretch with **`first`**: how long after the stretch's start it first happens, or **`"never"`** if it mustn't happen in the stretch at all, as in [`failsafe.toml`](../../scenarios/flight-controller/failsafe.toml):
+
+```toml
+[[expect]]
+what  = "the Quad disarms"
+over  = "1 s to 3 s"
+first = "between 1.497 s and 1.5082 s"
+basis = "source: ..."
+
+[[expect]]
+what  = "the Quad arms"
+over  = "4 s to 5.4 s"
+first = "never"
+basis = "source: ..."
+```
+
+- It happens between two steps: on the first step whose state shows it, so the stretch's start itself never counts. A Flight Controller loop's state is the one after its 125 µs step (at 8 kHz), so a frame that arms the Quad at 2.004 s shows at 2.004125 s, 0.004125 s after a stretch starting at 2 s.
+- If it doesn't happen in the stretch, a time fails, measured "never"; if it mustn't and does, `"never"` fails, measured "after" the time it did.
+- The reasons for refusing to arm are raised and cleared as Betaflight does it: RXLOSS and FAILSAFE whether armed or not, the others only while disarmed. So while the Quad is armed, THROTTLE, ANGLE, BOOTGRACE, NOT_DISARMED and ARM_SWITCH stay as they were when it armed: clear.
 
 Times are Simulation Time, counted in whole physics steps: at 8 kHz, `"1 s"` is the state after step 8000, and a moment between two steps is refused. The run lasts until the last moment the file mentions.
 

@@ -13,6 +13,15 @@
 # Configuration
 set small_angle = 25                   # 2026.6.2 default; the most it may tilt and still arm, in degrees
 
+# Failsafe
+set rx_min_usec = 885                  # 2026.6.2 default; µs: a Channel below this is invalid, and Failsafe's stage 1 throttle
+set rx_max_usec = 2115                 # 2026.6.2 default; µs: a Channel above this is invalid
+set failsafe_delay = 15                # 2026.6.2 default; tenths of a second: stage 2 (DROP) 1.5 s after the last good frame
+set failsafe_procedure = DROP          # 2026.6.2 default
+set failsafe_throttle = 1000           # 2026.6.2 default; µs, the throttle during stage 2
+# Failsafe, CLI only
+set failsafe_recovery_delay = 5        # 2026.6.2 default; tenths of a second of good frames before the link is back
+
 # PID Tuning
 set p_roll = 45                        # 2026.6.2 default
 set i_roll = 80                        # 2026.6.2 default
@@ -50,7 +59,7 @@ set mixer_type = LEGACY                # 2026.6.2 default
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands: the filters, RC smoothing and
 # feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA and
-# throttle boost with #50 (ADR-0015).
+# throttle boost with #50; runaway takeoff prevention later (ADR-0015).
 # PID Tuning
 set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
 set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
@@ -74,3 +83,6 @@ set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#4
 set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)
+# CLI only: runaway takeoff prevention guards against wiring and orientation
+# mistakes the sim can't have (#21)
+set runaway_takeoff_prevention = ON    # 2026.6.2 default; not simulated yet (later)

@@ -1,0 +1,64 @@
+# Results of radio-link-drop-outs.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Radio Link drop-out shorter than 1.5 s never disarms the Quad"
+
+[[expect]]
+what     = "RXLOSS blocks arming, first over 1 s to 2 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "RXLOSS blocks arming, first over 2 s to 3 s"
+basis    = "Source"
+expected = "between 0.146 s and 0.1465 s"
+measured = "0.146 s"
+
+[[expect]]
+what     = "roll setpoint at 2.4 s"
+basis    = "Source"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "roll setpoint at 2.501 s"
+basis    = "Source"
+expected = "193.54 °/s ± 0.01 °/s"
+measured = "194 °/s"
+
+[[expect]]
+what     = "RXLOSS stops blocking arming, first over 2.5 s to 4 s"
+basis    = "Source"
+expected = "0.500125 s ± 0.000001 s"
+measured = "0.500 s"
+
+[[expect]]
+what     = "the Quad disarms, first over 0 s to 4 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "10fdce0a3bfbc829"   # the whole state after each of 32000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.4 s" = "1cb49e43d6f3a478"
+"0.8 s" = "4baa0f0684086fdb"
+"1.2 s" = "15aaf1b637cc7d04"
+"1.6 s" = "a1f9e4d35587a36b"
+"2 s" = "34e5c27f98cf1880"
+"2.4 s" = "7106cfaad3615424"
+"2.8 s" = "476430fb006831e1"
+"3.2 s" = "3b9c0f2012265a4d"
+"3.6 s" = "4b002c0ef911453e"
+"4 s" = "c622896be7810895"

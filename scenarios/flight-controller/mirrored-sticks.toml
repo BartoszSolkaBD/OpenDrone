@@ -11,6 +11,13 @@
 # own mirror image on ELRS: step 992 reads 1500.77 µs (see actual-rates.toml),
 # asking for 0.11 °/s the same way in both runs. The throttle ramps, which
 # changes nothing about the mirror.
+#
+# On a real quad, Betaflight 2026.6.2's runaway takeoff prevention (on by
+# default, not simulated yet, #21's "later") would disarm this fresh Flight
+# Controller at about 0.08 s: full stick from the first frame holds a PID sum
+# of 600 or more with the gyro moving for 75 ms, before half a second of
+# normal flight could switch the prevention off (src/main/fc/core.c). This
+# Scenario checks only the symmetry, which holds either way.
 format = 1
 name   = "Mirrored sticks give a mirrored flight"
 

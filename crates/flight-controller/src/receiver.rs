@@ -29,7 +29,54 @@ pub(crate) struct RcData {
     pub aux: [f64; 3],
 }
 
+/// How many Channels the Flight Controller reads: four sticks and AUX1–3.
+pub(crate) const CHANNEL_COUNT: usize = 7;
+/// Betaflight's place for the throttle among them (`THROTTLE`).
+pub(crate) const THROTTLE: usize = 3;
+/// How many of them are sticks (`NON_AUX_CHANNEL_COUNT`).
+pub(crate) const STICK_COUNT: usize = 4;
+
 impl RcData {
+    /// What Betaflight holds before its first frame (`rxInit`): every Channel
+    /// at `mid_rc`, the throttle at `rx_min_usec`, and AUX1 just below the
+    /// Arm range's start, so Arm is off (1675 µs, one 25 µs step under
+    /// 1700 µs).
+    pub fn at_power_up(tune: &Tune) -> RcData {
+        let mid = f64::from(tune.mid_rc);
+        RcData {
+            roll: mid,
+            pitch: mid,
+            yaw: mid,
+            throttle: f64::from(tune.rx_min_usec),
+            aux: [1675.0, mid, mid],
+        }
+    }
+
+    /// Every Channel in Betaflight's order: roll, pitch, yaw, throttle, then
+    /// AUX1–3.
+    pub fn values(&self) -> [f64; CHANNEL_COUNT] {
+        [
+            self.roll,
+            self.pitch,
+            self.yaw,
+            self.throttle,
+            self.aux[0],
+            self.aux[1],
+            self.aux[2],
+        ]
+    }
+
+    /// The Channels from their values in Betaflight's order.
+    pub fn from_values(values: [f64; CHANNEL_COUNT]) -> RcData {
+        RcData {
+            roll: values[0],
+            pitch: values[1],
+            yaw: values[2],
+            throttle: values[3],
+            aux: [values[4], values[5], values[6]],
+        }
+    }
+
     pub fn from_channels(channels: &Channels) -> RcData {
         RcData {
             roll: channels.roll.micros(),

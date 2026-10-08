@@ -1,15 +1,22 @@
 //! Readable checks for the Flight Controller's edges: how Channels are
-//! numbered, how a Tune is read, and what a fresh Flight Controller sends.
-//! How it flies is proved by the Scenarios in `scenarios/flight-controller/`.
+//! numbered, how a Tune is read, and what a fresh Flight Controller sends
+//! and blocks. How it flies, arms and runs Failsafe is proved by the
+//! Scenarios in `scenarios/flight-controller/`.
 
 use opendrone_flight_controller::{
-    Channel, Channels, FlightController, Rates, SensorReadings, Tune,
+    Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings, Tune,
 };
 use opendrone_maths::{Attitude, Vec3};
 
 /// The Freestyle 5″'s Tune: Betaflight 2026.6.2's defaults.
 const DEFAULTS: &[(&str, &str)] = &[
     ("small_angle", "25"),
+    ("rx_min_usec", "885"),
+    ("rx_max_usec", "2115"),
+    ("failsafe_delay", "15"),
+    ("failsafe_procedure", "DROP"),
+    ("failsafe_throttle", "1000"),
+    ("failsafe_recovery_delay", "5"),
     ("p_roll", "45"),
     ("i_roll", "80"),
     ("d_roll", "30"),
@@ -43,6 +50,7 @@ fn tune() -> Tune {
 const STILL: SensorReadings = SensorReadings {
     gyro: Vec3::ZERO,
     attitude: Attitude::BODY_IS_WORLD,
+    escs_ready: true,
 };
 
 #[test]
@@ -204,4 +212,141 @@ fn a_flight_controller_started_armed_idles_at_zero_throttle() {
     let motors = fc.step(&STILL, Some(&armed));
     assert!(fc.armed());
     assert_eq!(motors[0].dshot, 158);
+}
+
+#[test]
+fn a_tune_set_to_auto_land_or_gps_rescue_flies_drop_and_says_it_isnt_simulated_yet() {
+    // Basis: Rule (#21: DROP is the only procedure; LAND and GPS Rescue fly
+    // DROP with a "not simulated yet" note). Betaflight 2026.6.2's words are
+    // AUTO-LAND, DROP and GPS-RESCUE (`lookupTableFailsafe`).
+    assert!(tune().not_simulated_values().is_empty());
+    for (word, procedure) in [
+        ("AUTO-LAND", FailsafeProcedure::AutoLand),
+        ("GPS-RESCUE", FailsafeProcedure::GpsRescue),
+    ] {
+        let lines = DEFAULTS.iter().map(|(name, value)| match *name {
+            "failsafe_procedure" => (*name, word),
+            _ => (*name, *value),
+        });
+        let read = Tune::read(lines).unwrap();
+        assert_eq!(read.failsafe_procedure, procedure);
+        assert_eq!(
+            read.not_simulated_values(),
+            [(
+                "failsafe_procedure",
+                format!(
+                    "`failsafe_procedure` is {word}, which isn't simulated yet: the Quad flies DROP, disarming as Failsafe's stage 2 starts"
+                )
+            )]
+        );
+    }
+    let lines = DEFAULTS.iter().map(|(name, value)| match *name {
+        "failsafe_procedure" => (*name, "LAND"),
+        _ => (*name, *value),
+    });
+    assert_eq!(
+        Tune::read(lines).unwrap_err().wrong,
+        [(
+            "failsafe_procedure",
+            "`failsafe_procedure` must be one of AUTO-LAND, DROP, GPS-RESCUE, not \"LAND\""
+                .to_string()
+        )]
+    );
+}
+
+#[test]
+fn a_tune_set_to_auto_land_disarms_as_drop_does_when_the_link_goes() {
+    // Basis: Rule (#21: AUTO-LAND flies DROP) and Source (failsafe.c: DROP
+    // disarms once more than failsafe_delay, 1.5 s, has passed since the last
+    // good frame, at an 11 ms check).
+    for word in ["DROP", "AUTO-LAND", "GPS-RESCUE"] {
+        let lines = DEFAULTS.iter().map(|(name, value)| match *name {
+            "failsafe_procedure" => (*name, word),
+            _ => (*name, *value),
+        });
+        let tune = Tune::read(lines).unwrap();
+        let mut fc = FlightController::new(tune, Rates::BETAFLIGHT_DEFAULT, 8000, true, &STILL);
+        // Frames for 1 s (the last at 0.996 s), then none.
+        frames(&mut fc, arm(true), STILL, 8000);
+        for _ in 0..(8000 * 3 / 2 - 100) {
+            fc.step(&STILL, None);
+        }
+        assert!(fc.armed(), "{word}: still armed at 2.4875 s");
+        for _ in 0..200 {
+            fc.step(&STILL, None);
+        }
+        // Dropped at the check at 2.497 s.
+        assert!(!fc.armed(), "{word}: dropped by 2.5125 s");
+        assert!(fc.debug().arming_blocks.failsafe);
+    }
+}
+
+/// Sticks centred, throttle low, the Arm switch as given.
+fn arm(on: bool) -> Channels {
+    Channels {
+        arm: Channel::from_switch(on),
+        ..Channels::RESTING
+    }
+}
+
+/// Runs `loops` loops with these Channels in a frame every 32 loops (250 Hz
+/// at 8 kHz), the first in the first loop.
+fn frames(fc: &mut FlightController, channels: Channels, readings: SensorReadings, loops: u32) {
+    for k in 0..loops {
+        let frame = (k % 32 == 0).then_some(&channels);
+        fc.step(&readings, frame);
+    }
+}
+
+#[test]
+fn a_fresh_flight_controller_names_bootgrace_until_the_escs_are_ready() {
+    // Basis: Rule (#32 §4: BOOTGRACE holds until the ESCs' ready beep, in
+    // place of Betaflight's 5 s) and Source (Betaflight 2026.6.2's
+    // `updateArmingStatus`: BOOTGRACE clears once its wait is over, and an
+    // Arm switch on while any flag stands raises ARM_SWITCH, which clears
+    // only with the switch off).
+    let powering_up = SensorReadings {
+        escs_ready: false,
+        ..STILL
+    };
+    let mut fc = FlightController::new(tune(), Rates::BETAFLIGHT_DEFAULT, 8000, false, &STILL);
+    assert_eq!(fc.debug().arming_blocks.names(), ["BOOTGRACE"]);
+    // The Arm switch already on at power-up: refused.
+    frames(&mut fc, arm(true), powering_up, 320);
+    assert!(!fc.armed());
+    assert_eq!(
+        fc.debug().arming_blocks.names(),
+        ["BOOTGRACE", "ARM_SWITCH"]
+    );
+    // The ESCs are ready: BOOTGRACE clears, but the switch must go off first.
+    frames(&mut fc, arm(true), STILL, 320);
+    assert!(!fc.armed());
+    assert_eq!(fc.debug().arming_blocks.names(), ["ARM_SWITCH"]);
+    frames(&mut fc, arm(false), STILL, 320);
+    assert!(fc.debug().arming_blocks.names().is_empty());
+    frames(&mut fc, arm(true), STILL, 320);
+    assert!(fc.armed());
+}
+
+#[test]
+fn a_fresh_flight_controller_counts_the_link_as_settled_and_watches_it_at_once() {
+    // Basis: Rule (#21: power-up skips Betaflight's own waits, the link
+    // settled) and Source (`rxFrameCheck`: no frame for 150 ms is RXLOSS).
+    let mut fc = FlightController::new(tune(), Rates::BETAFLIGHT_DEFAULT, 8000, false, &STILL);
+    frames(&mut fc, arm(false), STILL, 32);
+    let record = *fc.debug();
+    assert!(record.arming_blocks.names().is_empty(), "{record:?}");
+    assert!(record.failsafe.signal && record.failsafe.link_up);
+    // No frame at all: 150 ms on, RXLOSS. 1201 loops are 150.125 ms.
+    let mut silent = FlightController::new(tune(), Rates::BETAFLIGHT_DEFAULT, 8000, false, &STILL);
+    for _ in 0..1201 {
+        silent.step(&STILL, None);
+    }
+    assert!(!silent.debug().arming_blocks.rx_loss);
+    assert!(silent.debug().failsafe.signal);
+    silent.step(&STILL, None);
+    // The Channels are worked out again, so the arming checks run too, and
+    // BOOTGRACE clears: the ESCs are ready.
+    assert_eq!(silent.debug().arming_blocks.names(), ["RXLOSS"]);
+    assert!(!silent.debug().failsafe.signal);
 }

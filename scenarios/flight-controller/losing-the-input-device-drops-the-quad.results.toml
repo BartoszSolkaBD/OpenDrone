@@ -1,0 +1,70 @@
+# Results of losing-the-input-device-drops-the-quad.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Losing the Input Device drops the Quad"
+
+[[expect]]
+what     = "mixer throttle at 1.29 s"
+basis    = "Source"
+expected = "25.7% ± 0.001%"
+measured = "25.7%"
+
+[[expect]]
+what     = "mixer throttle at 1.4 s"
+basis    = "Source"
+expected = "0% ± 0.01%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 1 DShot at 1.4 s"
+basis    = "Source"
+expected = "between 158 and 200"
+measured = "159"
+
+[[expect]]
+what     = "the Quad disarms, first over 1 s to 3 s"
+basis    = "Source"
+expected = "between 1.497 s and 1.5082 s"
+measured = "1.50 s"
+
+[[expect]]
+what     = "motor 1 DShot at 2.6 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 speed at 3 s"
+basis    = "Observed"
+expected = "between 0 RPM and 3000 RPM"
+measured = "140 RPM"
+
+[[expect]]
+what     = "vertical speed at 4 s"
+basis    = "Observed"
+expected = "-18.8 m/s ± 0.5 m/s"
+measured = "-18.8 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "a915c52018e9213f"   # the whole state after each of 32000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.4 s" = "bec52162f33c2e54"
+"0.8 s" = "f7f0eb5ae64623d5"
+"1.2 s" = "31a13bf8d44c2675"
+"1.6 s" = "737a03c7e71d3096"
+"2 s" = "6e5f6cfc49d84d3a"
+"2.4 s" = "9896aa15d5987758"
+"2.8 s" = "293a7f12f19b14d8"
+"3.2 s" = "f38596f903784aa2"
+"3.6 s" = "dae936f0beaa9301"
+"4 s" = "1ced83f77536e982"

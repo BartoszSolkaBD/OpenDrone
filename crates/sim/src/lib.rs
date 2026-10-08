@@ -14,10 +14,19 @@
 //!   counts [`SimulationTime`] in whole ticks at the set-up's [`PhysicsRate`]
 //!   (8 kHz in the alpha), never with the computer's clock.
 //! - Flight Inputs, the one way in: [`Simulation::flight_input`] takes them,
-//!   stamped with Simulation Time; so far, Channels ([`FlightInput`]).
+//!   stamped with Simulation Time ([`FlightInput`]): Channels, the Flying
+//!   Input Device lost or back, and Reset.
 //! - The Radio Link: each Quad's Channels reach its Flight Controller in
 //!   regular frames at the pilot's [`PacketRate`], like an ELRS link on CRSF
-//!   (ADR-0007).
+//!   (ADR-0007). While the Flying Input Device is lost, it sends no frames,
+//!   and the Flight Controller's Failsafe follows.
+//! - Reset: the Quad back on its Launch Spot ([`QuadSetUp::launch_spot`]),
+//!   landed and disarmed, powered up fresh as a new battery does: a full
+//!   charge, a fresh Flight Controller, and ESCs playing their start-up
+//!   tones, so arming waits for their ready beep, about 1.7 s. The Radio Link
+//!   belongs to the pilot's radio, so it keeps its beat.
+//! - Auto-arm, the sim-only Assist that arms on the first throttle raise
+//!   ([`auto_arm`]), set with [`OurFlightController::new`].
 //! - [`FlightControllerSeam`]: what turns sensor readings and Radio Link
 //!   frames into the four motor commands each tick, one Flight Controller
 //!   loop per physics step. Our Flight Controller plugs in as
@@ -40,13 +49,17 @@
 //!   changes the Simulation.
 //!
 //! Each tick, for every Quad in order: the Flight Inputs stamped with this
-//! moment arrive; the Radio Link sends a frame if one is due; the Flight
-//! Controller seam reads the sensors (the state at the tick's start) and the
-//! frame and gives the motor commands; the physics moves the Quad on by one
-//! step with them.
+//! moment arrive (Reset powering the Quad up there and then); the Radio Link
+//! sends a frame if one is due; the Flight Controller seam reads the sensors
+//! (the state at the tick's start, and whether the ESCs have beeped ready)
+//! and the frame and gives the motor commands; the physics moves the Quad on
+//! by one step with them.
 //!
-//! Assists, the rest of the Radio Link (#56), and the session state arrive
-//! with their tickets.
+//! A crash never disarms or resets the Quad on its own: only the pilot's
+//! Arm switch, Failsafe or Reset do.
+//!
+//! Input smoothing and the rest of the Radio Link (#56), Endless Battery
+//! (#57) and the rest of the session state arrive with their tickets.
 //!
 //! # House rules
 //!
@@ -69,6 +82,7 @@
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
+pub mod auto_arm;
 mod flight_controller;
 mod motors;
 mod radio_link;
@@ -80,7 +94,8 @@ use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 pub use flight_controller::{OurFlightController, sensor_readings};
 pub use motors::{FlightControllerSeam, ScriptedMotors};
 pub use opendrone_flight_controller::{
-    Channel, Channels, DebugRecord, Rates, SensorReadings, Terms, Tune,
+    ArmingBlocks, Channel, Channels, DebugRecord, FailsafePhase, FailsafeReadings, Rates,
+    SensorReadings, Terms, Tune,
 };
 pub use opendrone_physics::{
     BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
@@ -113,6 +128,8 @@ pub struct SetUp {
 pub struct QuadSetUp {
     pub parameters: QuadParameters,
     pub start: QuadState,
+    /// Where Reset puts this Quad: resting on the Map's Launch Spot, still.
+    pub launch_spot: QuadState,
     /// How its motors and their ESCs start.
     pub motors: StartingMotors,
     /// The battery's charge, as a share of its capacity (0 to 1).
@@ -171,6 +188,8 @@ pub struct Simulation {
 
 struct SimulatedQuad {
     body: QuadBody,
+    /// Where Reset puts it.
+    launch_spot: QuadState,
     flight_controller: Box<dyn FlightControllerSeam>,
     motor_commands: MotorCommands,
     radio_link: RadioLink,
@@ -178,6 +197,29 @@ struct SimulatedQuad {
     inputs: Vec<(SimulationTime, FlightInput)>,
     /// Whether the seam has run a loop yet.
     stepped: bool,
+}
+
+impl SimulatedQuad {
+    /// Reset: the Quad on its Launch Spot, still, with a full battery and its
+    /// ESCs just powered, and its Flight Controller powered up fresh. Its
+    /// Radio Link and the Flight Inputs still to arrive are the pilot's, so
+    /// they go on.
+    fn reset(&mut self, world: &World) {
+        let start = QuadStart {
+            state: self.launch_spot,
+            motors: StartingMotors::PoweringUp,
+            battery: 1.0,
+            mount: self.body.mount(),
+        };
+        // The same parameters were accepted at set-up, so they are accepted
+        // again; if they weren't, the Quad would stay as it was.
+        if let Ok(body) = QuadBody::new(self.body.parameters().clone(), start, world) {
+            self.body = body;
+        }
+        self.motor_commands = MotorCommands::STOPPED;
+        let readings = sensor_readings(self.body.state(), self.body.escs_ready());
+        self.flight_controller.power_up(&readings);
+    }
 }
 
 impl Simulation {
@@ -202,6 +244,7 @@ impl Simulation {
             })?;
             quads.push(SimulatedQuad {
                 body,
+                launch_spot: quad.launch_spot,
                 flight_controller: quad.flight_controller,
                 motor_commands: MotorCommands::STOPPED,
                 radio_link: RadioLink::new(quad.packet_rate, set_up.physics_rate),
@@ -239,13 +282,21 @@ impl Simulation {
         let dt = self.physics_rate.step_length();
         for quad in &mut self.quads {
             let arrived = quad.inputs.partition_point(|(time, _)| *time <= self.time);
-            for (_, input) in quad.inputs.drain(..arrived) {
+            let inputs: Vec<FlightInput> = quad
+                .inputs
+                .drain(..arrived)
+                .map(|(_, input)| input)
+                .collect();
+            for input in inputs {
                 match input {
                     FlightInput::Channels(channels) => quad.radio_link.hear(channels),
+                    FlightInput::InputDeviceLost => quad.radio_link.lose(),
+                    FlightInput::InputDeviceBack => quad.radio_link.back(),
+                    FlightInput::Reset => quad.reset(&self.world),
                 }
             }
             let frame = quad.radio_link.frame(self.time);
-            let readings = sensor_readings(quad.body.state());
+            let readings = sensor_readings(quad.body.state(), quad.body.escs_ready());
             quad.motor_commands = quad
                 .flight_controller
                 .step(self.time, &readings, frame.as_ref());

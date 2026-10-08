@@ -1,0 +1,78 @@
+# Short Radio Link drop-outs, as Betaflight 2026.6.2 takes them
+# (src/main/rx/rx.c: rxFrameCheck, detectAndApplySignalLossBehaviour;
+# src/main/flight/failsafe.c): one shorter than 150 ms goes unnoticed, and
+# one shorter than failsafe_delay (1.5 s) runs stage 1 only, so the Quad
+# stays armed and flies on the moment the frames are back.
+#
+# The Flight Controller alone, armed, its gyro reading still, with roll at
+# 50% (Actual 70/670/0 asks 193.54 °/s) and the throttle at 50%. A frame
+# leaves every 4 ms at 250 Hz, so before a drop-out at 1 s or 2 s the last
+# frame is at 0.996 s or 1.996 s, and after one the next leaves on the
+# link's own beat.
+format = 1
+name   = "A Radio Link drop-out shorter than 1.5 s never disarms the Quad"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on" },
+  { at = "1 s", radio_link = "drops out for 0.1 s" },
+  { at = "2 s", radio_link = "drops out for 0.5 s" },
+]
+
+[[expect]]
+what  = "RXLOSS blocks arming"
+over  = "1 s to 2 s"
+first = "never"
+basis = "source: rxFrameCheck: the frames stop after 0.996 s and start again at 1.1 s, 104 ms later, less than the 150 ms (RXLOSS_TRIGGER_INTERVAL) the signal may go quiet"
+
+[[expect]]
+what  = "RXLOSS blocks arming"
+over  = "2 s to 3 s"
+first = "between 0.146 s and 0.1465 s"
+basis = "source: rxFrameCheck: 150 ms after the last frame at 1.996 s, on the first loop past it (2.146125 s), the signal counts as lost"
+
+[[expect]]
+what  = "roll setpoint"
+at    = "2.4 s"
+value = "0 °/s ± 0.001 °/s"
+basis = "source: detectAndApplySignalLossBehaviour: 300 ms after the last good frame (from 2.296125 s) roll takes its stage 1 value, mid_rc: centre"
+
+[[expect]]
+what  = "roll setpoint"
+at    = "2.501 s"
+value = "193.54 °/s ± 0.01 °/s"
+basis = "source: detectAndApplySignalLossBehaviour: a good frame (the one at 2.5 s) brings the Channels back at once while Failsafe is only in stage 1"
+
+[[expect]]
+what  = "RXLOSS stops blocking arming"
+over  = "2.5 s to 4 s"
+first = "0.500125 s ± 0.000001 s"
+basis = "source: failsafeOnValidDataReceived: RXLOSS clears on the first good frame more than failsafe_recovery_delay (0.5 s) after the last bad recheck at 2.496 s: the frame at 3 s"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 4 s"
+first = "never"
+basis = "source: failsafeCheckDataFailurePeriod: the link goes down, and DROP disarms, only after failsafe_delay (1.5 s) without good frames; these drop-outs last 0.1 s and 0.5 s"

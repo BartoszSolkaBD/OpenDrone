@@ -68,6 +68,19 @@ pub struct PilotChanges {
     pub rotation: Option<Vec3>,
     /// A Flight Controller Scenario's attitude reading from now on.
     pub attitude: Option<Attitude>,
+    /// The Flying Input Device lost or back. A Radio Link drop-out is the
+    /// two, its length apart.
+    pub input_device: Option<InputDevice>,
+    /// Reset: the Quad back where the Scenario starts, its Launch Spot,
+    /// powered up fresh.
+    pub reset: bool,
+}
+
+/// The Flying Input Device lost or back: both are Flight Inputs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InputDevice {
+    Lost,
+    Back,
 }
 
 /// A stick's new position, reached at once or by a ramp from where it was
@@ -190,12 +203,30 @@ pub struct Assists {
     pub auto_arm: bool,
 }
 
+/// What an Expectation expects: a value with its tolerance, or, for
+/// something that happens, that it never does.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Expecting {
+    Value(Expected),
+    Never,
+}
+
+impl Expecting {
+    /// As our tools write it, such as "670 °/s ± 3%" or "never".
+    pub fn text(&self) -> String {
+        match self {
+            Expecting::Value(expected) => expected.text(),
+            Expecting::Never => "never".to_string(),
+        }
+    }
+}
+
 /// One Expectation.
 #[derive(Clone, Debug)]
 pub struct Expectation {
     pub measure: Measure,
     pub when: When,
-    pub expected: Expected,
+    pub expected: Expecting,
     pub basis: Basis,
     /// The line its `[[expect]]` starts on.
     pub line: usize,
@@ -243,14 +274,18 @@ pub enum Statistic {
     Lowest,
     Highest,
     Final,
+    /// For something that happens: how long after the stretch's start it
+    /// first does.
+    First,
 }
 
 impl Statistic {
-    const ALL: [(&'static str, Statistic); 4] = [
+    const ALL: [(&'static str, Statistic); 5] = [
         ("mean", Statistic::Mean),
         ("lowest", Statistic::Lowest),
         ("highest", Statistic::Highest),
         ("final", Statistic::Final),
+        ("first", Statistic::First),
     ];
 
     pub fn word(self) -> &'static str {
@@ -504,18 +539,39 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
     }
     // "Stopped" means the ESCs are already powered up and ready, and
     // "powering up" that they were just powered. Where our Flight Controller
-    // runs, a landed "fresh" start is exactly Reset, so how its motors start
-    // is the arming and power-up ticket's to name: both are only for
-    // Scenarios whose motors are scripted.
-    if matches!(
-        motors,
-        Some(Some(StartingMotors::Stopped | StartingMotors::PoweringUp))
-    ) && kind == Some(Kind::Flight)
+    // runs, a "fresh" Flight Controller with its ESCs at rest is exactly
+    // Reset: the ESCs power up first. So a Flight Scenario's landed start is
+    // written "powering up", and starts as Reset leaves the Quad: disarmed
+    // and still.
+    if motors == Some(Some(StartingMotors::Stopped))
+        && kind == Some(Kind::Flight)
         && let Some(item) = start.get("motors")
     {
         problems.push(item.problem(
-            "motors \"stopped\" (at rest, with the ESCs already ready) and \"powering up\" (with the ESCs just powered) are only for Physics and Thrust Stand Scenarios, which script their motors; a Flight Scenario that starts landed with a \"fresh\" Flight Controller is Reset, and the arming and power-up ticket (#52) names how its motors start",
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; where the Flight Controller runs, a start at rest with a \"fresh\" Flight Controller is Reset, whose ESCs power up first: write \"powering up\"",
         ));
+    }
+    let reset_start =
+        motors == Some(Some(StartingMotors::PoweringUp)) && kind == Some(Kind::Flight);
+    if reset_start {
+        let still = |v: &Option<Option<[f64; 3]>>| v.flatten().is_none_or(|v| v == [0.0; 3]);
+        if armed == Some(true)
+            && let Some(item) = start.get("armed")
+        {
+            problems.push(item.problem(
+                "a Flight Scenario whose motors start \"powering up\" starts as Reset leaves the Quad, disarmed: `armed` must be false",
+            ));
+        }
+        for (key, still) in [
+            ("speed", still(&velocity)),
+            ("rotation", rotation.is_none_or(|r| r == Vec3::ZERO)),
+        ] {
+            if !still && let Some(item) = start.get(key) {
+                problems.push(item.problem(format!(
+                    "a Flight Scenario whose motors start \"powering up\" starts as Reset leaves the Quad, still: its `{key}` must be zero"
+                )));
+            }
+        }
     }
     let flight_controller = choice(
         start,
@@ -556,18 +612,18 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         table.refuse_unknown(ASSISTS, problems);
         let mut on = |key| {
             let on = choice(&table, key, &[("on", true), ("off", false)], problems);
-            let waits_for = match key {
-                "input_smoothing" => "Input smoothing arrives with the Radio Link ticket (#56)",
-                "auto_arm" => "Auto-arm arrives with the arming ticket (#52)",
-                _ => "Endless Battery arrives with its ticket (#57)",
+            let refusal = match key {
+                "input_smoothing" => Some("Input smoothing doesn't run yet, so `input_smoothing` must be \"off\": Input smoothing arrives with the Radio Link ticket (#56)"),
+                "auto_arm" if alone => Some("Auto-arm is an Assist of the Simulation, in front of the Flight Controller, and a Flight Controller Scenario runs the Flight Controller alone, so `auto_arm` must be \"off\""),
+                "auto_arm" => None,
+                _ => Some("Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"),
             };
             if flies
                 && on == Some(true)
+                && let Some(sentence) = refusal
                 && let Some(item) = table.get(key)
             {
-                problems.push(item.problem(format!(
-                    "Assists don't run yet, so `{key}` must be \"off\": {waits_for}"
-                )));
+                problems.push(item.problem(sentence));
             }
             on
         };
@@ -946,9 +1002,28 @@ impl Reader<'_> {
         };
         let known: &[&str] = match self.kind {
             Kind::Physics | Kind::ThrustStand => &["at", "motors"],
-            Kind::Flight => &["at", "roll", "pitch", "yaw", "throttle", "arm"],
+            Kind::Flight => &[
+                "at",
+                "roll",
+                "pitch",
+                "yaw",
+                "throttle",
+                "arm",
+                "input_device",
+                "radio_link",
+                "reset",
+            ],
             Kind::FlightController => &[
-                "at", "roll", "pitch", "yaw", "throttle", "arm", "rotation", "attitude",
+                "at",
+                "roll",
+                "pitch",
+                "yaw",
+                "throttle",
+                "arm",
+                "rotation",
+                "attitude",
+                "input_device",
+                "radio_link",
             ],
         };
         for entry in timeline {
@@ -968,17 +1043,50 @@ impl Reader<'_> {
             } else {
                 self.pilot_changes(&entry).map(Entry::Pilot)
             };
+            // A Radio Link drop-out: the Flying Input Device lost for a
+            // while, then back.
+            let drop_out = entry
+                .get("radio_link")
+                .and_then(|item| self.drop_out(&item));
+            if drop_out.is_some()
+                && let Some(item) = entry.get("input_device")
+            {
+                self.problems.push(item.problem(
+                    "a Radio Link drop-out is the Flying Input Device lost and back already, so one moment says one or the other",
+                ));
+            }
             if let (Some((_, quantity)), Some(read)) = (at, read) {
-                self.moments.push(Moment {
+                let moment = Moment {
                     seconds: quantity.value,
                     line,
                     text: quantity.text(),
                     entry: read,
-                });
+                };
+                if let Some((length, length_text)) = drop_out {
+                    let mut lost = moment.clone();
+                    let mut back = moment.clone();
+                    if let Entry::Pilot(changes) = &mut lost.entry {
+                        changes.input_device = Some(InputDevice::Lost);
+                    }
+                    back.entry = Entry::Pilot(PilotChanges {
+                        input_device: Some(InputDevice::Back),
+                        ..PilotChanges::default()
+                    });
+                    back.seconds = quantity.value + length;
+                    back.text = format!(
+                        "the end of the {length_text} drop-out from {}",
+                        quantity.text()
+                    );
+                    self.moments.push(lost);
+                    self.moments.push(back);
+                } else {
+                    self.moments.push(moment);
+                }
             }
         }
         if !self.kind.scripts_motors() {
             self.check_pilot_timeline(&inputs);
+            self.check_flight_inputs();
         }
         self.timeline_at(self.rate, false)
             .unwrap_or(Inputs::Motors(Vec::new()))
@@ -1136,7 +1244,120 @@ impl Reader<'_> {
                 .and_then(|text| attitude_text(text, &item, self.problems));
             fine &= changes.attitude.is_some();
         }
+        if let Some(item) = entry.get("input_device") {
+            match item.text(self.problems) {
+                Some("lost") => changes.input_device = Some(InputDevice::Lost),
+                Some("back") => changes.input_device = Some(InputDevice::Back),
+                Some(other) => {
+                    self.problems.push(item.problem(format!(
+                        "`input_device` is the Flying Input Device \"lost\" (unplugged, so the Radio Link sends no frames) or \"back\", not \"{other}\""
+                    )));
+                    fine = false;
+                }
+                None => fine = false,
+            }
+        }
+        if let Some(item) = entry.get("reset") {
+            match item.boolean() {
+                Some(true) => changes.reset = true,
+                _ => {
+                    self.problems.push(item.problem(
+                        "`reset = true` presses Reset at this moment; leave `reset` out otherwise",
+                    ));
+                    fine = false;
+                }
+            }
+        }
         fine.then_some(changes)
+    }
+
+    /// A Radio Link drop-out, "drops out for 0.2 s": how long, in seconds and
+    /// as written. It must be a whole number of physics steps.
+    fn drop_out(&mut self, item: &Item<'_, '_>) -> Option<(f64, String)> {
+        let help = "`radio_link` in a Timeline is a drop-out: the Radio Link sends no frames for a while, written like \"drops out for 0.2 s\"";
+        let text = item.text(self.problems)?;
+        let Some(length) = text.trim().strip_prefix("drops out for ") else {
+            self.problems
+                .push(item.problem(format!("{help}, not \"{text}\"")));
+            return None;
+        };
+        let (steps, quantity) = self.moment(length, item)?;
+        if steps == 0 {
+            self.problems
+                .push(item.problem(format!("{help}: a drop-out lasts longer than 0 s")));
+            return None;
+        }
+        Some((quantity.value, quantity.text()))
+    }
+
+    /// The Flight Inputs a Timeline sends besides the Channels: the Flying
+    /// Input Device lost and back (and drop-outs, which are the two), and
+    /// Reset. Lost and back take turns, starting with lost. Reset puts the
+    /// Quad back where the Scenario starts, its Launch Spot, so only a
+    /// Flight Scenario that starts as Reset leaves the Quad (motors
+    /// "powering up") has one. With Auto-arm on, no Arm switch is bound.
+    fn check_flight_inputs(&mut self) {
+        let mut ordered: Vec<&Moment> = self.moments.iter().collect();
+        ordered.sort_by(|a, b| a.seconds.total_cmp(&b.seconds));
+        let mut lost = false;
+        let mut found = Vec::new();
+        for moment in ordered {
+            let Entry::Pilot(changes) = moment.entry else {
+                continue;
+            };
+            match changes.input_device {
+                Some(InputDevice::Lost) if lost => found.push((
+                    moment.line,
+                    format!(
+                        "the Flying Input Device is lost at {}, but it was already lost: it must come back first",
+                        moment.text
+                    ),
+                )),
+                Some(InputDevice::Back) if !lost => found.push((
+                    moment.line,
+                    format!(
+                        "the Flying Input Device is back at {}, but it wasn't lost",
+                        moment.text
+                    ),
+                )),
+                Some(InputDevice::Lost) => lost = true,
+                Some(InputDevice::Back) => lost = false,
+                None => {}
+            }
+        }
+        // A Flight Controller Scenario is refused `reset` as a key it
+        // doesn't read, and Auto-arm as an Assist it leaves out.
+        let flight = self.kind == Kind::Flight;
+        let reset_start = self
+            .start
+            .as_ref()
+            .is_some_and(|start| start.motors == Some(StartingMotors::PoweringUp));
+        let auto_arm = flight
+            && self
+                .start
+                .as_ref()
+                .is_some_and(|start| start.assists.auto_arm);
+        for moment in &self.moments {
+            let Entry::Pilot(changes) = moment.entry else {
+                continue;
+            };
+            if changes.reset && flight && self.start.is_some() && !reset_start {
+                found.push((
+                    moment.line,
+                    "Reset puts the Quad back where the Scenario starts, as its Launch Spot, so a Scenario with Reset starts as Reset leaves the Quad: landed and still, disarmed, with its motors \"powering up\"".to_string(),
+                ));
+            }
+            if auto_arm && changes.arm == Some(true) {
+                found.push((
+                    moment.line,
+                    "with Auto-arm on, no Arm switch is bound (it would take over), so `arm` stays \"off\": Auto-arm turns Arm on itself".to_string(),
+                ));
+            }
+        }
+        for (line, sentence) in found {
+            self.problems
+                .push(Problem::of(self.file.clone(), line, sentence));
+        }
     }
 
     /// "0%" for all four motors, or four percentages in Betaflight's motor
@@ -1299,6 +1520,13 @@ impl Reader<'_> {
                 },
             );
         let (measure, basis, (expected, item)) = (measure?, basis?, expected?);
+        if measure.event().is_some() {
+            self.problems.push(item.problem(format!(
+                "a case is one loop, so \"{}\", something that happens between two loops, can't be seen in one",
+                measure.name()
+            )));
+            return None;
+        }
         if expected.dimension() != measure.dimension() {
             self.problems.push(item.problem(format!(
                 "{} is {}",
@@ -1310,7 +1538,7 @@ impl Reader<'_> {
         Some(Expectation {
             measure,
             when: When::At(1),
-            expected,
+            expected: Expecting::Value(expected),
             basis,
             line,
             description: format!("{} with {words}", measure.name()),
@@ -1323,8 +1551,9 @@ impl Reader<'_> {
         let (text, item) = table.text("what", self.problems)?;
         let Some(measure) = Measure::named(text) else {
             self.problems.push(item.problem(format!(
-                "the runner can't measure \"{text}\" yet; it measures {}",
-                Measure::names().join(", ")
+                "the runner can't measure \"{text}\" yet; it measures {}; and it sees when these happen: {}",
+                Measure::names().join(", "),
+                Measure::events().join(", ")
             )));
             return None;
         };
@@ -1354,8 +1583,8 @@ impl Reader<'_> {
     fn expectation(&mut self, table: &Table<'_, '_>, line: usize) -> Option<Expectation> {
         table.refuse_unknown(
             &[
-                "what", "at", "value", "over", "mean", "lowest", "highest", "final", "against",
-                "compare", "basis",
+                "what", "at", "value", "over", "mean", "lowest", "highest", "final", "first",
+                "against", "compare", "basis",
             ],
             self.problems,
         );
@@ -1372,7 +1601,7 @@ impl Reader<'_> {
         ) {
             (Some(_), Some(_)) | (None, None) => {
                 self.problems.push(table.problem(
-                        "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final`",
+                        "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens)",
                     ));
                 return None;
             }
@@ -1403,7 +1632,7 @@ impl Reader<'_> {
                     .collect();
                 let [(statistic, word, item)] = statistics.as_slice() else {
                     self.problems.push(table.problem(
-                            "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final`",
+                            "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens)",
                         ));
                     return None;
                 };
@@ -1422,17 +1651,74 @@ impl Reader<'_> {
             }
         };
         let (expected_text, expected_item) = expected_text;
-        let expected = match units::parse_expected(expected_text) {
-            Ok(expected) => Some(expected),
-            Err(p) => {
-                self.problems.push(expected_item.problem(p.0));
-                None
+        let first = matches!(
+            when,
+            When::Over {
+                statistic: Statistic::First,
+                ..
+            }
+        );
+        let never = expected_text.trim() == "never";
+        let expected = if first && never {
+            Some(Expecting::Never)
+        } else if never {
+            self.problems.push(expected_item.problem(
+                "\"never\" is for something that happens, over a stretch with `first`, such as `what = \"the Quad disarms\"`; a quantity needs a value with a tolerance",
+            ));
+            None
+        } else {
+            match units::parse_expected(expected_text) {
+                Ok(expected) => Some(Expecting::Value(expected)),
+                Err(p) => {
+                    self.problems.push(expected_item.problem(p.0));
+                    None
+                }
             }
         };
         let (measure, basis, expected) = (measure?, basis?, expected?);
         let compared = match compared {
             Some(found) => Some(found?),
             None => None,
+        };
+        // Something that happens is measured as when it first does, over a
+        // stretch; `first` is only for that.
+        match (measure.event(), first) {
+            (Some(_), false) => {
+                self.problems.push(table.problem(format!(
+                    "\"{}\" is something that happens: say `over` a stretch, with `first`, how long after the stretch's start it first happens, such as \"1.5 s ± 0.01 s\", or \"never\"",
+                    measure.name()
+                )));
+                return None;
+            }
+            (None, true) => {
+                self.problems.push(expected_item.problem(format!(
+                    "`first` is for something that happens, such as \"the Quad disarms\", not {}",
+                    measure.name()
+                )));
+                return None;
+            }
+            (Some(_), true) if compared.is_some() => {
+                self.problems.push(table.problem(format!(
+                    "\"{}\" is something that happens, which can't be compared with another run yet",
+                    measure.name()
+                )));
+                return None;
+            }
+            _ => {}
+        }
+        let expected = match expected {
+            Expecting::Never => {
+                return Some(Expectation {
+                    measure,
+                    when,
+                    expected: Expecting::Never,
+                    basis,
+                    line,
+                    description: format!("{}, {description_time}", measure.name()),
+                    compared: None,
+                });
+            }
+            Expecting::Value(expected) => expected,
         };
         let wanted = match compared {
             Some((Comparison::Ratio, _)) => Dimension::PERCENT,
@@ -1497,7 +1783,7 @@ impl Reader<'_> {
         Some(Expectation {
             measure,
             when,
-            expected,
+            expected: Expecting::Value(expected),
             basis,
             line,
             description,

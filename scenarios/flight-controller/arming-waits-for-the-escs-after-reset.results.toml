@@ -1,0 +1,112 @@
+# Results of arming-waits-for-the-escs-after-reset.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Arming waits for the ESCs' ready beep after power-up and after Reset, and Reset puts the Quad back landed and disarmed on a full battery"
+
+[[expect]]
+what     = "the ESCs are ready, first over 0 s to 3 s"
+basis    = "Source"
+expected = "1.662 s ± 0.001 s"
+measured = "1.66 s"
+
+[[expect]]
+what     = "the Quad arms, first over 0 s to 2 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "BOOTGRACE stops blocking arming, first over 0 s to 3 s"
+basis    = "Source"
+expected = "between 1.662 s and 1.6672 s"
+measured = "1.66 s"
+
+[[expect]]
+what     = "the Quad arms, first over 2 s to 2.1 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "height at 3 s"
+basis    = "Observed"
+expected = "between 0.5 m and 5 m"
+measured = "1.12 m"
+
+[[expect]]
+what     = "the Quad disarms, first over 3 s to 4 s"
+basis    = "Rule"
+expected = "0.500125 s ± 0.000001 s"
+measured = "0.500 s"
+
+[[expect]]
+what     = "BOOTGRACE blocks arming, first over 3 s to 4 s"
+basis    = "Rule"
+expected = "0.500125 s ± 0.000001 s"
+measured = "0.500 s"
+
+[[expect]]
+what     = "height at 3.6 s"
+basis    = "Rule"
+expected = "0.0175 m ± 0.000001 m"
+measured = "0.0175 m"
+
+[[expect]]
+what     = "speed at 3.6 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "battery charge used at 3.6 s"
+basis    = "Rule"
+expected = "0 mAh ± 0.000001 mAh"
+measured = "0 mAh"
+
+[[expect]]
+what     = "motor 1 speed at 3.6 s"
+basis    = "Rule"
+expected = "0 RPM ± 0.001 RPM"
+measured = "0 RPM"
+
+[[expect]]
+what     = "the Quad arms, first over 3.5 s to 5.5 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "BOOTGRACE stops blocking arming, first over 3.5 s to 6 s"
+basis    = "Source"
+expected = "between 1.662 s and 1.6672 s"
+measured = "1.66 s"
+
+[[expect]]
+what     = "the Quad arms, first over 5.5 s to 6 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "ee345c2e8f7ae56b"   # the whole state after each of 48000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.6 s" = "917e20d9e716aef6"
+"1.2 s" = "41ff053485cd14dc"
+"1.8 s" = "6894f89784b7a4f9"
+"2.4 s" = "cdd138be68330adb"
+"3 s" = "6a3b1d35e3cad753"
+"3.6 s" = "17a1f807e459b403"
+"4.2 s" = "a21e1688d49cb902"
+"4.8 s" = "062248322e6507b6"
+"5.4 s" = "9340165ae5ab3048"
+"6 s" = "c9c935d44e669584"

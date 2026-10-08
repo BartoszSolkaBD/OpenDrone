@@ -1,0 +1,150 @@
+# A Freestyle 5″ powered up on the floor, as Reset leaves it: its ESCs play
+# Bluejay's start-up tones first, and arming waits for their ready beep,
+# about 1.7 s, with Betaflight's BOOTGRACE reason (#32 §4). It arms once they
+# are ready, flies, and then Reset puts it back where it started, landed,
+# disarmed and on a full battery, and arming waits for the ESCs again.
+#
+# A landed start with a "fresh" Flight Controller is exactly Reset, so its
+# motors start "powering up", and this start is where Reset puts the Quad:
+# its Launch Spot. The Freestyle 5″'s body box is 35 mm tall, so it rests
+# with its centre 17.5 mm above the floor.
+#
+# Bluejay's power-up (crates/physics/src/esc.rs has each step, with
+# Bluejay.asm's lines): a 100 ms wait, the 1.04 s melody, a 100 ms pause,
+# 0.2 s looking for the DShot600 signal, the "signal found" beep, ten 32 ms
+# counts of zero throttle, and the ready beep: ready at 1.662 s. The Flight
+# Controller reads that at the start of each step, and BOOTGRACE clears with
+# the next Radio Link frame (every 4 ms).
+format = 1
+name   = "Arming waits for the ESCs' ready beep after power-up and after Reset, and Reset puts the Quad back landed and disarmed on a full battery"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  # During the ESCs' start-up: refused.
+  { at = "1 s",   arm = "on" },
+  { at = "1.2 s", arm = "off" },
+  # After the ready beep: arms, and climbs.
+  { at = "2 s",   arm = "on" },
+  { at = "2.5 s", throttle = "40%" },
+  { at = "3 s",   throttle = "0%" },
+  # Reset, with the Arm switch still on.
+  { at = "3.5 s", reset = true },
+  { at = "4 s",   arm = "off" },
+  { at = "4.5 s", arm = "on" },
+  { at = "4.7 s", arm = "off" },
+  { at = "5.5 s", arm = "on" },
+]
+
+[[expect]]
+what  = "the ESCs are ready"
+over  = "0 s to 3 s"
+first = "1.662 s ± 0.001 s"
+basis = "source: Bluejay v0.21.0's power-up, as the physics copies it (Bluejay.asm L498–L658): ready at 1.662 s"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0 s to 2 s"
+first = "never"
+basis = "rule: arming is blocked until the ESCs' ready beep (#32 §4), so the Arm switch at 1 s is refused"
+
+[[expect]]
+what  = "BOOTGRACE stops blocking arming"
+over  = "0 s to 3 s"
+first = "between 1.662 s and 1.6672 s"
+basis = "source: Bluejay's ready at 1.662 s, then updateArmingStatus clears BOOTGRACE on the next Radio Link frame, at most 4 ms later"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "2 s to 2.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and tryArm: the frame at 2 s turns Arm on in the Modes table, and the next, at 2.004 s, arms"
+
+[[expect]]
+what  = "height"
+at    = "3 s"
+value = "between 0.5 m and 5 m"
+basis = "observed: half a second at 40% throttle lifts it off the floor"
+
+# Reset at 3.5 s.
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "3 s to 4 s"
+first = "0.500125 s ± 0.000001 s"
+basis = "rule: Reset puts the Quad on the Launch Spot disarmed (#37), from the step at 3.5 s"
+
+[[expect]]
+what  = "BOOTGRACE blocks arming"
+over  = "3 s to 4 s"
+first = "0.500125 s ± 0.000001 s"
+basis = "rule: Reset powers the Flight Controller and the ESCs up fresh, so arming waits for the ready beep again (#32 §4)"
+
+[[expect]]
+what  = "height"
+at    = "3.6 s"
+value = "0.0175 m ± 0.000001 m"
+basis = "rule: Reset puts the Quad back on its Launch Spot, where this Scenario starts, resting on the floor"
+
+[[expect]]
+what  = "speed"
+at    = "3.6 s"
+value = "0 m/s ± 0.000001 m/s"
+basis = "rule: Reset leaves the Quad landed and still"
+
+[[expect]]
+what  = "battery charge used"
+at    = "3.6 s"
+value = "0 mAh ± 0.000001 mAh"
+basis = "rule: Reset gives a full battery, and the ESCs draw nothing while they start up"
+
+[[expect]]
+what  = "motor 1 speed"
+at    = "3.6 s"
+value = "0 RPM ± 0.001 RPM"
+basis = "rule: Reset powers the ESCs up afresh, with the motors stopped"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "3.5 s to 5.5 s"
+first = "never"
+basis = "rule: arming waits for the ESCs' ready beep after Reset (#32 §4), so the Arm switch on at Reset, and on again at 4.5 s, is refused"
+
+[[expect]]
+what  = "BOOTGRACE stops blocking arming"
+over  = "3.5 s to 6 s"
+first = "between 1.662 s and 1.6672 s"
+basis = "source: Bluejay's ready beep 1.662 s after Reset powers the ESCs up, then the next Radio Link frame"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "5.5 s to 6 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and tryArm: the frame at 5.5 s turns Arm on, and the next arms"

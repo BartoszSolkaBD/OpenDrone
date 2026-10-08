@@ -1,0 +1,144 @@
+# Auto-arm, the sim-only Assist for a pilot with no Arm switch (#13, #21,
+# #32 §4): the Quad arms on the first throttle raise after the ESCs' ready
+# beep that passes Betaflight's arming checks, and only Reset or a Failsafe
+# drop disarms it. It drives the Arm switch (AUX1) in the Radio Link frames
+# itself, through Betaflight's own arming: Betaflight arms only on a frame
+# with the throttle low, one frame after the switch goes on, so Auto-arm
+# turns Arm on with the frame that brings the raise and holds the throttle at
+# the bottom in that frame and the next. The raise reaches the Flight
+# Controller two frames (8 ms) late.
+#
+# With Auto-arm on no Arm switch is bound, so `arm` stays off. A landed start
+# with a "fresh" Flight Controller is Reset, so the ESCs start up first and
+# are ready at 1.662 s. The throttle is raised to 20%, which doesn't lift the
+# Freestyle 5″ off the floor. It flies the Test Quad with the Flight
+# Controller's filters and loop shaping off, so the mixer's throttle shows the
+# pilot's throttle straight from each frame, as Betaflight does with RC
+# smoothing (#49) and throttle boost (#50) off.
+format = 1
+name   = "Auto-arm arms on the first throttle raise that passes the arming checks, and only Reset or a Failsafe drop disarms"
+
+[start]
+kind              = "flight"
+quad              = "test/freestyle-5-filters-and-shaping-off"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "on" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",    roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  # A raise while the ESCs start up: BOOTGRACE, so nothing.
+  { at = "0.5 s",  throttle = "20%" },
+  { at = "1 s",    throttle = "0%" },
+  # The first raise after the ready beep.
+  { at = "2 s",    throttle = "20%" },
+  { at = "2.5 s",  throttle = "0%" },
+  # Reset disarms.
+  { at = "4 s",    reset = true },
+  # Raised during the ESCs' start-up and still up after their ready beep at
+  # 5.662 s: nothing until it comes down and up again.
+  { at = "4.5 s",  throttle = "20%" },
+  { at = "6 s",    throttle = "0%" },
+  { at = "6.5 s",  throttle = "20%" },
+  # Failsafe drops it; the link is back at 9 s, and Failsafe ends at about
+  # 10 s. A raise at 9.7 s is too early; the next, at 11 s, arms.
+  { at = "7 s",    input_device = "lost" },
+  { at = "9 s",    input_device = "back" },
+  { at = "9.5 s",  throttle = "0%" },
+  { at = "9.7 s",  throttle = "20%" },
+  { at = "10.5 s", throttle = "0%" },
+  { at = "11 s",   throttle = "20%" },
+]
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0 s to 2 s"
+first = "never"
+basis = "rule: Auto-arm follows Betaflight's arming checks, and BOOTGRACE blocks arming until the ESCs' ready beep at 1.662 s (#32 §4), so the raise at 0.5 s doesn't arm"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "2 s to 2.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "rule: the frame at 2 s brings the raise: Auto-arm turns Arm on and holds the throttle low, and Betaflight arms on the next frame, at 2.004 s (tryArm)"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "2.005 s"
+value = "0% ± 0%"
+basis = "rule: Auto-arm holds the throttle at the bottom in the frame that arms, the one at 2.004 s"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "2.009 s"
+value = "15% ± 0.001%"
+basis = "rule: the frame at 2.008 s, two frames after the raise, carries the pilot's 20% throttle: CRSF step 500, read as 1193.39 µs, a command of (1193 - 1050) × 1000 ÷ 950 = 150, through the throttle curve's table 1150 µs: 15%"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "2 s to 4 s"
+first = "never"
+basis = "rule: with Auto-arm and no Arm switch, only Reset or a Failsafe drop disarms (#21), so throttle down at 2.5 s keeps it armed, idling"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "3.9 s to 4.1 s"
+first = "0.100125 s ± 0.000001 s"
+basis = "rule: Reset disarms (#37), on the step at 4 s"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "4 s to 6.5 s"
+first = "never"
+basis = "rule: Auto-arm arms on a raise from low that passes the arming checks: the raise at 4.5 s comes during BOOTGRACE, and the throttle is still up after the ready beep"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "6.5 s to 6.6 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "rule: the first raise from low after the ready beep arms, two frames on"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "7 s to 9 s"
+first = "between 1.497 s and 1.5082 s"
+basis = "source: Failsafe's DROP, failsafe_delay (1.5 s) after the last frame at 6.996 s, at an 11 ms check (failsafe.c)"
+
+[[expect]]
+what  = "Failsafe ends"
+over  = "9 s to 10.5 s"
+first = "between 1.0 s and 1.0112 s"
+basis = "source: failsafe.c: RXLOSS clears after 0.5 s of frames (failsafe_recovery_delay), and Failsafe ends after another 0.5 s, at an 11 ms check"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "9 s to 11 s"
+first = "never"
+basis = "rule: Auto-arm follows Betaflight's arming checks, so the raise at 9.7 s, while RXLOSS and FAILSAFE still block arming, doesn't arm"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "11 s to 11.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "rule: once Failsafe has ended, bringing the throttle low and up again arms (#21), two frames on"
