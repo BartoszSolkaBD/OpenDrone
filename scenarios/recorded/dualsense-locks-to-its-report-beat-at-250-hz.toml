@@ -1,0 +1,64 @@
+# A DualSense over USB reports on a steady 4 ms beat, and each report
+# reaches our input thread 0 to 0.5 ms after it is due (#27, ADR-0020). At a
+# Packet Rate of 250 Hz, which divides its 250 Hz Report Rate, the Radio Link
+# locks to that beat: it learns where a report is due from when the reports
+# arrive (the earliest of the last second's, on whole 4 ms periods), and
+# sends each frame 0.75 ms after one is due. So every frame carries exactly
+# one fresh report, at most 0.75 ms old.
+#
+# The Input Track is the maintainer's DualSense on the desk, untouched, for
+# 6 s, its motion sensors on: a report every 4 ms that changes nothing, its
+# heartbeat (dualsense-at-rest.csv). The Flight Controller runs alone; only
+# the Radio Link's frames are measured.
+format = 1
+name   = "A DualSense's Radio Link frames at 250 Hz each carry exactly one fresh report"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "dualsense-at-rest.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = true }
+
+[[expect]]
+what   = "reports in the frame"
+over   = "0 s to 6 s"
+lowest = "1 ± 0"
+basis  = "rule: ADR-0020: locked, each frame leaves 0.75 ms after a report is due, past the 0–0.5 ms the reports arrive in, and before the next is due 4 ms later, so it carries the one report due before it; the DualSense reports every 4 ms"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0 s to 6 s"
+highest = "1 ± 0"
+basis   = "rule: ADR-0020: as above, no frame carries two"
+
+[[expect]]
+what    = "frame age"
+over    = "0 s to 6 s"
+highest = "0.75 ms ± 0.000001 ms"
+basis   = "rule: ADR-0020: a report is due where the earliest of the last second's arrived, and its frame leaves 0.75 ms (6 steps at 8 kHz) later, so no report is older than that when its frame leaves"
+
+[[expect]]
+what   = "frame age"
+over   = "0 s to 6 s"
+lowest = "0.25 ms ± 0.000001 ms"
+basis  = "observed: the latest of this recording's reports reached the input thread 0.5 ms (4 steps) after the earliest on the beat; #27 measured 99.9% within 0.48 ms"

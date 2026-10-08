@@ -7,9 +7,9 @@ use opendrone_maths::{Attitude, Fingerprint, Fingerprinter, Vec3, functions};
 use opendrone_pack::{MapDefinition, QuadDefinition};
 use opendrone_pack::{Packs, Problem, Problems};
 use opendrone_sim::{
-    Channel, Channels, FlightControllerSeam, FlightInput, MapShapeProblem, Mount,
-    OurFlightController, PacketRate, PhysicsRate, QuadSetUp, QuadState, RadioLink, ScriptedMotors,
-    SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime,
+    Channel, Channels, FlightControllerSeam, FlightInput, InputDeviceFacts, MapShapeProblem, Mount,
+    OurFlightController, PacketRate, PhysicsRate, QuadSetUp, QuadState, RadioLink, RadioLinkOutput,
+    ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime,
 };
 
 use crate::measure::{Sample, angle_near};
@@ -109,6 +109,18 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let Some(quad) = quad else {
         return Err(problems);
     };
+    if let Inputs::Track(track) = &scenario.inputs
+        && !track.read
+    {
+        return Err(Problems(vec![Problem {
+            file: scenario.file.clone(),
+            line: track.line,
+            sentence: format!(
+                "the Input Track \"{}\" hasn't been read: the runner reads it from beside the Scenario",
+                track.file
+            ),
+        }]));
+    }
     let tune = match start.kind {
         Kind::Physics | Kind::ThrustStand => None,
         Kind::Flight | Kind::FlightController => match &quad.flight_controller {
@@ -243,26 +255,23 @@ fn simulate(
         attitude: start.attitude,
         rotation: start.rotation,
     };
-    let (flight_controller, track): (Box<dyn FlightControllerSeam>, Option<PilotTrack>) =
-        match (plan.inputs, tune) {
-            (Inputs::Motors(timeline), _) => {
-                (Box::new(ScriptedMotors::new(timeline.clone())), None)
-            }
-            (Inputs::Pilot(entries), Some(tune)) => (
-                Box::new(OurFlightController::new(
-                    tune.clone(),
-                    start.rates.clone(),
-                    plan.physics_rate,
-                    start.armed,
-                    start.assists.auto_arm,
-                    &state,
-                )),
-                Some(PilotTrack::new(entries, start)),
-            ),
-            (Inputs::Pilot(_), None) => {
-                unreachable!("a pilot's Timeline flies our Flight Controller")
-            }
-        };
+    let flight_controller: Box<dyn FlightControllerSeam> = match (plan.inputs, tune) {
+        (Inputs::Motors(timeline), _) => Box::new(ScriptedMotors::new(timeline.clone())),
+        (Inputs::Pilot(_) | Inputs::Track(_), Some(tune)) => Box::new(OurFlightController::new(
+            tune.clone(),
+            start.rates.clone(),
+            plan.physics_rate,
+            start.armed,
+            start.assists.auto_arm,
+            &state,
+        )),
+        (Inputs::Pilot(_) | Inputs::Track(_), None) => {
+            unreachable!("a pilot's inputs fly our Flight Controller")
+        }
+    };
+    // Where the motors are scripted, no sticks reach a Flight Controller.
+    let flies = !matches!(plan.inputs, Inputs::Motors(_));
+    let mut feed = Feed::new(plan.inputs, start);
     let set_up = SetUp {
         physics_rate: plan.physics_rate,
         world: map.world,
@@ -281,6 +290,8 @@ fn simulate(
             battery: plan.battery,
             mount: mount(start),
             packet_rate: packet_rate(start),
+            input_device: feed.device(),
+            input_smoothing: flies && start.assists.input_smoothing,
             flight_controller,
         }],
     };
@@ -337,25 +348,14 @@ fn simulate(
     let mut step_fingerprints = Vec::with_capacity(plan.length.ticks() as usize + 1);
     let mut first_broken_number = None;
     let mut before: Option<Sample> = None;
-    let mut last_channels: Option<Channels> = None;
     for tick in 0..=plan.length.ticks() {
         if tick > 0 {
             // The pilot's Flight Inputs for the step that starts now enter the
-            // Simulation: the Flying Input Device lost or back, Reset, and
-            // the Channels whenever they change.
-            if let Some(track) = &track {
-                for input in track.events_at(tick - 1) {
-                    sim.flight_input(0, SimulationTime::from_ticks(tick - 1), input);
-                }
-                let channels = track.channels(tick - 1);
-                if last_channels != Some(channels) {
-                    sim.flight_input(
-                        0,
-                        SimulationTime::from_ticks(tick - 1),
-                        FlightInput::Channels(channels),
-                    );
-                    last_channels = Some(channels);
-                }
+            // Simulation: from a Timeline, the Flying Input Device lost or
+            // back, Reset, and the Channels whenever they change; from an
+            // Input Track, each as it was recorded.
+            for input in feed.inputs_at(tick - 1) {
+                sim.flight_input(0, SimulationTime::from_ticks(tick - 1), input);
             }
             sim.step();
         }
@@ -363,6 +363,7 @@ fn simulate(
         let now = Sample {
             quad: Some(output),
             flight_controller: output.flight_controller,
+            radio_link: (flies && tick > 0).then_some(output.radio_link),
         };
         step_fingerprints.push(sim.fingerprint());
         let finite = sim.is_finite() && output.flight_controller.is_none_or(|r| finite_record(&r));
@@ -387,16 +388,14 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad: Received) -> Outcome {
     let mut first_broken_number = None;
     let mut step_fingerprints = Vec::new();
     let measured = if scenario.cases.is_empty() {
-        let Inputs::Pilot(entries) = &scenario.inputs else {
-            unreachable!("a Flight Controller Scenario's Timeline is a pilot's");
-        };
         let mut tallies: Vec<Tally> = scenario
             .expectations
             .iter()
             .map(|e| Tally::new(e, e.when))
             .collect();
-        let track = PilotTrack::new(entries, start);
-        let (fingerprints, broken) = loop_alone(start, tune, &track, scenario.length, &mut tallies);
+        let mut feed = Feed::new(&scenario.inputs, start);
+        let (fingerprints, broken) =
+            loop_alone(start, tune, &mut feed, scenario.length, &mut tallies);
         step_fingerprints = fingerprints;
         first_broken_number = broken;
         tallies.into_iter().map(|t| t.finish(None)).collect()
@@ -408,11 +407,12 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad: Received) -> Outcome {
                 .iter()
                 .map(|e| Tally::new(e, e.when))
                 .collect();
-            let track = PilotTrack::new(&case_timeline(case), start);
+            let timeline = Inputs::Pilot(case_timeline(case));
+            let mut feed = Feed::new(&timeline, start);
             let (fingerprints, broken) = loop_alone(
                 start,
                 tune,
-                &track,
+                &mut feed,
                 SimulationTime::from_ticks(1),
                 &mut tallies,
             );
@@ -452,7 +452,7 @@ fn case_timeline(case: &Case) -> Vec<PilotEntry> {
 fn loop_alone(
     start: &Start,
     tune: &Tune,
-    track: &PilotTrack,
+    feed: &mut Feed<'_>,
     length: SimulationTime,
     tallies: &mut [Tally<'_>],
 ) -> (Vec<Fingerprint>, Option<String>) {
@@ -462,9 +462,10 @@ fn loop_alone(
         start.rates.clone(),
         rate.hz(),
         start.armed,
-        &track.readings(0),
+        &feed.readings(0),
     );
-    let mut link = RadioLink::new(packet_rate(start), rate);
+    let mut link = RadioLink::new(packet_rate(start), rate, feed.device());
+    let mut output = RadioLinkOutput::default();
     let fingerprint = |fc: &FlightController, link: &RadioLink| {
         let mut f = Fingerprinter::new();
         fc.write_fingerprint(&mut f);
@@ -474,30 +475,30 @@ fn loop_alone(
     let mut fingerprints = vec![fingerprint(&flight_controller, &link)];
     let mut first_broken_number = None;
     let mut before: Option<Sample> = None;
-    let mut last_channels: Option<Channels> = None;
     for tick in 0..=length.ticks() {
         let mut now = Sample {
             quad: None,
             flight_controller: None,
+            radio_link: None,
         };
         if tick > 0 {
             let t = tick - 1;
-            for input in track.events_at(t) {
+            let at = SimulationTime::from_ticks(t);
+            for input in feed.inputs_at(t) {
                 match input {
-                    FlightInput::InputDeviceLost => link.lose(),
-                    FlightInput::InputDeviceBack => link.back(),
+                    FlightInput::Channels(channels) => link.hear(at, channels),
+                    FlightInput::InputDeviceLost => link.lose(at),
+                    FlightInput::InputDeviceBack => link.back(at),
                     // The reader keeps Reset to Flight Scenarios.
-                    FlightInput::Reset | FlightInput::Channels(_) => {}
+                    FlightInput::Reset => {}
                 }
             }
-            let channels = track.channels(t);
-            if last_channels != Some(channels) {
-                link.hear(channels);
-                last_channels = Some(channels);
-            }
-            let frame = link.frame(SimulationTime::from_ticks(t));
-            flight_controller.step(&track.readings(t), frame.as_ref());
+            let frame = link.frame(at);
+            output = output.after(frame, &link);
+            let channels = frame.map(|frame| frame.channels);
+            flight_controller.step(&feed.readings(t), channels.as_ref());
             now.flight_controller = Some(*flight_controller.debug());
+            now.radio_link = Some(output);
             fingerprints.push(fingerprint(&flight_controller, &link));
             if first_broken_number.is_none() && !finite_record(flight_controller.debug()) {
                 first_broken_number = Some(format!(
@@ -529,6 +530,98 @@ fn finite_record(record: &opendrone_sim::DebugRecord) -> bool {
         .chain(terms)
         .chain([record.throttle])
         .all(f64::is_finite)
+}
+
+/// The pilot's Flight Inputs, step by step, and for the Flight Controller
+/// alone the sensor readings.
+enum Feed<'s> {
+    /// From a Timeline: the Flying Input Device lost or back, Reset, and the
+    /// Channels whenever they change. Scripted sticks have no Input Device.
+    Timeline {
+        track: Box<PilotTrack>,
+        last: Option<Channels>,
+    },
+    /// From an Input Track: each Flight Input as recorded, from the device
+    /// whose facts it gives. The sensor readings hold `[start]`'s.
+    Recorded {
+        inputs: &'s [(SimulationTime, FlightInput)],
+        next: usize,
+        device: InputDeviceFacts,
+        readings: SensorReadings,
+    },
+    /// Scripted motors: no pilot.
+    None,
+}
+
+impl<'s> Feed<'s> {
+    fn new(inputs: &'s Inputs, start: &Start) -> Feed<'s> {
+        match inputs {
+            Inputs::Pilot(entries) => Feed::Timeline {
+                track: Box::new(PilotTrack::new(entries, start)),
+                last: None,
+            },
+            Inputs::Track(track) => Feed::Recorded {
+                inputs: &track.inputs,
+                next: 0,
+                device: track.device,
+                readings: SensorReadings {
+                    gyro: start.rotation,
+                    attitude: start.attitude,
+                    escs_ready: true,
+                },
+            },
+            Inputs::Motors(_) => Feed::None,
+        }
+    }
+
+    /// The Input Device's facts, for the Radio Link: none for scripted
+    /// sticks, which get plain regular frames.
+    fn device(&self) -> Option<InputDeviceFacts> {
+        match self {
+            Feed::Recorded { device, .. } => Some(*device),
+            Feed::Timeline { .. } | Feed::None => None,
+        }
+    }
+
+    /// The Flight Inputs that arrive at a step, in order. Call it once for
+    /// each step, in order.
+    fn inputs_at(&mut self, tick: u64) -> Vec<FlightInput> {
+        match self {
+            Feed::Timeline { track, last } => {
+                let mut inputs: Vec<FlightInput> = track.events_at(tick).collect();
+                let channels = track.channels(tick);
+                if *last != Some(channels) {
+                    inputs.push(FlightInput::Channels(channels));
+                    *last = Some(channels);
+                }
+                inputs
+            }
+            Feed::Recorded { inputs, next, .. } => {
+                let mut arrived = Vec::new();
+                while let Some((at, input)) = inputs.get(*next)
+                    && at.ticks() <= tick
+                {
+                    arrived.push(*input);
+                    *next += 1;
+                }
+                arrived
+            }
+            Feed::None => Vec::new(),
+        }
+    }
+
+    /// The sensor readings at a step, for the Flight Controller alone.
+    fn readings(&self, tick: u64) -> SensorReadings {
+        match self {
+            Feed::Timeline { track, .. } => track.readings(tick),
+            Feed::Recorded { readings, .. } => *readings,
+            Feed::None => SensorReadings {
+                gyro: Vec3::ZERO,
+                attitude: Attitude::BODY_IS_WORLD,
+                escs_ready: true,
+            },
+        }
+    }
 }
 
 /// The pilot's Timeline, ready to read at any step: each stick's values (with

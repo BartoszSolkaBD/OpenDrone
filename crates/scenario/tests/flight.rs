@@ -186,7 +186,7 @@ fn a_flight_controller_scenario_measures_only_what_the_flight_controller_does() 
     let found = failures(&report(&fixture("fc-height", &text)));
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].ends_with(
-        "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller does, not height"
+        "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller and its Radio Link do, not height"
     ));
 }
 
@@ -218,26 +218,36 @@ fn what_a_flight_controller_loop_did_cant_be_measured_before_the_first_loop() {
 }
 
 #[test]
-fn angle_horizon_input_smoothing_and_endless_battery_wait_for_their_tickets() {
+fn angle_horizon_and_endless_battery_wait_for_their_tickets() {
     let text = tracer()
         .replacen(
             "flight_mode       = \"Acro\"",
             "flight_mode       = \"Angle\"",
             1,
         )
-        .replacen("input_smoothing = \"off\"", "input_smoothing = \"on\"", 1)
         .replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);
     let found = failures(&report(&fixture("angle-assists", &text)));
-    assert_eq!(found.len(), 3, "{found:#?}");
+    assert_eq!(found.len(), 2, "{found:#?}");
     assert!(found[0].ends_with(
         "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)"
     ));
     assert!(found[1].ends_with(
-        "Input smoothing doesn't run yet, so `input_smoothing` must be \"off\": Input smoothing arrives with the Radio Link ticket (#56)"
-    ));
-    assert!(found[2].ends_with(
         "Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"
     ));
+}
+
+#[test]
+fn input_smoothing_runs_in_a_flight_scenario_but_not_with_the_flight_controller_alone() {
+    // Input smoothing is the Simulation's Assist, in front of the Radio Link
+    // (#21, ADR-0003).
+    let text = arming().replacen("input_smoothing = \"off\"", "input_smoothing = \"on\"", 1);
+    let found = failures(&report(&fixture("fc-input-smoothing", &text)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].ends_with(
+        "Input smoothing is an Assist of the Simulation, in front of the Radio Link, and a Flight Controller Scenario runs the Flight Controller alone, so `input_smoothing` must be \"off\""
+    ));
+    let smoothing = scenario("flight-controller/input-smoothing-eases-roll-pitch-and-yaw");
+    assert!(read_scenario("input-smoothing", &smoothing).is_ok());
 }
 
 #[test]

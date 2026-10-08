@@ -4,8 +4,9 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 ## Where they live
 
-- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, and `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios.
+- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios, and `recorded/` for those that play back a real Input Device's recording.
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
+- `<plain words>.csv`, beside the Scenarios that play it: an Input Track, recorded Flight Inputs (see [An Input Track](#an-input-track) below).
 - `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, `whoop-65-rotor-drag-only.toml`, the Whoop 65 with rotor drag as its only drag, and `freestyle-5-filters-and-shaping-off.toml`, the Freestyle 5″ with the Flight Controller's filters and loop shaping off in its Tune, which the Flight Controller doesn't simulate yet (#49, #50), so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own. Each says at its top what it changes and why.
 
 ## The Scenario file
@@ -47,15 +48,15 @@ In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `arm
 
 | `kind` | What runs | Its inputs |
 |---|---|---|
-| `"flight"` | Our Flight Controller and the physics fly the Quad together. | The pilot's sticks and Arm switch. |
-| `"flight controller"` | The Flight Controller alone. | The pilot's sticks and Arm switch, and the sensor readings: a Timeline, or a table of cases. |
+| `"flight"` | Our Flight Controller and the physics fly the Quad together. | The pilot's sticks and Arm switch: a Timeline, or an Input Track. |
+| `"flight controller"` | The Flight Controller alone, with its Radio Link. | The pilot's sticks and Arm switch, and the sensor readings: a Timeline, an Input Track (with the sensor readings `[start]` gives), or a table of cases. |
 | `"physics"` | The physics alone, with scripted motors in place of the Flight Controller. | Motor commands. |
 | `"thrust stand"` | The physics, with the Quad held still: its `speed` and `rotation` must be zero, while its motors, ESCs and battery work as in flight. | Motor commands. |
 
 Where our Flight Controller runs:
 
 - **The Quad's Tune must spell out every setting the Flight Controller reads** ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). The Freestyle 5″'s does. The Whoop 65's gets its settings from the `diff all` importer (#53); until then a Scenario that flies it is refused, naming what its Tune lacks.
-- **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and Input smoothing (#56) and Endless Battery (#57) must be `"off"` until their tickets. Auto-arm runs in Flight Scenarios (see [Auto-arm](#auto-arm) below); a Flight Controller Scenario leaves it out, so there it must be `"off"`.
+- **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and Endless Battery (#57) must be `"off"` until its ticket. Auto-arm and Input smoothing run in Flight Scenarios (see [Auto-arm](#auto-arm) and [Input smoothing](#input-smoothing) below); they are the Simulation's Assists, in front of the Flight Controller and its Radio Link, so a Flight Controller Scenario leaves them out, and there they must be `"off"`.
 - **A Flight Scenario starts mid-air or landed.** Mid-air, its motors are `"settled"`. Landed, a "fresh" Flight Controller is exactly Reset: its motors start `"powering up"`, so its ESCs play their start-up tones and arming waits for their ready beep, about 1.7 s, and it starts as Reset leaves the Quad, with `armed = false` and no `speed` or `rotation`. That start is the Scenario's Launch Spot, where Reset puts the Quad back.
 - **`armed = true`** starts the Flight Controller armed, as a mid-air start needs; the Timeline's Arm switch then holds it armed, or disarms it.
 
@@ -170,12 +171,53 @@ timeline = [
 
 With `auto_arm = "on"` in a Flight Scenario, as in [`auto-arm.toml`](../../scenarios/flight-controller/auto-arm.toml), the Quad arms on the first throttle raise from low (below `min_check`) that passes Betaflight's arming checks, and only Reset or a Failsafe drop disarms it. No Arm switch is bound then (it would take over), so `arm` stays `"off"` all through the Timeline. Auto-arm drives the Arm switch in each Radio Link frame itself, through Betaflight's own arming, which arms only on a frame with the throttle low, one frame after the switch goes on: so it turns Arm on with the frame that brings the raise and holds the throttle at the bottom in that frame and the next. The raise reaches the Flight Controller two frames late, 8 ms at 250 Hz.
 
+#### Input smoothing
+
+With `input_smoothing = "on"` in a Flight Scenario, as in [`input-smoothing-eases-roll-pitch-and-yaw.toml`](../../scenarios/flight-controller/input-smoothing-eases-roll-pitch-and-yaw.toml), roll, pitch and yaw go through one fixed gentle low-pass before the Radio Link: a first-order filter at 15 Hz, which delays a stick move by about 10.6 ms (1 ÷ (2π × 15 Hz)) (#21). The throttle and the switches pass untouched. After a stick jumps, the smoothed stick has covered 1 − e^(−2π × 15 Hz × t) of the jump t seconds later: 67.7% after 12 ms, 95.1% after 32 ms. Each frame carries the smoothed sticks as they stand when it leaves, rounded to the receiver's nearest step, and the first Channels are taken as they are.
+
 How the sticks reach the Flight Controller, as on a real quad on ExpressLRS:
 
 1. **Each stick becomes a whole-number Channel:** the step an ELRS receiver hands over CRSF, from 172 (-100%, 988 µs) through 992 (centre, 1500 µs) to 1811 (+100%, 2012 µs). The runner rounds each percent to the nearest step: 50% is 1500 + 512 × 0.5 = 1756 µs, step 1401. Whenever a Channel changes, it enters the Simulation as a Flight Input, stamped with Simulation Time.
-2. **The Radio Link** sends a frame with the newest Channels at the Packet Rate (`radio_link`), the first at 0 s: every 4 ms at 250 Hz. A frame due between two physics steps leaves on the later one.
+2. **The Radio Link** sends a frame with the newest Channels at the Packet Rate (`radio_link`). A Timeline's sticks are scripted, with no Input Device, so they get plain regular frames on the link's own clock, the first at 0 s: every 4 ms at 250 Hz. A frame due between two physics steps leaves on the later one. An Input Track's device can lock the link to its report beat instead: see [An Input Track](#an-input-track) below.
 3. **The Flight Controller** reads each step as Betaflight 2026.6 reads CRSF: 0.62477 × step + 881 µs. So a centred stick reads 1500.77 µs, not 1500 µs, and asks for a little rotation (0.11 °/s on Actual 70/670), and 50% stick reads 1756.30 µs, a deflection of 0.5126. Full stick reads 2012.46 µs, beyond 500 µs from centre, so it is exactly full. [`actual-rates.toml`](../../scenarios/flight-controller/actual-rates.toml) has the table.
 4. **One Flight Controller loop runs per physics step,** reading the gyro (the Quad's true rotation) and the true attitude at the step's start.
+
+### An Input Track
+
+A Flight or Flight Controller Scenario may play back an **Input Track** instead of a Timeline: the Flight Inputs a real Input Device sent, recorded in a CSV file beside the Scenario, as in [`dualsense-locks-to-its-report-beat-at-250-hz.toml`](../../scenarios/recorded/dualsense-locks-to-its-report-beat-at-250-hz.toml):
+
+```toml
+[inputs]
+input_track  = "dualsense-at-rest.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = true }
+```
+
+- **`input_track`** names the CSV file, in the Scenario's own folder.
+- **`input_device`** gives the facts of the device it was recorded from, which the Simulation gets with its set-up, as the game gives it the Flying Input Device's from its Input Device profile: its `report_rate`, a whole number of reports a second such as `"250 Hz"` (or `"unknown"`), and `reports_at_rest`, `true` for a device that keeps reporting while its sticks rest, such as a DualSense over USB with its motion sensors on, and `false` for one that reports only changes, such as a Radio or a DualSense whose motion sensors didn't start.
+- A Flight Controller Scenario fed an Input Track keeps the sensor readings `[start]` gives. A Scenario that plays an Input Track can't be compared with another run yet: the track plays back as it was recorded, at the physics rate it was recorded at.
+
+The file starts with comment lines (`#`) saying where it came from, then its header, then a row for each Flight Input, in time order:
+
+```text
+time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event
+0,1525.882,1500,988,1500,988,988,988,
+0.003875,,,,,,,,
+0.008,1530.109,,,,,,,
+```
+
+- **`time`** is Simulation Time from the Scenario's start, in seconds, each a whole number of physics steps.
+- **The Channels** are in µs, at the device's full resolution after its Calibration and channel mapping, as the input layer hands them to the game. Each is rounded to the receiver's nearest step as it enters the Simulation, as the game rounds a live device's. Arm, Flight Mode and Crash Flip are AUX1–3, with their fixed meanings ([ADR-0017](../adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md)).
+- **A row only when something happens.** The first row, at 0 s, gives every Channel. After it a row gives only the Channels that changed; an empty cell holds the last value. A row with no values and no event is a report from the device that changed nothing: a device that reports at rest sends one with every report, and those keep it from counting as lost. A device that reports only changes has none.
+- **`event`** is empty, `input device lost` (the computer reported the Flying Input Device removed), `input device back`, or `reset` (only in a Flight Scenario that starts as Reset leaves the Quad). A row with an event gives no Channels.
+- The run lasts at least to the track's last row. After its last row the device says nothing more.
+
+The Input Tracks in `scenarios/recorded/` are the maintainer's own device recordings from the SDL3 input probe (#18, #27, #30), committed trimmed in `crates/input/tests/traces/`, played through the built-in Pack's Input Device profiles exactly as the game does. A readable check in `crates/input/tests/input_tracks.rs` makes each track afresh and fails if the committed one differs; `OPENDRONE_WRITE_INPUT_TRACKS=1 cargo test -p opendrone-input --test input_tracks` writes them again.
+
+What the Radio Link does with an Input Track's device ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md), #27):
+
+- **It locks to the device's report beat** when the Packet Rate divides its Report Rate evenly: the DualSense over USB (250 Hz) at 250 and 50 Hz, the Pocket (1 kHz) at 1000, 500, 333, 250, 100 and 50 Hz (333 Hz counts as a frame every 3 ms). It learns the beat only from the Flight Inputs' stamps, so a replay learns it exactly the same way: a report is due where the earliest of the last second's reports arrived, counted on whole report periods, and each frame leaves 0.75 ms after a report is due. So every frame carries the reports due since the last one, and the newest is at most 0.75 ms old. Between reports the beat carries on by itself. A report that arrives after its frame has left costs one repeated frame.
+- **Otherwise it runs on its own clock,** from 0 s, as for scripted sticks; at 100 Hz a DualSense's 4 ms reports fall two and three to a frame by turns.
+- **A device that reports at rest counts as lost after 1 s without a report,** exactly as if it were unplugged: the Radio Link sends no frames, and Failsafe follows. Its next report brings it back. A device that reports only changes is lost only when the track says `input device lost`.
 
 ### A table of cases, `[[case]]`
 
@@ -220,8 +262,9 @@ basis  = "rule: ..."
   - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length, and acceleration east and north the same for the speeds east and north; none of the three can be measured at 0 s.
   - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it, over the last step: in flight, in the air the rotor moved through, so it falls in a climb and rises in a descent and at speed; on the thrust stand, in still air), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %). **Total thrust** is all four motors' thrust.
   - **the battery:** **battery voltage** (at its terminals, past the connector), **battery current** (drawn from it; negative while braking motors give some back), **battery charge used** (since the start, in mAh) and **battery sag** (how far the voltage sits below the pack's resting voltage at its charge).
-  - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll P term**, **roll I term**, **roll D term** and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle; and **mixer throttle**, the throttle the mixer starts from, from 0% to 100%, before Airmode moves it (Blackbox's throttle), which shows the pilot's throttle through the throttle curve whatever the PID loop does. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these.
-  - **something that happens** (only where our Flight Controller runs, and not in a table of cases): **the Quad arms**, **the Quad disarms**, **Failsafe's stage 2 starts** (with DROP, the Quad disarms), **Failsafe ends**, **the ESCs are ready** (every ESC has played its ready beep; only in a Flight Scenario), and each of Betaflight's reasons for refusing to arm, **FAILSAFE**, **RXLOSS**, **NOT_DISARMED**, **THROTTLE**, **ANGLE**, **BOOTGRACE** and **ARM_SWITCH**, written "RXLOSS blocks arming" or "RXLOSS stops blocking arming". See [When something happens](#when-something-happens) below.
+  - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll P term**, **roll I term**, **roll D term** and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle; and **mixer throttle**, the throttle the mixer starts from, from 0% to 100%, before Airmode moves it (Blackbox's throttle), which shows the pilot's throttle through the throttle curve whatever the PID loop does. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these and what its Radio Link did.
+  - **what the Radio Link did** (only where the pilot's sticks reach a Flight Controller, and not at 0 s): **reports in the frame**, how many of the device's reports arrived since the last frame, the fresh ones the frame carries, measured on each step a frame leaves (on the device's beat, values that reach the input thread in two polls within one report count once; with no fresh report, a frame repeats the last one's Channels); **frame age**, how long before a frame left the newest fresh report it carries arrived, measured on each step a frame with a fresh report leaves; and **roll channel**, **pitch channel**, **yaw channel** and **throttle channel**, each stick as the last frame carried it, in percent as a Timeline writes sticks (roll, pitch and yaw from -100% to 100%, the throttle from 0% to 100%, read through ELRS's µs: step 992, centre, is 0.06%). A frame that leaves on a step shows after it: the one that leaves at 1.012 s at 1.012125 s.
+  - **something that happens** (only where our Flight Controller runs, and not in a table of cases): **the Quad arms**, **the Quad disarms**, **Failsafe's stage 2 starts** (with DROP, the Quad disarms), **Failsafe ends**, **the ESCs are ready** (every ESC has played its ready beep; only in a Flight Scenario), each of Betaflight's reasons for refusing to arm, **FAILSAFE**, **RXLOSS**, **NOT_DISARMED**, **THROTTLE**, **ANGLE**, **BOOTGRACE** and **ARM_SWITCH**, written "RXLOSS blocks arming" or "RXLOSS stops blocking arming", and, as the Radio Link counts it, **the Flying Input Device is lost** (unplugged, or silent too long) and **the Flying Input Device is back**. See [When something happens](#when-something-happens) below.
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`** (or **`first`**, for something that happens). A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.

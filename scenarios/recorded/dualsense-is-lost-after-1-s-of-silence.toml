@@ -1,0 +1,68 @@
+# A DualSense over USB keeps its motion sensors on as a heartbeat, so it
+# reports every 4 ms even while its sticks rest. A device that keeps
+# reporting at rest counts as lost after 1 s of silence, exactly as if it
+# were unplugged (#27); the Radio Link then sends no frames, and the Flight
+# Controller's Failsafe follows (Betaflight 2026.6.2, src/main/rx/rx.c).
+#
+# The Input Track is the maintainer's DualSense on the desk, untouched, its
+# motion sensors on (dualsense-at-rest.csv). Its last report is at 6 s;
+# after that it says nothing, as if it had hung. The Flight Controller runs
+# alone, disarmed.
+format = 1
+name   = "A DualSense that stops reporting is lost after 1 s of silence"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "dualsense-at-rest.csv"
+input_device = { report_rate = "250 Hz", reports_at_rest = true }
+
+[[expect]]
+what  = "the Flying Input Device is lost"
+over  = "0 s to 6.999 s"
+first = "never"
+basis = "source: #27: a device that reports at rest counts as lost only after 1 s of silence; it reports every 4 ms until 6 s"
+
+[[expect]]
+what  = "the Flying Input Device is lost"
+over  = "6 s to 8 s"
+first = "1.000125 s ± 0.000001 s"
+basis = "source: #27: lost 1 s after its last report, at 6 s: at 7 s, shown after that step (0.125 ms at 8 kHz)"
+
+[[expect]]
+what  = "reports in the frame"
+over  = "6.01 s to 6.99 s"
+highest = "0 ± 0"
+basis = "rule: ADR-0020: until it is lost the beat carries on by itself, each frame repeating the last Channels with no fresh report"
+
+[[expect]]
+what  = "RXLOSS blocks arming"
+over  = "6 s to 8 s"
+first = "between 1.146 s and 1.1505 s"
+basis = "source: rx.c, rxFrameCheck: 150 ms (RXLOSS_TRIGGER_INTERVAL) after the last frame, the one less than 4 ms before 7 s, on the first loop past it"
+
+[[expect]]
+what  = "the Flying Input Device is back"
+over  = "6 s to 9 s"
+first = "never"
+basis = "source: #27: only a report brings it back, and none comes"
