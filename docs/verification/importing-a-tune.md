@@ -6,7 +6,7 @@ The Whoop 65's Tune is made this way, from the maintainer's Meteor65 Pro.
 
 ## Import a quad's Tune
 
-1. In the Betaflight App's CLI tab, type `diff bare` and save everything it prints to a text file (see [What it accepts](#what-it-accepts) for why `bare`). The maintainer's two quads are in [`docs/research/quad-settings/`](../research/quad-settings/README.md), exported with `diff all`.
+1. In the Betaflight App's CLI tab, type `diff all` (on Betaflight 4.3 and 4.4, `diff bare`: see [What it accepts](#what-it-accepts)) and save everything it prints to a text file. The maintainer's two quads are in [`docs/research/quad-settings/`](../research/quad-settings/README.md), exported with `diff all`.
 2. Run the importer with that file and the Quad's folder:
 
    ```sh
@@ -21,7 +21,9 @@ Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is
 ## What it accepts
 
 - `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find Betaflight's PID profile (the part of Betaflight's settings that becomes most of a Tune).
-- **`diff bare` is the best choice.** Without `bare`, Betaflight first applies the board's own defaults (its manufacturer's settings for that flight controller board) and lists what differs from those. A setting the board's defaults change that the pilot left alone is then missing, so it imports at Betaflight's own default for that version, which isn't what the quad flies. The Meteor's own `diff all` shows it: it lists `min_throttle = 1070` and `motor_pwm_rate = 480`, which are Betaflight 4.3's own defaults, because the board's settings change them. So the importer says so whenever an export isn't `bare`. `diff bare` compares with Betaflight's own defaults, and holds just the active profiles. `diff all bare` is refused: it lists every profile but leaves out the line that says which one is active.
+- **On Betaflight 4.3 and 4.4, `diff bare` is the best choice.** Without `bare`, those versions first apply the board's own defaults (its manufacturer's settings for that flight controller board) and list what differs from those. A setting the board's defaults change that the pilot left alone is then missing, so it imports at Betaflight's own default for that version, which isn't what the quad flies. The Meteor's own `diff all` shows it: it lists `min_throttle = 1070` and `motor_pwm_rate = 480`, which are Betaflight 4.3's own defaults, because the board's settings change them. So the importer adds a note to a 4.3 or 4.4 `diff` that isn't `bare`. `diff bare` compares with Betaflight's own defaults, and holds just the active profiles.
+- **From 4.5 on, `bare` changes nothing about the comparison.** A board's own defaults are built into its firmware, so every `diff` lists what differs from those, and a setting the board changes from Betaflight's usual default but the pilot left alone imports at the usual default. Only a `dump`, which lists every value, avoids that, in any version.
+- **An export that lists every profile without saying which one is active is refused,** as a `diff all bare` or `dump all bare` does: it leaves out the line that selects the active profile again. The importer tells by the profile lines themselves, not only by the command echoed at the top. The Rates paste refuses one the same way.
 - It knows the settings and defaults of every Betaflight release from 4.3 to 2026.6: **4.3, 4.4, 4.5, 2025.12 and 2026.6**, each read from its source (4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2). A version's patch releases share its defaults. Older than 4.3, and newer than 2026.6, are refused with a sentence saying so.
 
 ## What it reads

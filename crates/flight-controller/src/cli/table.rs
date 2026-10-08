@@ -133,6 +133,10 @@ pub enum Rule {
     /// follow exactly: its I limit was `iterm_limit` too, and is now the same
     /// percentage of `pidsum_limit_yaw`, so 400 becomes 320 at the defaults.
     ItermWindup,
+    /// `failsafe_recovery_delay` from 4.3–4.4's: the same tenths of a second,
+    /// but 4.3 and 4.4 waited at least 200 ms however low it was set, where
+    /// 2026.6 waits at least 100 ms and takes 1 to 200. So 0 and 1 become 2.
+    RecoveryDelay,
 }
 
 /// How many versions each row covers: [`Family::ALL`]'s.
@@ -201,6 +205,7 @@ const D_ROLL: &[(&str, &str)] = &[("d_roll", "40"), ("d_min_roll", "30")];
 const D_PITCH: &[(&str, &str)] = &[("d_pitch", "46"), ("d_min_pitch", "34")];
 const D_YAW: &[(&str, &str)] = &[("d_yaw", "0"), ("d_min_yaw", "0")];
 const ADVANCE: &[(&str, &str)] = &[("d_max_gain", "37"), ("d_max_advance", "20")];
+const RECOVERY: &[(&str, &str)] = &[("failsafe_recovery_delay", "10")];
 const WINDUP: &[(&str, &str)] = &[
     ("iterm_limit", "400"),
     ("pidsum_limit", "500"),
@@ -225,9 +230,9 @@ pub const SETTINGS: &[Setting] = &[
     all("failsafe_procedure", Failsafe, "", "DROP"),
     all("failsafe_throttle", Failsafe, "µs", "1000"),
     all("failsafe_switch_mode", Failsafe, "", "STAGE1"),
-    all("failsafe_throttle_low_delay", FailsafeCli, "tenths of a second", "100"),
+    all("failsafe_throttle_low_delay", Failsafe, "tenths of a second", "100"),
     row("failsafe_recovery_delay", FailsafeCli, "tenths of a second",
-        [Same("10"), Same("10"), Same("5"), Same("5"), Same("5")]),
+        [rule(Rule::RecoveryDelay, RECOVERY), rule(Rule::RecoveryDelay, RECOVERY), Same("5"), Same("5"), Same("5")]),
     all("failsafe_stick_threshold", FailsafeCli, "percent", "30"),
     // PID Tuning: the PIDs, axis by axis, as the App's table shows them.
     // Until 2025.12, d_min was the base D and d the peak (see Rule::DBase).

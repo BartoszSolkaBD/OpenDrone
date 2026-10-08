@@ -331,11 +331,47 @@ impl<'a> CliText<'a> {
         })
     }
 
-    /// Whether the CLI echoed a `bare` export, which compares with
-    /// Betaflight's own defaults rather than the board's.
+    /// Whether the export is `bare`: the CLI echoed `bare`, or, with no echo,
+    /// it has no `batch start` line, which only a `bare` export leaves out.
+    /// In Betaflight 4.3 and 4.4, `bare` is what makes a `diff` compare with
+    /// Betaflight's own defaults rather than the board's; from 4.5 on, a
+    /// board's defaults are built into its firmware and `bare` only drops
+    /// the extra lines.
     pub fn bare(&self) -> bool {
-        self.echo
-            .is_some_and(|echo| echo.split_whitespace().any(|word| word == "bare"))
+        match self.echo {
+            Some(echo) => echo.split_whitespace().any(|word| word == "bare"),
+            None => !self.lines.iter().any(|line| line.text == "batch start"),
+        }
+    }
+
+    /// Whether the export is a `diff`, which lists only what differs, rather
+    /// than a `dump`, which lists every value: the CLI's echo says, or, with
+    /// no echo, a `defaults nosave` line, which only a `diff all` prints.
+    pub fn is_diff(&self) -> bool {
+        match self.echo {
+            Some(echo) => echo.starts_with("diff"),
+            None => self.lines.iter().any(|line| line.text == "defaults nosave"),
+        }
+    }
+
+    /// Whether the `profile` lines say which PID profile is active: there is
+    /// just one (a `diff` or `dump` lists only the active profile), or the
+    /// last selects again one listed before (a `diff all` or `dump all` ends
+    /// so). A `bare` export of every profile lists each and selects none
+    /// again; so does a paste missing its last lines.
+    pub fn names_active_profile(&self) -> bool {
+        names_active(self.lines.iter().filter_map(|line| match line.command {
+            Command::Profile(n) => Some(n),
+            _ => None,
+        }))
+    }
+
+    /// The same for the `rateprofile` lines.
+    pub fn names_active_rate_profile(&self) -> bool {
+        names_active(self.lines.iter().filter_map(|line| match line.command {
+            Command::RateProfile(n) => Some(n),
+            _ => None,
+        }))
     }
 
     /// The Betaflight version, or why there isn't one the translator reads.
@@ -350,9 +386,19 @@ impl<'a> CliText<'a> {
                 .map(|family| (version, family))
                 .map_err(Refusal::one),
             _ => Err(Refusal::one(
-                "There's no `# version` line, so the Betaflight version is unknown: paste the whole output of `diff all`, from its first line.",
+                "There's no `# version` line, so the Betaflight version is unknown: paste the whole output of `diff`, `diff all` or `dump`, from its first line.",
             )),
         }
+    }
+}
+
+/// Whether profile lines, in order, say which profile is active: none or
+/// one, or a last that repeats an earlier one.
+fn names_active(numbers: impl Iterator<Item = u8>) -> bool {
+    let numbers: Vec<u8> = numbers.collect();
+    match numbers.split_last() {
+        None | Some((_, [])) => true,
+        Some((last, earlier)) => earlier.contains(last),
     }
 }
 

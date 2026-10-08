@@ -188,6 +188,21 @@ fn rates_from_betaflight_older_than_4_3_are_refused() {
 }
 
 #[test]
+fn a_paste_that_lists_every_rate_profile_without_selecting_one_is_refused() {
+    // Basis: Source (a `diff all bare` lists each rate profile and leaves out
+    // the line that selects the active one again, 4.3.0's cli.c:6385).
+    let bare = changed(
+        CETUS,
+        "# restore original rateprofile selection\nrateprofile 0\n",
+        "",
+    );
+    assert!(
+        refused(&bare)
+            .starts_with("This paste lists each rate profile but doesn't say which one is active")
+    );
+}
+
+#[test]
 fn a_paste_with_no_rate_profile_is_refused() {
     assert!(
         refused("set p_roll = 40\naux 0 0 0 1700 2100 0 0\n")

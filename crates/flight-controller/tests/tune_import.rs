@@ -690,33 +690,75 @@ fn the_cetus_xs_diff_all_from_betaflight_4_4_imports_too() {
     assert!(tune.is_ok(), "{tune:?}");
 }
 
-#[test]
-fn an_export_not_taken_bare_is_imported_with_a_warning_and_a_diff_all_bare_is_refused() {
-    // Basis: Source (4.3.0's cli.c: without `bare`, `diff` first applies the
-    // board's own defaults, and `diff all bare` leaves out the line that
-    // selects the active profile again).
-    let meteor = meteor();
-    assert_eq!(meteor.warnings.len(), 1);
-    assert!(
-        meteor.warnings[0].starts_with(
-            "This `diff all` lists what differs from the board's own defaults, not Betaflight's:"
-        ),
-        "{:?}",
-        meteor.warnings
+/// The Meteor's `diff all` as `diff all bare` prints it: no batch, no
+/// `defaults nosave`, and no lines selecting the active profiles again.
+fn meteor_all_bare() -> String {
+    let text = changed(METEOR, "# diff all\n", "# diff all bare\n");
+    let text = changed(&text, "batch start\n", "");
+    let text = changed(&text, "defaults nosave\n", "");
+    let text = changed(
+        &text,
+        "# restore original profile selection\nprofile 0\n",
+        "",
     );
+    changed(
+        &text,
+        "# restore original rateprofile selection\nrateprofile 0\n",
+        "",
+    )
+}
+
+#[test]
+fn a_4_3_or_4_4_diff_not_taken_bare_is_imported_with_a_note_about_the_boards_defaults() {
+    // Basis: Source (4.3.0's cli.c:6245 and 4.4.0's cli.c:6222: without
+    // `bare`, a `diff` first applies the board's own defaults).
+    for import in [meteor(), cetus()] {
+        assert_eq!(import.warnings.len(), 1);
+        assert!(
+            import.warnings[0].starts_with(
+                "In Betaflight 4.3 and 4.4, a `diff` without `bare` lists what differs from the board's own defaults, not Betaflight's:"
+            ),
+            "{:?}",
+            import.warnings
+        );
+    }
     assert!(
-        meteor
+        meteor()
             .report()
-            .contains("- Note: This `diff all` lists what differs")
+            .contains("- Note: In Betaflight 4.3 and 4.4, a `diff` without `bare`")
     );
     let bare = changed(METEOR, "# diff all\n", "# diff bare\n");
     assert_eq!(import(&bare).warnings, Vec::<String>::new());
-    let all_bare = changed(METEOR, "# diff all\n", "# diff all bare\n");
-    assert!(
-        refusal(&all_bare).starts_with(
-            "A `diff all bare` doesn't say which of Betaflight's PID profiles is active"
-        )
+}
+
+#[test]
+fn a_dump_or_a_diff_from_4_5_or_newer_is_imported_without_that_note() {
+    // Basis: Source (a `dump` lists every value; from 4.5.0, cli.c's
+    // backupAndResetConfigs only resets to the firmware's defaults, with a
+    // board's defaults built into its firmware).
+    let dump = changed(METEOR, "# diff all\n", "# dump all\n");
+    assert_eq!(import(&dump).warnings, Vec::<String>::new());
+    let four_five = changed(CETUS, "(S411) 4.4.0 Oct", "(S411) 4.5.0 Oct");
+    assert_eq!(import(&four_five).warnings, Vec::<String>::new());
+    let latest = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 2026.6.2 Jun");
+    let latest = changed(
+        &latest,
+        "set dshot_idle_value = 600",
+        "set motor_idle = 600",
     );
+    assert_eq!(import(&latest).warnings, Vec::<String>::new());
+}
+
+#[test]
+fn an_export_that_lists_every_profile_without_selecting_one_is_refused() {
+    // Basis: Source (4.3.0's cli.c:6371 and 2026.6.2's cli.c:8123: only
+    // without `bare` does `diff all` select the active profile again).
+    let expected =
+        "This export lists each of Betaflight's PID profiles but doesn't say which one is active";
+    assert!(refusal(&meteor_all_bare()).starts_with(expected));
+    // Not from the echoed command alone: with the echo gone too.
+    let unechoed = changed(&meteor_all_bare(), "# diff all bare\n", "");
+    assert!(refusal(&unechoed).starts_with(expected));
 }
 
 #[test]
@@ -760,6 +802,29 @@ fn a_2026_6_export_reads_its_active_battery_profile_with_the_rest() {
             .left_out
             .iter()
             .any(|l| l.text == "set roll_srate = 80" && l.why == Why::RateProfile)
+    );
+}
+
+#[test]
+fn a_4_3_failsafe_recovery_delay_below_2_imports_as_2_as_4_3_waited_at_least_200_ms() {
+    // Basis: Source (4.3.0's failsafe.c:94-98 waits at least 200 ms and its
+    // range is 0 to 200; 2026.6.2 waits at least 100 ms and takes 1 to 200).
+    let quick = import(&changed(
+        METEOR,
+        "set small_angle = 180",
+        "set small_angle = 180\nset failsafe_recovery_delay = 0",
+    ));
+    assert_eq!(
+        got(&quick, "failsafe_recovery_delay"),
+        is(
+            "2",
+            "ADR-0008; 4.3 waited at least 200 ms, so its failsafe_recovery_delay 0 acted as 2"
+        )
+    );
+    assert_eq!(quick.problems, Vec::<String>::new());
+    assert_eq!(
+        got(&meteor(), "failsafe_recovery_delay"),
+        is("10", "4.3 default")
     );
 }
 

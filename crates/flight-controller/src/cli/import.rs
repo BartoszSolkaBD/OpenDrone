@@ -52,8 +52,9 @@ pub struct TuneImport {
     /// [`Tune::check`] says. The Tune is still written; the Pack checker
     /// refuses it until they're fixed by hand (`hand-set: <reason>`).
     pub problems: Vec<String>,
-    /// What the person importing should know, in plain sentences: that an
-    /// export not taken `bare` is relative to the board's own defaults, and
+    /// What the person importing should know, in plain sentences: that a
+    /// 4.3 or 4.4 `diff` not taken `bare` is relative to the board's own
+    /// defaults, and
     /// any value the Flight Controller reads but doesn't simulate yet, such as
     /// a `failsafe_procedure` of AUTO-LAND, which flies DROP (#21).
     pub warnings: Vec<String>,
@@ -156,23 +157,24 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
     let (version, family) = cli.family()?;
     let Some(profile) = cli.active_profile() else {
         return Err(Refusal::one(
-            "There's no `profile` line, so this export holds none of Betaflight's PID profiles: export the quad's settings with `diff all`.",
+            "There's no `profile` line, so this export holds none of Betaflight's PID profiles: export the quad's settings with `diff` (`diff bare` on 4.3 and 4.4) or `diff all`.",
         ));
     };
     let rate_profile = cli.active_rate_profile();
     let battery_profile = cli.active_battery_profile();
-    let all = cli
-        .echo
-        .is_some_and(|echo| echo.split_whitespace().any(|word| word == "all"));
-    if cli.bare() && all {
+    if !cli.names_active_profile() {
         return Err(Refusal::one(
-            "A `diff all bare` doesn't say which of Betaflight's PID profiles is active: it leaves out the line that selects it again. Export with `diff bare`, which holds just the active profiles, compared with Betaflight's own defaults.",
+            "This export lists each of Betaflight's PID profiles but doesn't say which one is active: a `diff all bare` or `dump all bare` leaves out the line that selects it again. Export with `diff` (`diff bare` on 4.3 and 4.4), which holds just the active profiles, or `diff all`.",
         ));
     }
+    // In 4.3 and 4.4, a `diff` without `bare` compares with the board's own
+    // defaults (`backupAndResetConfigs` applies them first). From 4.5 on, a
+    // board's defaults are built into its firmware, and a `dump` lists every
+    // value whatever its defaults.
     let mut warnings = Vec::new();
-    if cli.echo.is_some() && !cli.bare() {
+    if matches!(family, Family::V4_3 | Family::V4_4) && cli.is_diff() && !cli.bare() {
         warnings.push(format!(
-            "This `{}` lists what differs from the board's own defaults, not Betaflight's: a setting the board's defaults change that the pilot left alone isn't in it, so it imports at Betaflight {}'s default. Export with `diff bare` to compare with Betaflight's own defaults.",
+            "In Betaflight 4.3 and 4.4, a `diff` without `bare` lists what differs from the board's own defaults, not Betaflight's: a setting the board's defaults change that the pilot left alone isn't in this `{}`, so it imports at Betaflight {}'s default. Export with `diff bare` to compare with Betaflight's own defaults.",
             cli.echo.unwrap_or("diff"),
             family.name()
         ));
@@ -398,6 +400,20 @@ fn apply(rule: Rule, family: Family, inputs: &[Old<'_>]) -> Result<(String, Stri
                 format!(
                     "ADR-0008; {version}'s stick boost: {} {gain} × {} {advance} ÷ 100",
                     inputs[0].name, inputs[1].name
+                ),
+            ))
+        }
+        Rule::RecoveryDelay => {
+            let delay = inputs[0];
+            let tenths = delay.number()?;
+            if tenths >= 2 {
+                return Ok((delay.value.into(), delay.mark(family)));
+            }
+            Ok((
+                "2".into(),
+                format!(
+                    "ADR-0008; {version} waited at least 200 ms, so its {} {tenths} acted as 2",
+                    delay.name
                 ),
             ))
         }
@@ -701,7 +717,7 @@ impl TuneImport {
             names(&|w| w == Why::Slider),
         );
         list(
-            "other PID profiles' settings",
+            "other PID and battery profiles' settings",
             names(&|w| w == Why::OtherProfile),
         );
         list(

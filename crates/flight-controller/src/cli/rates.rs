@@ -105,6 +105,11 @@ impl RatesPaste {
                 "This is Betaflight {version}, which is older than 4.3: its default Rates differ (Actual rates became the default in 4.3), so OpenDrone reads Rates from 4.3 or newer."
             )));
         }
+        if !cli.names_active_rate_profile() {
+            return Err(Refusal::one(
+                "This paste lists each rate profile but doesn't say which one is active: a `diff all bare` or `dump all bare` leaves out the line that selects it again. Paste a `diff`, which holds just the active rate profile, or a `diff all`.",
+            ));
+        }
         let rate_profile = cli.active_rate_profile();
         let mut rates = Rates::BETAFLIGHT_DEFAULT;
         let mut read = Vec::new();
