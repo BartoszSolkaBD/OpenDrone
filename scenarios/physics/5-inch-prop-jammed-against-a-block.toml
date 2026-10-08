@@ -4,7 +4,7 @@
 # 3%. The Quad drops onto the block and the floor, tipped back on its body
 # with prop 2's disc pressed on the block, and the rub stops prop 2: at 3% its
 # motor can't turn it against the rub, so it stalls while running.
-# Ground effect (#119) cushions the drop, so prop 2 stalls on the step that
+# Ground effect (#44) cushions the drop, so prop 2 stalls on the step that
 # ends at 0.279875 s, not at 0.2095 s as in the open air; every moment below
 # that hangs off the stall is 0.070375 s later.
 #
@@ -64,7 +64,7 @@ timeline = [
 what    = "motor 2 drive"
 over    = "0.279875 s to 0.379375 s"
 highest = "0% ± 0%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (L1037–1041) and waits 100 ms (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. Prop 2 lands on the block and stalls on the step that ends at 0.279875 s (observed: ground effect, #119, cushions the drop, so it lands 70.4 ms later than it did in the open air, 0.2095 s)"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (L1037–1041) and waits 100 ms (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. Prop 2 lands on the block and stalls on the step that ends at 0.279875 s (observed: ground effect, #44, cushions the drop, so it lands 70.4 ms later than it did in the open air, 0.2095 s)"
 
 [[expect]]
 what  = "motor 2 drive"
@@ -136,7 +136,7 @@ basis   = "rule: the ESC draws its drive times the motor's current from the pack
 what  = "motor 2 restarts"
 at    = "7.5 s"
 value = "0 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L647–656, as at power-up: the disarm at 7 s sends zero, and after ten counts of its 32.1 ms timer at zero (the first within 32.1 ms, whatever the timer's phase) and its ready beep (66.5 ms) the ESC is ready again, its count cleared: by 7 s + 0.321 s + 0.067 s = 7.39 s (7.378 s in the model)"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L647–656, as at power-up: the disarm at 7 s sends zero, and after ten counts of its 32.1 ms timer at zero (the first within 32.1 ms, whatever the timer's phase) and its ready beep (66.5 ms) the ESC is ready again, its count cleared: by 7 s + 0.321 s + 0.067 s = 7.39 s (7.3805 s in the model)"
 
 [[expect]]
 what  = "motor 2 drive"

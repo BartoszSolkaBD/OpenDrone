@@ -33,8 +33,8 @@
 # 1.55 s, and the PID sums spike past ±20,000 at each. The Expectations leave
 # those out.
 #
-# Since ground and ceiling effect (#119): tipped into the wall, its rotors
-# blow at the wall's face and over its top, which cushions them, so the PID
+# Since ground and ceiling effect (#44): nose down and pressed against the
+# wall's face, its rotors blow close to the wall, which cushions them, so the PID
 # sums moved a little (the roll sum's lowest from 1.6 s to 3 s from 5.64 to
 # 2.08, the speed east at 1 s from -0.0915 to -0.0858 m/s). The hit, the
 # restarts, the second hit at about 1.41 s and where it ends up are the same.

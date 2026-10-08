@@ -36,9 +36,6 @@
 //!   thrust flickers, each rotor its own way, from a seeded random generator
 //!   kept in the Quad's state (E19, ADR-0005; [`prop_wash`]).
 //!
-//! The other effects arrive with their own tickets and Scenarios: Prop
-//! Strikes and stalled motors' restarts (#45), and so on.
-//!
 //! # How one step moves the Quad
 //!
 //! [`QuadBody::step`] moves the Quad on by one fixed step of `dt` seconds:

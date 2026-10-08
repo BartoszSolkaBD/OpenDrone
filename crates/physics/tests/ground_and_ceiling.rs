@@ -91,7 +91,7 @@ fn over_a_floor_each_rotor_gives_sanchez_cuevas_eq_4_times_its_open_air_thrust_a
         for (near, far) in near.iter().zip(far) {
             let gain = near / far;
             assert!(
-                (gain - eq_4(z)).abs() < 1e-5,
+                (gain - eq_4(z)).abs() < 1e-9,
                 "at {} R: {gain} against {}",
                 z / R,
                 eq_4(z)
@@ -179,8 +179,8 @@ fn on_its_back_over_a_floor_a_rotor_draws_its_air_from_the_floor_and_is_pulled_t
     let floor = map(&[floor_at(1.0)]);
     // Both start their motors from standstill, with no gravity so the Quad
     // doesn't fall onto the floor while its ESCs wait. Stop at the first step
-    // in which every rotor gives thrust (0.1 mN): the Quad has hardly moved,
-    // so the floor's gain is still the one at the start, to within 1e-5.
+    // in which every rotor gives any thrust: the Quad has hardly moved, so the
+    // floor's gain is still the one at the start.
     let weightless = World {
         gravity: 0.0,
         ..WORLD
@@ -188,11 +188,7 @@ fn on_its_back_over_a_floor_a_rotor_draws_its_air_from_the_floor_and_is_pulled_t
     for _ in 0..40_000 {
         on_its_back.step(&weightless, &floor, &commands, STEP);
         in_open_air.step(&weightless, &MapCollision::default(), &commands, STEP);
-        if in_open_air
-            .motors()
-            .iter()
-            .all(|motor| motor.thrust > 0.0001)
-        {
+        if in_open_air.motors().iter().all(|motor| motor.thrust > 0.0) {
             break;
         }
     }
@@ -200,7 +196,7 @@ fn on_its_back_over_a_floor_a_rotor_draws_its_air_from_the_floor_and_is_pulled_t
     let expected = opendrone_maths::functions::cbrt(gamma * gamma);
     for (near, far) in on_its_back.motors().iter().zip(in_open_air.motors()) {
         assert!(
-            (near.thrust / far.thrust - expected).abs() < 1e-5,
+            (near.thrust / far.thrust - expected).abs() < 1e-9,
             "{} {} {}",
             near.thrust,
             far.thrust,
