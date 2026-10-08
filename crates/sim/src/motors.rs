@@ -22,6 +22,10 @@ pub trait FlightControllerSeam {
         frame: Option<&Channels>,
     ) -> MotorCommands;
 
+    /// Reset, a new Map or a new Quad powers it up fresh, as a new battery
+    /// does: `readings` are what the sensors read at that moment.
+    fn power_up(&mut self, readings: &SensorReadings);
+
     /// What our Flight Controller's last loop did, for the flight log, the
     /// OSD and Scenarios; `None` for anything else that plugs in.
     fn debug(&self) -> Option<DebugRecord> {
@@ -77,6 +81,9 @@ impl FlightControllerSeam for ScriptedMotors {
     ) -> MotorCommands {
         self.at(time)
     }
+
+    /// The stand-in has nothing to power up: its timeline goes on.
+    fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, f: &mut Fingerprinter) {
         f.write_u64(self.next as u64);

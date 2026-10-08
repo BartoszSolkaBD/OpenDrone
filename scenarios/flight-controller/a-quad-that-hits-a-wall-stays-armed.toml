@@ -1,0 +1,122 @@
+# A Freestyle 5″ flown into a wall at 10 m/s stays armed: a crash never
+# disarms or resets the Quad on its own (ADR-0012). Betaflight 2026.6.2's
+# defaults disarm on no hit: `crash_recovery` is OFF and
+# `landing_disarm_threshold` is 0 (src/main/flight/pid.c). Only the Arm
+# switch, Failsafe or Reset disarm, and armed, Airmode keeps every motor at
+# idle or above.
+#
+# One default could: runaway takeoff prevention (`runaway_takeoff_prevention`
+# ON, a guard against wiring and orientation mistakes, not simulated yet,
+# #21's "later") disarms a Quad whose PID sum on any axis stays at 600 or more
+# (60% of the motor range) with the gyro moving for 75 ms, until half a
+# second of normal flight switches it off (src/main/fc/core.c). A mid-air
+# start skips that half second, so the Expectations below also check that the
+# hit holds the PID sums there for less than 75 ms: the pitch sum is above
+# 600 from about 0.486 s to 0.517 s, about 31 ms.
+#
+# It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
+# west), level and armed, its motors "settled", flying east at 10 m/s with
+# the sticks centred and the throttle at 30%.
+format = 1
+name   = "A Quad that hits a wall stays armed"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/wall"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 90°"
+speed             = "10 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+]
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 1 s"
+highest = "between 4.7 m and 5 m"
+basis   = "rule: the wall's face is at 5 m east and the Quad never passes through it (ADR-0012), so it reaches the wall, its nose half its length short of the face"
+
+[[expect]]
+what  = "speed east"
+at    = "1 s"
+value = "0.374 m/s ± 0.5 m/s"
+basis = "observed: the wall stopped the Quad, from 10 m/s east to almost nothing"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 3 s"
+first = "never"
+basis = "source: Betaflight 2026.6.2's defaults (crash_recovery OFF, landing_disarm_threshold 0, pid.c): nothing disarms on a hit, and the Arm switch stays on; runaway takeoff prevention would not act either (see the PID sums below)"
+
+[[expect]]
+what   = "motor 1 DShot"
+over   = "0.5 s to 3 s"
+lowest = "between 158 and 2047"
+basis  = "source: armed, Betaflight's mixer with Airmode never drops a motor below idle (48 + 5.5% × 1999 = 157.9, sent as 158)"
+
+# The hit holds no PID sum at 600 or more for 75 ms, so Betaflight's runaway
+# takeoff prevention wouldn't disarm it either.
+
+[[expect]]
+what    = "pitch PID sum"
+over    = "0 s to 0.485 s"
+highest = "between -600 and 600"
+basis   = "observed: before the hit, level flight asks next to nothing"
+
+[[expect]]
+what    = "pitch PID sum"
+over    = "0.52 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: the hit at about 0.486 s drives the pitch PID sum above 600 for about 31 ms; from 0.52 s on it stays below, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "0.52 s to 3 s"
+lowest = "between -600 and 600"
+basis  = "observed: nor below -600 after the hit"
+
+[[expect]]
+what    = "roll PID sum"
+over    = "0 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: the hit is square on, so roll asks next to nothing"
+
+[[expect]]
+what   = "roll PID sum"
+over   = "0 s to 3 s"
+lowest = "between -600 and 600"
+basis  = "observed: the hit is square on, so roll asks next to nothing"
+
+[[expect]]
+what    = "yaw PID sum"
+over    = "0 s to 3 s"
+highest = "between -600 and 600"
+basis   = "observed: the hit is square on, so yaw asks next to nothing"
+
+[[expect]]
+what   = "yaw PID sum"
+over   = "0 s to 3 s"
+lowest = "between -600 and 600"
+basis  = "observed: the hit is square on, so yaw asks next to nothing"

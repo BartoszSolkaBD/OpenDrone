@@ -10,8 +10,8 @@
 # Betaflight 2026.6.2 puts between a throttle step and the motors that the
 # Flight Controller doesn't simulate yet: RC smoothing (#49), and throttle
 # boost and anti-gravity (#50), with the rest of the filters and loop
-# shaping. So the motors' numbers are what Betaflight gives on this Tune today
-# and once those tickets land. (A Test Quad builds on a real Quad only, so the
+# shaping, and runaway takeoff prevention. So the motors' numbers are what
+# Betaflight gives on this Tune today and once those tickets land. (A Test Quad builds on a real Quad only, so the
 # list is written out again here.) Everything else is the Freestyle 5″'s.
 #
 # A Test Quad lists only what it changes, so any other change to the Freestyle
@@ -44,3 +44,4 @@ dterm_lpf1_dyn_min_hz = 0
 dterm_lpf2_static_hz = 0
 yaw_lowpass_hz = 0
 rc_smoothing = "OFF"
+runaway_takeoff_prevention = "OFF"

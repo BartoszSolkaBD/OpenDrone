@@ -153,7 +153,7 @@ fn a_quad_whose_tune_doesnt_spell_out_every_flight_controller_setting_cant_fly()
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(
         found[0].starts_with(&format!(
-            "scenarios/whoop-tune.toml line {}: the Quad \"opendrone/whoop-65\" can't fly with our Flight Controller yet: its Tune doesn't spell out `small_angle`, `p_roll`, ",
+            "scenarios/whoop-tune.toml line {}: the Quad \"opendrone/whoop-65\" can't fly with our Flight Controller yet: its Tune doesn't spell out `small_angle`, `rx_min_usec`, ",
             line_of(&text, "quad              =")
         )),
         "{found:#?}"
@@ -218,21 +218,239 @@ fn what_a_flight_controller_loop_did_cant_be_measured_before_the_first_loop() {
 }
 
 #[test]
-fn angle_horizon_and_the_assists_wait_for_their_tickets() {
+fn angle_horizon_input_smoothing_and_endless_battery_wait_for_their_tickets() {
     let text = tracer()
         .replacen(
             "flight_mode       = \"Acro\"",
             "flight_mode       = \"Angle\"",
             1,
         )
-        .replacen("auto_arm = \"off\"", "auto_arm = \"on\"", 1);
-    let found = failures(&report(&fixture("angle-auto-arm", &text)));
-    assert_eq!(found.len(), 2, "{found:#?}");
+        .replacen("input_smoothing = \"off\"", "input_smoothing = \"on\"", 1)
+        .replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);
+    let found = failures(&report(&fixture("angle-assists", &text)));
+    assert_eq!(found.len(), 3, "{found:#?}");
     assert!(found[0].ends_with(
         "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)"
     ));
     assert!(found[1].ends_with(
-        "Assists don't run yet, so `auto_arm` must be \"off\": Auto-arm arrives with the arming ticket (#52)"
+        "Input smoothing doesn't run yet, so `input_smoothing` must be \"off\": Input smoothing arrives with the Radio Link ticket (#56)"
+    ));
+    assert!(found[2].ends_with(
+        "Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"
+    ));
+}
+
+#[test]
+fn auto_arm_flies_in_a_flight_scenario_but_not_with_the_flight_controller_alone() {
+    // Auto-arm is the Simulation's Assist, in front of the Flight
+    // Controller (ADR-0003).
+    let text = arming().replacen("auto_arm = \"off\"", "auto_arm = \"on\"", 1);
+    let found = failures(&report(&fixture("fc-auto-arm", &text)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].ends_with(
+        "Auto-arm is an Assist of the Simulation, in front of the Flight Controller, and a Flight Controller Scenario runs the Flight Controller alone, so `auto_arm` must be \"off\""
+    ));
+    let auto_arm = scenario("flight-controller/auto-arm");
+    assert!(read_scenario("auto-arm", &auto_arm).is_ok());
+}
+
+#[test]
+fn with_auto_arm_on_no_arm_switch_is_bound_so_arm_stays_off() {
+    let text = scenario("flight-controller/auto-arm");
+    let old = "{ at = \"2 s\",    throttle = \"20%\" },";
+    let file = changed(
+        "auto-arm-switch",
+        &text,
+        old,
+        "{ at = \"2 s\",    throttle = \"20%\", arm = \"on\" },",
+    );
+    assert_eq!(
+        failures(&report(&file)),
+        [format!(
+            "scenarios/auto-arm-switch.toml line {}: with Auto-arm on, no Arm switch is bound (it would take over), so `arm` stays \"off\": Auto-arm turns Arm on itself",
+            line_of(&text, old)
+        )]
+    );
+}
+
+/// A landed Flight Scenario that starts as Reset leaves the Quad.
+fn landed() -> String {
+    scenario("flight-controller/arm-switch-on-at-power-up")
+}
+
+#[test]
+fn a_landed_flight_scenario_starts_as_reset_leaves_the_quad_disarmed_and_still() {
+    // A landed start with a "fresh" Flight Controller is exactly Reset: its
+    // ESCs power up first, and it is disarmed and still (#32 §4).
+    let text = landed()
+        .replacen("armed             = false", "armed             = true", 1)
+        .replacen(
+            "speed             = \"0 m/s\"",
+            "speed             = \"1 m/s east, 0 m/s north, 0 m/s up\"",
+            1,
+        );
+    let found = failures(&report(&fixture("landed-moving", &text)));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].ends_with(
+        "a Flight Scenario whose motors start \"powering up\" starts as Reset leaves the Quad, disarmed: `armed` must be false"
+    ));
+    assert!(found[1].ends_with(
+        "a Flight Scenario whose motors start \"powering up\" starts as Reset leaves the Quad, still: its `speed` must be zero"
+    ));
+}
+
+#[test]
+fn reset_needs_a_scenario_that_starts_as_reset_leaves_the_quad() {
+    // Reset puts the Quad back where the Scenario starts, its Launch Spot.
+    let text = tracer();
+    let old = "{ at = \"1.5 s\", roll = \"0%\" },";
+    let file = changed(
+        "tracer-reset",
+        &text,
+        old,
+        "{ at = \"1.5 s\", roll = \"0%\", reset = true },",
+    );
+    assert_eq!(
+        failures(&report(&file)),
+        [format!(
+            "scenarios/tracer-reset.toml line {}: Reset puts the Quad back where the Scenario starts, as its Launch Spot, so a Scenario with Reset starts as Reset leaves the Quad: landed and still, disarmed, with its motors \"powering up\"",
+            line_of(&text, old)
+        )]
+    );
+    // And a Flight Controller Scenario has no Quad to put back.
+    let text = arming().replacen(
+        "{ at = \"0.5 s\", arm = \"off\" },",
+        "{ at = \"0.5 s\", arm = \"off\", reset = true },",
+        1,
+    );
+    let found = failures(&report(&fixture("fc-reset", &text)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].contains("`reset` isn't something OpenDrone reads"),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn the_flying_input_device_is_lost_before_it_comes_back() {
+    let text = scenario("flight-controller/failsafe");
+    let old = "{ at = \"1 s\",   input_device = \"lost\" },";
+    let file = changed(
+        "back-twice",
+        &text,
+        old,
+        "{ at = \"1 s\",   input_device = \"back\" },",
+    );
+    let found = failures(&report(&file));
+    assert_eq!(
+        found,
+        [
+            format!(
+                "scenarios/back-twice.toml line {}: the Flying Input Device is back at 1 s, but it wasn't lost",
+                line_of(&text, old)
+            ),
+            format!(
+                "scenarios/back-twice.toml line {}: the Flying Input Device is back at 4 s, but it wasn't lost",
+                line_of(&text, "input_device = \"back\"")
+            ),
+        ]
+    );
+    let file = changed(
+        "lost-word",
+        &text,
+        old,
+        "{ at = \"1 s\",   input_device = \"unplugged\" },",
+    );
+    let found = failures(&report(&file));
+    assert!(
+        found.iter().any(|line| line.ends_with(
+            "`input_device` is the Flying Input Device \"lost\" (unplugged, so the Radio Link sends no frames) or \"back\", not \"unplugged\""
+        )),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn a_radio_link_drop_out_is_written_as_how_long_it_drops_out_for() {
+    let text = scenario("flight-controller/radio-link-drop-outs");
+    let old = "radio_link = \"drops out for 0.1 s\"";
+    let file = changed("drop-out-words", &text, old, "radio_link = \"0.1 s\"");
+    assert_eq!(
+        failures(&report(&file)),
+        [format!(
+            "scenarios/drop-out-words.toml line {}: `radio_link` in a Timeline is a drop-out: the Radio Link sends no frames for a while, written like \"drops out for 0.2 s\", not \"0.1 s\"",
+            line_of(&text, old)
+        )]
+    );
+    // A drop-out at 1 s for 0.1 s is the device lost at 1 s and back at
+    // 1.1 s; one that ends between two steps is refused.
+    let file = changed(
+        "drop-out-between-steps",
+        &text,
+        old,
+        "radio_link = \"drops out for 0.00001 s\"",
+    );
+    let found = failures(&report(&file));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(
+        found[0].contains("isn't a whole number of physics steps"),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn something_that_happens_is_measured_by_when_it_first_does_over_a_stretch() {
+    let wrong = [
+        (
+            "what = \"the Quad disarms\"\nat = \"1 s\"\nvalue = \"1 s ± 1 s\"",
+            "\"the Quad disarms\" is something that happens: say `over` a stretch, with `first`, how long after the stretch's start it first happens, such as \"1.5 s ± 0.01 s\", or \"never\"",
+        ),
+        (
+            "what = \"roll setpoint\"\nover = \"1 s to 2 s\"\nfirst = \"1 s ± 1 s\"",
+            "`first` is for something that happens, such as \"the Quad disarms\", not roll setpoint",
+        ),
+        (
+            "what = \"roll setpoint\"\nover = \"1 s to 2 s\"\nmean = \"never\"",
+            "\"never\" is for something that happens, over a stretch with `first`, such as `what = \"the Quad disarms\"`; a quantity needs a value with a tolerance",
+        ),
+    ];
+    for (n, (expectation, sentence)) in wrong.into_iter().enumerate() {
+        let text = arming() + &format!("\n[[expect]]\n{expectation}\nbasis = \"rule: x\"\n");
+        let found = failures(&report(&fixture(&format!("happens-{n}"), &text)));
+        assert_eq!(found.len(), 1, "{found:#?}");
+        assert!(found[0].contains(sentence), "{found:#?}");
+    }
+}
+
+#[test]
+fn something_expected_never_to_happen_fails_saying_when_it_did_and_the_other_way_round() {
+    // The arming Scenario's Quad disarms at 0.516 s.
+    let text = arming()
+        + "\n[[expect]]\nwhat = \"the Quad disarms\"\nover = \"0.5 s to 1 s\"\nfirst = \"never\"\nbasis = \"rule: x\"\n"
+        + "\n[[expect]]\nwhat = \"the Quad disarms\"\nover = \"0.6 s to 1 s\"\nfirst = \"0.1 s ± 0.1 s\"\nbasis = \"rule: x\"\n";
+    let found = failures(&report(&fixture("never", &text)));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(
+        found[0].starts_with(
+            "the Quad disarms, first over 0.5 s to 1 s: measured after 0.0161 s, expected never"
+        ),
+        "{found:#?}"
+    );
+    assert!(
+        found[1].starts_with(
+            "the Quad disarms, first over 0.6 s to 1 s: measured never, expected 0.1 s ± 0.1 s"
+        ),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn a_case_cant_see_something_happen() {
+    let text = cases().replacen("what  = \"motor 1 DShot\"", "what  = \"the Quad arms\"", 1);
+    let found = failures(&report(&fixture("case-event", &text)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].ends_with(
+        "a case is one loop, so \"the Quad arms\", something that happens between two loops, can't be seen in one"
     ));
 }
 

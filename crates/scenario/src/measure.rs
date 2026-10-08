@@ -100,9 +100,186 @@ pub enum Measure {
     /// The DShot value our Flight Controller sends a motor: 0 is "stop", 48
     /// to 2047 the throttle.
     MotorDshot(usize),
+    /// The throttle our Flight Controller's mixer starts from, from 0% to
+    /// 100%, before Airmode moves it: what Betaflight's Blackbox logs as the
+    /// mixer's throttle.
+    MixerThrottle,
+    /// Something that happens: measured as how long after a stretch's start
+    /// it first does (the "when something happens" Expectation).
+    Happens(Event),
 }
 
-const ALL: [(&str, Measure); 59] = [
+/// Something that happens between two steps, for the "when something
+/// happens" Expectation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// Our Flight Controller arms.
+    Arms,
+    /// Our Flight Controller disarms.
+    Disarms,
+    /// One of Betaflight's arming-disabled flags is raised (`true`) or
+    /// cleared (`false`): its place in `ArmingBlocks::NAMES`.
+    Blocks { flag: usize, raised: bool },
+    /// Failsafe's stage 2 starts: with DROP, the Quad disarms.
+    FailsafeStarts,
+    /// Failsafe ends: the link has been back long enough.
+    FailsafeEnds,
+    /// Every ESC has played its ready beep.
+    EscsReady,
+}
+
+/// Every event's words, as a Scenario's `what` names it.
+const EVENTS: [(&str, Event); 19] = [
+    ("the Quad arms", Event::Arms),
+    ("the Quad disarms", Event::Disarms),
+    ("Failsafe's stage 2 starts", Event::FailsafeStarts),
+    ("Failsafe ends", Event::FailsafeEnds),
+    ("the ESCs are ready", Event::EscsReady),
+    (
+        "FAILSAFE blocks arming",
+        Event::Blocks {
+            flag: 0,
+            raised: true,
+        },
+    ),
+    (
+        "FAILSAFE stops blocking arming",
+        Event::Blocks {
+            flag: 0,
+            raised: false,
+        },
+    ),
+    (
+        "RXLOSS blocks arming",
+        Event::Blocks {
+            flag: 1,
+            raised: true,
+        },
+    ),
+    (
+        "RXLOSS stops blocking arming",
+        Event::Blocks {
+            flag: 1,
+            raised: false,
+        },
+    ),
+    (
+        "NOT_DISARMED blocks arming",
+        Event::Blocks {
+            flag: 2,
+            raised: true,
+        },
+    ),
+    (
+        "NOT_DISARMED stops blocking arming",
+        Event::Blocks {
+            flag: 2,
+            raised: false,
+        },
+    ),
+    (
+        "THROTTLE blocks arming",
+        Event::Blocks {
+            flag: 3,
+            raised: true,
+        },
+    ),
+    (
+        "THROTTLE stops blocking arming",
+        Event::Blocks {
+            flag: 3,
+            raised: false,
+        },
+    ),
+    (
+        "ANGLE blocks arming",
+        Event::Blocks {
+            flag: 4,
+            raised: true,
+        },
+    ),
+    (
+        "ANGLE stops blocking arming",
+        Event::Blocks {
+            flag: 4,
+            raised: false,
+        },
+    ),
+    (
+        "BOOTGRACE blocks arming",
+        Event::Blocks {
+            flag: 5,
+            raised: true,
+        },
+    ),
+    (
+        "BOOTGRACE stops blocking arming",
+        Event::Blocks {
+            flag: 5,
+            raised: false,
+        },
+    ),
+    (
+        "ARM_SWITCH blocks arming",
+        Event::Blocks {
+            flag: 6,
+            raised: true,
+        },
+    ),
+    (
+        "ARM_SWITCH stops blocking arming",
+        Event::Blocks {
+            flag: 6,
+            raised: false,
+        },
+    ),
+];
+
+impl Event {
+    /// Its words, such as "the Quad disarms".
+    pub fn words(self) -> &'static str {
+        EVENTS
+            .iter()
+            .find(|(_, e)| *e == self)
+            .map_or("", |(words, _)| words)
+    }
+
+    /// True for what our Flight Controller does; false for the ESCs.
+    fn of_the_flight_controller(self) -> bool {
+        self != Event::EscsReady
+    }
+
+    /// Whether it happened between the step before and this one: `None` when
+    /// a step has nothing to tell it by, such as before the Flight
+    /// Controller's first loop.
+    pub fn happened(self, before: &Sample, now: &Sample) -> Option<bool> {
+        if self == Event::EscsReady {
+            let ready = |sample: &Sample| {
+                sample.quad.map(|quad| {
+                    quad.motors
+                        .iter()
+                        .all(|motor| !matches!(motor.esc, opendrone_sim::EscState::StartingUp(_)))
+                })
+            };
+            return Some(!ready(before)? && ready(now)?);
+        }
+        let (before, now) = (before.flight_controller?, now.flight_controller?);
+        Some(match self {
+            Event::Arms => !before.armed && now.armed,
+            Event::Disarms => before.armed && !now.armed,
+            Event::FailsafeStarts => !before.failsafe.active && now.failsafe.active,
+            Event::FailsafeEnds => before.failsafe.active && !now.failsafe.active,
+            Event::Blocks { flag, raised } => {
+                let was = before.arming_blocks.flags()[flag];
+                let is = now.arming_blocks.flags()[flag];
+                was != raised && is == raised
+            }
+            Event::EscsReady => false,
+        })
+    }
+}
+
+const ALL: [(&str, Measure); 60] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -162,12 +339,35 @@ const ALL: [(&str, Measure); 59] = [
     ("motor 2 DShot", Measure::MotorDshot(1)),
     ("motor 3 DShot", Measure::MotorDshot(2)),
     ("motor 4 DShot", Measure::MotorDshot(3)),
+    ("mixer throttle", Measure::MixerThrottle),
 ];
 
 impl Measure {
-    /// The measure a Scenario's `what` names.
+    /// The measure a Scenario's `what` names: a quantity, or something that
+    /// happens.
     pub fn named(name: &str) -> Option<Measure> {
-        ALL.iter().find(|(n, _)| *n == name).map(|(_, m)| *m)
+        ALL.iter()
+            .find(|(n, _)| *n == name)
+            .map(|(_, m)| *m)
+            .or_else(|| {
+                EVENTS
+                    .iter()
+                    .find(|(n, _)| *n == name)
+                    .map(|(_, e)| Measure::Happens(*e))
+            })
+    }
+
+    /// Every event the runner can see happen, as `what` names it.
+    pub fn events() -> Vec<&'static str> {
+        EVENTS.iter().map(|(words, _)| *words).collect()
+    }
+
+    /// The event, for something that happens.
+    pub fn event(self) -> Option<Event> {
+        match self {
+            Measure::Happens(event) => Some(event),
+            _ => None,
+        }
     }
 
     /// Every name the runner can measure, with the four motors' measures
@@ -196,6 +396,9 @@ impl Measure {
     }
 
     pub fn name(self) -> &'static str {
+        if let Measure::Happens(event) = self {
+            return event.words();
+        }
         ALL.iter()
             .find(|(_, m)| *m == self)
             .map_or("", |(name, _)| name)
@@ -221,6 +424,8 @@ impl Measure {
             Measure::BatteryChargeUsed => Dimension::CHARGE,
             Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
             Measure::PidTerm(..) | Measure::MotorDshot(_) => Dimension::NONE,
+            Measure::MixerThrottle => Dimension::PERCENT,
+            Measure::Happens(_) => Dimension::TIME,
         }
     }
 
@@ -228,10 +433,14 @@ impl Measure {
     /// Flight Controller Scenario measures, and nothing a Scenario with
     /// scripted motors can.
     pub fn of_the_flight_controller(self) -> bool {
-        matches!(
-            self,
-            Measure::Setpoint(_) | Measure::PidTerm(..) | Measure::MotorDshot(_)
-        )
+        match self {
+            Measure::Setpoint(_)
+            | Measure::PidTerm(..)
+            | Measure::MotorDshot(_)
+            | Measure::MixerThrottle => true,
+            Measure::Happens(event) => event.of_the_flight_controller(),
+            _ => false,
+        }
     }
 
     /// True for angles, which are compared the short way round the circle.
@@ -259,6 +468,12 @@ impl Measure {
     /// (`None` at the start) and the step's length in seconds. `None` when
     /// this step has nothing to measure it by.
     pub fn read(self, before: Option<&Sample>, now: &Sample, step: f64) -> Option<f64> {
+        if let Measure::Happens(event) = self {
+            // 1 when it happened over the step, 0 when it didn't.
+            return event
+                .happened(before?, now)
+                .map(|happened| f64::from(u8::from(happened)));
+        }
         if self.of_the_flight_controller() {
             return self.read_flight_controller(now.flight_controller.as_ref()?);
         }
@@ -294,7 +509,11 @@ impl Measure {
             Measure::BatteryCurrent => now.battery.current,
             Measure::BatteryChargeUsed => now.battery.charge_used,
             Measure::BatterySag => now.battery.sag,
-            Measure::Setpoint(_) | Measure::PidTerm(..) | Measure::MotorDshot(_) => return None,
+            Measure::Setpoint(_)
+            | Measure::PidTerm(..)
+            | Measure::MotorDshot(_)
+            | Measure::MixerThrottle
+            | Measure::Happens(_) => return None,
         })
     }
 
@@ -324,6 +543,7 @@ impl Measure {
                 )
             }
             Measure::MotorDshot(k) => f64::from(record.motors[k].dshot),
+            Measure::MixerThrottle => record.throttle,
             _ => return None,
         })
     }

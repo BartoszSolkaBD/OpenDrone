@@ -6,10 +6,10 @@ use opendrone_maths::Fingerprinter;
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
-    FlightControllerSeam, FlightInput, MapShape, MotorCommands, MotorParameters, Mount, PacketRate,
-    PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadPart, QuadSetUp, QuadShape,
-    QuadState, RotorLayout, ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem,
-    Simulation, SimulationTime, StartingMotors, World,
+    FlightControllerSeam, FlightInput, MapShape, MotorCommands, MotorParameters, Mount,
+    OurFlightController, PacketRate, PhysicsRate, PropDirection, PropParameters, QuadParameters,
+    QuadPart, QuadSetUp, QuadShape, QuadState, Rates, RotorLayout, ScriptedMotors, SensorReadings,
+    SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors, Tune, World,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -90,14 +90,16 @@ fn whoop_shape() -> QuadShape {
 }
 
 fn quad_at(height: f64) -> QuadSetUp {
+    let start = QuadState {
+        position: Vec3::new(0.0, 0.0, height),
+        velocity: Vec3::ZERO,
+        attitude: Attitude::BODY_IS_WORLD,
+        rotation: Vec3::ZERO,
+    };
     QuadSetUp {
         parameters: parameters(),
-        start: QuadState {
-            position: Vec3::new(0.0, 0.0, height),
-            velocity: Vec3::ZERO,
-            attitude: Attitude::BODY_IS_WORLD,
-            rotation: Vec3::ZERO,
-        },
+        start,
+        launch_spot: start,
         motors: StartingMotors::Stopped,
         battery: 1.0,
         mount: Mount::Free,
@@ -298,6 +300,8 @@ impl FlightControllerSeam for Listener {
         MotorCommands::STOPPED
     }
 
+    fn power_up(&mut self, _readings: &SensorReadings) {}
+
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
 }
 
@@ -310,6 +314,20 @@ fn listen(
     inputs: &[(u64, Channels)],
     ticks: u64,
 ) -> Vec<(u64, u16)> {
+    let inputs: Vec<(u64, FlightInput)> = inputs
+        .iter()
+        .map(|(tick, channels)| (*tick, FlightInput::Channels(*channels)))
+        .collect();
+    listen_to(physics_hz, packet_hz, &inputs, ticks)
+}
+
+/// [`listen`], with any Flight Inputs.
+fn listen_to(
+    physics_hz: u32,
+    packet_hz: u32,
+    inputs: &[(u64, FlightInput)],
+    ticks: u64,
+) -> Vec<(u64, u16)> {
     let heard = Rc::new(RefCell::new(Vec::new()));
     let mut quad = quad_at(10.0);
     quad.packet_rate = PacketRate::from_hz(packet_hz).unwrap();
@@ -317,12 +335,8 @@ fn listen(
         heard: Rc::clone(&heard),
     });
     let mut sim = Simulation::new(set_up(physics_hz, 1, vec![quad])).unwrap();
-    for (tick, channels) in inputs {
-        sim.flight_input(
-            0,
-            SimulationTime::from_ticks(*tick),
-            FlightInput::Channels(*channels),
-        );
+    for (tick, input) in inputs {
+        sim.flight_input(0, SimulationTime::from_ticks(*tick), *input);
     }
     for _ in 0..ticks {
         sim.step();
@@ -380,4 +394,164 @@ fn only_the_packet_rates_a_pilot_can_pick_are_accepted() {
     for hz in [0, 200, 2000] {
         assert!(PacketRate::from_hz(hz).is_none(), "{hz} Hz");
     }
+}
+
+#[test]
+fn while_the_input_device_is_lost_the_radio_link_sends_no_frames() {
+    // Basis: Rule (#37: an Input Device lost or back is a Flight Input; while
+    // lost, the Radio Link sends no frames). Lost at step 40, back at step
+    // 100: the frames due at 64 and 96 never leave, and the next, at 128,
+    // carries the newest Channels, which arrived while it was lost.
+    let inputs = [
+        (0, FlightInput::Channels(rolled(992))),
+        (40, FlightInput::InputDeviceLost),
+        (50, FlightInput::Channels(rolled(1811))),
+        (100, FlightInput::InputDeviceBack),
+    ];
+    let heard = listen_to(8000, 250, &inputs, 170);
+    assert_eq!(heard, vec![(0, 992), (32, 992), (128, 1811), (160, 1811)]);
+}
+
+/// The Freestyle 5″'s Tune: Betaflight 2026.6.2's defaults.
+fn tune() -> Tune {
+    Tune::read([
+        ("small_angle", "25"),
+        ("rx_min_usec", "885"),
+        ("rx_max_usec", "2115"),
+        ("failsafe_delay", "15"),
+        ("failsafe_procedure", "DROP"),
+        ("failsafe_throttle", "1000"),
+        ("failsafe_recovery_delay", "5"),
+        ("p_roll", "45"),
+        ("i_roll", "80"),
+        ("d_roll", "30"),
+        ("p_pitch", "47"),
+        ("i_pitch", "84"),
+        ("d_pitch", "34"),
+        ("p_yaw", "45"),
+        ("i_yaw", "80"),
+        ("d_yaw", "0"),
+        ("motor_output_limit", "100"),
+        ("pidsum_limit", "500"),
+        ("pidsum_limit_yaw", "400"),
+        ("iterm_windup", "80"),
+        ("pid_at_min_throttle", "ON"),
+        ("min_check", "1050"),
+        ("mid_rc", "1500"),
+        ("deadband", "0"),
+        ("yaw_deadband", "0"),
+        ("yaw_control_reversed", "OFF"),
+        ("airmode_start_throttle_percent", "25"),
+        ("motor_pwm_protocol", "DSHOT600"),
+        ("motor_idle", "550"),
+        ("yaw_motors_reversed", "OFF"),
+        ("mixer_type", "LEGACY"),
+    ])
+    .unwrap()
+}
+
+#[test]
+fn reset_puts_the_quad_on_its_launch_spot_still_disarmed_with_a_full_battery_and_its_escs_starting_up()
+ {
+    // Basis: Rule (#37: Reset is a Flight Input that puts the Quad on the
+    // Launch Spot, landed and disarmed, powered up fresh: a full battery and
+    // the ESCs starting up). The whoop flies armed on half a battery, 5 m
+    // up, its Arm switch on; Reset at 0.5 s.
+    let floor = MapShape::Box {
+        centre: Vec3::new(0.0, 0.0, -1.0),
+        size: Vec3::new(200.0, 200.0, 2.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    };
+    let mut quad = quad_at(5.0);
+    quad.launch_spot.position = Vec3::new(1.0, 2.0, 0.010);
+    quad.motors = StartingMotors::Settled;
+    quad.battery = 0.5;
+    quad.flight_controller = Box::new(OurFlightController::new(
+        tune(),
+        Rates::BETAFLIGHT_DEFAULT,
+        PhysicsRate::from_hz(8000).unwrap(),
+        true,
+        false,
+        &quad.start,
+    ));
+    let mut set_up = set_up(8000, 1, vec![quad]);
+    set_up.map = vec![floor];
+    let mut sim = Simulation::new(set_up).unwrap();
+    let flying = Channels {
+        throttle: Channel::from_throttle(0.4),
+        arm: Channel::HIGH,
+        ..Channels::RESTING
+    };
+    sim.flight_input(0, SimulationTime::START, FlightInput::Channels(flying));
+    sim.flight_input(0, SimulationTime::from_ticks(4000), FlightInput::Reset);
+    for _ in 0..4000 {
+        sim.step();
+    }
+    let before = sim.quad_output(0);
+    assert!(before.flight_controller.unwrap().armed);
+    assert!(before.state.position.z < 5.0 && before.battery.charge < 0.5);
+    sim.step();
+    let after = sim.quad_output(0);
+    assert_eq!(after.state.position, Vec3::new(1.0, 2.0, 0.010));
+    assert_eq!(after.state.velocity, Vec3::ZERO);
+    assert_eq!(after.state.rotation, Vec3::ZERO);
+    assert_eq!(after.battery.charge, 1.0);
+    assert!(
+        after
+            .motors
+            .iter()
+            .all(|m| matches!(m.esc, EscState::StartingUp(_)) && m.speed == 0.0)
+    );
+    let record = after.flight_controller.unwrap();
+    assert!(!record.armed);
+    // A frame arrived on the same step, with the throttle still up and the
+    // Arm switch still on: refused until the ESCs are ready and the throttle
+    // is low, and then until the switch goes off and on again.
+    assert_eq!(
+        record.arming_blocks.names(),
+        ["THROTTLE", "BOOTGRACE", "ARM_SWITCH"]
+    );
+}
+
+#[test]
+fn the_flight_controller_hears_whether_the_escs_have_beeped_ready() {
+    // Basis: Rule (#32 §4: arming waits for the ESCs' ready beep, about
+    // 1.66 s after power-up, as Bluejay's timeline in the physics gives it).
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let mut quad = quad_at(0.010);
+    quad.motors = StartingMotors::PoweringUp;
+    quad.flight_controller = Box::new(EscListener {
+        heard: Rc::clone(&heard),
+    });
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    for _ in 0..16_000 {
+        sim.step();
+    }
+    let heard = heard.take();
+    let first_ready = heard.iter().position(|ready| *ready).unwrap();
+    assert!(heard[first_ready..].iter().all(|ready| *ready));
+    let seconds = first_ready as f64 / 8000.0;
+    assert!((1.66..1.67).contains(&seconds), "ready at {seconds} s");
+}
+
+/// A stand-in for the Flight Controller that writes down, each tick,
+/// whether the sensor readings said the ESCs were ready.
+struct EscListener {
+    heard: Rc<RefCell<Vec<bool>>>,
+}
+
+impl FlightControllerSeam for EscListener {
+    fn step(
+        &mut self,
+        _time: SimulationTime,
+        readings: &SensorReadings,
+        _frame: Option<&Channels>,
+    ) -> MotorCommands {
+        self.heard.borrow_mut().push(readings.escs_ready);
+        MotorCommands::STOPPED
+    }
+
+    fn power_up(&mut self, _readings: &SensorReadings) {}
+
+    fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
 }

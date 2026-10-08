@@ -464,6 +464,14 @@ impl QuadBody {
         self.battery.output(&self.parameters.battery)
     }
 
+    /// True once every ESC has played its ready beep: none is still starting
+    /// up after power-up, so each answers its commands.
+    pub fn escs_ready(&self) -> bool {
+        self.escs
+            .iter()
+            .all(|esc| !matches!(esc.state(), EscState::StartingUp(_)))
+    }
+
     /// Every place where the Map pushed the Quad during the last step, in a
     /// fixed order: by part, then by Map shape. On the thrust stand, none.
     pub fn contacts(&self) -> &[Contact] {
