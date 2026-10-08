@@ -16,13 +16,13 @@
 //! | Power-on wait | 100.3 ms | `wait100ms`, Bluejay.asm L498 |
 //! | Start-up melody | 1041.5 ms | `play_beep_melody`, L499; the default melody, L406–407 |
 //! | Pause | 100.3 ms | `wait100ms`, "wait for flight controller to get ready", L502 |
-//! | Looking for the signal | 201.7 ms | `setup_dshot`: `wait1ms` (L563), then the DShot300 and DShot600 tests, 100.3 ms each (L606–611, L620–625) |
-//! | "Signal found" beep | 60.9 ms | `beep_f1_short`, L641 |
-//! | Waiting for zero throttle | until 10 counts | `arming_wait`, L645–649 |
-//! | Ready beep | 66.5 ms | `beep_f2_short`, L652 |
+//! | Looking for the signal | 201.7 ms | `setup_dshot` (L545): `wait1ms` (L562), then the DShot300 and DShot600 tests, 100.3 ms each (L609–613, L623–627) |
+//! | "Signal found" beep | 60.9 ms | `beep_f1_short`, L643 |
+//! | Waiting for zero throttle | until 10 counts | `arming_wait`, L647–651 |
+//! | Ready beep | 66.5 ms | `beep_f2_short`, L654; then `wait_for_start`, L658 |
 //!
 //! - **Timing.** Bluejay's "millisecond" is 24,581 cycles of its 24.5 MHz
-//!   clock (`wait_ms`, Fx.asm L60–86), so `wait100ms` is 100.33 ms. A tone of
+//!   clock (`wait_ms`, Fx.asm L70–86), so `wait100ms` is 100.33 ms. A tone of
 //!   `Temp4` pulses of loop length `Temp3` lasts `Temp4` × (24.72 × `Temp3` +
 //!   399.3) µs, the ESC Configurator's own formula, which a cycle count of
 //!   Fx.asm's `beep` (L131–183) matches to 0.15%. The default melody's notes
@@ -32,10 +32,10 @@
 //!   Betaflight 2026.6's default `motor_pwm_protocol`, so the ESC finds it in
 //!   its second test. (On DShot300 it would find it 100 ms sooner; the ready
 //!   beep comes at the same moment either way.)
-//! - **Zero throttle.** Bluejay's Timer2 starts at `setup_dshot` (L554) and
+//! - **Zero throttle.** Bluejay's Timer2 starts at `setup_dshot` (L553) and
 //!   overflows every 65,536 × 12 cycles, 32.10 ms. Each overflow while the
 //!   throttle is zero adds one to `Rcp_Stop_Cnt` (Isrs.asm L538–549), and any
-//!   frame above zero sets it back to nought (Isrs.asm L337–339). At 10 the
+//!   frame above zero sets it back to nought (Isrs.asm L338). At 10 the
 //!   ESC beeps ready. Interrupts are off during a beep, so overflows that
 //!   fall inside one count once, at its end. So a Flight Controller that holds
 //!   the throttle at zero from the start gets its ready beep at about 1.595 s,
@@ -47,11 +47,22 @@
 //!   (`wait100ms`, "wait to see if start pulse was glitch", L726–730), then
 //!   starts the motor only if the command is still above zero. The Quad
 //!   definition's `start_wait` holds the length.
-//! - **Start-up power.** For the start-up phase, 24 commutations (four
-//!   electrical turns: `Startup_Cnt`, L905–919 and Timing.asm L790–791), the
-//!   drive is held at or under Startup Power Max (`Pwm_Limit_Beg`, L762–768
-//!   and L910–912; Power.asm L57–60), the Quad definition's
-//!   `startup_power_limit`. Then the motor runs as commanded.
+//! - **Start-up power.** Every DShot frame's drive is capped at `Pwm_Limit`
+//!   (Isrs.asm L347–372), which `motor_start` sets to Startup Power Max
+//!   (`Pwm_Limit_Beg`, L762–768), the Quad definition's
+//!   `startup_power_limit`. It stays there through two phases, counted in
+//!   electrical turns at `run6`, once a turn (L894–955):
+//!   - the start-up phase, 24 commutations, four turns (`Startup_Cnt`,
+//!     L910–916 and Timing.asm L790–791), which clears only its own flag
+//!     (L921–923);
+//!   - the initial-run phase, a countdown of 12 (`Initial_Run_Rot_Cntd`, set
+//!     at L808), taken one a turn from the turn the start-up phase ends
+//!     (L925–935).
+//!
+//!   The countdown reaches nought on the 15th turn, and only then is the
+//!   limit lifted (`initial_run_phase_done`, "lift startup power
+//!   restrictions", L942–951). So the drive is capped for 15 electrical turns,
+//!   then the motor runs as commanded.
 //! - **Stopping.** At a zero command a running motor is braked: Bluejay always
 //!   drives "damped light", which brakes at zero drive (L54). Below its
 //!   minimum speed, about 1,330 electrical RPM, it powers off (L983–987) and
@@ -83,8 +94,10 @@ const READY_BEEP: f64 = 44.0 * (24.72 * 45.0 + 399.3) * 1e-6;
 const TIMER2: f64 = 65_536.0 * 12.0 / 24_500_000.0;
 /// Timer2 overflows at zero throttle before the ready beep.
 const ZERO_THROTTLE_COUNTS: u32 = 10;
-/// Commutations in the start-up phase: four electrical turns.
-const START_UP_ELECTRICAL_TURNS: f64 = 4.0;
+/// Electrical turns with the drive capped at the start-up power limit: four
+/// for the start-up phase, and 11 more until the initial-run countdown of 12,
+/// which starts on the fourth, reaches nought.
+const CAPPED_ELECTRICAL_TURNS: f64 = 15.0;
 /// Bluejay's minimum running speed, in electrical RPM.
 const MINIMUM_ELECTRICAL_RPM: f64 = 1330.0;
 
@@ -272,7 +285,7 @@ impl Esc {
                 if zero {
                     self.enter(EscState::Ready);
                 } else if self.turned * pole_pairs
-                    >= START_UP_ELECTRICAL_TURNS * 2.0 * core::f64::consts::PI
+                    >= CAPPED_ELECTRICAL_TURNS * 2.0 * core::f64::consts::PI
                 {
                     self.enter(EscState::Running);
                 }

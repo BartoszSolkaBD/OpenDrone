@@ -376,8 +376,8 @@ fn a_number_added_to_a_quad_that_already_existed_is_listed_with_its_confidence_a
     assert!(passed, "{text}");
     for line in [
         "line 30: [collision] duct_rings was added as 130 mm inside, 2 mm wall, 30 mm tall (Measured, from the source ducts: \"made up\")",
-        "line 70: [ducts] ram_drag was added as 5 s⁻¹ (Measured, from the source ducts: \"made up\")",
-        "line 71: [ducts] nose_up_offset was added as 40 mm (Measured, from the source ducts: \"made up\")",
+        "line 71: [ducts] ram_drag was added as 5 s⁻¹ (Measured, from the source ducts: \"made up\")",
+        "line 72: [ducts] nose_up_offset was added as 40 mm (Measured, from the source ducts: \"made up\")",
     ] {
         assert!(text.contains(&format!("- {QUAD} {line}")), "{line}\n{text}");
     }

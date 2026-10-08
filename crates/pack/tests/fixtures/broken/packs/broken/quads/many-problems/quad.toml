@@ -65,6 +65,7 @@ mass          = { value = "8.2 g", confidence = "Manufacturer", source = "maker"
 voltage_curve = { value = "4.35 V at 100%, 3.92 V at 50%, 3.30 V at 0%", confidence = "Estimate", range = "×0.97–×1.03", source = "guess" }
 resistance    = { value = "29 mΩ", confidence = "Derived", source = "worked-out" }
 recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "guess" }
+slow_sag      = { value = "1.05 mV·Ah/W", confidence = "Estimate", range = "×0.5–×2", source = "guess" }
 connector     = { value = "10 mΩ", confidence = "Estimate", range = "5–20 mΩ", source = "guess" }
 
 [ducts]

@@ -60,7 +60,7 @@ timeline = [
 what    = "motor 1 speed"
 over    = "0 s to 1.8 s"
 highest = "0 RPM ± 0 RPM"
-basis   = "source: Bluejay v0.21.0: a freshly powered ESC plays its melody (src/Bluejay.asm L497–502) with every interrupt off, so it reads no command, and starts its motor only from `wait_for_start` (L656), after the ready beep at about 1.66 s; then it waits 100 ms more (L726–730), so the command at 1.7 s turns nothing before 1.8 s"
+basis   = "source: Bluejay v0.21.0: a freshly powered ESC plays its melody (src/Bluejay.asm L497–502) with every interrupt off, so it reads no command, and starts its motor only from `wait_for_start` (L658), after the ready beep at about 1.66 s; then it waits 100 ms more (L726–730), so the command at 1.7 s turns nothing before 1.8 s"
 
 [[expect]]
 what  = "motor 1 drive"

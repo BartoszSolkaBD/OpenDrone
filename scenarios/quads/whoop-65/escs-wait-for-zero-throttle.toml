@@ -57,7 +57,7 @@ timeline = [
 what    = "motor 1 speed"
 over    = "0 s to 3.3 s"
 highest = "0 RPM ± 0 RPM"
-basis   = "source: Bluejay v0.21.0: in `arming_wait` (src/Bluejay.asm L645–649) the ESC waits for `Rcp_Stop_Cnt` to reach 10, which Timer2 counts up every 32.1 ms only at zero throttle and any frame above zero sets back to nought (src/Modules/Isrs.asm L337–339, L538–549). So the 25% at 1.5 s is never answered, and after 2.5 s the ESC is ready only once ten counts and the ready beep have passed; the 25% at 3.2 s then waits out the 100 ms start wait (L726–730)"
+basis   = "source: Bluejay v0.21.0: in `arming_wait` (src/Bluejay.asm L647–651) the ESC waits for `Rcp_Stop_Cnt` to reach 10, which Timer2 counts up every 32.1 ms only at zero throttle and any frame above zero sets back to nought (src/Modules/Isrs.asm L338, L538–549). So the 25% at 1.5 s is never answered, and after 2.5 s the ESC is ready only once ten counts and the ready beep have passed; the 25% at 3.2 s then waits out the 100 ms start wait (L726–730)"
 
 [[expect]]
 what  = "motor 1 drive"

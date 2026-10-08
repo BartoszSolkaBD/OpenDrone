@@ -55,7 +55,7 @@ In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `arm
 
 Each ESC copies Bluejay v0.21.0 ([`crates/physics/src/esc.rs`](../../crates/physics/src/esc.rs) has the timing, with the firmware's file and line for each step):
 
-- **Starting a stopped motor:** on the first command above 0%, a ready ESC waits the Quad's start wait (0.1 s), then starts the motor with its drive held at the Quad's start-up power limit (1.96%) for four electrical turns, and then runs it as commanded.
+- **Starting a stopped motor:** on the first command above 0%, a ready ESC waits the Quad's start wait (0.1 s), then starts the motor with its drive held at the Quad's start-up power limit (1.96%) for 15 electrical turns (Bluejay's 24 start-up commutations, then its initial-run countdown of 12 turns, which starts on the fourth), and then runs it as commanded.
 - **Stopping:** at 0% it brakes the motor, and below Bluejay's minimum speed, about 1,330 electrical RPM, switches it off and is ready again.
 
 ### The Rates

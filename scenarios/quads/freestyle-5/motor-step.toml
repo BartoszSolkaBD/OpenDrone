@@ -6,7 +6,9 @@
 #
 # - The ESC waits 0.1 s after the first command above 0% (Bluejay's start
 #   wait), then holds its drive at Bluejay's start-up power limit, 1.96%, for
-#   four electrical turns of the motor (Bluejay's 24 start-up commutations).
+#   15 electrical turns of the motor: Bluejay's 24 start-up commutations (four
+#   turns), then its initial-run countdown of 12 turns, which starts on the
+#   fourth. On this 14-pole motor that is 2.1 turns of the prop.
 # - Then the motor spins up with the 5″'s spin-up time, 33 ms: a first lag
 #   that covers 63% of the way to its full-drive speed in that time.
 # - At 0% the ESC brakes it with the slow-down time, 33 ms: after 33 ms 37%
@@ -64,21 +66,21 @@ basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L726–730: on the first com
 
 [[expect]]
 what    = "motor 1 drive"
-over    = "0.6 s to 0.67 s"
+over    = "0.6 s to 0.795 s"
 highest = "1.96% ± 0.001%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L762–768 and L905–919: for the start-up phase, 24 commutations, the drive is capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L762–768, L894–955 and src/Modules/Isrs.asm L347–372: from the start the drive is capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%, through the start-up phase (24 commutations) and the initial-run phase (a countdown of 12 turns), lifted only at L951"
 
 [[expect]]
 what  = "motor 1 speed"
-at    = "0.673 s"
-value = "816 RPM ± 1%"
-basis = "observed: where the start-up phase ends, after four electrical turns (4/7 of a turn of the 14-pole motor), at 0.673 s"
+at    = "0.795 s"
+value = "794 RPM ± 1%"
+basis = "observed: where the capped start ends, after 15 electrical turns (2.1 turns of the 14-pole motor), at 0.795 s"
 
 [[expect]]
 what  = "motor 1 speed"
-at    = "0.706 s"
-value = "18900 RPM ± 5%"
-basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured motor time constant of 33 ms. One time constant after the start-up phase ends at 0.673 s, a first lag has covered 63% of the way from 816 RPM to its full-drive speed of 29,470 RPM: 816 + 0.632 × (29,470 − 816) = 18,900 RPM. The bench supply sags 1 V as the motor draws its first rush of current, so allow 5%"
+at    = "0.828 s"
+value = "18920 RPM ± 5%"
+basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured motor time constant of 33 ms. One time constant after the capped start ends at 0.795 s, a first lag has covered 63% of the way from 794 RPM to its full-drive speed of 29,470 RPM: 794 + 0.632 × (29,470 − 794) = 18,920 RPM. The bench supply sags 1 V as the motor draws its first rush of current, so allow 5%"
 
 [[expect]]
 what  = "motor 1 speed"

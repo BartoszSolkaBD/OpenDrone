@@ -42,7 +42,7 @@ The one exception is a Quad's Tune, which keeps Betaflight's own CLI form and un
 
 `gf` is a gram of thrust (gram-force: 9.80665 mN, a gram's weight under standard gravity). Makers' thrust tables give thrust in grams; written in `gf`, a Scenario can quote them as they are.
 
-Units combine into others: products with `·` (or `*`, or a space), quotients with one `/`, and powers with `²`, `³` and `⁻¹` (or `^2`, `^3` and `^-1`). For example `"9.81 m/s²"`, `"670 °/s"`, `"140 g·cm²"`, `"25 cm²"`, `"1.225 kg/m³"`, `"0.3 s⁻¹"` and, for a torque, `"180 mN·m"`.
+Units combine into others: products with `·` (or `*`, or a space), quotients with one `/`, and powers with `²`, `³` and `⁻¹` (or `^2`, `^3` and `^-1`). For example `"9.81 m/s²"`, `"670 °/s"`, `"140 g·cm²"`, `"25 cm²"`, `"1.225 kg/m³"`, `"0.3 s⁻¹"`, for a torque `"180 mN·m"`, and for a battery's slow sag `"1.048 mV·Ah/W"` (volts a cell for each watt per amp-hour of capacity).
 
 Other symbols and their plain-keyboard spellings: `µ` or `u` for micro, `±` or `+-` or `+/-`, `−` or `-` for minus, `×` or `x` for times, and `–` or `-` between the two ends of a range.
 

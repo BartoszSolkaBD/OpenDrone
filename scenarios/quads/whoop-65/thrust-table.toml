@@ -121,4 +121,4 @@ basis = "source: BetaFPV's 0802SE table at 4.0 V, last row: 30.6 g at full thrus
 what  = "battery current"
 at    = "3.9 s"
 value = "3.32 A ± 0.5%"
-basis = "rule: at full drive the ESC puts the whole supply across the motor, so the supply's current is the motor's own, 3.32 A (above)"
+basis = "observed: the motor's own current at full drive, 3.32 A (above), which moves with it; at full drive the ESC puts the whole supply across the motor, so the supply gives the motor's current"

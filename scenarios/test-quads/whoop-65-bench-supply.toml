@@ -17,4 +17,5 @@ why      = "A 4.0 V bench supply in place of the pack, as BetaFPV's thrust table
 voltage_curve = "4.35 V at 100%, 4.00 V at 50%, 3.30 V at 0%"
 capacity      = "1000 Ah"
 resistance    = "0 mΩ"
+slow_sag      = "0 mV·Ah/W"
 connector     = "0 mΩ"

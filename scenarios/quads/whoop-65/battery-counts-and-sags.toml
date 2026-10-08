@@ -1,0 +1,86 @@
+# The Whoop 65 on the thrust stand, on its own full LAVA II pack: a hover's
+# worth of drive, a punch, then a chop. Proves the battery's charge counting
+# and its sag (E13 and E14 in #10).
+#
+# - Charge: the pack counts every bit of current that leaves it, so the
+#   charge used is the current over time.
+# - Sag: the voltage sits below the pack's resting voltage by the current
+#   times the pack's resistance (29 mΩ, from BetaFPV's discharge curve) and
+#   the BT2.0 connector's (10 mΩ). That 29 mΩ is read about 2 s into BetaFPV's
+#   18 A curve, so it already holds the slow part of the sag that builds by
+#   then: the Whoop 65 adds no slow sag on top (its `slow_sag` is 0), and its
+#   voltage is back at rest as soon as the motors stop drawing. The Freestyle
+#   5″'s pack, whose resistance is a plain figure, shows the slow part and its
+#   recovery (scenarios/quads/freestyle-5/battery-recovers-after-a-chop.toml).
+format = 1
+name   = "The Whoop 65's pack counts its charge, and sags by its current × resistance"
+
+[start]
+kind              = "thrust stand"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). On the thrust stand
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing here; they
+# are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   motors = "0%" },
+  { at = "0.5 s", motors = "50%" },
+  { at = "3 s",   motors = "100%" },
+  { at = "4 s",   motors = "0%" },
+]
+
+[[expect]]
+what  = "battery current"
+over  = "0 s to 8 s"
+mean  = "2.3397 A ± 0.01%"
+basis = "observed: what the four motors draw, on average, over the run"
+
+[[expect]]
+what  = "battery charge used"
+at    = "8 s"
+value = "5.1994 mAh ± 0.01%"
+basis = "rule: the charge used is the current over time: 2.3397 A × 8 s = 18.718 A·s, and 1 mAh is 3.6 A·s, so 5.1994 mAh"
+
+[[expect]]
+what  = "battery current"
+at    = "3.3 s"
+value = "12.599 A ± 0.01%"
+basis = "observed: what four motors at full drive draw, 0.3 s into the punch"
+
+[[expect]]
+what  = "battery sag"
+at    = "3.3 s"
+value = "0.49136 V ± 0.05%"
+basis = "rule: the sag is the current times the pack's resistance and its connector's, 12.599 A × (29 + 10) mΩ = 0.49136 V"
+
+[[expect]]
+what    = "battery sag"
+over    = "4.5 s to 8 s"
+highest = "0 V ± 0.0001 V"
+basis   = "rule: once the motors have stopped after the chop, nothing is drawn, so the voltage is back at the pack's resting voltage at its charge: no sag"

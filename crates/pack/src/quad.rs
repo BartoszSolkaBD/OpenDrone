@@ -828,6 +828,10 @@ pub struct Battery {
     pub resistance: f64,
     /// How long the voltage takes to recover after a punch.
     pub recovery: f64,
+    /// How big the slow part of the sag grows, in seconds: each cell's slow
+    /// sag settles at this times the power it gives per coulomb of its
+    /// capacity (written in mV·Ah/W).
+    pub slow_sag: f64,
     pub connector: f64,
 }
 
@@ -1185,6 +1189,7 @@ fn definition(
         voltage_curve: r.curve("battery.voltage_curve"),
         resistance: r.one("battery.resistance"),
         recovery: r.one("battery.recovery"),
+        slow_sag: r.one("battery.slow_sag"),
         connector: r.one("battery.connector"),
     };
     let ducts = has_ducts.then(|| Ducts {
@@ -1268,6 +1273,7 @@ fn definition(
             resistance: battery.resistance,
             connector: battery.connector,
             recovery: battery.recovery,
+            slow_sag: battery.slow_sag,
         },
     };
     let block = SECTIONS

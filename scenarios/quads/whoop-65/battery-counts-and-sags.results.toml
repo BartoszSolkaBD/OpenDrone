@@ -1,0 +1,58 @@
+# Results of battery-counts-and-sags.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Whoop 65's pack counts its charge, and sags by its current × resistance"
+
+[[expect]]
+what     = "battery current, mean over 0 s to 8 s"
+basis    = "Observed"
+expected = "2.3397 A ± 0.01%"
+measured = "2.34 A"
+
+[[expect]]
+what     = "battery charge used at 8 s"
+basis    = "Rule"
+expected = "5.1994 mAh ± 0.01%"
+measured = "5.20 mAh"
+
+[[expect]]
+what     = "battery current at 3.3 s"
+basis    = "Observed"
+expected = "12.599 A ± 0.01%"
+measured = "12.6 A"
+
+[[expect]]
+what     = "battery sag at 3.3 s"
+basis    = "Rule"
+expected = "0.49136 V ± 0.05%"
+measured = "0.491 V"
+
+[[expect]]
+what     = "battery sag, highest over 4.5 s to 8 s"
+basis    = "Rule"
+expected = "0 V ± 0.0001 V"
+measured = "0 V"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9234b03f5c910ae"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "4ce92d716087b3f9"   # the whole state after each of 64000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.8 s" = "9c6b432da0d7e2c6"
+"1.6 s" = "4e83318fb23f44a0"
+"2.4 s" = "08c98810c6e8dba7"
+"3.2 s" = "264f6f4af9c98eb2"
+"4 s" = "d9613e0497682ac3"
+"4.8 s" = "c7c6d66dcb678d90"
+"5.6 s" = "6b468eb9bb1cba73"
+"6.4 s" = "4ef8b45bede08cae"
+"7.2 s" = "809d25b6b7ad70d9"
+"8 s" = "291840574ae180e4"

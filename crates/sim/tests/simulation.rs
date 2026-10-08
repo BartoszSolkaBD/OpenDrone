@@ -60,6 +60,7 @@ fn parameters() -> QuadParameters {
             resistance: 0.029,
             connector: 0.010,
             recovery: 3.3,
+            slow_sag: 0.0,
         },
     }
 }

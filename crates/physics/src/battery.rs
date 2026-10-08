@@ -8,25 +8,22 @@
 //! - **Sag.** Under load the voltage drops at once by the current times the
 //!   pack's resistance and its connector's. A slower part builds up and dies
 //!   away with the pack's recovery time: one resistor–capacitor pair, as
-//!   Bauersfeld & Scaramuzza fitted to ten 4S–6S packs (flight-dynamics research §5.3, its source S7).
-//!   Their pair's voltage settles at `k` times the power each cell gives per
-//!   amp-hour of its capacity, with `k` = 0.00104846 V per W/Ah (their
-//!   Table I); the Quad definition holds only the time it takes, `recovery`.
+//!   Bauersfeld & Scaramuzza fitted to ten 4S–6S packs (flight-dynamics
+//!   research §5.3, its source S7). By their eq. 13 the pair's voltage
+//!   settles at `k` times the power each cell gives per amp-hour of its
+//!   capacity. The Quad definition gives both: `slow_sag` is `k` (their fit
+//!   is 1.048 mV·Ah/W) and `recovery` the time it takes (their 3.3 s). A
+//!   Quad whose pack resistance already holds its slow sag, or a bench
+//!   supply, sets `slow_sag` to 0.
 //! - **The voltage under load** follows from the power the ESCs draw: with
 //!   `E` the resting voltage less the slow part and `R` both resistances,
 //!   `V = (E + √(E² − 4·R·P)) / 2`, so the current is `P / V` (their eq. for
-//!   a load of fixed power). Braking gives some power back, and then the
-//!   current is negative.
+//!   a load of fixed power). When the load asks for more than the pack can
+//!   give, `E² / 4R`, the pack gives that most: `E / 2R` at `E / 2`. Braking
+//!   gives some power back, and then the current is negative.
 //! - **Charge** is counted as current over time.
 
 use opendrone_maths::{Fingerprinter, functions};
-
-/// Bauersfeld & Scaramuzza's `k`: the slow part's settled voltage per cell,
-/// in volts per watt per amp-hour of capacity.
-const SLOW_SAG_PER_POWER: f64 = 0.001_048_46;
-
-/// One coulomb in amp-hours.
-const AMP_HOURS_PER_COULOMB: f64 = 1.0 / 3600.0;
 
 /// The battery's numbers from the Quad definition.
 #[derive(Clone, Debug, PartialEq)]
@@ -43,6 +40,10 @@ pub struct BatteryParameters {
     pub connector: f64,
     /// The slow part's time constant, in seconds.
     pub recovery: f64,
+    /// How big the slow part grows (Bauersfeld & Scaramuzza's `k`), in
+    /// seconds: each cell's slow sag settles at this times the power the cell
+    /// gives per coulomb of its capacity. 1 mV·Ah/W is 3.6 s.
+    pub slow_sag: f64,
 }
 
 impl BatteryParameters {
@@ -128,20 +129,25 @@ impl Battery {
         let resting = cells * parameters.resting_cell_voltage(self.charge(parameters));
         let open = resting - cells * self.slow_sag;
         let resistance = parameters.resistance + parameters.connector;
-        let voltage = if resistance > 0.0 {
-            // V² − E·V + R·P = 0. When the load asks for more than the pack
-            // can give, it gives what it can: half its open voltage.
+        let (voltage, current) = if resistance > 0.0 {
+            // V² − E·V + R·P = 0, and the current is P / V. When the load asks
+            // for more than the pack can give, E² / 4R, it gives what it can:
+            // E / 2R at half its open voltage.
             let room = open * open - 4.0 * resistance * power;
-            (open + functions::max(room, 0.0).sqrt()) / 2.0
+            if room >= 0.0 {
+                let voltage = (open + room.sqrt()) / 2.0;
+                let current = if voltage > 0.0 { power / voltage } else { 0.0 };
+                (voltage, current)
+            } else {
+                (open / 2.0, open / (2.0 * resistance))
+            }
         } else {
-            open
+            (open, if open > 0.0 { power / open } else { 0.0 })
         };
-        let current = if voltage > 0.0 { power / voltage } else { 0.0 };
         self.charge_used += current * dt;
 
-        let capacity_ah = parameters.capacity * AMP_HOURS_PER_COULOMB;
-        let cell_power_per_ah = voltage * current / (cells * capacity_ah);
-        let settled = SLOW_SAG_PER_POWER * cell_power_per_ah;
+        let cell_power_per_charge = voltage * current / (cells * parameters.capacity);
+        let settled = parameters.slow_sag * cell_power_per_charge;
         self.slow_sag += (settled - self.slow_sag) * -functions::exp_m1(-dt / parameters.recovery);
         self.voltage = voltage;
         self.current = current;

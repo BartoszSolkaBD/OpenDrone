@@ -5,7 +5,9 @@
 #
 # - The ESC waits 0.1 s after the first command above 0% (Bluejay's start
 #   wait), then holds its drive at Bluejay's start-up power limit, 1.96%, for
-#   four electrical turns of the motor.
+#   15 electrical turns of the motor: Bluejay's 24 start-up commutations (four
+#   turns), then its initial-run countdown of 12 turns, which starts on the
+#   fourth. On this 12-pole motor that is 2.5 turns of the prop.
 # - Then the motor spins up with the whoop's spin-up time, 35 ms.
 # - At 0% the ESC brakes it. The whoop's slow-down time is 35 ms too, but
 #   its rotor (0.25 g·cm²) can't be braked that hard through its windings
@@ -66,21 +68,21 @@ basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L726–730: on the first com
 
 [[expect]]
 what    = "motor 1 drive"
-over    = "0.6 s to 0.66 s"
+over    = "0.6 s to 0.75 s"
 highest = "1.96% ± 0.001%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L762–768 and L905–919: for the start-up phase, 24 commutations, the drive is capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L762–768, L894–955 and src/Modules/Isrs.asm L347–372: from the start the drive is capped at Startup Power Max, 5 of 255 by default, the Quad definition's start-up power limit of 1.96%, through the start-up phase (24 commutations) and the initial-run phase (a countdown of 12 turns), lifted only at L951"
 
 [[expect]]
 what  = "motor 1 speed"
-at    = "0.66325 s"
-value = "1207 RPM ± 1%"
-basis = "observed: where the start-up phase ends, after four electrical turns (2/3 of a turn of the 12-pole motor), at 0.66325 s"
+at    = "0.7505 s"
+value = "1377 RPM ± 1%"
+basis = "observed: where the capped start ends, after 15 electrical turns (2.5 turns of the 12-pole motor), at 0.7505 s"
 
 [[expect]]
 what  = "motor 1 speed"
-at    = "0.69825 s"
-value = "29300 RPM ± 2%"
-basis = "observed: one spin-up time (35 ms, an Estimate) after the start-up phase, 63% of the way from 1,207 RPM to the full-drive speed: 1,207 + 0.632 × (45,600 − 1,207) = 29,300 RPM"
+at    = "0.7855 s"
+value = "29330 RPM ± 2%"
+basis = "observed: one spin-up time (35 ms, an Estimate) after the capped start, 63% of the way from 1,377 RPM to the full-drive speed: 1,377 + 0.632 × (45,600 − 1,377) = 29,330 RPM"
 
 [[expect]]
 what  = "motor 1 speed"

@@ -23,9 +23,12 @@
 //! - its torque is `(i − i₀) / KV`, where `i₀` is the no-load current: the
 //!   motor's own friction and iron losses. A Quad definition gives `i₀` at one
 //!   voltage; here it grows in step with speed from nothing at a standstill,
-//!   so it equals the given value at that voltage's no-load speed. (A
-//!   constant `i₀` would hold a motor still under Bluejay's start-up power
-//!   limit, which real motors overcome.)
+//!   so it equals the given value at that voltage's no-load speed. That is
+//!   the physics of it: the iron's eddy and hysteresis losses grow with
+//!   speed, which is why makers quote `i₀` at a stated voltage and why
+//!   Drela's QPROP lets it vary with speed; the 5″'s 1.2 A at 10 V becomes
+//!   about 2 A at full speed on 6S. (A constant `i₀` would also hold a motor
+//!   still under Bluejay's start-up power limit, which real motors overcome.)
 //! - Its ESC draws `d·i` from the battery: the power `d·V·i`, at the battery's
 //!   voltage.
 //!

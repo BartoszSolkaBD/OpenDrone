@@ -50,7 +50,7 @@ timeline = [
 [[expect]]
 what  = "battery charge used"
 at    = "20 s"
-value = "44.7 mAh ± 1%"
+value = "45.6 mAh ± 1%"
 basis = "observed: what 20 s at full throttle draws: 14% of the pack's 320 mAh, so it ends 11% past empty"
 
 [[expect]]
@@ -68,23 +68,23 @@ basis   = "rule: past empty (3.30 V at rest) the pack's resting voltage keeps fa
 [[expect]]
 what  = "battery voltage"
 at    = "1 s"
-value = "2.99 V ± 1%"
+value = "3.01 V ± 1%"
 basis = "observed: full throttle on a nearly flat pack"
 
 [[expect]]
 what  = "battery voltage"
 at    = "20 s"
-value = "2.68 V ± 1%"
+value = "2.73 V ± 1%"
 basis = "observed: the same, 11% past empty"
 
 [[expect]]
 what  = "total thrust"
 at    = "1 s"
-value = "82.2 gf ± 1%"
+value = "82.9 gf ± 1%"
 basis = "observed: full throttle on a nearly flat pack, a little over 2.6 times the Whoop 65's 31.2 g"
 
 [[expect]]
 what  = "total thrust"
 at    = "20 s"
-value = "69.7 gf ± 1%"
+value = "71.8 gf ± 1%"
 basis = "observed: the thrust fades with the voltage, with nothing switched off"

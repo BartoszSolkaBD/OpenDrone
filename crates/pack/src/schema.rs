@@ -329,6 +329,10 @@ pub const SECTIONS: &[Section] = &[
                 Physics(one(Dimension::RESISTANCE, ZeroOrMore)),
             ),
             key("recovery", Physics(one(Dimension::TIME, AboveZero))),
+            // How big the slow part of the sag grows: volts per cell per
+            // watt each cell gives per amp-hour of its capacity, written
+            // "mV·Ah/W" (Bauersfeld & Scaramuzza's k), which is a time.
+            key("slow_sag", Physics(one(Dimension::TIME, ZeroOrMore))),
             key("connector", Physics(one(Dimension::RESISTANCE, ZeroOrMore))),
         ],
     },

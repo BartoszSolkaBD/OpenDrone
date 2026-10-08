@@ -78,6 +78,7 @@ voltage_curve = { value = "4.20 V at 100%, 4.02 V at 80%, 3.84 V at 50%, 3.73 V 
                   confidence = "Estimate", range = "×0.97–×1.03", source = "typical-curve" }
 resistance    = { value = "28 mΩ", confidence = "Estimate", range = "15–45 mΩ", source = "pack-resistance" }
 recovery      = { value = "3.3 s", confidence = "Estimate", range = "1–30 s", source = "battery-model" }
+slow_sag      = { value = "1.048 mV·Ah/W", confidence = "Estimate", range = "×0.5–×2", source = "battery-model" }   # how big the slow part of the sag grows
 connector     = { value = "2 mΩ", confidence = "Estimate", range = "1–5 mΩ", source = "pack-resistance" }   # XT60
 
 [feel]
@@ -147,7 +148,7 @@ pack-resistance = "#10's resolution §5: about 30 mΩ for a 6S pack with its lea
 gnb             = "GNB (Gaoneng) 1400 mAh 6S 160C LiPo, the maker's specification as Rotorvillage lists it: 1400 mAh, 6S1P, nominal 22.2 V (a standard LiPo, not HV, so charged to 4.20 V a cell), 40 × 38 × 80 mm, 233 g ± 7 g, XT60 (read 2026-10-07); #10 §5 asks for a typical 6S 1400 mAh LiPo, and this one is"
 battery-window  = "docs/research/flight-dynamics.md §5.3: a LiPo cell runs from 4.2 V down to about 3.5 V"
 typical-curve   = "docs/research/quad-definitions.md: a typical LiPo open-circuit voltage curve"
-battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]"
+battery-model   = "docs/research/flight-dynamics.md §5.3: one RC pair with a 3.3 s time constant, fitted to 10 packs (4S to 6S) by Bauersfeld & Scaramuzza [S7]; by their eq. 13 its voltage settles at k = 1.048 mV·Ah/W times each cell's power per amp-hour of capacity (their Table I: 0.00104846)"
 bluejay         = "Bluejay v0.21.0 source (src/Bluejay.asm): 100 ms wait before a restart, at most 3 restarts after a stall, and start-up power capped at Startup Power Max, 5 of 255 (1.96%)"
 prop-wash       = "docs/research/flight-dynamics.md §4.4: thrust loss and flicker of 10–30% in a rotor's own air [S10, S11]"
 flicker         = "docs/research/flight-dynamics.md §4.4: how fast Prop Wash flickers has no published source"
