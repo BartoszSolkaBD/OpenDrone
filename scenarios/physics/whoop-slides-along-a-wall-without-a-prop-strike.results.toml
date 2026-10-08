@@ -59,18 +59,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "bb331df5a141eda0"   # test/whoop-65-no-drag: what the Simulation receives from it
+quad = "9f1ad58d056c8465"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "31fde1a571abb834"   # the whole state after each of 2400 steps at 8000 Hz, in order
+run  = "4ab55ad4b029e9b9"   # the whole state after each of 2400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.03 s" = "fcd0e6930643c27c"
-"0.06 s" = "278a96c3fab575fa"
-"0.09 s" = "69475886ecbdbd35"
-"0.12 s" = "780fc0fed3930c8a"
-"0.15 s" = "4666a882f6f426fd"
-"0.18 s" = "b599f7fd64abb9af"
-"0.21 s" = "81a6271c89be402a"
-"0.24 s" = "f0def66c83e0c751"
-"0.27 s" = "cf5da7c6f05ce46f"
-"0.3 s" = "eee2168d14bcbab1"
+"0.03 s" = "f8743907c45eaab1"
+"0.06 s" = "6e956161f90c32b6"
+"0.09 s" = "56c58837e4417364"
+"0.12 s" = "96161cf8cc7b3ba2"
+"0.15 s" = "ab7259a83f218bb2"
+"0.18 s" = "0c940c99fb657736"
+"0.21 s" = "8b20fe5520c5bc15"
+"0.24 s" = "8927246e4cc21348"
+"0.27 s" = "dfbf515ab8af4213"
+"0.3 s" = "f5aa6dd78db5db19"

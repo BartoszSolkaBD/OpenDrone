@@ -59,18 +59,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "e53dc6ebcda80458"   # test/freestyle-5-bench-supply: what the Simulation receives from it
+quad = "fd56361ca4d40849"   # test/freestyle-5-bench-supply: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "eba34dd01be79d89"   # the whole state after each of 16000 steps at 8000 Hz, in order
+run  = "44662134301ff185"   # the whole state after each of 16000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.2 s" = "21a3cb8b3c4b3e35"
-"0.4 s" = "4d408654001b36f1"
-"0.6 s" = "fa982efd64514607"
-"0.8 s" = "a9ee31a9f45536a3"
-"1 s" = "3d64471988590845"
-"1.2 s" = "3ac6c5e23faa915c"
-"1.4 s" = "879f17460a657dcb"
-"1.6 s" = "f3127bb4f583409f"
-"1.8 s" = "b030656541eb15a4"
-"2 s" = "45c33d8c39e3663a"
+"0.2 s" = "6b6d6e8b9b72114e"
+"0.4 s" = "72a35b6415f3d07e"
+"0.6 s" = "e816ec3ef9a043dc"
+"0.8 s" = "f4616b8d337616b4"
+"1 s" = "b994f3b79058dcf2"
+"1.2 s" = "f8bd192730cd8db3"
+"1.4 s" = "b224a4fc062e578c"
+"1.6 s" = "ae4d502ecab8ddf4"
+"1.8 s" = "92d454a35b01a13f"
+"2 s" = "c083f85ac141eff1"

@@ -31,16 +31,16 @@ measured = "none broken"
 [fingerprints]
 quad = "1a2471e1ab9f7fae"   # test/whoop-65-no-ceiling-effect: what the Simulation receives from it
 map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
-run  = "36f3188b8c518551"   # the whole state after each of 16000 steps at 8000 Hz, in order
+run  = "9c1abd7ff0df6b27"   # the whole state after each of 16000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.2 s" = "92d8def5a9873990"
-"0.4 s" = "197be345bcd8bda9"
-"0.6 s" = "0e8d7dec46fe4edf"
-"0.8 s" = "728cdcc578757b69"
-"1 s" = "db4b0fc9baeb8382"
-"1.2 s" = "e187c7a150ff16f1"
-"1.4 s" = "bd1b6c0c0f63a059"
-"1.6 s" = "0ece1463c0492086"
-"1.8 s" = "a29d8ef46870350c"
-"2 s" = "913184fe2dd129e2"
+"0.2 s" = "d100e16315aa4f50"
+"0.4 s" = "a019dfa4de494ce9"
+"0.6 s" = "8e4ebe5f365c94df"
+"0.8 s" = "f174172f84505e29"
+"1 s" = "c561b7c7ed46f242"
+"1.2 s" = "c51a8b719c2e5f31"
+"1.4 s" = "dd31cd4652caaed9"
+"1.6 s" = "09b6737d2eba3ec6"
+"1.8 s" = "8347b1a02745f58c"
+"2 s" = "e7cee9b1528fbba2"

@@ -32,7 +32,7 @@ measured = "0.00413 s"
 what     = "height at 3 s"
 basis    = "Observed"
 expected = "between 0.5 m and 5 m"
-measured = "1.12 m"
+measured = "1.42 m"
 
 [[expect]]
 what     = "the Quad disarms, first over 3 s to 4 s"
@@ -95,18 +95,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "59c46e1cf781ecbe"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "25ccd18a3ffed8e0"   # the whole state after each of 48000 steps at 8000 Hz, in order
+run  = "deb8c8770c25570d"   # the whole state after each of 48000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.6 s" = "3ecb8df1b77187b6"
-"1.2 s" = "5d0a09a8e553a4fc"
-"1.8 s" = "51e777438b0da319"
-"2.4 s" = "2044ebec85c8e65b"
-"3 s" = "80f2f6d9d3cf24d3"
-"3.6 s" = "1461ae707dcd30a3"
-"4.2 s" = "3d0ebc35e7de4d62"
-"4.8 s" = "151c1ef1568acd76"
-"5.4 s" = "9c976d775f78a388"
-"6 s" = "bd0c1f68f2247d64"
+"0.6 s" = "f2ef3dd186e64241"
+"1.2 s" = "354a96a0b46ddd47"
+"1.8 s" = "877d8ef0de7628b2"
+"2.4 s" = "21cc107cf23428a0"
+"3 s" = "4430910d7e337599"
+"3.6 s" = "c1d7cb2bec6140ed"
+"4.2 s" = "99ea3628eb3d5c9c"
+"4.8 s" = "385181f984342490"
+"5.4 s" = "2d07b317eb674fa7"
+"6 s" = "b509368bff8f38cc"
