@@ -171,11 +171,12 @@
 //!   point that rubs, as any push does, except for its turn about the prop's
 //!   own axis, which went into the prop. The blade moves one way or the other
 //!   with the prop's spin, so the push and the twist do too.
-//! - **A motor fighting the rub** twists the frame back through its stator,
-//!   which is the rotor's spin-up reaction (E7, the air ticket #42): the
-//!   reaction to the motor's change of speed in step 2 of "How one step moves
-//!   the Quad", before the rub slows it again here. Until that arrives, a
-//!   motor holding its speed against a long rub doesn't twist the frame.
+//! - **A motor fighting the rub** twists the frame back through its stator:
+//!   that is the rotors' spin reaction (`dh/dt`, E7) in step 6 of "How one
+//!   step moves the Quad", which counts only the motor's own change of speed
+//!   in step 2, before the rub slows it again here. Together they twist the
+//!   frame as hard as the motor fights, and a prop simply stopped by a hard
+//!   hit gives the frame none of its spin.
 //! - **A jammed prop** pressed hard enough is held still by the rub, as the
 //!   frame's friction holds the frame, against whatever its motor gives.
 //!

@@ -59,51 +59,51 @@ timeline = [
 
 [[expect]]
 what    = "motor 2 drive"
-over    = "0.108 s to 0.2075 s"
+over    = "0.2095 s to 0.309 s"
 highest = "0% ± 0%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (L1037–1041) and waits 100 ms (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. Prop 2 lands on the block and stalls at 0.108 s (observed)"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm: below its minimum speed with the throttle above zero, a running motor has stalled (L983–987, L1067–1071); the ESC switches it off (L1037–1041) and waits 100 ms (`wait100ms`, L1084), the Quad definition's start wait of 0.1 s. Prop 2 lands on the block and stalls on the step that ends at 0.2095 s (observed)"
 
 [[expect]]
 what  = "motor 2 drive"
-at    = "0.208 s"
+at    = "0.3095 s"
 value = "1.96% ± 0.001%"
 basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1086 and L762–768: 0.1 s after the stall it restarts the motor (`ljmp motor_start`), its drive capped at Startup Power Max, 1.96%"
 
 [[expect]]
 what  = "motor 2 restarts"
-at    = "0.208 s"
+at    = "0.3095 s"
 value = "1 ± 0"
 basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: its first restart"
 
 [[expect]]
 what    = "motor 2 speed"
-over    = "0.208 s to 5.5 s"
+over    = "0.3095 s to 5.6 s"
 highest = "0 RPM ± 190 RPM"
 basis   = "rule: the prop stays jammed: at 1.96% of 25.2 V the motor's torque can't pass 2.6 A × 1 / (1,750 KV) = 0.014 N·m, and the rub holds more than that against it, so the prop never turns faster than Bluejay's minimum speed, 190 RPM on this 14-pole motor, and every restart fails"
 
 [[expect]]
 what   = "motor 2 drive"
-over   = "0.208 s to 1.19 s"
+over   = "0.3095 s to 1.29 s"
 lowest = "1.96% ± 0.001%"
-basis  = "source: Bluejay v0.21.0 (src/Modules/Timing.asm L533–575, L599–734, L771–788; src/Modules/Power.asm L65–96; src/Bluejay.asm L1033–1036): a start never gives up on a timeout during its start-up and initial-run phases, so the field steps on at its timeouts' pace through all 15 capped electrical turns, 24 commutations of 34.1 ms and 66 of 13.0 ms, then waits one more for a zero cross, still capped: 1.711 s if the comparator reads the level opposite to the one Bluejay waits for in that closing wait (a 65,280-count timeout), as the model takes it, or 1.724 s if it reads the other one (one more commutation first), on the assumption that a jammed rotor shows Bluejay none of the levels it waits for (a real comparator might end half the start waits at once, about 1.0 s a try; the esc module in crates/physics has the working). So the first restart drives the jammed motor, capped, for at least 0.99 s: until 1.198 s at the soonest (1.919 s in the model)"
+basis  = "source: Bluejay v0.21.0 (src/Modules/Timing.asm L533–575, L599–734, L771–788; src/Modules/Power.asm L65–96; src/Bluejay.asm L1033–1036): a start never gives up on a timeout during its start-up and initial-run phases, so the field steps on at its timeouts' pace through all 15 capped electrical turns, 24 commutations of 34.1 ms and 66 of 13.0 ms, then waits one more for a zero cross, still capped: 1.711 s if the comparator reads the level opposite to the one Bluejay waits for in that closing wait (a 65,280-count timeout), as the model takes it, or 1.724 s if it reads the other one (one more commutation first), on the assumption that a jammed rotor shows Bluejay none of the levels it waits for (a real comparator might end half the start waits at once, about 1.0 s a try; the esc module in crates/physics has the working). So the first restart drives the jammed motor, capped, for at least 0.99 s: until 1.2995 s at the soonest (2.021 s in the model)"
 
 [[expect]]
 what   = "motor 2 drive"
-over   = "0.208 s to 2.03 s"
+over   = "0.3095 s to 2.13 s"
 lowest = "0% ± 0%"
-basis  = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1041 and L1084: the try fails somewhere between 1.198 s (a try of about 1.0 s, if a real comparator ends half the start waits at once) and 0.208 s + 1.724 s = 1.932 s (1.919 s in the model), and the ESC then switches the motor off for 100 ms before trying again, so the drive is 0% somewhere in this stretch"
+basis  = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1041 and L1084: the try fails somewhere between 1.2995 s (a try of about 1.0 s, if a real comparator ends half the start waits at once) and 0.3095 s + 1.724 s = 2.034 s (2.021 s in the model), and the ESC then switches the motor off for 100 ms before trying again, so the drive is 0% somewhere in this stretch"
 
 [[expect]]
 what  = "motor 2 restarts"
-at    = "2.1 s"
+at    = "2.2 s"
 value = "2 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: one failed start in a row, fewer than 3, so it restarts again 0.1 s after the failed try: by 2.032 s whichever level the comparator reads in the closing wait (2.019 s in the model), and for any try from about 1.0 s to 1.724 s that second restart has come and not yet failed at 2.1 s"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: one failed start in a row, fewer than 3, so it restarts again 0.1 s after the failed try: by 2.134 s whichever level the comparator reads in the closing wait (2.121 s in the model), and for any try from about 1.0 s to 1.724 s that second restart has come and not yet failed at 2.2 s"
 
 [[expect]]
 what  = "motor 2 restarts"
-at    = "3.9 s"
+at    = "4 s"
 value = "3 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: two failed starts in a row, fewer than 3, so it restarts a third time: by 3.856 s whichever level the comparator reads in the closing wait (3.830 s in the model), sooner for shorter tries, and the count stays at 3 once it gives up"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: two failed starts in a row, fewer than 3, so it restarts a third time: by 3.958 s whichever level the comparator reads in the closing wait (3.932 s in the model), sooner for shorter tries, and the count stays at 3 once it gives up"
 
 [[expect]]
 what    = "motor 2 restarts"
@@ -113,19 +113,19 @@ basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1036 and L1073–107
 
 [[expect]]
 what    = "motor 2 drive"
-over    = "5.6 s to 8 s"
+over    = "5.7 s to 8 s"
 highest = "0% ± 0%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1088–1107 and L633–656: after giving up it plays its \"motor stalled\" beeps and goes back to waiting for arming, which needs the throttle at zero for ten counts of its 32 ms timer; while the command stays at 3% it never comes, so the motor stays off, \"stopped after failed restarts\", through the disarm at 7 s until the next command above zero. It gives up by 5.581 s whichever level the comparator reads in the closing wait (5.541 s in the model), sooner for shorter tries"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1088–1107 and L633–656: after giving up it plays its \"motor stalled\" beeps and goes back to waiting for arming, which needs the throttle at zero for ten counts of its 32 ms timer; while the command stays at 3% it never comes, so the motor stays off, \"stopped after failed restarts\", through the disarm at 7 s until the next command above zero. It gives up by 5.682 s whichever level the comparator reads in the closing wait (5.643 s in the model), sooner for shorter tries"
 
 [[expect]]
 what    = "motor 2 current"
-over    = "0.208 s to 5.5 s"
+over    = "0.3095 s to 5.6 s"
 highest = "between 0 A and 2.61 A"
 basis   = "rule: through the restarts the drive is capped at 1.96% of the pack's 25.2 V, 0.494 V, so a jammed motor, held still with no back-voltage, draws at most 0.494 V / 0.19 Ω = 2.60 A"
 
 [[expect]]
 what    = "battery current"
-over    = "0.208 s to 5.5 s"
+over    = "0.3095 s to 5.6 s"
 highest = "between 0 A and 0.052 A"
 basis   = "rule: the ESC draws its drive times the motor's current from the pack, 1.96% × 2.60 A = 0.051 A, and the other motors are off; at that rate the 1,400 mAh pack would last 27 hours, so a jammed motor can't drain it"
 
@@ -133,7 +133,7 @@ basis   = "rule: the ESC draws its drive times the motor's current from the pack
 what  = "motor 2 restarts"
 at    = "7.5 s"
 value = "0 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L647–656, as at power-up: the disarm at 7 s sends zero, and after ten counts of its 32.1 ms timer at zero (the first within 32.1 ms, whatever the timer's phase) and its ready beep (66.5 ms) the ESC is ready again, its count cleared: by 7 s + 0.321 s + 0.067 s = 7.39 s (7.375 s in the model)"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L647–656, as at power-up: the disarm at 7 s sends zero, and after ten counts of its 32.1 ms timer at zero (the first within 32.1 ms, whatever the timer's phase) and its ready beep (66.5 ms) the ESC is ready again, its count cleared: by 7 s + 0.321 s + 0.067 s = 7.39 s (7.378 s in the model)"
 
 [[expect]]
 what  = "motor 2 drive"

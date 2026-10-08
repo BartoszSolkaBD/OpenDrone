@@ -46,8 +46,8 @@ quickrates_rc_expo = "off"
 
 [inputs]
 # A Physics Scenario scripts the four motor commands instead of the sticks.
-# 24.4%: about the drive that holds settled motors at their speed on this
-# pack.
+# 24.4%: about the drive that holds settled motors at their hover speed in
+# still air on this pack.
 timeline = [
   { at = "0 s", motors = "24.4%" },
 ]
@@ -80,19 +80,19 @@ basis   = "rule: prop 3 sits west of the centre of mass, the farthest from the w
 what  = "motor 2 speed"
 at    = "0.0055 s"
 value = "between 190 RPM and 9400 RPM"
-basis = "rule: the rub brakes prop 2 below the 9,440 RPM its drive held it at, and a graze only slows it: it doesn't stop, or fall below Bluejay's minimum speed, 1,330 electrical RPM (190 RPM on this 14-pole motor), where its ESC would find it stalled"
+basis = "rule: the rub brakes prop 2 below the 9,320 RPM it was turning at, and a graze only slows it: it doesn't stop, or fall below Bluejay's minimum speed, 1,330 electrical RPM (190 RPM on this 14-pole motor), where its ESC would find it stalled"
 
 [[expect]]
 what  = "motor 2 speed"
 at    = "0.0055 s"
-value = "7640 RPM ± 5%"
+value = "7530 RPM ± 5%"
 basis = "observed: the graze takes about a fifth of its speed"
 
 [[expect]]
 what  = "motor 4 speed"
 at    = "0.0055 s"
-value = "9440 RPM ± 0.1%"
-basis = "rule: prop 4 touches nothing, so it keeps the speed its drive holds"
+value = "9320 RPM ± 0.5%"
+basis = "rule: prop 4 touches nothing, so nothing brakes it: it stays within 0.5% of the 9,310 RPM it settled at, drifting only as its drive and the air it flies through set it"
 
 [[expect]]
 what  = "speed north"
@@ -115,5 +115,5 @@ basis = "rule: the rub pushes south at prop 2's hub's line, 11 cm east of the ce
 [[expect]]
 what  = "yaw rate"
 at    = "0.0055 s"
-value = "41.6 °/s ± 5%"
+value = "41.9 °/s ± 5%"
 basis = "observed: about 0.016 N·s at 11 cm on a yaw inertia of 25 kg·cm²"

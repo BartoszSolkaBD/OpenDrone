@@ -6,21 +6,21 @@ scenario = "A hard hit stops a 5-inch's motor at once; it restarts after 0.1 s a
 
 [[expect]]
 what     = "motor 2 speed at 0 s"
-basis    = "Rule"
-expected = "9452 RPM ± 0.1%"
-measured = "9450 RPM"
+basis    = "Observed"
+expected = "9440 RPM ± 0.5%"
+measured = "9440 RPM"
 
 [[expect]]
 what     = "prop 2 rub, highest over 0 s to 0.5 s"
 basis    = "Rule"
 expected = "between 1 N and 100000 N"
-measured = "697 N"
+measured = "696 N"
 
 [[expect]]
 what     = "motor 2 speed at 0.00075 s"
 basis    = "Rule"
 expected = "0 RPM ± 190 RPM"
-measured = "117 RPM"
+measured = "118 RPM"
 
 [[expect]]
 what     = "motor 2 drive, highest over 0.001 s to 0.1 s"
@@ -47,19 +47,19 @@ expected = "1.96% ± 0.001%"
 measured = "1.96%"
 
 [[expect]]
-what     = "motor 2 speed at 0.28375 s"
+what     = "motor 2 speed at 0.283625 s"
 basis    = "Observed"
 expected = "833 RPM ± 1%"
 measured = "833 RPM"
 
 [[expect]]
-what     = "motor 2 speed at 0.31675 s"
+what     = "motor 2 speed at 0.316625 s"
 basis    = "Source"
 expected = "6254 RPM ± 5%"
 measured = "6240 RPM"
 
 [[expect]]
-what     = "motor 2 speed at 0.41575 s"
+what     = "motor 2 speed at 0.415625 s"
 basis    = "Rule"
 expected = "9253 RPM ± 1%"
 measured = "9250 RPM"
@@ -79,16 +79,16 @@ measured = "none broken"
 [fingerprints]
 quad = "ad78c1f099c487ec"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "a87b41450e62d2cf"   # the whole state after each of 4000 steps at 8000 Hz, in order
+run  = "26ea08eb90b185f4"   # the whole state after each of 4000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.05 s" = "cd94d068e4a24c31"
-"0.1 s" = "b0c88bf08811664e"
-"0.15 s" = "d950c9860a1f145b"
-"0.2 s" = "f77747008367b949"
-"0.25 s" = "154c349cb3e9df88"
-"0.3 s" = "aae037973e43a742"
-"0.35 s" = "46f66b7c1f2265d0"
-"0.4 s" = "49b0ca16348a7787"
-"0.45 s" = "2ee5b9601db8828a"
-"0.5 s" = "64cfd9da4ed25c87"
+"0.05 s" = "a6be14d0f3325eec"
+"0.1 s" = "ba261a9efdfd54b2"
+"0.15 s" = "725cdd78fb14b7da"
+"0.2 s" = "8ddd35ebf7b6cfab"
+"0.25 s" = "baf02ec07bb348b2"
+"0.3 s" = "445728c2216b9fab"
+"0.35 s" = "afc679832bf7d154"
+"0.4 s" = "a29dc3c1440c8a2e"
+"0.45 s" = "0c27289c5b41fbc6"
+"0.5 s" = "25c864df564de41f"

@@ -48,8 +48,8 @@ quickrates_rc_expo = "off"
 
 [inputs]
 # A Physics Scenario scripts the four motor commands instead of the sticks.
-# 24.4%: about the drive that holds settled motors at their speed on this
-# pack.
+# 24.4%: about the drive that holds settled motors at their hover speed in
+# still air on this pack.
 timeline = [
   { at = "0 s", motors = "0%, 24.4%, 0%, 0%" },
 ]
@@ -57,8 +57,8 @@ timeline = [
 [[expect]]
 what  = "motor 2 speed"
 at    = "0 s"
-value = "9452 RPM ± 0.1%"
-basis = "rule: settled motors turn at the speed whose thrust carries a quarter of the Quad's weight: the Quad weighs 0.652 kg × 9.81 m/s², a quarter is 1.599 N, and its props make k_f·ω² with k_f = C_T·ρ·D⁴/4π² = 0.187 × 1.225 kg/m³ × (0.1295 m)⁴ / 4π² = 1.632 × 10⁻⁶ N/(rad/s)², so ω = √(1.599 / 1.632 × 10⁻⁶) = 989.8 rad/s = 9,452 RPM"
+value = "9440 RPM ± 0.5%"
+basis = "observed: settled motors turn at the speed whose thrust carries a quarter of the Quad's weight in the air it flies through. In still air that is 9,452 RPM: a quarter of 0.652 kg × 9.81 m/s² is 1.599 N, its props make k_f·ω² with k_f = C_T·ρ·D⁴/4π² = 0.187 × 1.225 kg/m³ × (0.1295 m)⁴ / 4π² = 1.632 × 10⁻⁶ N/(rad/s)², and √(1.599 / 1.632 × 10⁻⁶) = 989.8 rad/s; flying at 1 m/s its props bite a little more air (#42), so a little less does"
 
 [[expect]]
 what    = "prop 2 rub"
@@ -98,19 +98,19 @@ basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L894–955: the drive stays 
 
 [[expect]]
 what  = "motor 2 speed"
-at    = "0.28375 s"
+at    = "0.283625 s"
 value = "833 RPM ± 1%"
-basis = "observed: where the capped restart ends, after 15 electrical turns, at 0.28375 s"
+basis = "observed: where the capped restart ends, after 15 electrical turns, on the step that ends at 0.283625 s"
 
 [[expect]]
 what  = "motor 2 speed"
-at    = "0.31675 s"
+at    = "0.316625 s"
 value = "6254 RPM ± 5%"
-basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured spin-up time of 33 ms. One time constant after the capped restart ends at 0.28375 s, a first lag has covered 63% of the way from 833 RPM to the 9,410 RPM its 24.4% drive holds: 833 + 0.632 × (9,410 − 833) = 6,254 RPM"
+basis = "source: NeuroBEM's 5″ racing quad (docs/research/flight-dynamics.md §3.2 and §8.2), the Quad definition's Measured spin-up time of 33 ms. One time constant after the capped restart ends at 0.283625 s, a first lag has covered 63% of the way from 833 RPM to the 9,410 RPM its 24.4% drive holds: 833 + 0.632 × (9,410 − 833) = 6,254 RPM"
 
 [[expect]]
 what  = "motor 2 speed"
-at    = "0.41575 s"
+at    = "0.415625 s"
 value = "9253 RPM ± 1%"
 basis = "rule: back to speed within its spin-up time: four spin-up times (4 × 33 ms) after the capped restart ends, a first lag has covered 1 − e⁻⁴ = 98.2% of the way, 833 + 0.982 × (9,410 − 833) = 9,253 RPM. Allow 1%: for its first few steps the motor speeds up a little slower than the lag, as its drive can give no more than the command"
 

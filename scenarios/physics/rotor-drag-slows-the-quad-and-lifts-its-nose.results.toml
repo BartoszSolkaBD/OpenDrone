@@ -37,16 +37,16 @@ measured = "none broken"
 [fingerprints]
 quad = "855fa077c9936530"   # test/whoop-65-rotor-drag-only: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "d637258633dec0cc"   # the whole state after each of 1600 steps at 8000 Hz, in order
+run  = "3f1a4827a3aced03"   # the whole state after each of 1600 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.02 s" = "bcab8117ba193ad4"
-"0.04 s" = "174bcf4ad4049d07"
-"0.06 s" = "c70e1608126b49f3"
-"0.08 s" = "ea6acad8aab86ba9"
-"0.1 s" = "4d71c40c723990a6"
-"0.12 s" = "c0cb5a4968860bff"
-"0.14 s" = "ffd3fd6d2dcdb5b7"
-"0.16 s" = "997fec2c7d54d496"
-"0.18 s" = "388bbba4625e98ee"
-"0.2 s" = "449d88c809171f49"
+"0.02 s" = "3168d373e4f4d394"
+"0.04 s" = "3ecf5d916d609dc7"
+"0.06 s" = "6fb12039b4ca85f3"
+"0.08 s" = "1d04d9b8890bade9"
+"0.1 s" = "7dba2899d6141626"
+"0.12 s" = "722f0c2adaf96e7f"
+"0.14 s" = "cba0ab81cefabdb7"
+"0.16 s" = "4101eee145ce28d6"
+"0.18 s" = "725f1480c880caae"
+"0.2 s" = "bbb7d2f5511a56c9"

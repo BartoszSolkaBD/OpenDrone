@@ -88,11 +88,11 @@ basis = "observed: the rings' friction (0.5 times the push) slows the slide by 0
 [[expect]]
 what   = "motor 1 speed"
 over   = "0 s to 0.3 s"
-lowest = "between 22500 RPM and 23000 RPM"
-basis  = "rule: with no rub, nothing brakes motor 1: it keeps the 22,560 RPM it settled at (√cos 10° of the 22,733 RPM that holds the Quad's weight level), drifting only as its drive and the pack settle"
+lowest = "between 22300 RPM and 23000 RPM"
+basis  = "rule: with no rub, nothing brakes motor 1: it never falls below the 22,400 RPM it settled at (the speed whose thrust, in the air it flies through at 3 m/s, carries the Quad's weight along the motors' axis), and only rises as its 37.3% drive takes it"
 
 [[expect]]
 what   = "motor 2 speed"
 over   = "0 s to 0.3 s"
-lowest = "between 22500 RPM and 23000 RPM"
+lowest = "between 22300 RPM and 23000 RPM"
 basis  = "rule: with no rub, nothing brakes motor 2 either"

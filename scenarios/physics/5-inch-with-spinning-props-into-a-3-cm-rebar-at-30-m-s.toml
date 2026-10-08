@@ -41,8 +41,8 @@ quickrates_rc_expo = "off"
 
 [inputs]
 # A Physics Scenario scripts the four motor commands instead of the sticks.
-# 24.4%: about the drive that holds settled motors at their speed on this
-# pack.
+# 24.4%: about the drive that holds settled motors at their hover speed in
+# still air on this pack.
 timeline = [
   { at = "0 s", motors = "24.4%" },
 ]
@@ -75,22 +75,22 @@ basis   = "rule: the rear props are 16 cm behind the front ones, and the stub ne
 what  = "motor 2 speed"
 at    = "0.031 s"
 value = "2060 RPM ± 10%"
-basis = "observed: the strike takes nearly four fifths of prop 2's 9,410 RPM in one step"
+basis = "observed: the strike takes three quarters of prop 2's 7,920 RPM in one step (settled at 30 m/s, its props need less speed than in a hover in still air)"
 
 [[expect]]
 what    = "motor 2 drive"
-over    = "0.04 s to 0.1 s"
+over    = "0.05 s to 0.1 s"
 highest = "0% ± 0%"
 basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L983–987, L1037–1041 and L1084: the stub's rub leaves prop 2 turning backwards, about 380 RPM (observed), slower than the minimum speed the way it's told to turn, so its ESC finds the motor stalled, switches it off and waits 0.1 s before restarting it"
 
 [[expect]]
 what    = "motor 4 drive"
-over    = "0.04 s to 0.1 s"
+over    = "0.05 s to 0.1 s"
 highest = "0% ± 0%"
 basis   = "source: Bluejay v0.21.0, as for motor 2: prop 4 is left turning backwards too, so its ESC switches it off for its restart wait"
 
 [[expect]]
 what  = "speed east"
 at    = "0.1 s"
-value = "-1.8 m/s ± 0.3 m/s"
+value = "-1.74 m/s ± 0.3 m/s"
 basis = "observed: its rubbing props slow and the stub squeezes between them, then the stub reaches its frame at about 11.5 m/s, and it bounces back, tipping nose up"

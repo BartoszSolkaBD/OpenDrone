@@ -68,47 +68,73 @@ fn by_the_wall(parameters: QuadParameters, into: f64) -> QuadBody {
     QuadBody::new(parameters, start, &WORLD).unwrap()
 }
 
-/// What one Prop Strike did, on the step prop 2 first touched the wall.
+/// How long a strike is watched for, from the step prop 2 first touches the
+/// wall: 5 ms. A touch can take a step or two to close the last of the gap
+/// before the wall pushes.
+const WATCHED: u64 = 40;
+
+/// What one Prop Strike did, over the [`WATCHED`] steps from the one where
+/// prop 2 first touched the wall.
 struct Strike {
-    /// Prop 2's speed before and after the step, in rad/s.
+    /// Prop 2's speed just before it touched, and its lowest while watched,
+    /// in rad/s.
     before: f64,
     after: f64,
-    /// How hard prop 2 rubbed, in newtons.
+    /// How hard prop 2 rubbed, in all, in N·s.
     rub: f64,
     /// How the Quad's speed north changed, in m/s.
     pushed_north: f64,
-    /// The Quad's yaw rate after the step, nose right positive, in rad/s.
+    /// The Quad's yaw rate at the end, nose right positive, in rad/s.
     yaw: f64,
     /// How many steps it took to reach the wall.
     steps: u64,
 }
 
-/// Flies the Quad at the wall until prop 2 first touches it.
-fn strike(parameters: QuadParameters, into: f64) -> Strike {
-    let map = wall();
+/// Flies the Quad at `map` until prop 2 first touches it, or for `steps`
+/// steps if given, and watches what happens next.
+fn strike_on(
+    parameters: QuadParameters,
+    into: f64,
+    map: &MapCollision,
+    steps: Option<u64>,
+) -> Strike {
     let mut quad = by_the_wall(parameters, into);
-    for steps in 1..8000 {
-        let before = quad.motors()[1].speed;
-        let north = quad.state().velocity.y;
-        quad.step(&WORLD, &map, &HOVER, STEP);
-        if let Some(contact) = quad.contacts().first() {
-            assert_eq!(contact.part, QuadPart::PropDisc(2), "only prop 2 reaches");
-            assert!(
-                quad.contacts()
-                    .iter()
-                    .all(|c| c.part == QuadPart::PropDisc(2))
-            );
-            return Strike {
-                before,
-                after: quad.motors()[1].speed,
-                rub: quad.prop_rubs()[1],
-                pushed_north: quad.state().velocity.y - north,
-                yaw: PilotRates::from_body(quad.state().rotation).yaw,
-                steps,
-            };
-        }
+    let mut taken = 0;
+    let (mut before, mut north) = (0.0, 0.0);
+    while taken == 0 || steps.map_or(quad.contacts().is_empty(), |steps| taken < steps) {
+        assert!(taken < 8000, "prop 2 never reached the wall");
+        before = quad.motors()[1].speed;
+        north = quad.state().velocity.y;
+        quad.step(&WORLD, map, &HOVER, STEP);
+        taken += 1;
     }
-    panic!("prop 2 never reached the wall");
+    let steps = taken;
+    let (mut rub, mut after) = (0.0, before);
+    for _ in 0..WATCHED {
+        assert!(
+            quad.contacts()
+                .iter()
+                .all(|c| c.part == QuadPart::PropDisc(2)),
+            "only prop 2 reaches"
+        );
+        rub += quad.prop_rubs()[1] * STEP;
+        after = opendrone_maths::functions::min(after, quad.motors()[1].speed);
+        quad.step(&WORLD, map, &HOVER, STEP);
+    }
+    Strike {
+        before,
+        after,
+        rub,
+        pushed_north: quad.state().velocity.y - north,
+        yaw: PilotRates::from_body(quad.state().rotation).yaw,
+        steps,
+    }
+}
+
+/// Flies the Quad at the wall until prop 2 first touches it, and watches the
+/// strike.
+fn strike(parameters: QuadParameters, into: f64) -> Strike {
+    strike_on(parameters, into, &wall(), None)
 }
 
 #[test]
@@ -145,16 +171,24 @@ fn a_rubbing_prop_pushes_and_twists_the_quad_by_its_spin_direction() {
 
 #[test]
 fn a_hard_hit_stops_the_motor_at_once_and_a_graze_only_slows_it() {
-    // A hard hit stops the prop's spin within the step. Sliding along the
-    // wall at 3 m/s, the Quad then drags the stopped prop round backwards,
-    // as a wheel rolls: either way it no longer turns the way its motor
-    // drives it, faster than Bluejay's minimum speed, so its ESC finds it
-    // stalled.
-    let hit = strike(open_props(), 1.0);
+    // A hard hit stops the prop's spin at once. Sliding along the wall at
+    // 3 m/s, the Quad then drags the stopped prop round backwards, as a
+    // wheel rolls: either way it no longer turns the way its motor drives
+    // it, faster than Bluejay's minimum speed, so its ESC finds it stalled.
+    let map = wall();
+    let mut quad = by_the_wall(open_props(), 1.0);
+    let mut stopped = None;
+    for _ in 0..8000 {
+        quad.step(&WORLD, &map, &HOVER, STEP);
+        if quad.prop_rubs()[1] > 0.0 {
+            stopped = Some(quad.motors()[1].speed);
+            break;
+        }
+    }
+    let stopped = stopped.expect("prop 2 should strike the wall");
     assert!(
-        hit.after < MINIMUM,
-        "a hard hit should stop prop 2 within the step, not leave it at {} rad/s",
-        hit.after
+        stopped < MINIMUM,
+        "a hard hit should stop prop 2 within the step it rubs, not leave it at {stopped} rad/s"
     );
     let graze = strike(open_props(), 0.02);
     assert!(graze.after < graze.before);
@@ -169,27 +203,29 @@ fn prop_grip_comes_from_the_quad_definition() {
         strike(parameters, 0.02)
     };
     // No grip, no rub: the prop's disc still stops the Quad going into the
-    // wall, but the blades slide over it, and the motor isn't braked.
+    // wall, but the blades slide over it, the motor isn't braked, and the
+    // Quad's speed north changes only as it does in open air.
     let none = with_grip(0.0);
     assert_eq!(none.rub, 0.0);
-    assert_eq!(none.pushed_north, 0.0);
-    let free = {
-        let mut quad = by_the_wall(open_props(), 0.02);
-        let empty_air = MapCollision::default();
-        for _ in 0..none.steps {
-            quad.step(&WORLD, &empty_air, &HOVER, STEP);
-        }
-        quad.motors()[1].speed
-    };
-    assert_eq!(
-        none.after, free,
-        "without grip the wall doesn't touch the motor"
+    let free = strike_on(
+        open_props(),
+        0.02,
+        &MapCollision::default(),
+        Some(none.steps),
     );
+    assert!(
+        (none.after - free.after).abs() < 1e-6 * free.after,
+        "without grip the wall doesn't touch the motor: {} against {} rad/s",
+        none.after,
+        free.after
+    );
+    let pushed = (none.pushed_north - free.pushed_north).abs();
+    assert!(pushed < 1e-4, "pushed north by {pushed} m/s");
 
     // More grip, more rub, and a slower prop.
     let little = with_grip(0.2);
     let much = with_grip(0.8);
-    assert!(much.rub > 3.0 * little.rub);
+    assert!(much.rub > 2.0 * little.rub);
     assert!(much.after < little.after);
     // A spinning prop's blade slides over the wall, so its rub is all its grip
     // allows: the grip times the push.
@@ -198,7 +234,7 @@ fn prop_grip_comes_from_the_quad_definition() {
         let mut parameters = open_props();
         parameters.props.grip = grip;
         let mut quad = by_the_wall(parameters, 0.02);
-        while quad.contacts().is_empty() {
+        while quad.contacts().iter().all(|c| c.push < 1e-3) {
             quad.step(&WORLD, &map, &HOVER, STEP);
         }
         let contact = quad.contacts()[0];

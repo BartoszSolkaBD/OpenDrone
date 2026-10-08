@@ -14,13 +14,13 @@ measured = "2.94 m"
 what     = "prop 2 rub, highest over 0.03 s to 0.04 s"
 basis    = "Rule"
 expected = "between 1 N and 100000 N"
-measured = "3080 N"
+measured = "2160 N"
 
 [[expect]]
 what     = "prop 4 rub, highest over 0.03 s to 0.04 s"
 basis    = "Rule"
 expected = "between 1 N and 100000 N"
-measured = "2040 N"
+measured = "2210 N"
 
 [[expect]]
 what     = "prop 1 rub, highest over 0 s to 0.04 s"
@@ -35,13 +35,13 @@ expected = "2060 RPM ± 10%"
 measured = "2060 RPM"
 
 [[expect]]
-what     = "motor 2 drive, highest over 0.04 s to 0.1 s"
+what     = "motor 2 drive, highest over 0.05 s to 0.1 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
 
 [[expect]]
-what     = "motor 4 drive, highest over 0.04 s to 0.1 s"
+what     = "motor 4 drive, highest over 0.05 s to 0.1 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
@@ -49,8 +49,8 @@ measured = "0%"
 [[expect]]
 what     = "speed east at 0.1 s"
 basis    = "Observed"
-expected = "-1.8 m/s ± 0.3 m/s"
-measured = "-1.80 m/s"
+expected = "-1.74 m/s ± 0.3 m/s"
+measured = "-1.74 m/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -61,16 +61,16 @@ measured = "none broken"
 [fingerprints]
 quad = "ad78c1f099c487ec"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "61249da54cc5d1fa"   # test/thin-rail
-run  = "7bca9c3dbcc87c95"   # the whole state after each of 800 steps at 8000 Hz, in order
+run  = "d6125850ef576ffb"   # the whole state after each of 800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.01 s" = "564e758ca490ef6d"
-"0.02 s" = "60bdaaba536218e0"
-"0.03 s" = "384d79e54e48d879"
-"0.04 s" = "eef7bf6389dccef7"
-"0.05 s" = "412d197b3ed076df"
-"0.06 s" = "faa9a9d2b218d91e"
-"0.07 s" = "89394cdadef3b491"
-"0.08 s" = "02c53ac08bd88f5d"
-"0.09 s" = "db389cb2af18053d"
-"0.1 s" = "9a2b8bb5c59cf4cb"
+"0.01 s" = "2fdd89b1ea3ab8e7"
+"0.02 s" = "08029f1eb57eeb83"
+"0.03 s" = "65ca51a3c6118770"
+"0.04 s" = "bd6ef53aae03a669"
+"0.05 s" = "0d32d684844e1bfa"
+"0.06 s" = "bacd03d0d68d3a41"
+"0.07 s" = "36cb06ff799a7229"
+"0.08 s" = "6a43fbb9eb9951e1"
+"0.09 s" = "20c7d01356e485b3"
+"0.1 s" = "5f9fb7e5ccb067aa"

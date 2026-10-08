@@ -32,19 +32,19 @@ measured = "0 N"
 what     = "motor 2 speed at 0.0055 s"
 basis    = "Rule"
 expected = "between 190 RPM and 9400 RPM"
-measured = "7640 RPM"
+measured = "7530 RPM"
 
 [[expect]]
 what     = "motor 2 speed at 0.0055 s"
 basis    = "Observed"
-expected = "7640 RPM ± 5%"
-measured = "7640 RPM"
+expected = "7530 RPM ± 5%"
+measured = "7530 RPM"
 
 [[expect]]
 what     = "motor 4 speed at 0.0055 s"
 basis    = "Rule"
-expected = "9440 RPM ± 0.1%"
-measured = "9440 RPM"
+expected = "9320 RPM ± 0.5%"
+measured = "9320 RPM"
 
 [[expect]]
 what     = "speed north at 0.0055 s"
@@ -62,13 +62,13 @@ measured = "2.98 m/s"
 what     = "yaw rate at 0.0055 s"
 basis    = "Rule"
 expected = "between 1 °/s and 1000 °/s"
-measured = "41.6 °/s"
+measured = "41.9 °/s"
 
 [[expect]]
 what     = "yaw rate at 0.0055 s"
 basis    = "Observed"
-expected = "41.6 °/s ± 5%"
-measured = "41.6 °/s"
+expected = "41.9 °/s ± 5%"
+measured = "41.9 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -79,16 +79,16 @@ measured = "none broken"
 [fingerprints]
 quad = "ad78c1f099c487ec"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "0348f45502c89cb0"   # the whole state after each of 400 steps at 8000 Hz, in order
+run  = "b07c7e6f8a5f3bc4"   # the whole state after each of 400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.005 s" = "644cc95f039c9068"
-"0.01 s" = "73ce10ff464411cd"
-"0.015 s" = "97faa133febee10d"
-"0.02 s" = "6378db39868f634d"
-"0.025 s" = "f2349c83848b98f1"
-"0.03 s" = "bcea44fdb06d8380"
-"0.035 s" = "573ba9350114ac8b"
-"0.04 s" = "17e46fea3bdd76ba"
-"0.045 s" = "a4c8c87b51b4791b"
-"0.05 s" = "d745d6552e889a40"
+"0.005 s" = "75d2d8d770ae736a"
+"0.01 s" = "37fbf6ab8ee36f5e"
+"0.015 s" = "ed7216095679ce8b"
+"0.02 s" = "a6cc52196787fdcc"
+"0.025 s" = "eae257fff22cb497"
+"0.03 s" = "d7fce5cc3a714fcf"
+"0.035 s" = "1e9e00bcd8ad8f64"
+"0.04 s" = "d02fa64da91029d1"
+"0.045 s" = "f7175b2bb49e2fb8"
+"0.05 s" = "4956c1da0441b8c8"

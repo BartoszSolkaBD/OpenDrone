@@ -43,14 +43,14 @@ measured = "2.92 m/s"
 [[expect]]
 what     = "motor 1 speed, lowest over 0 s to 0.3 s"
 basis    = "Rule"
-expected = "between 22500 RPM and 23000 RPM"
-measured = "22600 RPM"
+expected = "between 22300 RPM and 23000 RPM"
+measured = "22400 RPM"
 
 [[expect]]
 what     = "motor 2 speed, lowest over 0 s to 0.3 s"
 basis    = "Rule"
-expected = "between 22500 RPM and 23000 RPM"
-measured = "22600 RPM"
+expected = "between 22300 RPM and 23000 RPM"
+measured = "22400 RPM"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -61,16 +61,16 @@ measured = "none broken"
 [fingerprints]
 quad = "19dcc67dc9d24c34"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "953e0a5d47db1424"   # the whole state after each of 2400 steps at 8000 Hz, in order
+run  = "b93719e879f59ebc"   # the whole state after each of 2400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.03 s" = "08ae52ea87d6c7e0"
-"0.06 s" = "bc38152f1e3330f1"
-"0.09 s" = "5a99b28ab890999a"
-"0.12 s" = "cad56a8694967baa"
-"0.15 s" = "03e9a27a2115cf1c"
-"0.18 s" = "9260d879f7948cb5"
-"0.21 s" = "ade4b820c0440aa2"
-"0.24 s" = "9801786e529fa95a"
-"0.27 s" = "c5f405cc569e8299"
-"0.3 s" = "82d78230ad56a6b9"
+"0.03 s" = "acc783f9097f2ee4"
+"0.06 s" = "27daee7a8ba75f22"
+"0.09 s" = "5d4601c1b784ef7d"
+"0.12 s" = "64ebd79c15ac68f2"
+"0.15 s" = "deef19d9df9badc5"
+"0.18 s" = "c3f63e78d8781c77"
+"0.21 s" = "c0da915670bc51d2"
+"0.24 s" = "c08fcb1867cf3b19"
+"0.27 s" = "f7d17107466d5877"
+"0.3 s" = "024e7c9758bda5b9"
