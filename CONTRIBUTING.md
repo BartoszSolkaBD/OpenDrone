@@ -23,6 +23,7 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   ```
 
 - A change that moves a flight updates the Scenarios' Results files: run `cargo scenarios run` and commit them. [Reading a Scenario and its Results](docs/verification/reading-a-scenario.md) explains both.
+- A change that adds a starting-state item, or changes how a Pack file is written, adds a format migration step and runs it over every file with `cargo xtask migrate <step>`: see [Changing a file format](docs/format-migration.md).
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
 - `opendrone-input` builds SDL 3.4 from source ([ADR-0018](docs/adr/0018-input-through-sdl3-on-its-own-thread.md)), so building needs CMake and a C compiler. On Linux, also install `libudev-dev` and `pkg-config`, so SDL notices devices being plugged in and out. `cargo xtask input-monitor` shows your Input Devices live: [Watching Input Devices](docs/verification/watching-input-devices.md).

@@ -8,4 +8,4 @@ OpenDrone is built by its maintainer with AI agents. Right now it's in **Phase 1
 4. **The Review Report,** one comment kept up to date on the pull request, shows the Verdict, the Red Flags, what moved, the speed, the Areas touched, renders of changed Maps and downloads, so the maintainer can judge a change in one place.
 5. **It merges by itself,** squashed into one commit, once every required check and the Verdict pass. A Red Flag such as an edited ADR or a changed Source Expectation waits for the maintainer.
 
-This part holds [setting up and CI](contributing.md), [the agent workflow](agents.md) with [the Reviewer and the Verdict](../agents/reviewer.md), [reading the Review Report](../review-report.md) and [the data policy](../data-policy.md).
+This part holds [setting up and CI](contributing.md), [changing a file format](../format-migration.md), [the agent workflow](agents.md) with [the Reviewer and the Verdict](../agents/reviewer.md), [reading the Review Report](../review-report.md) and [the data policy](../data-policy.md).
