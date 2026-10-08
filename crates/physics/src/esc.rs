@@ -102,7 +102,8 @@
 //!   turns are done, a rotor turning the right way at the minimum speed or
 //!   faster runs on, and a slower one has the closing wait to get there
 //!   before the start has failed. Worked from the timeouts, a jammed try
-//!   takes 1.711 s:
+//!   takes 1.711 s, on an assumption about Bluejay's comparator spelt out
+//!   after the list:
 //!   - Bluejay's commutation timers count 12 cycles of its 24.5 MHz clock
 //!     (L553–554), 0.49 µs. While the rotor doesn't answer, its estimate of
 //!     four commutations' time (`Comm_Period4x`) sits at its slowest, 0xFFFF
@@ -116,19 +117,31 @@
 //!   - In the initial-run phase (the other 11 turns, 66 commutations) each
 //!     waits 15°, 15° and 7.5°, then a zero-cross wait of a quarter of the
 //!     estimate, once: 26,615 counts, 13.0 ms.
-//!   - The closing wait. With no back-voltage the floating phase sits at the
-//!     star point, so the comparator compares two equal voltages and its
-//!     level is down to its offset. The model takes it to read the level
-//!     opposite to the one Bluejay waits for. That first reading clears the
-//!     demag flag that every wait starts with and sets a timeout of 65,280
-//!     counts, 32.0 ms (Timing.asm L599, L656–658, L671–673, L693–734);
-//!     while it keeps reading so, nothing can end the wait but that timeout,
-//!     which, with the flag clear, leaves run mode (L771–788). Had it read
-//!     the level Bluejay waits for instead, the demag flag would stay set,
-//!     the first wait's timeout (16,383 counts) wouldn't leave run mode
-//!     (L777), and the next wait, for the other level, would end the same
-//!     way: one commutation (26,615 counts, 13.0 ms) later, 1.724 s in all.
-//!     A comparator that flickers between the two could take longer still.
+//!   - The closing wait, for one zero cross after the 15 turns. The model
+//!     takes the comparator to read the level opposite to the one Bluejay
+//!     waits for. That first reading clears the demag flag that every wait
+//!     starts with and sets a timeout of 65,280 counts, 32.0 ms (Timing.asm
+//!     L599, L656–658, L671–673, L693–734); while it keeps reading so,
+//!     nothing can end the wait but that timeout, which, with the flag clear,
+//!     leaves run mode (L771–788). Had it read the level Bluejay waits for
+//!     instead, the demag flag would stay set, the first wait's timeout
+//!     (16,383 counts) wouldn't leave run mode (L777), and the next wait, for
+//!     the other level, would end the same way: one commutation (26,615
+//!     counts, 13.0 ms) later, 1.724 s in all.
+//!
+//!   **The assumption.** The working, like the model, takes a jammed rotor
+//!   to show Bluejay none of the levels it waits for, at any start-up or
+//!   initial-run step, so every one of those 90 waits times out. Nothing in
+//!   the physics says what the comparator reads with no back-voltage, and a
+//!   real one may do otherwise. A level fixed by its own offset is the one
+//!   Bluejay waits for at half the steps (each phase is waited on for high
+//!   at one step and for low at another), and in the start phases a good
+//!   reading ends the wait at once (L608–609, L660–669), so a try would
+//!   take about 1.0 s. A comparator showing the awaited level at every step
+//!   could even carry the start on to `run6`, which clears the count of
+//!   failed starts (Bluejay.asm L957–960), so Bluejay might never give up.
+//!   The Scenarios check the moments around a jammed try with room for any
+//!   try from about 1.0 s to 1.724 s.
 //!
 //!   Bluejay builds for 48 MHz chips run the start-up phase's waits about a
 //!   quarter faster and the closing wait twice as fast, about 1.5 s a try;

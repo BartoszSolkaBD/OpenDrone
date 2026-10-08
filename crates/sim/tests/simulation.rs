@@ -614,3 +614,50 @@ fn each_ticks_output_says_what_the_gyro_reads() {
     assert_eq!(gyro.pitch, 0.0);
     assert_eq!(gyro.yaw, 2000.0 * DEGREE);
 }
+
+#[test]
+fn the_flight_controller_reads_the_gyro_clipped_at_its_range() {
+    // Basis: Rule (#26 §4): the Flight Controller sees only what a real
+    // board sees, so its gyro reads 2,000 °/s of a 3,000 °/s spin. Spinning
+    // nose right at 3,000 °/s and rolling right at 500 °/s, 10 m up, our
+    // Flight Controller disarmed: nothing slows the spin.
+    let mut quad = quad_at(10.0);
+    quad.start.rotation = PilotRates {
+        roll: 500.0 * DEGREE,
+        pitch: 0.0,
+        yaw: 3000.0 * DEGREE,
+    }
+    .to_body();
+    quad.flight_controller = Box::new(OurFlightController::new(
+        tune(),
+        Rates::BETAFLIGHT_DEFAULT,
+        PhysicsRate::from_hz(8000).unwrap(),
+        false,
+        false,
+        &quad.start,
+        quad.parameters.gyro_range,
+    ));
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    for _ in 0..80 {
+        // The Flight Controller reads the sensors at the start of each tick.
+        // Spinning about two axes at once, the true rates drift a little
+        // (Euler's equations), but the yaw stays far past the gyro's range.
+        let rates = PilotRates::from_body(sim.quad_output(0).state.rotation);
+        assert!(rates.yaw > 2900.0 * DEGREE && rates.roll < 1000.0 * DEGREE);
+        sim.step();
+        // Betaflight's axes, in °/s: roll right, pitch nose down and yaw
+        // nose left are positive.
+        let read = sim.quad_output(0).flight_controller.unwrap().gyro;
+        assert!(
+            (read[0] - rates.roll / DEGREE).abs() < 1e-9,
+            "roll {}",
+            read[0]
+        );
+        assert!(
+            (read[1] - -rates.pitch / DEGREE).abs() < 1e-9,
+            "pitch {}",
+            read[1]
+        );
+        assert!((read[2] - -2000.0).abs() < 1e-9, "yaw {}", read[2]);
+    }
+}

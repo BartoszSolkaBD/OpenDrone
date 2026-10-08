@@ -29,13 +29,13 @@ expected = "0 RPM ± 190 RPM"
 measured = "4.49 RPM"
 
 [[expect]]
-what     = "motor 2 drive, lowest over 0.208 s to 1.91 s"
+what     = "motor 2 drive, lowest over 0.208 s to 1.19 s"
 basis    = "Source"
 expected = "1.96% ± 0.001%"
 measured = "1.96%"
 
 [[expect]]
-what     = "motor 2 drive at 1.95 s"
+what     = "motor 2 drive, lowest over 0.208 s to 2.03 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
@@ -95,18 +95,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "e5f997741d5103b1"   # test/freestyle-5-no-drag: what the Simulation receives from it
+quad = "ad78c1f099c487ec"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "1cf123df8fcb25b6"   # test/block
-run  = "24a16525206f5321"   # the whole state after each of 64801 steps at 8000 Hz, in order
+run  = "11dbfe4dc0246f4b"   # the whole state after each of 64801 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.81 s" = "4a25aa48d19cbba7"
-"1.62 s" = "d0fa7426a9c8024f"
-"2.43 s" = "2fec4e7fe1f124a9"
-"3.24 s" = "879dae2c354e8c5f"
-"4.05 s" = "d91b41326fffe4a4"
-"4.86 s" = "55252d8f6f5cf29f"
-"5.67 s" = "d70df9c689a50b56"
-"6.48 s" = "245fb8419718d227"
-"7.29 s" = "f0ffd4dc9a080f3f"
-"8.100125 s" = "530bf825cb597868"
+"0.81 s" = "b6deb7e2b2b460e7"
+"1.62 s" = "64d477816c3cc98f"
+"2.43 s" = "9c94ba0455f38829"
+"3.24 s" = "0ff341085dd6669f"
+"4.05 s" = "fce4a19ead061ac4"
+"4.86 s" = "de0243bee71a3ddf"
+"5.67 s" = "7fc9ec80ed1ec9b6"
+"6.48 s" = "9aa52bae24c03d67"
+"7.29 s" = "92d93662f52b50df"
+"8.100125 s" = "f5971f94afe38cc8"
