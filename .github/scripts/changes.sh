@@ -8,6 +8,8 @@
 #                   assumes no Rust check reads a `.md` file outside packs/;
 #                   the Pack checker reads each Quad's feel-tests.md, which is
 #                   why any change under packs/ runs the checks.
+#                   The Red Flag gate reads ADRs and deep dives, so it runs in
+#                   its own workflow (review.yml) with no skip.
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
 #                   library, or changes the policy, so known security
 #                   advisories are checked (ADR-0014).

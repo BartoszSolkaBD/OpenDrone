@@ -1,0 +1,43 @@
+# A fixture: the same Expectations, with their moments spelled differently:
+# "1.0 s" for "1 s", "500 ms" for "0.5 s" and "0 s to 1000 ms" for "0 s to 1 s".
+format = 1
+name   = "Free fall is exactly g"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+random_seed       = 1
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what  = "vertical speed"
+at    = "1.0 s"
+value = "-9.81 m/s ± 0.00001 m/s"
+basis = "rule: speed = g × t = 9.81 m/s² × 1 s, downward"
+
+[[expect]]
+what  = "height"
+at    = "1 s"
+value = "-4.905 m ± 0.001 m"
+basis = "rule: distance fallen = ½ × g × t² = 4.905 m"
+
+[[expect]]
+what  = "vertical acceleration"
+over  = "0 s to 1000 ms"
+mean  = "-9.81 m/s² ± 0.01 m/s²"
+basis = "source: the Test Map's gravity, 9.81 m/s², in the built-in Test Maps"
+
+[[expect]]
+what  = "horizontal speed"
+at    = "500 ms"
+value = "0 m/s ± 0.001 m/s"
+basis = "observed: what the Simulation did when this was written"

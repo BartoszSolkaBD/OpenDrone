@@ -24,7 +24,7 @@ use opendrone_pack::feel_tests::{QuadFiles, compare_packs};
 use opendrone_pack::{Packs, read_manifest};
 
 /// The repo around the current folder: the nearest folder holding `packs/`.
-fn repo() -> Result<PathBuf, String> {
+pub(crate) fn repo() -> Result<PathBuf, String> {
     let here = std::env::current_dir().map_err(|e| format!("can't tell where this is: {e}"))?;
     here.ancestors()
         .find(|folder| folder.join("packs").is_dir())
@@ -65,7 +65,7 @@ pub fn run_packs(args: &[String]) -> ExitCode {
                 .join(", ")
         };
         println!(
-            "Every Pack passes the Pack checker: {} Pack(s) ({}), the Quads {}, and the Test Quads {}.",
+            "Every Pack passes the Pack checker: {} Pack(s) ({}), the Quads {}, the Test Quads {}, and the Input Device profiles {}.",
             packs.manifests().len(),
             packs
                 .manifests()
@@ -75,6 +75,12 @@ pub fn run_packs(args: &[String]) -> ExitCode {
                 .join(", "),
             ids(packs.quads()),
             ids(packs.test_quads()),
+            packs
+                .input_devices()
+                .iter()
+                .map(|p| p.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
         );
         return ExitCode::SUCCESS;
     }

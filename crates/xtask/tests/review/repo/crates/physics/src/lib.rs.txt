@@ -1,0 +1,6 @@
+//! A fixture core crate.
+
+/// Half of a number.
+pub fn half(x: f64) -> f64 {
+    x * 0.5
+}

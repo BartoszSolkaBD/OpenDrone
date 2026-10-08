@@ -1,0 +1,12 @@
+# Flying
+
+A fixture deep dive.
+
+## Language
+
+**Quad**:
+The aircraft the pilot flies.
+_Avoid_: drone
+
+**Flight Controller**:
+The board that turns stick positions into motor commands.

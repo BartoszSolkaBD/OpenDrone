@@ -1,0 +1,12 @@
+//! A fixture crate. Nothing here is unsafe code.
+
+/// Words, never code: a raw string, a byte string, a block comment over two
+/// lines, a lifetime and an escaped quote in a char literal.
+pub fn words() -> (&'static str, &'static str, char) {
+    let raw = r#"an unsafe "quoted" word, and #[allow(clippy::disallowed_methods)]"#;
+    /* a block comment says unsafe { } too,
+       and over two lines: unsafe */
+    let byte = b"unsafe";
+    let _ = byte;
+    (raw, "unsafe", '\'')
+}

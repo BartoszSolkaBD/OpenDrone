@@ -25,6 +25,7 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
 - A change that moves a flight updates the Scenarios' Results files: run `cargo scenarios run` and commit them. [Reading a Scenario and its Results](docs/verification/reading-a-scenario.md) explains both.
 
 - Rust is pinned in [`rust-toolchain.toml`](rust-toolchain.toml); `rustup` picks it up on its own.
+- `opendrone-input` builds SDL 3.4 from source ([ADR-0018](docs/adr/0018-input-through-sdl3-on-its-own-thread.md)), so building needs CMake and a C compiler. On Linux, also install `libudev-dev` and `pkg-config`, so SDL notices devices being plugged in and out. `cargo xtask input-monitor` shows your Input Devices live: [Watching Input Devices](docs/verification/watching-input-devices.md).
 - The docs in [`docs/`](docs/README.md) also make the docs site, an mdBook ([`book.toml`](book.toml)). Every page under `docs/` must be listed in [`docs/SUMMARY.md`](docs/SUMMARY.md), its table of contents. `cargo xtask book` builds it into `target/book`, and `mdbook serve` shows it while you edit, without rustdoc.
 - Libraries must be permissive or MPL-2.0, from crates.io ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). [`deny.toml`](deny.toml) holds the policy.
 - By contributing, you agree your work is dual-licensed under MIT or Apache-2.0, as the [README](README.md#licence) says.
@@ -42,3 +43,12 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs these on every 
 | Docs site and rustdoc | The docs site builds from `docs/` with every page in it; rustdoc builds for every crate, internal items included, with its warnings as errors; and every link in the book leads somewhere real: a page, a heading, a file of the repo or a rustdoc page (`cargo xtask book`). The [Pages workflow](.github/workflows/pages.yml) publishes the same build from main. |
 
 A pull request that changes only Markdown files skips the Rust work inside these checks, except the docs site's, and they still report as passed. A file renamed to Markdown counts as a change to its old path too, so it still runs them, and so does any change under `packs/`, because the Pack checker reads each Quad's Feel Test log.
+
+Two more come from the [review workflow](.github/workflows/review.yml), as commit statuses on every pull request into main, docs-only ones included:
+
+| Check | What it proves |
+|---|---|
+| Red Flag gate | No Red Flag waits for the maintainer: no Source or Rule Expectation changed or removed, no existing ADR edited, and no move to a new Bevy 0.N or wgpu major version. It is worked out by main's code, from the PR's commits read as data, with the Review Report's Red Flags, What moved and Areas touched. Locally: `cargo xtask review-report --base origin/main --head HEAD`. |
+| Review check | The newest Verdict covers the PR's latest commit and says pass, the PR was opened by the maintainer's account or by Dependabot from a branch in this repo, and fewer than 3 review rounds have failed. |
+
+Any workflow with `statuses: write` can set these two statuses, so for a PR that changes CI's workflows they can't be trusted. The Report says so, and the maintainer merges such a PR by hand. How to read the Review Report, and its limits: [`docs/review-report.md`](docs/review-report.md). What the Reviewer checks and the Verdict format: [`docs/agents/reviewer.md`](docs/agents/reviewer.md).

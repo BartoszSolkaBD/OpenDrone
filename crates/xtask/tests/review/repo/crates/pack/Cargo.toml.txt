@@ -1,0 +1,7 @@
+# A fixture edge crate's manifest.
+[package]
+name = "opendrone-pack"
+version.workspace = true
+
+[lints]
+workspace = true

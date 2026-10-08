@@ -1,0 +1,42 @@
+# A fixture: Results after a change that moved every value but the Source one.
+format   = 1
+scenario = "Free fall is exactly g"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Rule"
+expected = "-9.81 m/s ± 0.00001 m/s"
+measured = "-9.83 m/s"
+
+[[expect]]
+what     = "height at 1 s"
+basis    = "Rule"
+expected = "-4.905 m ± 0.001 m"
+measured = "-5.40 m"
+
+[[expect]]
+what     = "vertical acceleration, mean over 0 s to 1 s"
+basis    = "Source"
+expected = "-9.81 m/s² ± 0.01 m/s²"
+measured = "-9.81 m/s²"
+
+[[expect]]
+what     = "horizontal speed at 0.5 s"
+basis    = "Observed"
+expected = "0 m/s ± 0.001 m/s"
+measured = "0.0002 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "after step 4000, vertical speed is not a number"
+
+[fingerprints]
+quad = "00640ff54c5b9b2d"
+map  = "f720a5ecea6336f3"
+run  = "1111111111111111"
+
+[fingerprints.checkpoints]
+"0.5 s" = "2222222222222222"
+"1 s" = "3333333333333333"

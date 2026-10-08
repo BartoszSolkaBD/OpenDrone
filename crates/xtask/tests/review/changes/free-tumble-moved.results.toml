@@ -1,0 +1,24 @@
+# A fixture: Results after a change that moved the end roll by 1°.
+format   = 1
+scenario = "A free tumble keeps its spin"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1.125 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0.001 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "roll at 1.125 s"
+basis    = "Rule"
+expected = "90° ± 0.001°"
+measured = "91.0°"
+
+[fingerprints]
+quad = "00640ff54c5b9b2d"
+map  = "f720a5ecea6336f3"
+run  = "4444444444444444"
+
+[fingerprints.checkpoints]
+"0.5625 s" = "6454cebbcf1f09eb"
+"1.125 s" = "5555555555555555"

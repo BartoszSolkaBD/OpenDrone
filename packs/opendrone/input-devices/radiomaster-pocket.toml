@@ -1,0 +1,32 @@
+# The Radiomaster Pocket, over USB in EdgeTX's Classic USB joystick mode
+# (EdgeTX 2.10 and later), from #19 §8. A starting point: setup always
+# calibrates the pilot's own radio, and their copy is kept with their settings.
+format = 1
+name   = "Radiomaster Pocket"
+kind   = "Radio"
+# SDL names it "EdgeTX Radiomaster Pocket Joystick" (#18); EdgeTX after 2.12.4
+# spells it "RadioMaster". The product name is found anywhere in the device's
+# name, ignoring case.
+match  = { usb_vendor = "1209", usb_product = "4F54", product_name = "Radiomaster Pocket Joystick" }
+report_rate     = { usb = "1000 Hz" }   # with RF off (#18)
+reports_at_rest = { usb = false }       # it sends only changes, so it's lost only when unplugged (#27)
+
+[channels]            # EdgeTX sends the model's CH1–CH8 as axes and CH9–CH32 as buttons
+roll     = { channel = 1 }
+pitch    = { channel = 2 }
+throttle = { channel = 3 }
+yaw      = { channel = 4 }
+
+[switches]            # the Flight Controller sees Arm on AUX1, Flight Mode on AUX2, Crash Flip on AUX3
+arm         = { channel = 5, on = "high" }
+flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
+crash_flip  = { channel = 7, on = "high" }
+
+[actions]
+reset = { channel = 9, on = "pressed" }   # SE, the Pocket's momentary switch
+
+[calibration]         # starting values: "trust the radio"
+roll     = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+pitch    = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+yaw      = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
+throttle = { min = "-100 %", max = "+100 %" }

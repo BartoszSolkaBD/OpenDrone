@@ -1,0 +1,31 @@
+# A fixture Cargo.lock: one new outside library, one new OpenDrone crate, and
+# a new version of a library already used.
+version = 4
+
+[[package]]
+name = "bevy"
+version = "0.20.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "libm"
+version = "0.2.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "opendrone-physics"
+version = "0.1.0-alpha.0"
+
+[[package]]
+name = "opendrone-sim"
+version = "0.1.0-alpha.0"
+
+[[package]]
+name = "smallvec"
+version = "1.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "wgpu"
+version = "27.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
