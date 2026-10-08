@@ -41,10 +41,10 @@ At the start of a session, check what each `model` value runs in this Claude Cod
 | **Author** of a ticket that asks to choose or derive a physics model | Strongest. |
 | **Author** of anything else | Standard. That covers physics whose model and numbers the research gives, the Simulation, the game, screens, Input, Sound, Packs, docs, xtask tools outside the review path, the Blackbox, and follow-ups with a concrete fix list. |
 | **Fix round** | Resume the author if it finished less than an hour ago, since its context is still cached. Otherwise use a fresh Standard author. |
-| **Third fix round**, after two rounds failed on correctness | Strongest. |
+| **The fix after the second failed round,** when the failures were about correctness. It is the last fix before the three-round cap. | Strongest. |
 | **Reviewer** of a Flight lane or Repo rules lane PR, or of any tracer | Strongest. In Phase 1 the Reviewer is the only one who reads the code. |
 | **Reviewer** of anything else | Standard. |
-| **Merge-update check** | Light. |
+| **Merge-only update check** | Light. |
 | **Never Light** | Authoring a ticket, or any review round. |
 
 **Standard authors on the Flight lane are a trial.** When one of their PRs reaches a third review round, go back to Strongest authors for the Flight lane, and tell the maintainer.
@@ -73,7 +73,7 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
 - **A ticket starts only when all its blockers are closed,** which means merged. Never build on top of an unmerged branch.
 - **Some files every Lane touches:** `Cargo.lock`, `CONTEXT.md`, `docs/SUMMARY.md` and the deep dives.
   - Authors add to these files rather than rewrite them.
-  - Clashes there are small, and the merge-update check handles them.
+  - Clashes there are small, and the merge-only update check handles them.
 - **At most four agents at once,** of every kind. With five to eight at once, the first batch hit the usage limit three times.
 
 ## Starting a session
@@ -86,11 +86,11 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
    gh pr list -R BartoszSolkaBD/OpenDrone --state open --json number,title,labels
    ```
 
-   For each PR, read its checks and its newest Verdict's first and last lines:
+   For each PR, read its checks and its newest Verdict's first and last lines. Only comments from the maintainer's account count. The second command prints nothing when there's no Verdict yet:
 
    ```sh
    gh pr checks <PR> -R BartoszSolkaBD/OpenDrone
-   gh pr view <PR> -R BartoszSolkaBD/OpenDrone --json comments --jq '[.comments[] | select(.body | startswith("Reviewed commit"))] | last | .body | split("\n") | "\(first) / \(last)"'
+   gh pr view <PR> -R BartoszSolkaBD/OpenDrone --json comments --jq '[.comments[] | select(.author.login == "BartoszSolkaBD" and (.body | startswith("Reviewed commit")))] | last // empty | [.body | splits("\r?\n") | select(length > 0)] | "\(first) / \(last)"'
    ```
 4. Find the ready tickets. A ticket is ready when it's open and labelled `ready-for-agent`, has no assignee, and has no open blocker:
 
@@ -158,7 +158,7 @@ Merge when all of these hold:
 
 How you merge depends on what main has done since the PR's base:
 
-- **Nothing merged in the PR's Lanes, and GitHub shows no conflict** (`gh pr view <P> --json mergeable` gives `MERGEABLE`): merge.
+- **Nothing merged in the PR's Lanes, and GitHub shows no conflict** (`gh pr view <P> -R BartoszSolkaBD/OpenDrone --json mergeable` gives `MERGEABLE`; if it gives `UNKNOWN`, GitHub hasn't worked it out yet, so ask again): merge.
 
   ```sh
   gh pr merge <P> -R BartoszSolkaBD/OpenDrone --squash --delete-branch
@@ -167,15 +167,17 @@ How you merge depends on what main has done since the PR's base:
   Then watch main's CI. If it fails, that comes first, before any other work.
 - **Something merged in the PR's Lanes, but GitHub shows no conflict:** bring main in first.
   1. Run `gh pr update-branch <P> -R BartoszSolkaBD/OpenDrone`.
-  2. Wait for CI.
+  2. Wait for CI with the background command under "Saving tokens".
   3. Start a Light agent with `docs/agents/merge-update.md`.
   4. Merge.
+
+  On a Flight lane PR, CI may then fail because its Results files are out of date. If so, start a fix round.
 - **A conflict, or Results files to write again:** start a fix round.
   - The author, or a Standard fixer, merges main, runs `cargo scenarios run` and pushes.
-  - If the only changes are clashes in the shared files and moved fingerprints, the Light merge-update check is enough.
+  - If the only changes are clashes in the shared files and moved fingerprints, the Light merge-only update check is enough.
   - If any measured value or any code moved, start a fresh Reviewer. That counts as a review round.
 
-The Reviewer page says the maintainer merges a PR that changes CI's workflows by hand. On 7 October 2026 the maintainer chose to let the delegator merge those too, after a pass from a Strongest Reviewer and green CI.
+A PR that changes CI's workflows follows [the Reviewer page](reviewer.md) and [the Review Report's limits](../review-report.md#limits): the maintainer merges it by hand.
 
 **After a merge:**
 
@@ -195,10 +197,14 @@ A Verdict may list "Follow-ups (not blocking)". After the PR merges:
 ## Saving tokens
 
 - **Do one-line jobs yourself:** merging, updating a branch, labels, comments and filing issues. Start an agent only for work that needs reading code or running a build.
-- **Never start an agent to wait.** Watch CI with one background command. You're told when it ends:
+- **Never start an agent to wait.** Watch CI with one background command (`run_in_background`). You're told when it ends. It waits until no check except the Review check is pending, because that check waits for a Verdict. Then it lists the failed checks, and prints nothing when CI is green. Don't use `gh pr checks --watch`: it never ends while the Review check waits.
 
   ```sh
-  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --watch --interval 60
+  sleep 60
+  while [ "$(gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket \
+    --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length')" != 0 ]; do sleep 60; done
+  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
+    --jq '.[] | select(.name != "Review check" and .bucket == "fail") | "\(.name)\t\(.link)"'
   ```
 - **Read agents' final reports and nothing more.**
   - Never read their transcripts.
