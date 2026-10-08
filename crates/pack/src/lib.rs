@@ -11,7 +11,8 @@
 //!   `<pack>/<item>`. So far the items are Quads: `quads/<id>/` holds
 //!   `quad.toml` ([`read_quad_file`], [`check_quad`]), `tune.txt`
 //!   ([`read_tune`]), `picture.png` and the Feel Test log, `feel-tests.md`
-//!   ([`feel_tests`]).
+//!   ([`feel_tests`]); `input-devices/<id>.toml` holds an Input Device
+//!   profile ([`input_device`]).
 //! - Every problem names its file, its line and a plain sentence
 //!   ([`Problems`]), and all of them are listed at once. A broken item is
 //!   skipped and the rest of its Pack loads; a broken manifest skips the
@@ -36,6 +37,7 @@
 
 pub mod document;
 pub mod feel_tests;
+pub mod input_device;
 mod manifest;
 mod map;
 mod quad;
@@ -49,6 +51,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
+pub use input_device::{InputDeviceProfile, read_input_device_file};
 pub use manifest::{LicenceOverride, Manifest, is_an_id, read_manifest};
 pub use map::{MapDefinition, read_map_file, test_map, test_map_ids};
 pub use quad::{
@@ -61,8 +64,8 @@ pub use tune::{Tune, TuneSetting, read_tune};
 use quad::{ReadInFull, check_quad_as_read, read_quad_file_as_far_as_it_goes};
 use tune::read_tune_as_far_as_it_goes;
 
-/// The kinds of item a Pack may hold, each in its own folder. Maps and Input
-/// Device profiles are known, but not read yet (#63, #19).
+/// The kinds of item a Pack may hold, each in its own folder. Maps are known,
+/// but not read yet (#63).
 const KINDS: &[&str] = &["quads", "maps", "input-devices"];
 
 /// The first bytes of every PNG file.
@@ -75,6 +78,8 @@ pub struct Packs {
     packs: Vec<OpenPack>,
     /// Every Quad by id.
     quads: BTreeMap<String, QuadItem>,
+    /// Every Input Device profile by id, checked or with its problems.
+    input_devices: BTreeMap<String, Result<InputDeviceProfile, Problems>>,
     /// Packs skipped because their manifest is broken.
     skipped: Vec<String>,
     problems: Problems,
@@ -149,6 +154,7 @@ impl Packs {
         let mut packs = Packs {
             packs: Vec::new(),
             quads: BTreeMap::new(),
+            input_devices: BTreeMap::new(),
             skipped: Vec::new(),
             problems: Problems::new(),
             test_quads: None,
@@ -211,6 +217,7 @@ impl Packs {
             }
             match name.as_str() {
                 "quads" => self.open_quads(&kind, pack),
+                "input-devices" => self.open_input_devices(&kind, pack),
                 known if KINDS.contains(&known) => {}
                 other => self.problems.extend(Problems::of_file(
                     &kind.label,
@@ -224,6 +231,43 @@ impl Packs {
                     ),
                 )),
             }
+        }
+    }
+
+    /// Reads every Input Device profile in a Pack's `input-devices/`, each
+    /// written as `<id>.toml`.
+    fn open_input_devices(&mut self, folder: &Folder, pack: &str) {
+        let names = match folder.names() {
+            Ok(names) => names,
+            Err(found) => return self.problems.extend(found),
+        };
+        for name in names {
+            let file = folder.child(&name);
+            let stem = name.strip_suffix(".toml").filter(|_| file.path.is_file());
+            let Some(stem) = stem else {
+                self.problems.extend(Problems::of_file(
+                    &file.label,
+                    "only Input Device profiles, each written as <id>.toml, live in input-devices/",
+                ));
+                continue;
+            };
+            if !is_an_id(stem) {
+                self.problems.extend(Problems::of_file(
+                    &file.label,
+                    format!(
+                        "the file's name is the profile's id, so \"{stem}\" must be lowercase words joined by dashes, such as \"radiomaster-pocket\""
+                    ),
+                ));
+                continue;
+            }
+            let id = format!("{pack}/{stem}");
+            let checked = file
+                .read()
+                .and_then(|text| read_input_device_file(&id, &file.label, &text));
+            if let Err(found) = &checked {
+                self.problems.extend(found.clone());
+            }
+            self.input_devices.insert(id, checked);
         }
     }
 
@@ -348,6 +392,30 @@ impl Packs {
             .values()
             .filter_map(|item| item.checked.as_ref().ok())
             .collect()
+    }
+
+    /// Every Input Device profile that passed the checker, in id order.
+    pub fn input_devices(&self) -> Vec<&InputDeviceProfile> {
+        self.input_devices
+            .values()
+            .filter_map(|checked| checked.as_ref().ok())
+            .collect()
+    }
+
+    /// The checked Input Device profile with this id, such as
+    /// `opendrone/dualsense`, or the problems that kept it out.
+    pub fn input_device(&self, id: &str) -> Result<InputDeviceProfile, Problems> {
+        let (pack, name) = self.find(id)?;
+        match self.input_devices.get(id) {
+            Some(checked) => checked.clone(),
+            None => Err(Problems::of_file(
+                id,
+                format!(
+                    "there's no Input Device profile here: {}/input-devices/{name}.toml doesn't exist",
+                    pack.folder.label
+                ),
+            )),
+        }
     }
 
     /// Every Test Quad that passed the checker, in id order.

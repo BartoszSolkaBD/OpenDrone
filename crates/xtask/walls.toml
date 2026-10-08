@@ -38,10 +38,12 @@ may-use = ["opendrone-maths", "opendrone-sim"]
 rule = "the Test Pilot drives the Simulation from outside, through Flight Inputs (ADR-0003)"
 
 # ADR-0003 names no uses for input, pack and blackbox. They hand the core plain
-# data or read what it puts out, so they may use the core crates and nothing else.
+# data or read what it puts out, so they may use the core crates. Input also
+# reads Input Device profiles as the Pack checker hands them over (#61), as the
+# Scenario runner reads Quad definitions: pack reads Pack files, input never does.
 [crates.opendrone-input]
-may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot"]
-rule = "ADR-0003 names no uses for this edge crate, so it may use the core crates but not another edge crate or the game"
+may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot", "opendrone-pack"]
+rule = "input may use the core crates, and pack for the Input Device profiles the Pack checker reads (#61), but no other edge crate and not the game"
 
 [crates.opendrone-pack]
 may-use = ["opendrone-maths", "opendrone-physics", "opendrone-flight-controller", "opendrone-sim", "opendrone-test-pilot"]

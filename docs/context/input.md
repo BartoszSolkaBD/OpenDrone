@@ -2,6 +2,8 @@
 
 The physical devices pilots fly with, and the Actions they trigger. Back to the [map](../../CONTEXT.md).
 
+What an Input Device profile holds and what the Pack checker refuses: [Checking a Pack](../verification/checking-a-pack.md#an-input-device-profile-input-devicesidtoml). Seeing a real device's Channels live: [Watching Input Devices](../verification/watching-input-devices.md).
+
 ## Language
 
 **Input Device**:
