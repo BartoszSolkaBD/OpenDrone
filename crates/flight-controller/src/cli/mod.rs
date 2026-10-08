@@ -19,14 +19,15 @@
 //! [ADR-0015]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md
 //! [ADR-0017]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md
 
-pub mod aux;
+// Not `aux`: Windows can't hold a file of that name.
+pub mod aux_paste;
 mod import;
 mod rates;
 pub mod table;
 
 use core::fmt;
 
-pub use aux::AuxPaste;
+pub use aux_paste::AuxPaste;
 pub use import::{ImportedSetting, LeftOut, TuneImport, Where, Why, import_tune};
 pub use rates::{NowAfter, RatesPaste};
 

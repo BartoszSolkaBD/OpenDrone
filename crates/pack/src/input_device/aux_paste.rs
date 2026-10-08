@@ -11,7 +11,7 @@
 //! and up, which a Radio sends as buttons (pressed is high).
 
 use opendrone_flight_controller::cli::AuxPaste;
-use opendrone_flight_controller::cli::aux::{
+use opendrone_flight_controller::cli::aux_paste::{
     AuxFlightModeSwitch, AuxSwitch, FlightMode as PastedMode, POSITION_NAMES,
 };
 

@@ -7,7 +7,7 @@
 //! §5) unless said.
 
 use opendrone_flight_controller::cli::AuxPaste;
-use opendrone_flight_controller::cli::aux::{AuxFlightModeSwitch, AuxSwitch, FlightMode};
+use opendrone_flight_controller::cli::aux_paste::{AuxFlightModeSwitch, AuxSwitch, FlightMode};
 
 const METEOR: &str = include_str!("../../../docs/research/quad-settings/meteor65-pro.diff-all.txt");
 const CETUS: &str = include_str!("../../../docs/research/quad-settings/cetus-x.diff-all.txt");
