@@ -7,6 +7,9 @@
 //! - `walls`: checks the walls between crates written in `walls.toml`: who may
 //!   use whom, and that the core crates never reach Bevy or anything that
 //!   touches the operating system.
+//! - `core-maths`: checks the compiled code of every library the core is
+//!   built with for calls to the operating system's maths library
+//!   ([`core_maths`]).
 //! - `book`: builds the docs site from `docs/` with mdBook, with rustdoc for
 //!   every crate under `api/`, and checks every link in it ([`book`]).
 //! - `book-preprocessor`: the step mdBook runs on every page while it builds
@@ -30,6 +33,7 @@
 use std::process::ExitCode;
 
 mod book;
+mod core_maths;
 mod input_monitor;
 mod migrate;
 mod packs;
@@ -45,6 +49,12 @@ Commands:
       Check the walls between crates (ADR-0003): who may use whom, and that
       the core crates never reach Bevy or anything that touches the operating
       system. The rules are in crates/xtask/walls.toml.
+  core-maths [--with <package>]... [--target <triple>] [--manifest-path <Cargo.toml>]
+      Build the core crates (with the packages named, so their features are
+      merged as in the real build; for this computer, or the target named)
+      and check the compiled code of every library the core is built with:
+      none may call the operating system's maths library (ADR-0001), except
+      where crates/xtask/walls.toml allows it with a reason.
   book
       Build the docs site from docs/ with mdBook, with rustdoc for every crate
       under api/, and check every link in it. Needs mdBook (the version is in
@@ -83,6 +93,7 @@ fn main() -> ExitCode {
     };
     match command.as_str() {
         "walls" => walls::run(rest),
+        "core-maths" => core_maths::run(rest),
         "book" => book::run(rest),
         "book-preprocessor" => book::preprocessor::run(rest),
         "check-links" => book::run_link_check(rest),

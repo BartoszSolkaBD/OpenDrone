@@ -1,0 +1,58 @@
+# Results of whoop-thrown-into-a-ceiling.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A whoop thrown into a ceiling"
+
+[[expect]]
+what     = "height, highest over 0 s to 0.4 s"
+basis    = "Rule"
+expected = "between 3 m and 3.0851 m"
+measured = "3.08 m"
+
+[[expect]]
+what     = "height, lowest over 0 s to 3 s"
+basis    = "Rule"
+expected = "between 0.0099 m and 1 m"
+measured = "0.0106 m"
+
+[[expect]]
+what     = "vertical speed at 0.4 s"
+basis    = "Observed"
+expected = "-2.17 m/s ± 0.05 m/s"
+measured = "-2.17 m/s"
+
+[[expect]]
+what     = "speed, highest over 2.5 s to 3 s"
+basis    = "Observed"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "height at 3 s"
+basis    = "Observed"
+expected = "0.015 m ± 0.0001 m"
+measured = "0.0150 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b9a2be5ff046b974"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
+run  = "de1bc7a8a1a7f428"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "27adf0dc97be8c12"
+"0.6 s" = "91c60241bdb93329"
+"0.9 s" = "438cb7e58c861ca9"
+"1.2 s" = "ab1ef31917a6ed71"
+"1.5 s" = "f322ae825777fe3a"
+"1.8 s" = "a8bb611fc625ab18"
+"2.1 s" = "1e2a7f0bbe3097a3"
+"2.4 s" = "da5c7634fca6b359"
+"2.7 s" = "c06af17f1154094c"
+"3 s" = "76994063d9299d77"

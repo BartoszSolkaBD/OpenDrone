@@ -3,7 +3,10 @@
 //! body).
 
 use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
-use opendrone_physics::{Drag, QuadBody, QuadParameters, QuadState, SetUpProblem, World};
+use opendrone_physics::{
+    Drag, DuctRings, MapCollision, QuadBody, QuadParameters, QuadShape, QuadState, SetUpProblem,
+    World,
+};
 
 const NO_DRAG: Drag = Drag {
     body_area: Vec3::ZERO,
@@ -16,6 +19,26 @@ fn whoop_sized(inertia: Vec3) -> QuadParameters {
         mass: 0.0312,
         inertia: Mat3::diagonal(inertia),
         drag: NO_DRAG,
+        shape: whoop_shape(),
+    }
+}
+
+/// The Whoop 65's collision shape, as its Quad definition gives it.
+fn whoop_shape() -> QuadShape {
+    QuadShape {
+        body: Vec3::new(0.035, 0.030, 0.020),
+        pack: Vec3::new(0.064, 0.010, 0.006),
+        pack_height: -0.006,
+        diagonal: 0.066,
+        rotor_height: 0.008,
+        prop_diameter: 0.035,
+        duct_rings: Some(DuctRings {
+            inside_diameter: 0.037,
+            wall: 0.0015,
+            height: 0.014,
+        }),
+        bounce: 0.3,
+        friction: 0.5,
     }
 }
 
@@ -53,8 +76,9 @@ fn a_tumble_about_a_tilted_axis_keeps_its_angular_momentum() {
         gravity: 9.81,
         air_density: 1.225,
     };
+    let empty_air = MapCollision::default();
     for _ in 0..8000 {
-        quad.step(&world, 1.0 / 8000.0);
+        quad.step(&world, &empty_air, 1.0 / 8000.0);
     }
     let after = momentum(quad.state());
     let drift = (after - before).length() / before.length();

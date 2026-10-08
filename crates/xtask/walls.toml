@@ -98,6 +98,88 @@ rule = "xtask holds developer tools and is never shipped (ADR-0003); it may use 
 [core-libraries]
 libm = "pure-Rust maths functions that give the same bits on every platform (ADR-0001)"
 
+# parry3d's 64-bit edition answers the physics' collision questions, in its
+# enhanced-determinism mode and without its `std` feature (ADR-0004, #43).
+# Everything below it is pure Rust that computes in memory; none of it reads a
+# clock or a file, starts a thread or talks to a device or the network.
+#
+# std itself is always among parry3d's own dependencies (it takes indexmap with
+# indexmap's default std feature), so parry3d's own maths method calls go to
+# std's maths: [core-platform-maths] below lists the two its code makes, and
+# why neither runs. The libraries it computes with (glamx and below) must keep
+# std out of their dependencies: see [never-in-core-features].
+parry3d-f64 = "the collision geometry library: what touches what, where, and when a moving shape first meets another, in 64-bit (ADR-0004)"
+approx = "compares numbers to within a tolerance, for parry3d's maths types"
+arrayvec = "lists of a fixed greatest length, kept in place"
+autocfg = "checks which Rust features the compiler has, while num-traits builds"
+bitflags = "sets of on/off flags, such as parry3d's mesh options"
+bytemuck = "reads plain numbers as bytes and back, for wide's number types"
+byteorder = "reads and writes numbers in a set byte order, for hash32"
+downcast-rs = "turns parry3d's shapes back into their own kinds"
+either = "a value of one of two kinds"
+equivalent = "key comparisons for indexmap"
+foldhash = "a fixed-seed hash for parry3d's maps; no operating-system randomness"
+glam = "vector and quaternion maths for parry3d, switched to plain non-SIMD maths and libm by parry3d's determinism mode (ADR-0004)"
+glamx = "poses, rotations and eigenvalues on top of glam, for parry3d; while std is nowhere in its own dependencies its maths goes through simba's libm-forced functions (see [never-in-core-features]), and glam's through libm"
+hash32 = "32-bit hashing for heapless"
+hashbrown = "the hash map behind indexmap; parry3d's determinism mode iterates its maps in a fixed order through indexmap"
+heapless = "fixed-size collections for rstar"
+indexmap = "maps that keep their insertion order, which parry3d's determinism mode uses for every map it iterates"
+log = "a logging interface: it writes nothing unless the program installs a logger, and the core installs none"
+num-complex = "complex numbers for simba's number traits"
+num-derive = "writes number-trait code while parry3d builds"
+num-traits = "number traits shared by parry3d's maths libraries"
+ordered-float = "floats with a fixed sort order"
+proc-macro2 = "used by code-writing macros while parry3d builds; never part of the running program"
+quote = "used by code-writing macros while parry3d builds; never part of the running program"
+rstar = "an R*-tree of shapes, in parry3d's tools"
+safe_arch = "x86 processor instructions for wide's number types; parry3d's 64-bit queries never compute with them"
+serde = "serialisation traits; nothing in the core serialises"
+serde_core = "serialisation traits; nothing in the core serialises"
+serde_derive = "writes serialisation code while building; never part of the running program"
+simba = "number traits for parry3d and glamx, with every maths function forced to libm by parry3d's determinism mode (ADR-0004)"
+smallvec = "short lists kept in place"
+stable_deref_trait = "a marker for heapless's pointers"
+syn = "reads Rust code for code-writing macros while parry3d builds; never part of the running program"
+thiserror = "writes error types' messages while parry3d builds"
+thiserror-impl = "writes error types' messages while parry3d builds; never part of the running program"
+unicode-ident = "tells letters in Rust names apart for code-writing macros while building"
+wide = "SIMD number types simba keeps compiled; parry3d's 64-bit queries never compute with them"
+
+# Features of outside libraries the core must never have turned on, written
+# "library/feature", with why. cargo merges each library's features across the
+# whole workspace, so a feature that any crate turns on counts.
+#
+# Once std is anywhere among a library's dependencies, Rust resolves its
+# `x.acos()` on a number to std's own maths method, ahead of the libm-forced
+# maths trait it imports. glamx works out eigenvalues that way, and parry3d
+# builds every convex Map shape through them, so each feature below, which
+# would put std among glamx's dependencies, would send that maths to the
+# operating system (ADR-0001). glam's own maths stays on libm through its libm
+# feature, but glam/std still puts std among glamx's dependencies.
+# `cargo xtask core-maths` checks the compiled code too, so a way round this
+# list still fails CI.
+[never-in-core-features]
+"parry3d-f64/std" = "it turns on glamx's std feature (see glamx/std)"
+"glamx/std" = "glamx then works out eigenvalues with std's acos, cos and powi, which differ from one operating system to another, instead of libm; parry3d builds every convex Map shape through them (ADR-0001)"
+"glam/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"simba/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"approx/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"num-traits/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"num-complex/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"wide/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+"bytemuck/extern_crate_std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+
+# Calls to the operating system's maths library (`cos`, `acos`, `log2` and the
+# rest) that the core's compiled code may keep, written "library/function",
+# with the only functions allowed to make them and why those can never run in
+# the Simulation. `cargo xtask core-maths` reads the compiled code of every
+# library the core is built with and fails on any other call, or on one of
+# these made from anywhere else (ADR-0001).
+[core-platform-maths]
+"parry3d-f64/acos" = { from = ["<parry3d_f64::shape::trimesh::TriMesh>::compute_pseudo_normals"], reason = "it runs only once a mesh has the ORIENTED or FIX_INTERNAL_EDGES flag (parry3d's TriMesh::set_flags), or to redo pseudo-normals a mesh already has; opendrone-physics builds every mesh with TriMesh::new and no flags and never changes one (map.rs, whose test checks every Map mesh has no flags and no pseudo-normals)" }
+"parry3d-f64/log2" = { from = ["<parry3d_f64::partitioning::bvh::bvh_tree::Bvh>::optimize_incremental"], reason = "it rebalances a tree whose shapes move; nothing in parry3d's own code calls it (only its tests do), and opendrone-physics never does" }
+
 # Outside libraries the core must never reach, with why. A name ending in `*`
 # covers every library whose name starts that way. None of these may be added
 # to the list above.

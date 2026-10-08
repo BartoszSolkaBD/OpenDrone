@@ -22,8 +22,8 @@
 //!   runner reads them.
 //! - [`units`] is the shared unit list, which reads every number in Scenario
 //!   and Pack files. The Scenario runner uses it too.
-//! - The Test Maps built into the code, such as `test/empty-air`
-//!   ([`MapDefinition`]).
+//! - The Test Maps built into the code, such as `test/empty-air` and
+//!   `test/thin-rail`, with their solid parts ([`MapDefinition`]).
 //!
 //! Every file starts with `format = N`: a newer format is refused ("needs a
 //! newer OpenDrone"), and an older one is upgraded in memory by the same
@@ -44,6 +44,7 @@ mod map;
 pub mod migration;
 mod quad;
 pub mod schema;
+mod test_maps;
 mod tune;
 pub mod units;
 mod values;

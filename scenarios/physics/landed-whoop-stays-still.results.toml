@@ -1,0 +1,106 @@
+# Results of landed-whoop-stays-still.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A landed whoop stays still for two minutes"
+
+[[expect]]
+what     = "height, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "distance east, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance north, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance north, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "speed, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "roll, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "roll, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b9a2be5ff046b974"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "a25566195bb416f0"   # the whole state after each of 960000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"12 s" = "246efd8bfe920d94"
+"24 s" = "40d3b73def0772dc"
+"36 s" = "39079acbe1ca0217"
+"48 s" = "bb49a21f564710c5"
+"60 s" = "88dfd35b2076a44a"
+"72 s" = "027562f0d6e2537e"
+"84 s" = "232fcedfad542ed9"
+"96 s" = "1775c3ddf3bbb37b"
+"108 s" = "f3f33eaea046e7f8"
+"120 s" = "ab315abe91995490"

@@ -25,7 +25,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 |---|---|---|
 | `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`. So far only Physics Scenarios run: scripted motors stand in for the Flight Controller. |
 | `quad` | `"test/whoop-65-no-drag"` | The Quad, by id. Its numbers come from its Quad definition, never from the Scenario. |
-| `map` | `"test/empty-air"` | The Map, by id. Gravity and air density come from the Map. `test/empty-air` is built into the code: 9.81 m/s² and 1.225 kg/m³, with nothing to hit. |
+| `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. |
 | `position` | `"0 m east, 0 m north, 0 m up"` | From the Map's origin. |
 | `attitude` | `"level, heading 0°"` or `"roll 0°, pitch 30°, heading 45°"` | Heading is a compass heading (0° north, 90° east). Pitch is nose up, roll is right side down. |
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
@@ -42,6 +42,21 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `[start.rates]` | `type = "Actual"`, `roll = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"`, … | Every field of a Betaflight 2026.6 rate profile, written as the Betaflight App shows it: see [The Rates](#the-rates) below. |
 
 In a Physics Scenario the Flight Controller doesn't run, so `armed` down to the Rates change nothing. They are written down all the same, so the format never needs them added later.
+
+### Test Maps
+
+The Test Maps are simple Maps built into the code for Scenarios only, each with the `test/` prefix. Each one's `map.toml` is a file in [`crates/pack/test-maps/`](../../crates/pack/test-maps/), so `cargo xtask migrate` keeps its format up, and its solid parts are written in [`crates/pack/src/test_maps.rs`](../../crates/pack/src/test_maps.rs). All have standard gravity (9.81 m/s²) and sea-level air (1.225 kg/m³). Every one but empty air stands on the same ground: a box 200 m square whose top is the origin's height, 0 m. Positions are from the Map's origin.
+
+| Id | What is in it |
+|---|---|
+| `test/empty-air` | Nothing: no floor, no walls. |
+| `test/flat-floor` | The ground. |
+| `test/wall` | The ground and a wall 20 m wide, 5 m tall and 0.2 m thick, its face 5 m east, facing west. |
+| `test/thin-rail` | The ground, a round rail 6 cm across running north–south at 3 m east, 1 m up, from 5 m south to 5 m north, and a rebar stub 3 cm across standing 2 m tall at 3 m east, 10 m north: the alpha Maps' thinnest parts. |
+| `test/floor-and-ceiling` | A floor and a concrete ceiling 3.1 m above it, as on the Bando's floors: the floor a sheet at 0 m, the ceiling a slab from 3.1 m to 3.3 m, both triangle meshes 40 m square. |
+| `test/ledge` | The ground and a platform 1 m high covering everything west of the origin, its edge running north–south through the origin. |
+
+Between them they use all three kinds of solid shape a Map's `.glb` gives: boxes, convex shapes (the rail, the stub and the ledge) and triangle meshes (the floor and ceiling). A Quad resting on a floor has its centre half its body box's height above it: 10 mm for the Whoop 65, 17.5 mm for the Freestyle 5″.
 
 ### The Rates
 
@@ -104,7 +119,7 @@ lowest = "-9.81 m/s² ± 0.00001 m/s²"
 basis  = "rule: ..."
 ```
 
-- **`what`** is one of: height, distance east, distance north, vertical speed, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
+- **`what`** is one of: height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.
@@ -132,7 +147,7 @@ measured = "-4.91 m"
 - Each Expectation's **measured** value, to 3 significant figures, in the unit its expected value uses. The check itself uses the full number: -4.9056 m passes "-4.905 m ± 0.001 m", and the Results show it as -4.91 m.
 - The Results are the same on every computer, so a pull request's diff shows every value that moved, even inside its tolerance.
 - `[fingerprints]`: short codes that change if anything changes by even one bit.
-  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition changed.
+  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition changed; if `map` moved, the Map's world values or its solid shapes did.
   - `run`: the whole state after every step, in order. Any change to the flight changes it.
   - `[fingerprints.checkpoints]`: the whole state after each tenth of the run, so you can see how far into the run nothing changed.
 

@@ -16,6 +16,10 @@ pub enum Measure {
     DistanceNorth,
     /// Up is positive.
     VerticalSpeed,
+    /// East is positive.
+    SpeedEast,
+    /// North is positive.
+    SpeedNorth,
     /// Over the ground, in any direction.
     HorizontalSpeed,
     /// In any direction.
@@ -39,11 +43,13 @@ pub enum Measure {
     Heading,
 }
 
-const ALL: [(&str, Measure); 13] = [
+const ALL: [(&str, Measure); 15] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
     ("vertical speed", Measure::VerticalSpeed),
+    ("speed east", Measure::SpeedEast),
+    ("speed north", Measure::SpeedNorth),
     ("horizontal speed", Measure::HorizontalSpeed),
     ("speed", Measure::Speed),
     ("vertical acceleration", Measure::VerticalAcceleration),
@@ -75,7 +81,11 @@ impl Measure {
     pub fn dimension(self) -> Dimension {
         match self {
             Measure::Height | Measure::DistanceEast | Measure::DistanceNorth => Dimension::LENGTH,
-            Measure::VerticalSpeed | Measure::HorizontalSpeed | Measure::Speed => Dimension::SPEED,
+            Measure::VerticalSpeed
+            | Measure::SpeedEast
+            | Measure::SpeedNorth
+            | Measure::HorizontalSpeed
+            | Measure::Speed => Dimension::SPEED,
             Measure::VerticalAcceleration => Dimension::ACCELERATION,
             Measure::RollRate | Measure::PitchRate | Measure::YawRate => Dimension::ROTATION_SPEED,
             Measure::Roll | Measure::Pitch | Measure::Heading => Dimension::ANGLE,
@@ -111,6 +121,8 @@ impl Measure {
             Measure::DistanceEast => now.position.x,
             Measure::DistanceNorth => now.position.y,
             Measure::VerticalSpeed => v.z,
+            Measure::SpeedEast => v.x,
+            Measure::SpeedNorth => v.y,
             Measure::HorizontalSpeed => (v.x * v.x + v.y * v.y).sqrt(),
             Measure::Speed => v.length(),
             Measure::VerticalAcceleration => (v.z - before?.velocity.z) / step,

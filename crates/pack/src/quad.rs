@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
-use opendrone_physics::{Drag, QuadParameters};
+use opendrone_physics::{Drag, DuctRings, QuadParameters, QuadShape};
 
 use crate::document::{Document, Item, Problem, Problems, Table};
 use crate::migration::{self, FileKind};
@@ -696,7 +696,8 @@ pub struct QuadDefinition {
     /// The real Quad a Test Quad builds on.
     pub based_on: Option<String>,
     /// What the physics receives so far: the mass (dry mass plus the battery,
-    /// stored apart and added here), the inertia and the drag.
+    /// stored apart and added here), the inertia, the drag and the collision
+    /// shape with its bounce and friction.
     pub parameters: QuadParameters,
     pub frame: Frame,
     pub collision: Collision,
@@ -1202,6 +1203,17 @@ fn definition(
     };
     let [roll, pitch, yaw] = frame.inertia;
     let [front, side, top] = frame.drag_area;
+    let collision = Collision {
+        body: r.three("collision.body"),
+        pack: r.three("collision.pack"),
+        pack_height: r.one("collision.pack_height"),
+        duct_rings: r
+            .has("collision.duct_rings")
+            .then(|| r.three("collision.duct_rings")),
+        bounce: r.one("collision.bounce"),
+        friction: r.one("collision.friction"),
+    };
+    let size = |[a, b, c]: [f64; 3]| Vec3::new(a, b, c);
     let parameters = QuadParameters {
         // Stored apart, added here, so a heavier pack can't be counted twice
         // (#16 §4).
@@ -1214,6 +1226,23 @@ fn definition(
             rotor: props.rotor_drag,
             // A Quad without ducts has no duct drag.
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
+        },
+        shape: QuadShape {
+            body: size(collision.body),
+            pack: size(collision.pack),
+            pack_height: collision.pack_height,
+            diagonal: frame.diagonal,
+            rotor_height: frame.rotor_height,
+            prop_diameter: props.diameter,
+            duct_rings: collision
+                .duct_rings
+                .map(|[inside_diameter, wall, height]| DuctRings {
+                    inside_diameter,
+                    wall,
+                    height,
+                }),
+            bounce: collision.bounce,
+            friction: collision.friction,
         },
     };
     let no_load = r.numbers("motors.no_load_current");
@@ -1244,16 +1273,7 @@ fn definition(
         based_on,
         parameters,
         frame,
-        collision: Collision {
-            body: r.three("collision.body"),
-            pack: r.three("collision.pack"),
-            pack_height: r.one("collision.pack_height"),
-            duct_rings: r
-                .has("collision.duct_rings")
-                .then(|| r.three("collision.duct_rings")),
-            bounce: r.one("collision.bounce"),
-            friction: r.one("collision.friction"),
-        },
+        collision,
         props,
         motors: Motors {
             kv: r.one("motors.kv"),

@@ -1,0 +1,52 @@
+# Results of whoop-bounces-on-a-floor.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A dropped whoop bounces and settles"
+
+[[expect]]
+what     = "height, lowest over 0 s to 2 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.0001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "vertical speed, highest over 0.45 s to 0.6 s"
+basis    = "Observed"
+expected = "1.33 m/s ± 0.02 m/s"
+measured = "1.33 m/s"
+
+[[expect]]
+what     = "height, highest over 0.5 s to 0.7 s"
+basis    = "Observed"
+expected = "0.1 m ± 0.005 m"
+measured = "0.100 m"
+
+[[expect]]
+what     = "speed, highest over 1.5 s to 2 s"
+basis    = "Observed"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b9a2be5ff046b974"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "ba2861fb66e77fe5"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "f72504c397e20b73"
+"0.4 s" = "91e1940d644c6dd8"
+"0.6 s" = "0e8a1f8892aa36e7"
+"0.8 s" = "eb8ba4dd5b397606"
+"1 s" = "0d40eeea6d47a8a4"
+"1.2 s" = "67513891fa045e52"
+"1.4 s" = "77ae2a781767a908"
+"1.6 s" = "d57d1c231af3850b"
+"1.8 s" = "00fa6ea496ee0191"
+"2 s" = "ba46d53ebff6aaef"

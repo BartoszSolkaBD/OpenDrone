@@ -1,0 +1,46 @@
+# Results of whoop-glances-off-a-wall.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A whoop glances off a wall"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "between 4 m and 5 m"
+measured = "4.96 m"
+
+[[expect]]
+what     = "speed east at 0.4 s"
+basis    = "Observed"
+expected = "-1.46 m/s ± 0.1 m/s"
+measured = "-1.46 m/s"
+
+[[expect]]
+what     = "speed north at 0.4 s"
+basis    = "Observed"
+expected = "4.17 m/s ± 0.3 m/s"
+measured = "4.17 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b9a2be5ff046b974"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "322c32e95c27f68f"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "bf69865e25d1a638"
+"0.1 s" = "d4d28f3bd0d2e6ac"
+"0.15 s" = "3532de1eb4fd7a21"
+"0.2 s" = "b42eb7a35cd9a15f"
+"0.25 s" = "32c3d1cfb7c9a56c"
+"0.3 s" = "8c35981d09eba351"
+"0.35 s" = "db54ddfc7c1ed95d"
+"0.4 s" = "526314ed9e4d336e"
+"0.45 s" = "95ce5206566b8d3b"
+"0.5 s" = "883fc519a82c2e3a"

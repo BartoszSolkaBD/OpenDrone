@@ -1,0 +1,58 @@
+# Results of whoop-slides-to-a-stop.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A sliding whoop stops where its friction says"
+
+[[expect]]
+what     = "height, lowest over 0 s to 1.5 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.0001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 1.5 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.0001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "speed east at 0.3 s"
+basis    = "Observed"
+expected = "1.53 m/s ± 0.05 m/s"
+measured = "1.53 m/s"
+
+[[expect]]
+what     = "distance east at 1.5 s"
+basis    = "Observed"
+expected = "0.917 m ± 0.01 m"
+measured = "0.917 m"
+
+[[expect]]
+what     = "speed, highest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "b9a2be5ff046b974"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "18266295cac038a7"   # the whole state after each of 12000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.15 s" = "e3288287d1346e2b"
+"0.3 s" = "02a8f92e05ead0ac"
+"0.45 s" = "c121db76de262461"
+"0.6 s" = "558b10c9dacd8246"
+"0.75 s" = "208a27eda8eb67eb"
+"0.9 s" = "2c4834620c354bfa"
+"1.05 s" = "c9c77b6a650e1d66"
+"1.2 s" = "1480e658b2dbcf01"
+"1.35 s" = "7becd7c1871fd4c0"
+"1.5 s" = "c63e8a7cb053909c"

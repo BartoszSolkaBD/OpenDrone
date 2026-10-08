@@ -111,6 +111,51 @@ fn a_core_crate_using_an_outside_library_nobody_has_checked_breaks_the_walls() {
 }
 
 #[test]
+fn a_core_library_with_a_feature_the_core_must_never_have_breaks_the_walls() {
+    // glamx's `std` feature makes it use std's maths instead of libm.
+    let outcome = Fixture::new("core-library-with-std")
+        .outside("glamx", &[])
+        .features("glamx", &["std"])
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths", "glamx/std"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "The core reaches `glamx` with its `std` feature turned on, which it must never have: \
+         glamx then works out eigenvalues with std's acos, cos and powi",
+    );
+    outcome.says("It gets there through opendrone-physics → glamx.");
+}
+
+#[test]
+fn a_feature_that_would_put_std_among_glamxs_libraries_breaks_the_walls() {
+    // num-traits is one of glamx's libraries: its `std` feature would make
+    // glamx's maths resolve to std's.
+    let outcome = Fixture::new("core-library-num-traits-std")
+        .outside("num-traits", &[])
+        .features("num-traits", &["std"])
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths", "num-traits/std"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "The core reaches `num-traits` with its `std` feature turned on, which it must never \
+         have: it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths",
+    );
+}
+
+#[test]
+fn the_same_core_library_without_that_feature_passes() {
+    let outcome = Fixture::new("core-library-without-std")
+        .outside("glamx", &[])
+        .features("glamx", &["std"])
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths", "glamx"])
+        .check_walls();
+    assert!(outcome.passed, "{}", outcome.output);
+}
+
+#[test]
 fn the_core_may_use_libm() {
     let outcome = Fixture::new("core-uses-libm")
         .outside("libm", &[])
@@ -212,6 +257,8 @@ struct Fixture {
     members: Vec<(String, Vec<String>)>,
     test_only: Vec<(String, String)>,
     outside: Vec<(String, Vec<String>)>,
+    /// Features an outside library declares.
+    features: Vec<(String, Vec<String>)>,
 }
 
 impl Fixture {
@@ -223,6 +270,7 @@ impl Fixture {
             members: Vec::new(),
             test_only: Vec::new(),
             outside: Vec::new(),
+            features: Vec::new(),
         }
     }
 
@@ -238,9 +286,16 @@ impl Fixture {
         self
     }
 
-    /// A stand-in for an outside library, and what it depends on.
+    /// A stand-in for an outside library, and what it depends on. A
+    /// dependency written `name/feature` turns that feature on.
     fn outside(mut self, name: &str, uses: &[&str]) -> Fixture {
         self.outside.push((name.to_owned(), owned(uses)));
+        self
+    }
+
+    /// Features an outside library declares, each turning on nothing else.
+    fn features(mut self, name: &str, features: &[&str]) -> Fixture {
+        self.features.push((name.to_owned(), owned(features)));
         self
     }
 
@@ -285,10 +340,20 @@ impl Fixture {
              publish = false\n\n[lib]\npath = \"lib.rs\"\n\n[dependencies]\n"
         );
         for dependency in uses {
+            let (dependency, features) = match dependency.split_once('/') {
+                Some((name, feature)) => (name, format!(", features = [{feature:?}]")),
+                None => (dependency.as_str(), String::new()),
+            };
             manifest.push_str(&format!(
-                "{dependency} = {{ path = {:?} }}\n",
+                "{dependency} = {{ path = {:?}{features} }}\n",
                 self.path_to(dependency)
             ));
+        }
+        manifest.push_str("\n[features]\n");
+        for (_, features) in self.features.iter().filter(|(owner, _)| owner == name) {
+            for feature in features {
+                manifest.push_str(&format!("{feature} = []\n"));
+            }
         }
         manifest.push_str("\n[dev-dependencies]\n");
         for dependency in dev {

@@ -1,0 +1,10 @@
+# The built-in Test Map test/floor-and-ceiling. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Floor and ceiling"
+description = "A floor and a concrete ceiling 3.1 m above it, as on the Bando's floors, both triangle meshes 40 m square: the floor a sheet at 0 m facing up, the ceiling a closed slab from 3.1 m to 3.3 m."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
