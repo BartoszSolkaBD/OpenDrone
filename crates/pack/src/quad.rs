@@ -22,7 +22,8 @@ use opendrone_physics::{
     RotorLayout,
 };
 
-use crate::document::{self, Document, Item, Problem, Problems, Table};
+use crate::document::{Document, Item, Problem, Problems, Table};
+use crate::migration::{self, FileKind};
 use crate::schema::{self, Bounds, Form, Key, Kind, Need, SECTIONS, Section, TOP_TEXT};
 use crate::tune::Tune;
 use crate::units::{self, Dimension, Range};
@@ -143,7 +144,7 @@ pub fn read_quad_file_as_far_as_it_goes(
     file: &str,
     text: &str,
 ) -> Result<(QuadFile, Problems), Problems> {
-    let text = document::upgraded(file, text, document::PACK_UPGRADES)?;
+    let text = migration::upgraded(file, text, FileKind::Quad)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
@@ -423,7 +424,7 @@ pub fn read_test_quad(
     text: &str,
     base: impl FnOnce(&str) -> Result<QuadFile, Problems>,
 ) -> Result<(String, QuadFile), Problems> {
-    let text = document::upgraded(file, text, document::PACK_UPGRADES)?;
+    let text = migration::upgraded(file, text, FileKind::TestQuad)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);

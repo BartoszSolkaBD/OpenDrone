@@ -26,9 +26,14 @@
 //! The command is `cargo scenarios` (see `main.rs`). How to read a Scenario
 //! and its Results: `docs/verification/reading-a-scenario.md`.
 //!
+//! Every Scenario starts with `format = N` ([`SCENARIO_FORMAT`]). A new
+//! starting-state item comes with a step in [`SCENARIO_STEPS`] that
+//! `cargo xtask migrate` runs over every Scenario ([`Repo::files_to_migrate`]).
+//!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
 pub mod agreement;
+mod format;
 mod measure;
 mod rates;
 mod read;
@@ -40,6 +45,7 @@ use std::path::{Path, PathBuf};
 
 use opendrone_pack::{Packs, Problems};
 
+pub use format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 pub use measure::Measure;
 pub use opendrone_sim::StartingMotors;
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};

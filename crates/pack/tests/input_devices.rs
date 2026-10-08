@@ -8,6 +8,7 @@
 mod common;
 
 use common::{Fixture, line_of, repo};
+use opendrone_pack::document::FORMAT;
 use opendrone_pack::input_device::controls::{PadButton, Position, Stick};
 use opendrone_pack::input_device::{
     Action, ActionSource, Connection, FlightMode, FlightModeSwitch, GamepadThrottle, Kind, Match,
@@ -426,8 +427,10 @@ fn an_unknown_key_is_refused_naming_what_is_read_there() {
 
 #[test]
 fn a_profile_in_a_newer_format_needs_a_newer_opendrone() {
-    let (text, found) = pocket_with("format = 1", "format = 2");
-    one_problem(&text, &found, "format = 2", "needs a newer OpenDrone");
+    // One newer than the newest, which this OpenDrone reads.
+    let newer = format!("format = {}", FORMAT + 1);
+    let (text, found) = pocket_with(&format!("format = {FORMAT}"), &newer);
+    one_problem(&text, &found, &newer, "needs a newer OpenDrone");
 }
 
 #[test]

@@ -15,7 +15,7 @@ format = 1
 name   = "Free fall is exactly g"
 ```
 
-`format` is the file format's version, so an older OpenDrone refuses a newer file. `name` says what the Scenario proves.
+`format` is the file format's version, so an older OpenDrone refuses a newer file. When a new starting-state item arrives, one command writes it into every Scenario and bumps this number ([Changing a file format](../format-migration.md)). `name` says what the Scenario proves.
 
 ### The starting state, `[start]`
 

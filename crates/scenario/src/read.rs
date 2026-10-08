@@ -6,6 +6,7 @@ use opendrone_pack::units::{self, Dimension, Expected, Quantity};
 use opendrone_pack::{Problem, Problems};
 use opendrone_sim::{MotorCommands, PhysicsRate, SimulationTime, StartingMotors};
 
+use crate::format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 use crate::measure::Measure;
 use crate::rates::{self, Rates};
 
@@ -238,7 +239,7 @@ const PACKET_RATES: [u32; 7] = [50, 100, 150, 250, 333, 500, 1000];
 pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
     let doc = Document::parse(file, text)?;
     let mut problems = Problems::new();
-    doc.check_format(&mut problems);
+    doc.check_format_against(SCENARIO_FORMAT, SCENARIO_STEPS, &mut problems);
     let root = doc.root();
     root.refuse_unknown(TOP, &mut problems);
     let name = root.text("name", &mut problems).map(|(n, _)| n.to_string());

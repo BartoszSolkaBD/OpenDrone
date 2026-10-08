@@ -26,8 +26,9 @@
 //!   ([`MapDefinition`]).
 //!
 //! Every file starts with `format = N`: a newer format is refused ("needs a
-//! newer OpenDrone"), and an older one is upgraded in memory
-//! ([`document::upgraded`]).
+//! newer OpenDrone"), and an older one is upgraded in memory by the same
+//! steps `cargo xtask migrate` runs over the repo's own files
+//! ([`migration`]).
 //!
 //! The numbers it hands the Simulation must be the same on every computer
 //! (ADR-0001), so it converts units with multiplication and division only, and
@@ -40,6 +41,7 @@ pub mod feel_tests;
 pub mod input_device;
 mod manifest;
 mod map;
+pub mod migration;
 mod quad;
 pub mod schema;
 mod tune;
@@ -51,9 +53,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
-pub use input_device::{InputDeviceProfile, read_input_device_file};
+pub use input_device::{
+    InputDeviceProfile, read_input_device_file, read_input_device_file_with_steps,
+};
 pub use manifest::{LicenceOverride, Manifest, is_an_id, read_manifest};
-pub use map::{MapDefinition, read_map_file, test_map, test_map_ids};
+pub use map::{
+    MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps, test_map,
+    test_map_ids,
+};
 pub use quad::{
     Battery, Board, Camera, Chemistry, Collision, Confidence, Ducts, Feel, Frame, Motors,
     PropDirection, Props, QuadDefinition, QuadFile, Setting, Sound, Value, check_quad, label,

@@ -5,7 +5,8 @@
 use opendrone_maths::{Fingerprint, Fingerprinter};
 use opendrone_physics::World;
 
-use crate::document::{Document, Problems};
+use crate::document::{Document, FORMAT, Problems};
+use crate::migration::{self, FileKind, PACK_STEPS, Step};
 use crate::units::{self, Dimension};
 
 /// A checked Map: what the Simulation receives from it.
@@ -28,20 +29,14 @@ impl MapDefinition {
     }
 }
 
-/// The Test Maps, built into the code for Scenarios only, each written as the
-/// text of a `map.toml`. They use the `test/` prefix (#16 §2).
-const TEST_MAPS: &[(&str, &str)] = &[(
-    "empty-air",
-    r#"
-format      = 1
-name        = "Empty air"
-description = "Nothing but air: no floor, no walls and no wind. For Physics Scenarios."
+/// Where the Test Maps' `map.toml` files live, from the repo's root: one
+/// `<name>.toml` each. They are built into the code, and `cargo xtask
+/// migrate` rewrites them like any Pack file, so their `format` keeps up.
+pub const TEST_MAPS_FOLDER: &str = "crates/pack/test-maps";
 
-[world]
-gravity     = "9.81 m/s²"     # standard gravity, as the alpha Maps write it
-air_density = "1.225 kg/m³"   # sea level
-"#,
-)];
+/// The Test Maps, built into the code for Scenarios only, each the text of a
+/// `map.toml` in [`TEST_MAPS_FOLDER`]. They use the `test/` prefix (#16 §2).
+const TEST_MAPS: &[(&str, &str)] = &[("empty-air", include_str!("../test-maps/empty-air.toml"))];
 
 /// A Test Map by the part of its id after `test/`, such as `empty-air`.
 pub fn test_map(name: &str) -> Option<Result<MapDefinition, Problems>> {
@@ -65,9 +60,23 @@ pub fn test_map_ids() -> Vec<String> {
         .collect()
 }
 
-/// Reads a `map.toml`: its name and its world values.
+/// Reads a `map.toml`: its name and its world values. An older file is
+/// upgraded in memory first, like every Pack file.
 pub fn read_map_file(id: &str, file: &str, text: &str) -> Result<MapDefinition, Problems> {
-    let doc = Document::parse(file, text)?;
+    read_map_file_with_steps(id, file, text, PACK_STEPS)
+}
+
+/// [`read_map_file`], upgrading an older file with `steps` instead of
+/// [`PACK_STEPS`]: the steps must lead to the newest format, [`FORMAT`].
+/// The readable checks give it a synthetic step.
+pub fn read_map_file_with_steps(
+    id: &str,
+    file: &str,
+    text: &str,
+    steps: &[Step],
+) -> Result<MapDefinition, Problems> {
+    let text = migration::upgraded_with(file, text, FileKind::Map, FORMAT, steps)?;
+    let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
     doc.check_format(&mut problems);
     if doc.is_newer() {

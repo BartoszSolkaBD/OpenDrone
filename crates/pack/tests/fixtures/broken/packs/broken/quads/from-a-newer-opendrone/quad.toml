@@ -1,5 +1,5 @@
 # A good fixture Quad with every section, ducts and a buzzer.
-format = 2   # BROKEN: a format newer than this OpenDrone reads
+format = 1000   # BROKEN: a format far newer than this OpenDrone reads
 
 name        = "Ducted"
 description = "A fixture Quad"
