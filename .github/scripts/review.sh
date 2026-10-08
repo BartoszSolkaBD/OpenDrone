@@ -10,7 +10,10 @@
 #                      from the PR's comments; then post the Review Report
 #                      comment, the labels, and the Red Flag gate's and the
 #                      Review check's commit statuses.
-#                      Needs REPO, XTASK and PR_NUMBER; RUN_URL is optional.
+#                      Needs REPO, XTASK and PR_NUMBER; RUN_URL is optional,
+#                      and so are EVENT_HEAD_SHA, EVENT_BASE_REF and
+#                      DEFAULT_BRANCH, the commit a PR event names, marked
+#                      with error if the PR's record can't be read.
 #   review.sh others   After a PR closes, gets a new commit or moves onto or
 #                      off the default branch: list the other open PRs into
 #                      the default branch whose latest commit is (or, before a
@@ -74,14 +77,17 @@ add_label() {
   echo "Added the label \`$name\` to #$pr."
 }
 
-# The commit being judged, once known, so a failure can say so on it.
+# The commit being judged, once known, so a failure can say so on it. The
+# script's own output is kept as file 3: a failure inside a call whose output
+# goes to a file still logs what it posted.
 judged=""
+exec 3>&1
 on_error() {
   if [[ -n "$judged" ]]; then
     post_status "$judged" "Red Flag gate" error \
-      "The review workflow failed: see its run" "${RUN_URL:-}" || true
+      "The review workflow failed: see its run" "${RUN_URL:-}" >&3 || true
     post_status "$judged" "Review check" error \
-      "The review workflow failed: see its run" "${RUN_URL:-}" || true
+      "The review workflow failed: see its run" "${RUN_URL:-}" >&3 || true
   fi
 }
 trap on_error ERR
@@ -121,11 +127,15 @@ update() {
     return 0
   fi
 
-  api "repos/$REPO/pulls/$pr" > "$work/pr.json"
-  if [[ "$(jq -r .state "$work/pr.json")" != "open" ]]; then
-    echo "#$pr is closed, so its Review Report stays as it is."
-    return 0
+  # Until GitHub's record of the PR is read, a failure marks the commit the
+  # event named, if it named one on a PR into the default branch. A comment
+  # names no commit: its failed run is the only trace.
+  if [[ "${EVENT_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ && -n "${DEFAULT_BRANCH:-}" \
+    && "${EVENT_BASE_REF:-}" == "${DEFAULT_BRANCH:-}" ]]; then
+    judged="$EVENT_HEAD_SHA"
   fi
+
+  api "repos/$REPO/pulls/$pr" > "$work/pr.json"
   local head base_ref default_branch
   head="$(jq -r .head.sha "$work/pr.json")"
   base_ref="$(jq -r .base.ref "$work/pr.json")"
@@ -134,6 +144,12 @@ update() {
     || [[ "$base_ref" == *..* ]]; then
     echo "#$pr's latest commit or base branch looks wrong: $head, $base_ref" >&2
     return 1
+  fi
+  # From here on, GitHub's record decides which commit is judged.
+  judged=""
+  if [[ "$(jq -r .state "$work/pr.json")" != "open" ]]; then
+    echo "#$pr is closed, so its Review Report stays as it is."
+    return 0
   fi
 
   # Only a PR into the default branch sets the statuses (xtask decides; this
@@ -234,9 +250,19 @@ others() {
   fi
   for sha in "${BEFORE_SHA:-}" "${HEAD_SHA:-}"; do
     [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
-    # A commit GitHub no longer has (after a force-push) has no PRs.
-    api "repos/$REPO/commits/$sha/pulls?per_page=100" > "$work/pulls.json" \
-      || echo '[]' > "$work/pulls.json"
+    if ! api "repos/$REPO/commits/$sha/pulls?per_page=100" > "$work/pulls.json" \
+      2> "$work/pulls.err"; then
+      # A commit GitHub doesn't have (after a force-push) is in no PR. Any
+      # other error fails this job, so it shows instead of passing quietly.
+      if grep -qE '\(HTTP (404|422)\)' "$work/pulls.err"; then
+        echo "GitHub has no commit $sha, so no PR has it."
+        echo '[]' > "$work/pulls.json"
+      else
+        cat "$work/pulls.err" >&2
+        echo "GitHub couldn't say which PRs have $sha, so none is judged again." >&2
+        return 1
+      fi
+    fi
     found="$(jq -c --argjson found "$found" --argjson pr "$pr" --arg sha "$sha" --arg main "$main" \
       '$found + [.[] | select(.state == "open" and .base.ref == $main
                          and .head.sha == $sha and .number != $pr) | .number]

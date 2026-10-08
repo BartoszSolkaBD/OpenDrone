@@ -372,6 +372,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ra-ap-rustc_lexer"
+version = "0.174.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e3150be7e79139b0f085e886dd71b0bb9cd6b35da0a61fca1042ac400b1687e"
+dependencies = [
+ "memchr",
+ "unicode-ident",
+ "unicode-properties",
+]
+
+[[package]]
 name = "rpkg-config"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -594,9 +605,15 @@ checksum = "357cc3acc6a036009fd6c973ed009037c732d60d0b4f6c673e9041497482a28f"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.26"
+version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-properties"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7df058c713841ad818f1dc5d3fd88063241cc61f49f5fbea4b951e8cf5a8d71d"
 
 [[package]]
 name = "wide"
@@ -626,6 +643,7 @@ dependencies = [
  "opendrone-pack",
  "opendrone-scenario",
  "pulldown-cmark",
+ "ra-ap-rustc_lexer",
  "rustc-demangle",
  "serde_json",
  "toml",

@@ -476,12 +476,14 @@ fn a_raw_c_string_cannot_hide_a_house_rule_exception() {
 }
 
 #[test]
-fn no_string_prefix_or_suffix_rust_accepts_can_hide_unsafe_code_later_on_its_line() {
-    // Each line compiles with Rust 1.99, and each literal ends before
-    // `unsafe`, whatever its prefix, or a suffix before it, does to a
-    // backslash.
+fn no_literal_rust_1_99_reads_can_hide_unsafe_code_later_on_its_line() {
+    // Each line compiles with Rust 1.99 in edition 2024, the edition every
+    // crate here uses, and each literal ends before `unsafe`. The lines come
+    // from the review rounds on #92 and #104; the Report reads them with
+    // rustc's own lexer.
     let lines = [
-        // C strings and raw C strings.
+        // C strings and raw C strings. In edition 2024, `cr#"\"#` is one raw
+        // C string, and its backslash is plain text.
         r#"let _p = c"\""; let first = unsafe { *x.as_ptr() };"#,
         r##"let _p = cr#"\"#; let first = unsafe { *x.as_ptr() }; let _q = "";"##,
         r#"let _p = cr"\"; let first = unsafe { *x.as_ptr() }; let _q = "";"#,
@@ -495,19 +497,119 @@ fn no_string_prefix_or_suffix_rust_accepts_can_hide_unsafe_code_later_on_its_lin
         r#"ignore!('a'r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
         r#"ignore!(r"a"r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
         r#"ignore!(c"a"r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        // A lifetime right before a string: `'r` is a lifetime, so `"\" "` is
+        // an ordinary string.
+        r#"ignore!('r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!('br"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!('cr"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        // A suffix holding a character Rust allows in names that is neither a
+        // letter nor a digit: a combining accent or a middle dot. The `r` after
+        // it is still the suffix.
+        r#"ignore!("a"x{U+0301}r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!("a"x{U+00B7}r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!(1x{U+0301}r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!('a'x{U+0301}r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        // A long `\u{…}` escape: any number of `_` may follow its first digit.
+        r#"ignore!('\u{2__________2}'"' "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
     ];
+    let mut missed = Vec::new();
     for (i, line) in lines.iter().enumerate() {
+        let line = with_marks(line);
         let review = PullRequest::new(&format!("literal-hides-unsafe-{i}"))
             .write(
                 "crates/sim/src/lib.rs",
                 &format!("{SIM_START}    {line}\n    first\n}}\n"),
             )
             .review();
-        review.reviewer_decides(
+        if !review.has_flag(
+            "reviewer-decides",
             "New `unsafe` code",
             &format!("`crates/sim/src/lib.rs` adds `{line}`."),
+        ) {
+            missed.push(line);
+        }
+    }
+    assert!(
+        missed.is_empty(),
+        "no \"New `unsafe` code\" Red Flag for {} of {} lines:\n  {}",
+        missed.len(),
+        lines.len(),
+        missed.join("\n  ")
+    );
+}
+
+#[test]
+fn neither_a_lifetime_before_a_string_nor_an_unusual_suffix_can_hide_a_house_rule_exception() {
+    // The Reviewer's cases on #104: in a core crate both lines pass
+    // `cargo clippy -- -D warnings`, so `x.sin()` would get past the house
+    // rules unseen.
+    let lines = [
+        r#"ignore!('r"\" "); #[allow(clippy::disallowed_methods)] let y = x.sin(); ignore!("");"#,
+        r#"ignore!("a"x{U+0301}r"\" "); #[allow(clippy::disallowed_methods)] let y = x.sin(); ignore!("");"#,
+    ];
+    for (i, line) in lines.iter().enumerate() {
+        let review = PullRequest::new(&format!("literal-hides-allow-{i}"))
+            .write(
+                "crates/physics/src/lib.rs",
+                &format!("{PHYSICS_START}    {}\n    y\n}}\n", with_marks(line)),
+            )
+            .review();
+        review.reviewer_decides(
+            "A house-rule exception in a core crate",
+            "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
         );
     }
+}
+
+#[test]
+fn a_file_is_read_in_its_own_crate_s_edition() {
+    // Before 2021, `cr#"a"` is the name `cr`, then `#` and the string `"a"`,
+    // so `unsafe` after it is code: this line compiles with real `unsafe` in
+    // edition 2018. In edition 2024 the same text is one raw C string up to
+    // `"#` (and doesn't compile).
+    let line = r##"ignore!(cr#"a"); let first = unsafe { *x.as_ptr() }; ignore!("#");"##;
+    let file = format!("{SIM_START}    {line}\n    first\n}}\n");
+    let in_2018 = PullRequest::new("edition-2018")
+        .on_main(
+            "crates/sim/Cargo.toml",
+            "[package]\nname = \"opendrone-sim\"\nedition = \"2018\"\n",
+        )
+        .write("crates/sim/src/lib.rs", &file)
+        .review();
+    in_2018.reviewer_decides(
+        "New `unsafe` code",
+        &format!("`crates/sim/src/lib.rs` adds `{line}`."),
+    );
+    let in_2024 = PullRequest::new("edition-2024")
+        .on_main(
+            "crates/sim/Cargo.toml",
+            "[package]\nname = \"opendrone-sim\"\nedition.workspace = true\n",
+        )
+        .write("crates/sim/src/lib.rs", &file)
+        .review();
+    assert!(
+        !in_2024.report.contains("New `unsafe` code"),
+        "{}",
+        in_2024.report
+    );
+    // Before 2024, `#"` is `#` and then an ordinary string, so `\"` is an
+    // escape: this line compiles with real `unsafe` in edition 2021 (2024
+    // refuses `#"`).
+    let line = r#"ignore!(#"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#;
+    let in_2021 = PullRequest::new("edition-2021")
+        .on_main(
+            "crates/sim/Cargo.toml",
+            "[package]\nname = \"opendrone-sim\"\nedition = \"2021\"\n",
+        )
+        .write(
+            "crates/sim/src/lib.rs",
+            &format!("{SIM_START}    {line}\n    first\n}}\n"),
+        )
+        .review();
+    in_2021.reviewer_decides(
+        "New `unsafe` code",
+        &format!("`crates/sim/src/lib.rs` adds `{line}`."),
+    );
 }
 
 #[test]
@@ -936,6 +1038,17 @@ const TEST_QUAD: &str = "scenarios/test-quads/whoop-65-no-drag.toml";
 /// reads the first byte of `x` into `first`.
 const SIM_START: &str = "//! A fixture crate.\n\nmacro_rules! ignore {\n    ($($t:tt)*) => {};\n}\n\n\
                          /// The first byte.\npub fn first_byte(x: &[u8]) -> u8 {\n";
+/// The start of a core crate's `lib.rs`, up to a line inside a function that
+/// works out `y` from `x`.
+const PHYSICS_START: &str = "//! A fixture core crate.\n\nmacro_rules! ignore {\n    ($($t:tt)*) => {};\n}\n\n\
+                             /// A sine.\npub fn sine(x: f64) -> f64 {\n";
+
+/// A line with `{U+0301}` (a combining accent) and `{U+00B7}` (a middle dot)
+/// written as the characters themselves.
+fn with_marks(line: &str) -> String {
+    line.replace("{U+0301}", "\u{301}")
+        .replace("{U+00B7}", "\u{B7}")
+}
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/review")
@@ -1105,8 +1218,9 @@ struct Review {
 }
 
 impl Review {
-    fn flag(&self, level: &str, title: &str, detail: &str) {
-        let found = self.json["red_flags"]
+    /// Whether the Report has this Red Flag, with `detail` in its detail.
+    fn has_flag(&self, level: &str, title: &str, detail: &str) -> bool {
+        self.json["red_flags"]
             .as_array()
             .expect("red_flags is a list")
             .iter()
@@ -1114,9 +1228,12 @@ impl Review {
                 flag["level"] == level
                     && flag["title"] == title
                     && flag["detail"].as_str().is_some_and(|d| d.contains(detail))
-            });
+            })
+    }
+
+    fn flag(&self, level: &str, title: &str, detail: &str) {
         assert!(
-            found,
+            self.has_flag(level, title, detail),
             "expected the {level} Red Flag \"{title}\" saying \"{detail}\", but the Report \
              says:\n{}",
             self.report

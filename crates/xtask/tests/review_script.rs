@@ -63,7 +63,7 @@ fn a_run_sets_both_statuses_to_pending_first_then_to_their_results() {
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
-fn a_run_that_stops_before_it_can_read_the_pr_leaves_both_statuses_at_error_never_an_older_result()
+fn a_run_whose_fetch_of_the_pr_s_commit_fails_leaves_both_statuses_at_error_never_an_older_result()
 {
     // The Reviewer's case on #92: the fetch fails (here, because the commit
     // isn't there), after an earlier run had set both statuses to success.
@@ -87,6 +87,51 @@ fn a_run_that_stops_before_it_can_read_the_pr_leaves_both_statuses_at_error_neve
         "{}",
         run.output
     );
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pr_event_s_run_that_cannot_read_the_pr_from_github_marks_the_commit_it_named_with_error() {
+    // GitHub's record of the PR doesn't come; the event named the PR's latest
+    // commit and its base branch, main.
+    let scratch = Scratch::new("pr-unreadable");
+    scratch.fails(
+        &format!("repos/{REPO}/pulls/77"),
+        "gh: Server Error (HTTP 502)",
+    );
+    let run = scratch.run(
+        "update",
+        &[
+            ("PR_NUMBER", "77"),
+            ("EVENT_HEAD_SHA", HEAD),
+            ("EVENT_BASE_REF", "main"),
+            ("DEFAULT_BRANCH", "main"),
+        ],
+    );
+    assert!(!run.passed, "{}", run.output);
+    let failed = "error (The review workflow failed: see its run)";
+    assert_eq!(
+        run.statuses(),
+        [
+            format!("Red Flag gate on {HEAD}: {failed}"),
+            format!("Review check on {HEAD}: {failed}"),
+        ],
+        "{}",
+        run.output
+    );
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_comment_s_run_that_cannot_read_the_pr_names_no_commit_so_only_its_failed_run_shows() {
+    let scratch = Scratch::new("comment-pr-unreadable");
+    scratch.fails(
+        &format!("repos/{REPO}/pulls/77"),
+        "gh: Server Error (HTTP 502)",
+    );
+    let run = scratch.run("update", &[("PR_NUMBER", "77"), ("DEFAULT_BRANCH", "main")]);
+    assert!(!run.passed, "{}", run.output);
+    assert!(run.statuses().is_empty(), "{}", run.output);
 }
 
 #[test]
@@ -187,6 +232,10 @@ fn with_no_other_pr_on_the_commit_nobody_is_judged_again() {
         &format!("repos/{REPO}/commits/{HEAD}/pulls?per_page=100"),
         &json!([listed(77, "open", "main", HEAD)]),
     );
+    scratch.fails(
+        &format!("repos/{REPO}/commits/{OLDER}/pulls?per_page=100"),
+        &format!("gh: No commit found for SHA: {OLDER} (HTTP 422)"),
+    );
     let run = scratch.run(
         "others",
         &[
@@ -198,6 +247,35 @@ fn with_no_other_pr_on_the_commit_nobody_is_judged_again() {
     );
     assert!(run.passed, "{}", run.output);
     assert_eq!(run.outputs()["prs"], "[]", "{}", run.output);
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn when_github_cannot_say_which_prs_have_the_commit_the_job_fails_and_shows() {
+    // Any error but "no such commit" fails the job, so it never passes
+    // quietly while a PR stays stuck with the "keep one" failure.
+    let scratch = Scratch::new("github-down");
+    scratch.fails(
+        &format!("repos/{REPO}/commits/{HEAD}/pulls?per_page=100"),
+        "gh: Server Error (HTTP 502)",
+    );
+    let run = scratch.run(
+        "others",
+        &[
+            ("PR_NUMBER", "77"),
+            ("DEFAULT_BRANCH", "main"),
+            ("HEAD_SHA", HEAD),
+        ],
+    );
+    assert!(!run.passed, "{}", run.output);
+    assert!(!run.outputs().contains_key("prs"), "{}", run.output);
+    assert!(
+        run.output.contains(
+            "GitHub couldn't say which PRs have 1111111111111111111111111111111111111111"
+        ),
+        "{}",
+        run.output
+    );
 }
 
 /// GitHub's record of a pull request (`GET /repos/{owner}/{repo}/pulls/{n}`).
@@ -225,7 +303,8 @@ fn listed(number: u64, state: &str, base: &str, head: &str) -> Value {
 }
 
 /// A stand-in for `gh`: `gh api … <endpoint>` prints the answer saved for
-/// that endpoint, or fails as GitHub does for one it doesn't know.
+/// that endpoint, or the error saved for it, as `gh` prints GitHub's errors.
+/// An endpoint with neither fails too.
 const FAKE_GH: &str = r#"#!/usr/bin/env bash
 for arg in "$@"; do
   case "$arg" in
@@ -235,6 +314,9 @@ done
 file="$FAKE_GH_ANSWERS/$(printf '%s' "${endpoint:-none}" | tr -c 'A-Za-z0-9.-' '_')"
 if [[ -f "$file" ]]; then
   cat "$file"
+elif [[ -f "$file.error" ]]; then
+  cat "$file.error" >&2
+  exit 1
 else
   echo "gh: no answer saved for ${endpoint:-none}" >&2
   exit 1
@@ -263,18 +345,23 @@ impl Scratch {
 
     /// Saves GitHub's answer for an endpoint.
     fn answer(&self, endpoint: &str, answer: &Value) {
-        let name: String = endpoint
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
-        fs::write(self.root.join("answers").join(name), answer.to_string())
-            .expect("can write the answer");
+        fs::write(
+            self.root.join("answers").join(file_name(endpoint)),
+            answer.to_string(),
+        )
+        .expect("can write the answer");
+    }
+
+    /// Saves the error `gh` prints for an endpoint, such as
+    /// "gh: Server Error (HTTP 502)".
+    fn fails(&self, endpoint: &str, error: &str) {
+        fs::write(
+            self.root
+                .join("answers")
+                .join(format!("{}.error", file_name(endpoint))),
+            error,
+        )
+        .expect("can write the error");
     }
 
     /// GitHub's copy of the repository, with main and a pull request's
@@ -353,6 +440,20 @@ impl Scratch {
             outputs: fs::read_to_string(outputs).unwrap_or_default(),
         }
     }
+}
+
+/// The stand-in's file name for an endpoint's answer.
+fn file_name(endpoint: &str) -> String {
+    endpoint
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 /// What a run of the script did.

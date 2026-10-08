@@ -8,10 +8,10 @@
 use std::collections::BTreeSet;
 
 use super::areas::{Areas, REPO_RULES};
-use super::changes::Changes;
+use super::changes::{Changes, Side};
 use super::libraries::{self, NewLibrary};
 use super::markdown::{code, plain};
-use super::rust::code_only;
+use super::rust::{code_only, edition_of};
 use super::scenarios;
 
 /// What a Red Flag asks for.
@@ -172,15 +172,20 @@ fn turns_off_a_house_rule(lint: &str) -> bool {
         )
 }
 
-/// Every lint a Rust file allows or expects, by name: in `#[allow(…)]`,
+/// A Rust file's code on one side, with comments and literals blanked out,
+/// read as rustc 1.99 reads it in its crate's edition ([`super::rust`]).
+fn code_of(side: &Side, path: &str) -> Option<String> {
+    let text = side.text(path)?;
+    Some(code_only(&text, edition_of(path, |file| side.text(file))))
+}
+
+/// Every lint a Rust file's code allows or expects, by name: in `#[allow(…)]`,
 /// `#![allow(…)]`, `#[expect(…)]` or inside a `cfg_attr`, however the
-/// attribute is spread over lines. Comments, strings and char literals don't
-/// count, and can't hide one.
-fn allowed_lints(text: &str) -> Vec<String> {
-    let compact: String = code_only(text)
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+/// attribute is spread over lines. `code` comes from [`code_of`], so
+/// comments, strings and char literals don't count, and hide one only
+/// where they would hide it from rustc.
+fn allowed_lints(code: &str) -> Vec<String> {
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
     let mut lints = Vec::new();
     for keyword in ["allow(", "expect("] {
         for (at, _) in compact.match_indices(keyword) {
@@ -223,16 +228,12 @@ fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
                     ));
                 }
             } else if path.ends_with(".rs") {
-                let mut before: Vec<String> = changes
-                    .base
-                    .text(path)
-                    .map(|t| allowed_lints(&t))
+                let mut before: Vec<String> = code_of(&changes.base, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default();
                 let mut new = Vec::new();
-                for lint in changes
-                    .head
-                    .text(path)
-                    .map(|t| allowed_lints(&t))
+                for lint in code_of(&changes.head, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default()
                 {
                     match before.iter().position(|b| *b == lint) {
@@ -306,9 +307,9 @@ fn workspace_unsafe_setting(manifest: Option<String>) -> Option<toml::Value> {
 /// alone: a line counts only if its code, without comments, strings and char
 /// literals, is new.
 fn added_code_lines(changes: &Changes, path: &str) -> Vec<(String, String)> {
-    let base = code_only(&changes.base.text(path).unwrap_or_default());
+    let base = code_of(&changes.base, path).unwrap_or_default();
     let head_text = changes.head.text(path).unwrap_or_default();
-    let head = code_only(&head_text);
+    let head = code_of(&changes.head, path).unwrap_or_default();
     let mut base_lines: Vec<&str> = base.lines().map(str::trim_end).collect();
     base_lines.sort_unstable();
     let mut added = Vec::new();
@@ -337,14 +338,15 @@ fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
                     .filter(|(code, _)| has_word(code, "unsafe"))
                     .map(|(_, line)| code(&line)),
             );
-            let allows = |text: Option<String>| {
-                text.map(|t| allowed_lints(&t))
+            let allows = |side: &Side| {
+                code_of(side, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default()
                     .iter()
                     .filter(|lint| lint.as_str() == "unsafe_code")
                     .count()
             };
-            if allows(changes.head.text(path)) > allows(changes.base.text(path)) {
+            if allows(&changes.head) > allows(&changes.base) {
                 found.push("an allowance of the `unsafe_code` lint".to_string());
             }
         } else if path == "Cargo.toml" {
