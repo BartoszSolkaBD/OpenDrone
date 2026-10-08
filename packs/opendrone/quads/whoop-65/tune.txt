@@ -3,17 +3,19 @@
 # configured 2023-01-16 (docs/research/quad-settings/meteor65-pro.diff-all.txt),
 # by `cargo xtask import-tune`.
 # Each line's mark says where its value came from:
-#   diff         set on the real quad
-#   4.3 default  not in the diff, so Betaflight 4.3.0's default
-#   ADR-0008     4.3 had no such setting (or it meant something else); set to behave like 4.3
-#   (was …)      the setting's 4.3 name
-#   hand-set: …  changed by hand, with the reason
+#   diff            set on the real quad
+#   4.3 default     not in the diff, so Betaflight 4.3.0's default
+#   ADR-0008        4.3 had no such setting (or it meant something else); set to behave like 4.3
+#   2026.6 default  4.3 had no such setting and no value behaves like 4.3: Betaflight 2026.6.2's default
+#   (was …)         the setting's 4.3 name
+#   hand-set: …     changed by hand, with the reason
 #
 # It spells out every setting the Flight Controller reads so far, grouped by
 # the Betaflight App's tabs in their order, with each tab's CLI-only settings
-# after the ones the tab shows (ADR-0015). The settings the diff sets that
-# OpenDrone doesn't simulate yet come last, under their own heading. As the
-# Flight Controller reads more settings, run the importer again.
+# after the ones the tab shows (ADR-0015). The settings it knows but doesn't
+# simulate yet come last, under their own heading, and then the other
+# settings the diff sets. As the Flight Controller reads more settings, run
+# the importer again.
 
 # Configuration
 set small_angle = 180                  # diff; degrees: the most it may tilt and still arm
@@ -52,26 +54,39 @@ set yaw_motors_reversed = OFF          # 4.3 default; must match [props] directi
 # Motors, CLI only
 set mixer_type = LEGACY                # 4.3 default
 
-# Not simulated yet
-set d_max_roll = 48                    # diff (was d_roll)
-set f_roll = 125                       # diff
-set d_max_pitch = 52                   # diff (was d_pitch)
-set f_pitch = 124                      # diff
-set f_yaw = 100                        # diff
+# Not simulated yet. The Flight Controller checks these values but flies as
+# if each were off until its ticket lands (ADR-0015).
+# PID Tuning
+set f_roll = 125                       # diff; not simulated yet (#49)
+set f_pitch = 124                      # diff; not simulated yet (#49)
+set f_yaw = 100                        # diff; not simulated yet (#49)
+set d_max_roll = 48                    # diff (was d_roll); not simulated yet (#50)
+set d_max_pitch = 52                   # diff (was d_pitch); not simulated yet (#50)
+set d_max_yaw = 0                      # 4.3 default (was d_min_yaw); not simulated yet (#50)
+set iterm_relax = RP                   # 4.3 default; not simulated yet (#50)
+set anti_gravity_gain = 80             # 2026.6 default; not simulated yet (#50)
+set tpa_rate = 70                      # diff; not simulated yet (#50)
+set tpa_low_rate = 0                   # ADR-0008; not simulated yet (#50)
+set throttle_boost = 5                 # 4.3 default; not simulated yet (#50)
+# PID Tuning, filters
+set gyro_lpf1_static_hz = 0            # diff; not simulated yet (#49)
+set gyro_lpf1_dyn_min_hz = 287         # diff; not simulated yet (#49)
+set gyro_lpf2_static_hz = 575          # diff; not simulated yet (#49)
+set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)
+set dterm_lpf1_static_hz = 82          # diff; not simulated yet (#49)
+set dterm_lpf1_dyn_min_hz = 82         # diff; not simulated yet (#49)
+set dterm_lpf2_static_hz = 165         # diff; not simulated yet (#49)
+set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
+# Receiver
+set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
+
+# Not simulated yet either: the other settings the diff sets.
 set feedforward_averaging = 2_POINT    # diff
 set feedforward_jitter_factor = 9      # diff
-set tpa_rate = 70                      # diff; percent
-set gyro_lpf1_static_hz = 0            # diff; Hz; 0 is off
-set gyro_lpf1_dyn_min_hz = 287         # diff; Hz; 0 is off
 set gyro_lpf1_dyn_max_hz = 575         # diff; Hz
-set gyro_lpf2_static_hz = 575          # diff; Hz; 0 is off
-set dterm_lpf1_static_hz = 82          # diff; Hz; 0 is off
-set dterm_lpf1_dyn_min_hz = 82         # diff; Hz; 0 is off
-set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
-set dterm_lpf2_static_hz = 165         # diff; Hz; 0 is off
-set blackbox_sample_rate = 1/2         # diff
-set dyn_notch_count = 2                # diff
 set dyn_notch_q = 350                  # diff
-set dyn_notch_min_hz = 130             # diff
+set dyn_notch_min_hz = 130             # diff; Hz
+set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
+set blackbox_sample_rate = 1/2         # diff
 set dshot_bidir = ON                   # diff
 set vbat_max_cell_voltage = 435        # diff

@@ -65,7 +65,12 @@ A setting the export doesn't set takes **its own version's** default, never 2026
 
 ## Not simulated yet
 
-The settings the export sets that our Flight Controller doesn't read yet stay in the Tune, under a "Not simulated yet" heading at the end: the RPM filter, the dynamic notch, thrust linearisation and more, plus settings that later Flight Controller tickets read, such as feedforward (#49) and Dynamic D's peak (#50). Once a ticket reads one, importing again moves it under its tab, and settings the export doesn't set start being spelled out with their defaults.
+The "Not simulated yet" part of a Tune comes last, in two halves:
+
+- **What the Flight Controller knows but flies as off** until its ticket lands ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): feedforward, the low-pass filters and RC smoothing (#49), Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch, which waits for gyro noise (#21). These are always spelled out, from the export or the version's defaults, each mark ending `not simulated yet (#49)` or the like, in the order the Freestyle 5″'s Tune lists them.
+- **The other settings the export sets** that nothing reads yet: the RPM filter, the rest of the dynamic notch, thrust linearisation, the Blackbox rate and more.
+
+Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab, and a setting the export doesn't set starts being spelled out with its default.
 
 ## What still differs from the real quad
 

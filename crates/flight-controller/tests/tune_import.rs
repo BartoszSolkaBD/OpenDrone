@@ -199,8 +199,19 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
         ("crashflip_rate", "0"),
     ] {
         assert_eq!(got(&meteor, name), is(value, "ADR-0008"), "{name}");
-        // Nothing reads them yet, and the diff doesn't set them, so the Tune
-        // holds them once their Flight Controller tickets read them.
+    }
+    // The Flight Controller already knows low-throttle TPA, so the Tune
+    // spells it out, flown as off (#50). It doesn't know the others yet, and
+    // the diff doesn't set them, so the Tune holds them once their Flight
+    // Controller tickets read them.
+    let tpa_low = meteor.setting("tpa_low_rate").unwrap();
+    assert_eq!(tpa_low.written, Where::FlownAsOff);
+    assert_eq!(tpa_low.note, "not simulated yet (#50)");
+    for name in [
+        "feedforward_yaw_hold_gain",
+        "angle_earth_ref",
+        "crashflip_rate",
+    ] {
         assert_eq!(meteor.setting(name).unwrap().written, Where::NotWritten);
     }
 }
@@ -394,19 +405,43 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
     let meteor = meteor();
     let text = meteor.tune_txt("Whoop 65", "meteor");
     let (_, after) = text
-        .split_once("\n# Not simulated yet\n")
+        .split_once("\n# Not simulated yet. ")
         .expect("a Not simulated yet heading");
+    let (known, others) = after
+        .split_once("\n# Not simulated yet either: the other settings the diff sets.\n")
+        .expect("a heading for the other settings the diff sets");
+    // Every setting the Flight Controller knows but flies as off, from the
+    // diff, 4.3's defaults or ADR-0008, with its ticket, in its order.
+    let later = Tune::not_simulated_yet();
+    let lines = set_lines(known);
+    assert_eq!(
+        lines.iter().map(|(n, _, _)| n.as_str()).collect::<Vec<_>>(),
+        later.iter().map(|(n, _)| *n).collect::<Vec<_>>()
+    );
+    for ((name, value, mark), (_, ticket)) in lines.iter().zip(&later) {
+        assert!(
+            mark.ends_with(&format!("; not simulated yet ({ticket})")),
+            "{name} {value} {mark}"
+        );
+    }
+    assert!(known.contains(
+        "set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)"
+    ));
+    assert!(
+        known.contains(
+            "set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)"
+        )
+    );
+    // Then the other settings the diff sets that nothing reads yet.
     for line in [
-        "set dyn_notch_count = 2",
         "set dshot_bidir = ON",
-        "set f_roll = 125",
-        "set d_max_roll = 48",
         "set feedforward_jitter_factor = 9",
         "set blackbox_sample_rate = 1/2",
+        "set dyn_notch_q = 350",
     ] {
-        assert!(after.contains(line), "{line} not under Not simulated yet");
+        assert!(others.contains(line), "{line} not under Not simulated yet");
     }
-    assert!(after.lines().all(|l| l.starts_with("set ")));
+    assert!(others.lines().all(|l| l.starts_with("set ")));
     // A setting 2026.6 has no counterpart for is left out, with the reason.
     assert!(
         meteor
@@ -643,8 +678,13 @@ fn a_value_the_flight_controller_cant_read_is_named() {
 #[test]
 fn the_translator_knows_every_setting_the_flight_controller_reads() {
     // Basis: Rule (ADR-0015: a Tune spells out every setting the Flight
-    // Controller reads, so the importer must write each one).
-    for name in Tune::settings() {
+    // Controller reads, and the ones it knows but flies as off for now, so
+    // the importer must write each one).
+    let later = Tune::not_simulated_yet();
+    for name in Tune::settings()
+        .into_iter()
+        .chain(later.iter().map(|(name, _)| *name))
+    {
         assert!(
             table::SETTINGS.iter().any(|s| s.name == name),
             "the table has no row for {name}"

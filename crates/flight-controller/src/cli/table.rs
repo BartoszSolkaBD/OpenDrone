@@ -72,14 +72,21 @@ impl Place {
             Place::FailsafeCli => "Failsafe, CLI only",
             Place::PidTuning => "PID Tuning",
             Place::PidTuningCli => "PID Tuning, CLI only",
-            Place::Filters => "PID Tuning: Filter Settings",
-            Place::FiltersCli => "PID Tuning: Filter Settings, CLI only",
+            Place::Filters => "PID Tuning, filters",
+            Place::FiltersCli => "PID Tuning, filters, CLI only",
             Place::Receiver => "Receiver",
             Place::ReceiverCli => "Receiver, CLI only",
             Place::Motors => "Motors",
             Place::MotorsCli => "Motors, CLI only",
             Place::Blackbox => "Blackbox",
         }
+    }
+
+    /// The tab's heading, without the CLI-only split: the "Not simulated
+    /// yet" part of a Tune groups by tab alone.
+    pub fn tab(self) -> &'static str {
+        let heading = self.heading();
+        heading.strip_suffix(", CLI only").unwrap_or(heading)
     }
 }
 
@@ -310,13 +317,19 @@ pub const SETTINGS: &[Setting] = &[
         [Newer, Newer, Same("OFF"), Same("OFF"), Same("OFF")]),
     row("horizon_delay_ms", PidTuningCli, "ms",
         [Newer, Newer, Same("500"), Same("500"), Same("500")]),
-    // PID Tuning: Filter Settings
+    // PID Tuning, filters
     all("gyro_lpf1_type", Filters, "", "PT1"),
     all("gyro_lpf1_static_hz", Filters, "Hz; 0 is off", "250"),
     all("gyro_lpf1_dyn_min_hz", Filters, "Hz; 0 is off", "250"),
     all("gyro_lpf1_dyn_max_hz", Filters, "Hz", "500"),
     all("gyro_lpf2_type", Filters, "", "PT1"),
     all("gyro_lpf2_static_hz", Filters, "Hz; 0 is off", "500"),
+    // The dynamic notch isn't in the alpha: it waits for gyro noise (#21).
+    all("dyn_notch_count", Filters, "0 is off", "3"),
+    all("dyn_notch_q", Filters, "", "300"),
+    row("dyn_notch_min_hz", Filters, "Hz",
+        [Same("150"), Same("100"), Same("100"), Same("100"), Same("100")]),
+    all("dyn_notch_max_hz", Filters, "Hz", "600"),
     all("dterm_lpf1_type", Filters, "", "PT1"),
     all("dterm_lpf1_static_hz", Filters, "Hz; 0 is off", "75"),
     all("dterm_lpf1_dyn_min_hz", Filters, "Hz; 0 is off", "75"),

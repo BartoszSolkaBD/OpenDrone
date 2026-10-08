@@ -335,8 +335,22 @@ fn the_whoop_65s_tune_spells_out_every_setting_the_flight_controller_reads() {
         )
     );
     assert_eq!(mark("small_angle").0, "180");
-    // What the Flight Controller doesn't read yet stays, as not simulated.
-    assert_eq!(mark("dyn_notch_count"), ("2", "diff"));
+    // What the Flight Controller knows but doesn't simulate yet is spelled
+    // out too, from the diff or 4.3's defaults, flown as off for now.
+    assert_eq!(mark("f_roll"), ("125", "diff; not simulated yet (#49)"));
+    assert_eq!(
+        mark("rc_smoothing"),
+        ("ON", "4.3 default; not simulated yet (#49)")
+    );
+    assert_eq!(
+        mark("dyn_notch_count"),
+        ("2", "diff; not simulated yet (waits for gyro noise, #21)")
+    );
+    for (name, _) in opendrone_flight_controller::Tune::not_simulated_yet() {
+        assert!(tune.contains_key(name), "{name}");
+    }
+    // The other settings the diff sets stay too.
+    assert_eq!(mark("dshot_bidir"), ("ON", "diff"));
 }
 
 #[test]

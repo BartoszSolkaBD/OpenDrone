@@ -8,8 +8,9 @@
 //! code ([ADR-0015]).
 //!
 //! Some settings it knows but doesn't simulate yet ([`Tune::not_simulated_yet`]):
-//! the filters, RC smoothing and feedforward (#49), and Dynamic D, I-term
-//! relax, anti-gravity, TPA and throttle boost (#50). A Tune may set them,
+//! the low-pass filters, RC smoothing and feedforward (#49), Dynamic D, I-term
+//! relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch,
+//! which waits for gyro noise (#21). A Tune may set them,
 //! and their values are checked, but the Flight Controller flies as if each
 //! were off until its ticket lands; a Test Quad sets them off to fly exactly
 //! as Betaflight does. Settings it doesn't know at all are left alone; later
@@ -184,11 +185,16 @@ const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
     ("tpa_low_rate", Kind::Number(0, 100), "#50"),
     ("throttle_boost", Kind::Number(0, 100), "#50"),
     // PID Tuning, filters: the gyro and D-term low-passes, the dynamic notch
-    // and the yaw P low-pass.
+    // and the yaw P low-pass. The dynamic notch isn't in the alpha: like the
+    // RPM filter, it comes only once gyro noise is simulated (#21, #37).
     ("gyro_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
     ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
     ("gyro_lpf2_static_hz", Kind::Number(0, 1000), "#49"),
-    ("dyn_notch_count", Kind::Number(0, 7), "#49"),
+    (
+        "dyn_notch_count",
+        Kind::Number(0, 7),
+        "waits for gyro noise, #21",
+    ),
     ("dterm_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
     ("dterm_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
     ("dterm_lpf2_static_hz", Kind::Number(0, 1000), "#49"),

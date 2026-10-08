@@ -35,7 +35,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "bea23e59b56b9562"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "45c881f0ae4af8e8"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
 run  = "01ee21e86cc65c74"   # the whole state after each of 15200 steps at 8000 Hz, in order
 

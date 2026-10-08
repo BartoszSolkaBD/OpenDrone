@@ -6,8 +6,11 @@
 # "settled", the throttle at 30% so Airmode has started (25%), then half a
 # second of full right roll on Betaflight's default Rates, Actual 70/670/0.
 #
-# Feedforward, the filters and Dynamic D come with #49 and #50, so the roll
-# spins up on P and I alone and overshoots.
+# The Flight Controller flies the Tune's "Not simulated yet" settings as off
+# until their tickets land: feedforward and the filters (#49), Dynamic D and
+# I-term relax (#50). So the roll spins up on P and I alone and overshoots.
+# The Source Expectations hold either way; the Observed overshoot and
+# bounce-back will move when those land.
 format = 1
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
 

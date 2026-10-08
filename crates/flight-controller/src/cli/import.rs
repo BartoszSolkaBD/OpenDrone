@@ -23,7 +23,7 @@
 
 use std::collections::BTreeMap;
 
-use super::table::{self, Place, Rule, Setting, Source};
+use super::table::{self, Place, Rule, Source};
 use super::{CliText, Command, Family, Refusal, Section, Version};
 use crate::Tune;
 
@@ -62,8 +62,8 @@ pub struct ImportedSetting {
     pub value: String,
     /// Where its value came from (ADR-0015), such as `diff (was d_min_roll)`.
     pub mark: String,
-    /// The table's note for it, such as its unit, or "".
-    pub note: &'static str,
+    /// The note the Tune writes after its mark, such as its unit, or "".
+    pub note: String,
     /// Its place in the Tune, if the table knows it.
     pub place: Option<Place>,
     /// The export's line it came from, if one.
@@ -77,8 +77,12 @@ pub enum Where {
     /// Under its tab: the Flight Controller reads it, or the Pack checker
     /// compares it with the Quad definition.
     UnderItsTab,
-    /// Under "Not simulated yet": the export sets it, and nothing reads it
-    /// yet.
+    /// Under "Not simulated yet", always: the Flight Controller knows it and
+    /// checks its value, but flies as if it were off until its ticket lands
+    /// ([`Tune::not_simulated_yet`]).
+    FlownAsOff,
+    /// Under "Not simulated yet", after those: the export sets it, and
+    /// nothing reads it yet.
     NotSimulatedYet,
     /// Not written: nothing reads it yet, and the export doesn't set it.
     NotWritten,
@@ -204,6 +208,7 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
 
     // 2. Every row of the table, worked out.
     let reads = Tune::settings();
+    let later = Tune::not_simulated_yet();
     let mut settings = Vec::new();
     let mut problems = Vec::new();
     let mut used: Vec<&'t str> = Vec::new();
@@ -258,21 +263,32 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
                 continue;
             }
         };
-        let written = if reads.contains(&setting.name)
+        let flown_as_off = later.iter().find(|(name, _)| *name == setting.name);
+        let (written, note) = if reads.contains(&setting.name)
             || table::CHECKED_AGAINST_THE_QUAD.contains(&setting.name)
         {
-            Where::UnderItsTab
+            (Where::UnderItsTab, setting.note.to_string())
+        } else if let Some((_, ticket)) = flown_as_off {
+            (Where::FlownAsOff, format!("not simulated yet ({ticket})"))
         } else if line.is_some() {
-            Where::NotSimulatedYet
+            (Where::NotSimulatedYet, setting.note.to_string())
         } else {
-            Where::NotWritten
+            (Where::NotWritten, setting.note.to_string())
         };
-        if written == Where::UnderItsTab
+        if matches!(written, Where::UnderItsTab | Where::FlownAsOff)
             && let Err(sentence) = Tune::check(setting.name, &value)
         {
             problems.push(sentence);
         }
-        settings.push(imported(setting, value, mark, line, written));
+        settings.push(ImportedSetting {
+            name: setting.name.to_string(),
+            value,
+            mark,
+            note,
+            place: Some(setting.place),
+            line,
+            written,
+        });
     }
 
     // 3. The export's settings the table doesn't know: kept, not simulated.
@@ -285,7 +301,7 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
             name: name.to_string(),
             value: value.to_string(),
             mark: "diff".into(),
-            note: "",
+            note: String::new(),
             place: None,
             line: Some(line),
             written: Where::NotSimulatedYet,
@@ -304,24 +320,6 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
         left_out,
         problems,
     })
-}
-
-fn imported(
-    setting: &Setting,
-    value: String,
-    mark: String,
-    line: Option<usize>,
-    written: Where,
-) -> ImportedSetting {
-    ImportedSetting {
-        name: setting.name.to_string(),
-        value,
-        mark,
-        note: setting.note,
-        place: Some(setting.place),
-        line,
-        written,
-    }
 }
 
 /// Works out a setting whose meaning changed, from the old version's
@@ -486,11 +484,12 @@ impl TuneImport {
         line("#");
         line("# It spells out every setting the Flight Controller reads so far, grouped by");
         line("# the Betaflight App's tabs in their order, with each tab's CLI-only settings");
+        line("# after the ones the tab shows (ADR-0015). The settings it knows but doesn't");
+        line("# simulate yet come last, under their own heading, and then the other");
         line(&format!(
-            "# after the ones the tab shows (ADR-0015). The settings the {export} sets that"
+            "# settings the {export} sets. As the Flight Controller reads more settings, run"
         ));
-        line("# OpenDrone doesn't simulate yet come last, under their own heading. As the");
-        line("# Flight Controller reads more settings, run the importer again.");
+        line("# the importer again.");
 
         // A blank line before each tab; its CLI-only settings follow at once.
         let mut heading: Option<&str> = None;
@@ -506,14 +505,38 @@ impl TuneImport {
             }
             line(&set_line(setting));
         }
-        let not_simulated: Vec<&&ImportedSetting> = written
+        // What the Flight Controller knows but flies as off, in the order it
+        // lists them, by tab; then the rest the export sets.
+        let later = Tune::not_simulated_yet();
+        let mut flown_as_off: Vec<&&ImportedSetting> = written
+            .iter()
+            .filter(|s| s.written == Where::FlownAsOff)
+            .collect();
+        flown_as_off.sort_by_key(|s| later.iter().position(|(name, _)| *name == s.name));
+        if !flown_as_off.is_empty() {
+            line("");
+            line("# Not simulated yet. The Flight Controller checks these values but flies as");
+            line("# if each were off until its ticket lands (ADR-0015).");
+            let mut tab = None;
+            for setting in flown_as_off {
+                let this = setting.place.map(Place::tab);
+                if this != tab {
+                    line(&format!("# {}", this.unwrap_or("")));
+                    tab = this;
+                }
+                line(&set_line(setting));
+            }
+        }
+        let others: Vec<&&ImportedSetting> = written
             .iter()
             .filter(|s| s.written == Where::NotSimulatedYet)
             .collect();
-        if !not_simulated.is_empty() {
+        if !others.is_empty() {
             line("");
-            line("# Not simulated yet");
-            for setting in not_simulated {
+            line(&format!(
+                "# Not simulated yet either: the other settings the {export} sets."
+            ));
+            for setting in others {
                 line(&set_line(setting));
             }
         }
@@ -538,6 +561,10 @@ impl TuneImport {
             "- {} settings the Flight Controller reads (or the Pack checker compares with the Quad), under their tabs.\n",
             count(Where::UnderItsTab)
         ));
+        out.push_str(&format!(
+            "- {} settings the Flight Controller knows but flies as off until their tickets land, under \"Not simulated yet\".\n",
+            count(Where::FlownAsOff)
+        ));
         let renamed: Vec<String> = self
             .settings
             .iter()
@@ -559,7 +586,7 @@ impl TuneImport {
             .collect();
         if !not_simulated.is_empty() {
             out.push_str(&format!(
-                "- Not simulated yet, kept under their own heading: {}.\n",
+                "- The other settings the export sets, kept as not simulated yet: {}.\n",
                 not_simulated.join(", ")
             ));
         }
