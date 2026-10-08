@@ -112,8 +112,8 @@ impl Fixture {
 /// Makes `link` a symbolic link to `target`, a path relative to the link's
 /// folder, as `ln -s` does. `None` means this computer can't make one: Windows
 /// lets only an administrator, or Developer Mode, make symbolic links, so
-/// there a check that needs one says why and skips. macOS and Linux CI always
-/// run it.
+/// there, outside CI, a check that needs one says why and skips. In CI (the
+/// `CI` variable is set) it fails instead, so a skip never passes unseen.
 pub fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     #[cfg(unix)]
     let made = std::os::unix::fs::symlink(target, link);
@@ -125,14 +125,17 @@ pub fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     };
     match made {
         Ok(()) => Some(()),
-        Err(error) if cfg!(windows) => {
+        Err(error) if cfg!(windows) && std::env::var_os("CI").is_none() => {
             eprintln!(
-                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. macOS and Linux CI run this check.",
+                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. CI never skips this check.",
                 link.display()
             );
             None
         }
-        Err(error) => panic!("can't make the symbolic link {}: {error}", link.display()),
+        Err(error) => panic!(
+            "can't make the symbolic link {}: {error}. In CI (the CI variable is set) a check that needs one fails rather than skip, so a skip can never pass unseen",
+            link.display()
+        ),
     }
 }
 

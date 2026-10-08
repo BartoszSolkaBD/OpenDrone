@@ -282,6 +282,28 @@ fn taking_a_quad_out_blocks_unless_its_pack_retires_it() {
         text.contains("- fixture/ducted, retired by packs/fixture/pack.toml line 15: \"Replaced by a 75 mm whoop with the same ducts.\""),
         "{text}"
     );
+
+    // Reviewer's case on #103: brought back later, with its inertia 20×, it
+    // has nothing to compare with, so CI says it was retired before, for the
+    // Reviewer to compare it with its old numbers.
+    copy(
+        &repo_root().join("crates/pack/tests/fixtures/good/packs/fixture/quads/ducted"),
+        &scratch.root.join("packs/fixture/quads/ducted"),
+    );
+    scratch.change("packs/fixture/quads/ducted/quad.toml", INERTIA, INERTIA_20X);
+    scratch.change(
+        MANIFEST,
+        "\n[retired]\n\"quads/ducted\" = \"Replaced by a 75 mm whoop with the same ducts.\"\n",
+        "",
+    );
+    scratch.commit("bring the Quad back");
+    let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
+    assert!(passed, "{text}");
+    assert!(
+        text.contains("New, previously retired Quads, with no version at HEAD^1 to compare; the Reviewer compares each with its numbers from before it was retired:\n- fixture/ducted, which packs/fixture/pack.toml line 15 retired before this change: \"Replaced by a 75 mm whoop with the same ducts.\""),
+        "{text}"
+    );
+    assert!(!text.contains("New Quads, with no version"), "{text}");
 }
 
 const DOT_FOLDER: &str = "is a folder whose name starts with a dot, which most computers hide, so the Pack checker refuses it rather than skip it: rename it without the dot, or take it out";
@@ -356,10 +378,11 @@ fn a_pack_folder_renamed_to_a_dot_name_is_refused_so_no_number_moves_behind_it()
     );
 }
 
-/// Makes `link` a symbolic link to `target`, a path relative to the link's
-/// folder, as `ln -s` does. `None` means this computer can't make one:
-/// Windows lets only an administrator, or Developer Mode, make symbolic links,
-/// so there the check says why and skips. macOS and Linux CI always run it.
+/// Makes `link` a symbolic link to the folder `target`, a path relative to
+/// the link's folder, as `ln -s` does. `None` means this computer can't make
+/// one: Windows lets only an administrator, or Developer Mode, make symbolic
+/// links, so there, outside CI, the check says why and skips. In CI (the `CI`
+/// variable is set) it fails instead, so a skip never passes unseen.
 fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     #[cfg(unix)]
     let made = std::os::unix::fs::symlink(target, link);
@@ -367,15 +390,98 @@ fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     let made = std::os::windows::fs::symlink_dir(target, link);
     match made {
         Ok(()) => Some(()),
-        Err(error) if cfg!(windows) => {
+        Err(error) if cfg!(windows) && std::env::var_os("CI").is_none() => {
             eprintln!(
-                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. macOS and Linux CI run this check.",
+                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. CI never skips this check.",
                 link.display()
             );
             None
         }
-        Err(error) => panic!("can't make the symbolic link {}: {error}", link.display()),
+        Err(error) => panic!(
+            "can't make the symbolic link {}: {error}. In CI (the CI variable is set) a check that needs one fails rather than skip, so a skip can never pass unseen",
+            link.display()
+        ),
     }
+}
+
+#[test]
+fn the_packs_folder_replaced_by_a_symbolic_link_is_refused_so_no_number_moves_through_it() {
+    // Reviewer's case on #103: probe S one folder up. packs/ itself moved to
+    // stash/ and linked back, then a 20× move in stash/. Git keeps the link
+    // as one small file, so the base refused it while the working tree
+    // followed it.
+    let scratch = Scratch::new("linked-packs-folder").with_base();
+    fs::create_dir_all(scratch.root.join("stash")).unwrap();
+    fs::rename(scratch.root.join("packs"), scratch.root.join("stash/packs")).unwrap();
+    if symbolic_link("stash/packs", &scratch.root.join("packs")).is_none() {
+        return;
+    }
+    scratch.commit("step 1: move packs/ to stash/ and link it back");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+
+    scratch.change(
+        "stash/packs/fixture/quads/ducted/quad.toml",
+        INERTIA,
+        INERTIA_20X,
+    );
+    scratch.commit("step 2: move the inertia 20× in stash/packs, with no row");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+}
+
+#[test]
+fn the_test_quad_folder_replaced_by_a_symbolic_link_is_refused() {
+    let scratch = Scratch::new("linked-test-quad-folder");
+    copy(
+        &repo_root().join("crates/pack/tests/fixtures/good/test-quads"),
+        &scratch.root.join("scenarios/test-quads"),
+    );
+    let scratch = scratch.with_base();
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(passed, "{text}");
+    fs::create_dir_all(scratch.root.join("stash")).unwrap();
+    fs::rename(
+        scratch.root.join("scenarios/test-quads"),
+        scratch.root.join("stash/test-quads"),
+    )
+    .unwrap();
+    let link = scratch.root.join("scenarios/test-quads");
+    if symbolic_link("../stash/test-quads", &link).is_none() {
+        return;
+    }
+    scratch.commit("step 1: move the Test Quads to stash/ and link them back");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- scenarios/test-quads: {LINK}")),
+        "{text}"
+    );
+
+    scratch.change(
+        "stash/test-quads/ducted-no-drag.toml",
+        "rotor_drag = \"0 s⁻¹\"",
+        "rotor_drag = \"6 s⁻¹\"",
+    );
+    scratch.commit("step 2: change the Test Quad in stash/");
+    let (passed, text) = xtask(&scratch.root, &["packs"]);
+    assert!(!passed, "{text}");
+    assert!(
+        text.contains(&format!("- scenarios/test-quads: {LINK}")),
+        "{text}"
+    );
 }
 
 #[test]

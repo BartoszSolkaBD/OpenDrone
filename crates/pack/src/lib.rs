@@ -101,7 +101,14 @@ pub const REFUSED_LINK: &str = "is a symbolic link, which the Pack checker refus
 /// feel-tests` holds the working tree to the same rule. A file whose name
 /// starts with a dot, such as macOS's `.DS_Store`, holds nothing the checker
 /// reads, so it's still skipped.
+///
+/// `folder` itself is held to the rule first: when it's a link, or its name
+/// starts with a dot, that is the one problem, and nothing in it is looked
+/// at ([`folder_refused`]).
 pub fn dot_folders_and_links(folder: &Path, label: &str) -> Problems {
+    if let Some(sentence) = folder_refused(folder) {
+        return Problems::of_file(label, sentence);
+    }
     let mut problems = Problems::new();
     Folder {
         path: folder.to_path_buf(),
@@ -109,6 +116,26 @@ pub fn dot_folders_and_links(folder: &Path, label: &str) -> Problems {
     }
     .find_dot_folders_and_links(&mut problems);
     problems
+}
+
+/// Why the Pack checker refuses a whole folder it was asked to check, such
+/// as `packs/` or `scenarios/test-quads/`, if it does: it's a symbolic link
+/// ([`REFUSED_LINK`]), or a folder whose name starts with a dot
+/// ([`REFUSED_DOT_FOLDER`]). Then nothing in it is read, so moving the real
+/// folder elsewhere and linking it back can't take it out of CI's
+/// comparisons.
+pub fn folder_refused(folder: &Path) -> Option<&'static str> {
+    let found = fs::symlink_metadata(folder).ok()?;
+    let dot_named = folder
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().starts_with('.'));
+    if found.file_type().is_symlink() {
+        Some(REFUSED_LINK)
+    } else if found.is_dir() && dot_named {
+        Some(REFUSED_DOT_FOLDER)
+    } else {
+        None
+    }
 }
 
 /// The checked Packs in a folder, every problem found in them, and the Test
@@ -230,13 +257,12 @@ impl Packs {
     /// the broken item, or the Pack whose manifest is broken, left out. A
     /// folder whose name starts with a dot, and a symbolic link, are refused
     /// wherever they are ([`dot_folders_and_links`]), and nothing in them is
-    /// read.
+    /// read. That includes `folder` itself: when it's a link, no Pack is read.
     pub fn open(folder: &Path, label: &str) -> Result<Packs, Problems> {
         let root = Folder {
             path: folder.to_path_buf(),
             label: label.to_string(),
         };
-        let names = root.names()?;
         let mut packs = Packs {
             packs: Vec::new(),
             quads: BTreeMap::new(),
@@ -244,6 +270,11 @@ impl Packs {
             skipped: Vec::new(),
             problems: dot_folders_and_links(folder, label),
             test_quads: None,
+        };
+        let names = if folder_refused(folder).is_some() {
+            Vec::new()
+        } else {
+            root.names()?
         };
         for name in names {
             let folder = root.child(&name);
@@ -408,8 +439,11 @@ impl Packs {
     }
 
     /// Reads and checks every Test Quad in `folder`, such as
-    /// `scenarios/test-quads`. Its problems join [`Packs::problems`].
+    /// `scenarios/test-quads`. Its problems join [`Packs::problems`]. When
+    /// `folder` itself is a link, or its name starts with a dot, it's refused
+    /// and no Test Quad is read.
     pub fn with_test_quads(mut self, folder: &Path, label: &str) -> Packs {
+        let refused = folder_refused(folder).is_some();
         let folder = Folder {
             path: folder.to_path_buf(),
             label: label.to_string(),
@@ -419,7 +453,7 @@ impl Packs {
             quads: BTreeMap::new(),
             problems: dot_folders_and_links(&folder.path, &folder.label),
         };
-        let names = if folder.path.is_dir() {
+        let names = if folder.path.is_dir() && !refused {
             folder.names().unwrap_or_else(|found| {
                 test_quads.problems.extend(found);
                 Vec::new()

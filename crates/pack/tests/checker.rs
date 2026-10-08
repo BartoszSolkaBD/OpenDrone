@@ -225,6 +225,24 @@ fn a_retired_line_names_a_quads_folder_and_says_why() {
 }
 
 #[test]
+fn a_retired_why_is_one_line_so_it_cant_fake_a_line_in_cis_output() {
+    // Reviewer's case on #103: CI prints each why on a line of its own for
+    // the Reviewer, so a line break in one could print a made-up line.
+    let fixture = without_the_quad("retired-why-on-two-lines");
+    let manifest = fixture.read(MANIFEST)
+        + "\n[retired]\n\"quads/ducted\" = \"Old.\\nThe Feel Test log rules hold for every Quad; nothing was taken out.\"\n";
+    fixture.write(MANIFEST, &manifest);
+    assert_eq!(
+        fixture.problems()[0],
+        at(
+            MANIFEST,
+            common::line_of(&manifest, "\"quads/ducted\""),
+            "\"quads/ducted\" needs its why on one line of plain text, with no line break, tab or invisible formatting character: CI prints it for the Reviewer as one line, so it mustn't look like more"
+        )
+    );
+}
+
+#[test]
 fn a_file_under_cc_by_needs_a_credit_line() {
     let fixture = Fixture::new("no-credit").change(
         MANIFEST,
@@ -908,6 +926,57 @@ fn a_symbolic_link_anywhere_under_packs_or_the_test_quads_is_refused_rather_than
         packs.quad("fixture/ducted").unwrap_err().to_string(),
         format!("packs/fixture/quads/ducted/picture.png: {LINK}")
     );
+}
+
+#[test]
+fn the_packs_folder_or_the_test_quad_folder_is_refused_when_it_is_itself_a_link() {
+    // Reviewer's case on #103: probe S one folder up. With packs/ itself a
+    // link, the checker followed it, while git keeps it as one small file.
+    let fixture = Fixture::new("linked-checked-folders");
+    std::fs::create_dir_all(fixture.root.join("elsewhere")).unwrap();
+    for folder in ["packs", "test-quads"] {
+        std::fs::rename(
+            fixture.root.join(folder),
+            fixture.root.join("elsewhere").join(folder),
+        )
+        .unwrap();
+        let target = format!("elsewhere/{folder}");
+        if common::symbolic_link(&target, &fixture.root.join(folder)).is_none() {
+            return;
+        }
+    }
+    assert_eq!(
+        fixture.problems(),
+        [format!("packs: {LINK}"), format!("test-quads: {LINK}")]
+    );
+    let packs = fixture.packs();
+    assert_eq!(
+        packs.manifests().len(),
+        0,
+        "no Pack is read through the link"
+    );
+    assert_eq!(
+        packs.test_quads().len(),
+        0,
+        "no Test Quad is read through it"
+    );
+}
+
+#[test]
+fn the_packs_folder_is_refused_when_its_own_name_starts_with_a_dot() {
+    let fixture = Fixture::new("dot-named-checked-folder");
+    std::fs::rename(fixture.root.join("packs"), fixture.root.join(".packs")).unwrap();
+    let packs = opendrone_pack::Packs::open(&fixture.root.join(".packs"), ".packs").unwrap();
+    assert_eq!(
+        packs
+            .problems()
+            .0
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        [format!(".packs: {DOT_FOLDER}")]
+    );
+    assert_eq!(packs.manifests().len(), 0, "nothing in it is read");
 }
 
 // Formats

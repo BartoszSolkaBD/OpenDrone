@@ -193,6 +193,12 @@ fn read_retired(root: &Table<'_, '_>, problems: &mut Problems) -> Vec<Retired> {
             )));
             continue;
         }
+        if why.chars().any(breaks_a_line) {
+            problems.push(item.problem(format!(
+                "\"{path}\" needs its why on one line of plain text, with no line break, tab or invisible formatting character: CI prints it for the Reviewer as one line, so it mustn't look like more"
+            )));
+            continue;
+        }
         retired.push(Retired {
             quad: quad.to_string(),
             why: why.to_string(),
@@ -200,6 +206,18 @@ fn read_retired(root: &Table<'_, '_>, problems: &mut Problems) -> Vec<Retired> {
         });
     }
     retired
+}
+
+/// A character that could make one line of CI's output look like more, or
+/// like other text: a control character (a line break or a tab, say), a
+/// line or paragraph separator, or an invisible one that changes which way
+/// text runs.
+fn breaks_a_line(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{2028}' | '\u{2029}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+        )
 }
 
 /// Lowercase words (letters and digits) joined by single dashes, such as

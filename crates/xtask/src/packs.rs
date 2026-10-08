@@ -20,15 +20,15 @@
 //!   with a dot, and a symbolic link, are refused, and nothing in them is
 //!   read. In the working tree one blocks; at the base it's named.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
-use opendrone_pack::feel_tests::{QuadFiles, RetiredQuad, compare_packs};
+use opendrone_pack::feel_tests::{PacksVersion, QuadFiles, RetiredQuad, compare_packs};
 use opendrone_pack::{
     Manifest, Packs, Problem, Problems, REFUSED_DOT_FOLDER, REFUSED_LINK, dot_folders_and_links,
-    read_manifest,
+    folder_refused, read_manifest,
 };
 
 /// The repo around the current folder: the nearest folder holding `packs/`.
@@ -113,7 +113,7 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
         git.check_base()?;
         let before = quads_at_base(&git)?;
         let after = quads_now(&root);
-        let mut report = compare_packs(&before.quads, &after.quads, &after.retired);
+        let mut report = compare_packs(&before.packs, &after.packs);
         // This change can fix a dot-named folder or link in its own files,
         // so one blocks it. One already at the base can't be fixed by this
         // change, only removed by it, so it's named, not blocked on.
@@ -151,6 +151,14 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
             report.new_quads.join(", ")
         );
     }
+    if !report.previously_retired.is_empty() {
+        println!(
+            "New, previously retired Quads, with no version at {base} to compare; the Reviewer compares each with its numbers from before it was retired:"
+        );
+        for line in &report.previously_retired {
+            println!("- {line}");
+        }
+    }
     if !report.taken_out.is_empty() {
         println!(
             "Quads this change takes out, each renamed, moved or retired; the Reviewer checks each one:"
@@ -187,14 +195,26 @@ pub fn run_feel_tests(args: &[String]) -> ExitCode {
 /// One version of the repo's Packs, as the Feel Test log rules see it.
 #[derive(Default)]
 struct Version {
-    /// Every Quad, by id.
-    quads: Vec<QuadFiles>,
-    /// Every Quad a Pack's `[retired]` list names.
-    retired: Vec<RetiredQuad>,
+    /// Every Quad, and every Quad a Pack's `[retired]` list names.
+    packs: PacksVersion,
     /// Every folder whose name starts with a dot and every symbolic link
-    /// under `packs/`, which the Pack checker refuses; nothing in them is
-    /// read.
+    /// under `packs/`, or `packs/` itself when it's one, which the Pack
+    /// checker refuses; nothing in them is read.
     refused: Problems,
+}
+
+/// A Pack's `[retired]` lines, as the Feel Test log rules name them.
+fn retired_quads(id: &str, manifest_file: &str, manifest: Option<&Manifest>) -> Vec<RetiredQuad> {
+    manifest
+        .iter()
+        .flat_map(|manifest| &manifest.retired)
+        .map(|line| RetiredQuad {
+            id: format!("{id}/{}", line.quad),
+            manifest_file: manifest_file.to_string(),
+            line: line.line,
+            why: line.why.clone(),
+        })
+        .collect()
 }
 
 /// A Pack's manifest from its `pack.toml`, if it reads (the Pack checker
@@ -211,12 +231,16 @@ fn pack_id(folder: &str, manifest: Option<&Manifest>) -> String {
 
 /// Every Quad in the working tree, by id, read by the Pack checker's rule:
 /// a folder whose name starts with a dot, and a symbolic link, are refused,
-/// and nothing in them is read.
+/// and nothing in them is read. When `packs/` itself is a link, no Quad is
+/// read, as at the base, where git keeps the link as one small file.
 fn quads_now(root: &Path) -> Version {
     let mut version = Version {
         refused: dot_folders_and_links(&root.join("packs"), "packs"),
         ..Version::default()
     };
+    if folder_refused(&root.join("packs")).is_some() {
+        return version;
+    }
     let names = |folder: &Path| -> Vec<String> {
         let mut names: Vec<String> = fs::read_dir(folder)
             .map(|entries| {
@@ -241,19 +265,12 @@ fn quads_now(root: &Path) -> Version {
             fs::read_to_string(path).ok()
         }
     };
-    let quads = &mut version.quads;
+    let PacksVersion { quads, retired } = &mut version.packs;
     for pack in names(&root.join("packs")) {
         let manifest_file = format!("packs/{pack}/pack.toml");
         let manifest = manifest(read(&manifest_file).as_deref());
         let id = pack_id(&pack, manifest.as_ref());
-        for line in manifest.iter().flat_map(|manifest| &manifest.retired) {
-            version.retired.push(RetiredQuad {
-                id: format!("{id}/{}", line.quad),
-                manifest_file: manifest_file.clone(),
-                line: line.line,
-                why: line.why.clone(),
-            });
-        }
+        retired.extend(retired_quads(&id, &manifest_file, manifest.as_ref()));
         for quad in names(&root.join("packs").join(&pack).join("quads")) {
             let folder = format!("packs/{pack}/quads/{quad}");
             let Some(text) = read(&format!("{folder}/quad.toml")) else {
@@ -306,18 +323,31 @@ fn quads_at_base(git: &Git<'_>) -> Result<Version, String> {
             Ok(None)
         }
     };
+    // Each Pack's manifest at the base, by its folder: its id, and the Quads
+    // its `[retired]` list names.
+    let mut manifests: BTreeMap<String, Option<Manifest>> = BTreeMap::new();
+    for path in &files {
+        let parts: Vec<&str> = path.split('/').collect();
+        if let ["packs", pack, "pack.toml"] = parts.as_slice() {
+            let manifest = manifest(show(path)?.as_deref());
+            let id = pack_id(pack, manifest.as_ref());
+            let retired = retired_quads(&id, path, manifest.as_ref());
+            version.packs.retired.extend(retired);
+            manifests.insert(pack.to_string(), manifest);
+        }
+    }
     for path in &files {
         let parts: Vec<&str> = path.split('/').collect();
         let ["packs", pack, "quads", quad, "quad.toml"] = parts.as_slice() else {
             continue;
         };
-        let manifest = manifest(show(&format!("packs/{pack}/pack.toml"))?.as_deref());
-        let id = pack_id(pack, manifest.as_ref());
+        let manifest = manifests.get(*pack).and_then(Option::as_ref);
+        let id = pack_id(pack, manifest);
         let folder = format!("packs/{pack}/quads/{quad}");
         let Some(text) = show(path)? else {
             continue;
         };
-        version.quads.push(QuadFiles {
+        version.packs.quads.push(QuadFiles {
             id: format!("{id}/{quad}"),
             quad_file: format!("{folder}/quad.toml"),
             log_file: format!("{folder}/feel-tests.md"),
