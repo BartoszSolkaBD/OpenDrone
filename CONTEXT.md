@@ -23,7 +23,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Test Pilot, Test Map, Test Quad, Feel Test, Feel Test log | [docs/context/verification.md](docs/context/verification.md) |
 | Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning | [docs/context/screens.md](docs/context/screens.md) |
 | Sound | Listening Position, Background Sound | [docs/context/sound.md](docs/context/sound.md) |
-| Development | Phase 1, Phase 2, Review Report, Red Flag, Reviewer, Verdict, Area, Work Count, Frame Check | [docs/context/development.md](docs/context/development.md) |
+| Development | Phase 1, Phase 2, Review Report, Red Flag, Reviewer, Verdict, Delegator, Area, Lane, Work Count, Frame Check | [docs/context/development.md](docs/context/development.md) |
 
 ## Terms to avoid
 
