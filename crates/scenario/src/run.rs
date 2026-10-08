@@ -165,6 +165,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         .collect();
     let this_run = Plan {
         physics_rate: start.physics_rate,
+        random_seed: start.random_seed,
         battery: start
             .battery
             .expect("the reader requires `battery` for every kind that runs the physics"),
@@ -194,6 +195,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             .unzip();
         let plan = Plan {
             physics_rate: other.physics_rate,
+            random_seed: other.random_seed.unwrap_or(start.random_seed),
             battery: other
                 .battery
                 .or(start.battery)
@@ -229,9 +231,11 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     })
 }
 
-/// One run of a Scenario: its physics rate, battery and Timeline.
+/// One run of a Scenario: its physics rate, random seed, battery and
+/// Timeline.
 struct Plan<'s> {
     physics_rate: PhysicsRate,
+    random_seed: u64,
     battery: f64,
     inputs: &'s Inputs,
     length: SimulationTime,
@@ -277,7 +281,7 @@ fn simulate(
         physics_rate: plan.physics_rate,
         world: map.world,
         map: map.shapes.clone(),
-        random_seed: start.random_seed,
+        random_seed: plan.random_seed,
         quads: vec![QuadSetUp {
             parameters: quad.parameters.clone(),
             start: state,
@@ -308,8 +312,14 @@ fn simulate(
                     SetUpProblem::NoVoltageCurve => {
                         "its battery's voltage curve has no points".to_string()
                     }
+                    SetUpProblem::PropWashOutOfRange => {
+                        "its Prop Wash strength must be from 0% to 100% and its flicker 0 Hz or more".to_string()
+                    }
                     SetUpProblem::ShapeCantBeBuilt => {
                         "its collision shape needs every size above zero, a bounce from 0 to 1, and a friction and a prop grip of 0 or more".to_string()
+                    }
+                    SetUpProblem::GroundOrCeilingEffectCantWork => {
+                        "its ground_effect_body and ceiling_effect_asymmetry must be 0 or more, and ground_effect_body small enough for its rotors' layout that close to a floor its rotors still push air down".to_string()
                     }
                 };
                 (
@@ -973,6 +983,7 @@ impl<'s> Tally<'s> {
                     "none: the other run measured {}, and a share of nothing has no answer",
                     expected.unit().write(that)
                 )),
+                Comparison::Gap => Ok((this - that).abs()),
             },
         };
         let (measured, passed) = match value {

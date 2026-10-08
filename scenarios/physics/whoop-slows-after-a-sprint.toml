@@ -81,5 +81,5 @@ basis = "observed: 0.1 s after letting go it has lost a fifth of its speed"
 [[expect]]
 what  = "pitch"
 at    = "0.1 s"
-value = "35.5° ± 2°"
-basis = "observed: the ducts' nose-up moment has lifted its nose 35° in 0.1 s, tipping its thrust back"
+value = "38.7° ± 2°"
+basis = "observed: the ducts' nose-up moment has lifted its nose 39° in 0.1 s, tipping its thrust back (was 35.5°: the flicker now draws per rotor)"

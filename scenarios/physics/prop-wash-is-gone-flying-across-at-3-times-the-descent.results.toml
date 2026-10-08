@@ -1,0 +1,64 @@
+# Results of prop-wash-is-gone-flying-across-at-3-times-the-descent.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Flying forward at 3 times its descent, a Whoop 65 escapes Prop Wash"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1 s"
+basis    = "Source"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Rule"
+expected = "-3.5 m/s ± 0.01 m/s"
+measured = "-3.50 m/s"
+
+[[expect]]
+what     = "speed north at 1 s"
+basis    = "Rule"
+expected = "10.5 m/s ± 0.001 m/s"
+measured = "10.5 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "9f1ad58d056c8465"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "33040b9552f8384e"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "ca3b19c9890b501d"
+"0.2 s" = "a7f3265b2a6e9d9a"
+"0.3 s" = "c39ac5cc79834fa7"
+"0.4 s" = "2af81c9a6f5c2b4b"
+"0.5 s" = "921bc56c09d5d8f1"
+"0.6 s" = "521a2f3697653d4f"
+"0.7 s" = "846a774b69549d34"
+"0.8 s" = "7a16ee89a8d40a2a"
+"0.9 s" = "7db1886e1bb3be81"
+"1 s" = "99ef069a3a7949db"

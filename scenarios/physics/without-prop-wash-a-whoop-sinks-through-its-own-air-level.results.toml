@@ -1,0 +1,82 @@
+# Results of without-prop-wash-a-whoop-sinks-through-its-own-air-level.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Without Prop Wash, a Whoop 65 sinking through its own air stays level"
+
+[[expect]]
+what     = "roll rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0 °/s ± 0.000001 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "motor 1 thrust at 0 s"
+basis    = "Rule"
+expected = "7.139 gf ± 0.1%"
+measured = "7.14 gf"
+
+[[expect]]
+what     = "motor 1 thrust, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "7.139 gf ± 0.1%"
+measured = "7.14 gf"
+
+[[expect]]
+what     = "motor 1 thrust, lowest over 0 s to 1 s"
+basis    = "Observed"
+expected = "7.08 gf ± 0.02 gf"
+measured = "7.08 gf"
+
+[[expect]]
+what     = "vertical speed at 1 s"
+basis    = "Observed"
+expected = "-5.06 m/s ± 0.02 m/s"
+measured = "-5.06 m/s"
+
+[[expect]]
+what     = "motor 1 speed at 0 s"
+basis    = "Observed"
+expected = "18752 RPM ± 0.1%"
+measured = "18800 RPM"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "c844c924f7e8d036"   # test/whoop-65-no-prop-wash: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "891496219e89167e"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "c1b9435e0dcd4c46"
+"0.2 s" = "b3d74181b5b3bafc"
+"0.3 s" = "4ae6d010ca675309"
+"0.4 s" = "f4a1c2cffcbdb3e0"
+"0.5 s" = "a0230b60f12db7ea"
+"0.6 s" = "e08171493ec04e16"
+"0.7 s" = "f019d551807dd46c"
+"0.8 s" = "5f3e3fd854dda91f"
+"0.9 s" = "8b763d688ac2ea7b"
+"1 s" = "d40323113e94abd0"

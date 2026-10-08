@@ -51,16 +51,41 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/freestyle-5-bench-supply",
             "test/freestyle-5-filters-and-shaping-off",
             "test/freestyle-5-no-drag",
+            "test/freestyle-5-no-prop-wash",
             "test/freestyle-5-no-runaway-takeoff-prevention",
             "test/freestyle-5-output-limit-80",
             "test/whoop-65-bench-supply",
             "test/whoop-65-body-drag-only",
             "test/whoop-65-ducts-only",
+            "test/whoop-65-no-ceiling-effect",
             "test/whoop-65-no-drag",
             "test/whoop-65-no-drag-bench-supply",
+            "test/whoop-65-no-prop-wash",
             "test/whoop-65-rotor-drag-only"
         ]
     );
+}
+
+#[test]
+fn prop_washs_strength_and_flicker_reach_the_physics_from_the_quads_feel_numbers() {
+    // Basis: Rule (ADR-0005: they come only from the Quad definition). Both
+    // alpha Quads: 20%, flickering 15 times a second; the Test Quads with
+    // Prop Wash off: 0%.
+    for id in ["opendrone/whoop-65", "opendrone/freestyle-5"] {
+        let q = quad(id);
+        assert_eq!(q.feel.prop_wash_strength, 0.2, "{id}");
+        assert_eq!(q.parameters.prop_wash.strength, 0.2, "{id}");
+        assert_eq!(q.parameters.prop_wash.flicker, 15.0, "{id}");
+    }
+    let packs = built_in();
+    for id in [
+        "test/whoop-65-no-prop-wash",
+        "test/freestyle-5-no-prop-wash",
+    ] {
+        let q = packs.quad(id).unwrap();
+        assert_eq!(q.parameters.prop_wash.strength, 0.0, "{id}");
+        assert_eq!(q.parameters.prop_wash.flicker, 15.0, "{id}");
+    }
 }
 
 #[test]
@@ -88,6 +113,26 @@ fn the_freestyle_5_weighs_about_650_g_with_its_pack() {
     assert!(five.ducts.is_none());
     assert_eq!(five.parameters.drag.duct_ram, 0.0);
     assert_eq!(five.parameters.drag.duct_offset, 0.0);
+}
+
+#[test]
+fn both_quads_ground_and_ceiling_effect_numbers_reach_the_physics() {
+    // Basis: Rule (the Quad definitions' [feel] ground_effect_body = 2 and
+    // ceiling_effect_asymmetry = 1; the Test Quad sets the asymmetry to 0).
+    for id in ["opendrone/whoop-65", "opendrone/freestyle-5"] {
+        let surfaces = quad(id).parameters.ground_and_ceiling;
+        assert_eq!(surfaces.ground_effect_body, 2.0, "{id}");
+        assert_eq!(surfaces.ceiling_effect_asymmetry, 1.0, "{id}");
+    }
+    let packs = built_in();
+    let test_quads = packs.test_quads();
+    let no_ceiling = test_quads
+        .iter()
+        .find(|q| q.id == "test/whoop-65-no-ceiling-effect")
+        .expect("the Test Quad loads");
+    let surfaces = no_ceiling.parameters.ground_and_ceiling;
+    assert_eq!(surfaces.ceiling_effect_asymmetry, 0.0);
+    assert_eq!(surfaces.ground_effect_body, 2.0);
 }
 
 #[test]

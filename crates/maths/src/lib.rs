@@ -13,6 +13,8 @@
 //! - [`functions`]: every maths function the core may call, from `libm`.
 //! - [`Fingerprinter`]: a fingerprint of numbers that is the same on every
 //!   computer, for checking that two runs or two computers agree.
+//! - [`Random`]: a seeded random number generator that gives the same numbers
+//!   on every computer, for the Simulation's randomness.
 //!
 //! # Directions
 //!
@@ -57,11 +59,13 @@ mod attitude;
 mod fingerprint;
 pub mod functions;
 mod matrix;
+mod random;
 mod vector;
 
 pub use attitude::{Attitude, PilotAngles, PilotRates};
 pub use fingerprint::{Fingerprint, Fingerprinter};
 pub use matrix::Mat3;
+pub use random::Random;
 pub use vector::Vec3;
 
 /// One degree, in radians.

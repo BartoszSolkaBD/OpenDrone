@@ -1,0 +1,17 @@
+# The Whoop 65 with no Prop Wash.    id: test/whoop-65-no-prop-wash
+#
+# Everything else is the Whoop 65's own, drag included, so a Scenario flown
+# on it shows what the same flight does without Prop Wash: a rotor sinking
+# into its own air keeps momentum theory's thrust, with no loss and no
+# flicker.
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No Prop Wash, so a Scenario can fly the Whoop 65 through its own air without it"
+
+# A deliberate test value: no Confidence or source.
+[feel]
+prop_wash_strength = "0%"

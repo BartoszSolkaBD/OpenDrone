@@ -1,11 +1,12 @@
 //! Readable checks for the shared number types: the directions every crate
-//! uses, exact turning, and fingerprints that are the same on every computer.
+//! uses, exact turning, fingerprints that are the same on every computer, and
+//! the seeded random numbers.
 
 use core::f64::consts::PI;
 
-use opendrone_maths::functions::{cos, max, min};
+use opendrone_maths::functions::{cbrt, cos, max, min};
 use opendrone_maths::{
-    Attitude, DEGREE, Fingerprint, Fingerprinter, Mat3, PilotAngles, PilotRates, Vec3,
+    Attitude, DEGREE, Fingerprint, Fingerprinter, Mat3, PilotAngles, PilotRates, Random, Vec3,
 };
 
 const FORWARD: Vec3 = Vec3::new(1.0, 0.0, 0.0);
@@ -205,6 +206,69 @@ fn a_fingerprint_is_the_same_on_every_computer() {
         Fingerprinter::new().finish().to_string(),
         "cbf29ce484222325"
     );
+}
+
+#[test]
+fn the_cube_root_undoes_cubing_whichever_side_of_zero() {
+    assert_eq!(cbrt(8.0), 2.0);
+    assert_eq!(cbrt(-27.0), -3.0);
+    let x = 1.112_372_435_695_794_5_f64;
+    assert!((cbrt(x * x) * cbrt(x) - x).abs() < 1e-15);
+}
+
+#[test]
+fn the_random_numbers_are_splitmix64s_on_every_computer() {
+    // SplitMix64's published sequence from a seed of 0 (the version Vigna
+    // publishes beside xoshiro). CI runs this on ARM and x86.
+    let mut random = Random::new(0);
+    assert_eq!(random.next_u64(), 0xe220_a839_7b1d_cdaf);
+    assert_eq!(random.next_u64(), 0x6e78_9e6a_a1b9_65f4);
+    assert_eq!(random.next_u64(), 0x06c4_5d18_8009_454f);
+    assert_eq!(random.next_u64(), 0xf88b_b8a8_724c_81ec);
+}
+
+#[test]
+fn the_same_seed_gives_the_same_numbers_and_another_seed_others() {
+    let draws = |seed| {
+        let mut random = Random::new(seed);
+        [(); 8].map(|_| random.next_u64())
+    };
+    assert_eq!(draws(1), draws(1));
+    assert_ne!(draws(1), draws(2));
+}
+
+#[test]
+fn a_copied_generator_goes_on_with_the_same_numbers() {
+    let mut random = Random::new(7);
+    random.next_u64();
+    let mut copy = random.clone();
+    assert_eq!(copy, random);
+    assert_eq!(copy.next_u64(), random.next_u64());
+    let fingerprint = |random: &Random| {
+        let mut f = Fingerprinter::new();
+        random.write_fingerprint(&mut f);
+        f.finish()
+    };
+    assert_eq!(fingerprint(&copy), fingerprint(&random));
+    random.next_u64();
+    assert_ne!(fingerprint(&copy), fingerprint(&random));
+}
+
+#[test]
+fn uniform_numbers_lie_from_0_up_to_1_and_signed_ones_from_minus_1_up_to_1() {
+    let mut random = Random::new(3);
+    let (mut lowest, mut highest, mut sum) = (1.0, 0.0, 0.0);
+    for _ in 0..100_000 {
+        let u = random.uniform();
+        let s = random.signed();
+        assert!((0.0..1.0).contains(&u) && (-1.0..1.0).contains(&s));
+        lowest = min(lowest, s);
+        highest = max(highest, s);
+        sum += s;
+    }
+    // Spread over the whole stretch, centred on 0.
+    assert!(lowest < -0.999 && highest > 0.999);
+    assert!((sum / 100_000.0).abs() < 0.01);
 }
 
 #[test]

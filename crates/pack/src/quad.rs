@@ -20,8 +20,8 @@ use std::collections::BTreeMap;
 use opendrone_flight_controller::Tune as FlightControllerTune;
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters,
-    QuadParameters, QuadShape, RotorLayout,
+    BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters,
+    PropParameters, PropWash, QuadParameters, QuadShape, RotorLayout,
 };
 
 use crate::document::{Document, Item, Problem, Problems, Table};
@@ -886,13 +886,15 @@ pub struct Ducts {
     pub nose_up_offset: f64,
 }
 
-/// `[feel]`: Prop Wash and the ground effect's body term.
+/// `[feel]`: Prop Wash, the ground effect's body term and the ceiling
+/// effect's asymmetry.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Feel {
     pub prop_wash_strength: f64,
     /// In flickers a second.
     pub prop_wash_flicker: f64,
     pub ground_effect_body: f64,
+    pub ceiling_effect_asymmetry: f64,
 }
 
 /// `[board]`.
@@ -1305,6 +1307,10 @@ fn definition(
             duct_ram: ducts.as_ref().map_or(0.0, |d| d.ram_drag),
             duct_offset: ducts.as_ref().map_or(0.0, |d| d.nose_up_offset),
         },
+        prop_wash: PropWash {
+            strength: r.one("feel.prop_wash_strength"),
+            flicker: r.one("feel.prop_wash_flicker"),
+        },
         rotors: RotorLayout {
             diagonal: frame.diagonal,
             rotor_height: frame.rotor_height,
@@ -1363,6 +1369,10 @@ fn definition(
             friction: collision.friction,
         },
         gyro_range: r.one("board.gyro_range"),
+        ground_and_ceiling: GroundAndCeiling {
+            ground_effect_body: r.one("feel.ground_effect_body"),
+            ceiling_effect_asymmetry: r.one("feel.ceiling_effect_asymmetry"),
+        },
     };
     let block = SECTIONS
         .iter()
@@ -1400,6 +1410,7 @@ fn definition(
             prop_wash_strength: r.one("feel.prop_wash_strength"),
             prop_wash_flicker: r.one("feel.prop_wash_flicker"),
             ground_effect_body: r.one("feel.ground_effect_body"),
+            ceiling_effect_asymmetry: r.one("feel.ceiling_effect_asymmetry"),
         },
         board: Board {
             gyro_range: r.one("board.gyro_range"),
