@@ -610,6 +610,186 @@ fn a_file_is_read_in_its_own_crate_s_edition() {
         "New `unsafe` code",
         &format!("`crates/sim/src/lib.rs` adds `{line}`."),
     );
+    // Before 2021, `'r#r` is the lifetime `'r`, then `#` and a raw string
+    // `r"\"`, whose backslash is plain text (round 2's case on #104). This
+    // line compiles with real `unsafe` in edition 2018.
+    let line = r#"ignore!('r#r"\"); let first = unsafe { *x.as_ptr() }; ignore!('"');"#;
+    let raw_lifetime = PullRequest::new("edition-2018-raw-lifetime")
+        .on_main(
+            "crates/sim/Cargo.toml",
+            "[package]\nname = \"opendrone-sim\"\nedition = \"2018\"\n",
+        )
+        .write(
+            "crates/sim/src/lib.rs",
+            &format!("{SIM_START}    {line}\n    first\n}}\n"),
+        )
+        .review();
+    raw_lifetime.reviewer_decides(
+        "New `unsafe` code",
+        &format!("`crates/sim/src/lib.rs` adds `{line}`."),
+    );
+    // The same in a core crate, around a house-rule exception that Clippy
+    // lets through.
+    let line =
+        r#"ignore!('r#r"\"); #[allow(clippy::disallowed_methods)] let y = x.sin(); ignore!('"');"#;
+    let raw_lifetime_allow = PullRequest::new("edition-2018-raw-lifetime-allow")
+        .on_main(
+            "crates/physics/Cargo.toml",
+            "[package]\nname = \"opendrone-physics\"\nedition = \"2018\"\n\n\
+             [lints]\nworkspace = true\n",
+        )
+        .write(
+            "crates/physics/src/lib.rs",
+            &format!("{PHYSICS_START}    {line}\n    y\n}}\n"),
+        )
+        .review();
+    raw_lifetime_allow.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn a_change_to_a_crate_s_rust_edition_is_a_repo_rules_change() {
+    // Code reads differently in another edition, so moving a crate, or one
+    // of its targets, is for the Reviewer (and `cargo xtask walls` refuses
+    // any crate not on edition 2024).
+    let package = PullRequest::new("package-edition-changed")
+        .write(
+            "crates/physics/Cargo.toml",
+            "[package]\nname = \"opendrone-physics\"\nversion.workspace = true\n\
+             edition = \"2018\"\n\n[lints]\nworkspace = true\n",
+        )
+        .review();
+    package.reviewer_decides(
+        "A change to the Repo rules",
+        "`crates/physics/Cargo.toml` (a Rust edition changes)",
+    );
+    let target = PullRequest::new("target-edition-changed")
+        .write(
+            "crates/pack/Cargo.toml",
+            "[package]\nname = \"opendrone-pack\"\nversion.workspace = true\n\
+             edition.workspace = true\n\n[lib]\nedition = \"2021\"\n\n\
+             [lints]\nworkspace = true\n",
+        )
+        .review();
+    target.reviewer_decides(
+        "A change to the Repo rules",
+        "`crates/pack/Cargo.toml` (a Rust edition changes)",
+    );
+}
+
+#[test]
+fn a_file_include_pulls_in_reads_dashes_as_code_not_as_frontmatter() {
+    // Round 2's case on #104: rustc reads a file `include!` pulls in as an
+    // expression with no frontmatter, so `---` is three minus signs, and
+    // Clippy lets `x.sin()` through. Rust 1.99 refuses frontmatter everywhere
+    // else.
+    let review = PullRequest::new("frontmatter-is-code")
+        .write(
+            "crates/physics/src/sine_expr.rs",
+            "---\n{ #[allow(clippy::disallowed_methods)] let y = x.sin(); y }\n---\n- 0.0\n",
+        )
+        .write(
+            "crates/physics/src/lib.rs",
+            "//! A fixture core crate.\n\n/// A sine.\n#[allow(double_negations)]\n\
+             pub fn sine(x: f64) -> f64 {\n    include!(\"sine_expr.rs\")\n}\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/sine_expr.rs` now allows `clippy::disallowed_methods`.",
+    );
+    review.reviewer_decides(
+        "Code read from another file",
+        "`crates/physics/src/lib.rs` adds `include!` or `#[path]`",
+    );
+}
+
+#[test]
+fn rust_pulled_in_from_a_file_of_any_name_is_for_the_reviewer_to_read() {
+    // The Red Flags read only `.rs` files, but `include!` and `#[path]` can
+    // compile a file of any name as Rust. Clippy lets the `allow` in
+    // `root.inc` through.
+    let include = PullRequest::new("include-a-non-rust-file")
+        .write(
+            "crates/physics/src/root.inc",
+            "{\n    #[allow(clippy::disallowed_methods)]\n    let y = x.sqrt();\n    y\n}\n",
+        )
+        .write(
+            "crates/physics/src/lib.rs",
+            "//! A fixture core crate.\n\n/// A square root.\n\
+             pub fn square_root(x: f64) -> f64 {\n    include!(\"root.inc\")\n}\n",
+        )
+        .review();
+    include.reviewer_decides(
+        "Code read from another file",
+        "`crates/physics/src/lib.rs` adds `include!` or `#[path]`, which compile another \
+         file's text as Rust.",
+    );
+    let path = PullRequest::new("path-attribute")
+        .write(
+            "crates/input/src/lib.rs",
+            "//! A fixture crate.\n\n#[cfg_attr(unix, path = \"unix.txt\")]\n\
+             #[cfg_attr(not(unix), path = \"other.txt\")]\nmod platform;\n",
+        )
+        .review();
+    path.reviewer_decides(
+        "Code read from another file",
+        "`crates/input/src/lib.rs` adds `include!` or `#[path]`",
+    );
+    let not_these = PullRequest::new("include-str-is-text")
+        .write(
+            "crates/input/src/lib.rs",
+            "//! A fixture crate.\n\npub const NOTES: &str = include_str!(\"notes.txt\");\n\
+             pub fn has(path: &str) -> bool { path == \"x\" }\n",
+        )
+        .review();
+    assert!(
+        !not_these.report.contains("Code read from another file"),
+        "`include_str!` is text, and a `path` variable is no attribute:\n{}",
+        not_these.report
+    );
+}
+
+#[test]
+fn a_lint_a_macro_s_argument_names_is_a_house_rule_exception() {
+    // A macro that takes the lint, or the lint attribute, as an argument:
+    // Clippy lets `x.sin()` and `x.cos()` through, and no `allow(clippy::…)`
+    // is written anywhere.
+    let review = PullRequest::new("lint-from-a-macro")
+        .write(
+            "crates/physics/src/lib.rs",
+            "//! A fixture core crate.\n\n\
+             macro_rules! quiet {\n    ($lint:path, $item:item) => {\n        #[allow($lint)]\n        \
+             $item\n    };\n}\n\
+             quiet!(clippy::disallowed_methods, pub fn sine(x: f64) -> f64 { x.sin() });\n\n\
+             macro_rules! level {\n    ($level:ident, $item:item) => {\n        \
+             #[$level(clippy::disallowed_methods)]\n        $item\n    };\n}\n\
+             level!(allow, pub fn cosine(x: f64) -> f64 { x.cos() });\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `$level(clippy::disallowed_methods)` (named by \
+         a macro's argument), `$lint` (named by a macro's argument).",
+    );
+}
+
+#[test]
+fn a_raw_identifier_for_allow_is_still_an_allow() {
+    // `#[r#allow(…)]` is the `allow` attribute; Clippy obeys it.
+    let review = PullRequest::new("raw-identifier-allow")
+        .write(
+            "crates/physics/src/lib.rs",
+            "//! A fixture core crate.\n\n#[r#allow(clippy::disallowed_methods)]\n\
+             pub fn tangent(x: f64) -> f64 {\n    x.tan()\n}\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
 }
 
 #[test]

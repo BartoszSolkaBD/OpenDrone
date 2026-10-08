@@ -32,6 +32,7 @@ Read only these. Never read the author's notes or conversation.
   - **A house-rule exception in a core crate:** it's needed, and it can't break determinism.
   - **New `unsafe` code:** it's in `opendrone-input` or the game, and it's needed.
   - **A change to the Repo rules:** the ticket asks for it, and no check gets weaker.
+  - **Code read from another file:** read the file each new `include!` or `#[path]` names, for `unsafe` code and house-rule exceptions.
   - **A change to CI workflows:** no workflow can set a commit status, whether through `statuses: write` or `permissions: write-all` (below).
   - **A Scenario's setup changed under Source or Rule Expectations:** the listed fields still let those Expectations check what their Basis says, for example the physics rate a Rule's working assumes.
 - **The listed Red Flags look right:**

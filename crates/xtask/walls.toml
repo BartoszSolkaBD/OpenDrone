@@ -13,6 +13,12 @@ core = [
     "opendrone-test-pilot",
 ]
 
+# Every crate, and each of its targets, is on this Rust edition: the workspace's,
+# which each crate takes with `edition.workspace = true`. The Review Report
+# reads code the way rustc reads it in this edition, so moving to another one
+# is decided here.
+edition = "2024"
+
 # Who may use whom. Every crate in the workspace is listed here with the
 # OpenDrone crates it may declare as dependencies (of any kind), and the rule
 # behind that. A crate missing from this list fails the check.

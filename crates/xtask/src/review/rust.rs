@@ -2,21 +2,22 @@
 //! at code: new `unsafe` code and house-rule exceptions.
 //!
 //! It reads a file with rustc's own lexer, `ra-ap-rustc_lexer` 0.174.0, whose
-//! source is byte for byte the lexer of Rust 1.99.0, the pinned Rust. It goes
-//! the way rustc 1.99 goes for a source file, so it finds exactly the comments
-//! and literals rustc finds:
+//! source is byte for byte the lexer of Rust 1.99.0, the pinned Rust, and goes
+//! the way rustc 1.99 goes for a source file:
 //!
 //! 1. drop a byte order mark, and read Windows line ends as plain ones;
 //! 2. skip the first line if `rustc_lexer::strip_shebang` calls it a shebang;
-//! 3. lex, with frontmatter allowed at the start;
-//! 4. make the changes rustc's parser makes, by edition, to where a literal
-//!    ends: before 2021, `c"…"` and `cr"…"` are a name and then the rest;
-//!    before 2024, `#"…"` is `#` and then a string.
+//! 3. lex, with no frontmatter: Rust 1.99 refuses frontmatter in every file
+//!    but one `include!` pulls in as an expression, where `---` is code;
+//! 4. lex again where rustc's parser does, by edition (`rustc_parse::lexer`,
+//!    the only three places it does): before 2021, a C string's `c` or `cr`
+//!    is a name, and a raw lifetime's `'r` is a lifetime; before 2024, `#"` is
+//!    `#` and then a string, while in 2024 a whole `#"…"#` is one literal.
 //!
-//! The edition is the one the file's crate uses, read from its `Cargo.toml`
-//! ([`edition_of`]). What this can't see: a file a crate pulls in with
-//! `include!` or `#[path]` from another crate, which rustc reads with the
-//! other crate's edition, and an edition set on one target (`[lib]`) alone.
+//! So on every file that compiles with Rust 1.99, it finds the comments and
+//! literals rustc finds. The edition is the one the file's crate uses, read
+//! from its `Cargo.toml` ([`edition_of`]); `cargo xtask walls` keeps every
+//! crate on edition 2024, and the Report flags any change to an edition.
 
 use ra_ap_rustc_lexer::{
     Cursor, FrontmatterAllowed, LiteralKind, TokenKind, strip_shebang, tokenize,
@@ -93,9 +94,9 @@ fn package_edition(package: &toml::Value, workspace: impl Fn() -> Edition) -> Ed
     }
 }
 
-/// A Rust file with every comment, every string and char literal, a skipped
-/// first line and any frontmatter blanked out, so only code is left: the
-/// names, numbers, punctuation and literal suffixes rustc reads. The text
+/// A Rust file with every comment, every string and char literal and a
+/// skipped first line blanked out, so only code is left: the names, numbers,
+/// punctuation and literal suffixes rustc reads. The text
 /// keeps its lines, so line N of the result is line N of the file.
 pub fn code_only(text: &str, edition: Edition) -> String {
     let text = text
@@ -108,10 +109,8 @@ pub fn code_only(text: &str, edition: Edition) -> String {
         blank(&mut out, &text[..shebang]);
         at = shebang;
     }
-    let mut frontmatter = FrontmatterAllowed::Yes;
     'lexing: while at < text.len() {
-        for token in tokenize(&text[at..], frontmatter) {
-            frontmatter = FrontmatterAllowed::No;
+        for token in tokenize(&text[at..], FrontmatterAllowed::No) {
             let piece = &text[at..at + token.len as usize];
             if let Some(again) = relex(token.kind, &text[at..], edition) {
                 match again {
@@ -122,9 +121,9 @@ pub fn code_only(text: &str, edition: Edition) -> String {
                 continue 'lexing;
             }
             match token.kind {
-                TokenKind::LineComment { .. }
-                | TokenKind::BlockComment { .. }
-                | TokenKind::Frontmatter { .. } => blank(&mut out, piece),
+                TokenKind::LineComment { .. } | TokenKind::BlockComment { .. } => {
+                    blank(&mut out, piece)
+                }
                 // A string, byte string, C string, raw string or char: its
                 // suffix, a name, is code; the rest is words.
                 TokenKind::Literal { kind, suffix_start }
@@ -168,6 +167,8 @@ impl Again {
 ///
 /// - before 2021, a C string's `c` or `cr` is a name, and the rest is lexed
 ///   again;
+/// - before 2021, a raw lifetime's `'r` (of `'r#name`) is a lifetime, and the
+///   rest, from `#`, is lexed again;
 /// - a guarded string's `#"` or `##` (the lexer's token takes the second
 ///   character too): before 2024 the `#` alone is code, and the rest is
 ///   lexed again; in 2024 a whole `#"…"#` is one literal (which 2024
@@ -182,6 +183,7 @@ fn relex(kind: TokenKind, rest: &str, edition: Edition) -> Option<Again> {
             kind: LiteralKind::RawCStr { .. },
             ..
         } if edition < Edition::E2021 => Some(Again::AfterCode(2)),
+        TokenKind::RawLifetime if edition < Edition::E2021 => Some(Again::AfterCode(2)),
         TokenKind::GuardedStrPrefix if edition < Edition::E2024 => Some(Again::AfterCode(1)),
         TokenKind::GuardedStrPrefix => Cursor::new(rest, FrontmatterAllowed::No)
             .guarded_double_quoted_string()

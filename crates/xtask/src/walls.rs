@@ -13,7 +13,9 @@
 //! - no library the core reaches has a feature on the never-in-core-features
 //!   list turned on;
 //! - no core crate has a `.clippy.toml`, which Clippy would read instead of
-//!   the `clippy.toml` that holds the house rules ([ADR-0001]).
+//!   the `clippy.toml` that holds the house rules ([ADR-0001]);
+//! - every crate, and each of its targets, is on the Rust edition `walls.toml`
+//!   names, the one the Review Report reads code in.
 //!
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
@@ -97,6 +99,21 @@ fn check(workspace: &Workspace, rules: &Rules) -> Vec<String> {
 
     for member in &workspace.members {
         let name = workspace.name(member);
+        for (target, edition) in workspace.editions(member) {
+            if *edition != rules.edition {
+                let what = match target {
+                    None => format!("`{name}`"),
+                    Some(target) => format!("`{name}`'s target {target}"),
+                };
+                problems.push(format!(
+                    "{what} is on Rust edition {edition} ({}), but every crate is on edition {} \
+                     ({RULES_FILE}): the Review Report reads code the way rustc reads it in that \
+                     edition. Take the workspace's with `edition.workspace = true`.",
+                    workspace.relative_manifest(member),
+                    rules.edition
+                ));
+            }
+        }
         let Some(rule) = rules.crates.get(name) else {
             problems.push(format!(
                 "`{name}` ({}) isn't one of the crates in {RULES_FILE}. ADR-0003 decides which \
@@ -216,6 +233,8 @@ fn reached_from_core(workspace: &Workspace, rules: &Rules) -> Vec<(String, Vec<S
 /// The rules in `walls.toml`.
 pub(crate) struct Rules {
     pub(crate) core: Vec<String>,
+    /// The Rust edition every crate is on.
+    edition: String,
     crates: BTreeMap<String, CrateRule>,
     core_libraries: BTreeMap<String, String>,
     never_in_core: BTreeMap<String, String>,
@@ -279,6 +298,11 @@ impl Rules {
         }
         Ok(Rules {
             core: strings(table.get("core"), "core")?,
+            edition: table
+                .get("edition")
+                .and_then(toml::Value::as_str)
+                .ok_or(format!("{RULES_FILE} names no `edition`"))?
+                .to_owned(),
             crates,
             core_libraries: reasons(&table, "core-libraries")?,
             never_in_core: reasons(&table, "never-in-core")?,
@@ -364,6 +388,9 @@ struct Workspace {
     /// The features cargo turns on in each package, merged across the whole
     /// workspace.
     features: BTreeMap<String, Vec<String>>,
+    /// Each package's Rust edition (no target), and each of its targets' (a
+    /// target such as `lib \`opendrone_sim\``).
+    editions: BTreeMap<String, Vec<(Option<String>, String)>>,
 }
 
 struct Dependency {
@@ -398,10 +425,30 @@ impl Workspace {
     fn from_metadata(metadata: &Value) -> Result<Workspace, String> {
         let mut names = BTreeMap::new();
         let mut manifests = BTreeMap::new();
+        let mut editions = BTreeMap::new();
         for package in list(&metadata["packages"], "packages")? {
             let id = text(&package["id"], "a package id")?;
             names.insert(id.clone(), text(&package["name"], "a package name")?);
-            manifests.insert(id, text(&package["manifest_path"], "a manifest path")?);
+            manifests.insert(
+                id.clone(),
+                text(&package["manifest_path"], "a manifest path")?,
+            );
+            let mut found = vec![(None, text(&package["edition"], "a package's edition")?)];
+            for target in list(&package["targets"], "a package's targets")? {
+                let kind = list(&target["kind"], "a target's kinds")?
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                found.push((
+                    Some(format!(
+                        "{kind} `{}`",
+                        text(&target["name"], "a target's name")?
+                    )),
+                    text(&target["edition"], "a target's edition")?,
+                ));
+            }
+            editions.insert(id, found);
         }
         let name_of = |id: &str| names.get(id).cloned().unwrap_or_else(|| id.to_owned());
 
@@ -443,7 +490,13 @@ impl Workspace {
             manifests,
             dependencies,
             features,
+            editions,
         })
+    }
+
+    /// A package's Rust edition, and each of its targets'.
+    fn editions(&self, id: &str) -> &[(Option<String>, String)] {
+        self.editions.get(id).map_or(&[], Vec::as_slice)
     }
 
     fn name<'a>(&'a self, id: &'a str) -> &'a str {
