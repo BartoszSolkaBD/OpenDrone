@@ -224,7 +224,11 @@ impl SimulatedQuad {
             self.body = body;
         }
         self.motor_commands = MotorCommands::STOPPED;
-        let readings = sensor_readings(self.body.state(), self.body.escs_ready());
+        let readings = sensor_readings(
+            self.body.state(),
+            self.body.escs_ready(),
+            self.body.parameters().gyro_range,
+        );
         self.flight_controller.power_up(&readings);
     }
 }
@@ -303,7 +307,11 @@ impl Simulation {
                 }
             }
             let frame = quad.radio_link.frame(self.time);
-            let readings = sensor_readings(quad.body.state(), quad.body.escs_ready());
+            let readings = sensor_readings(
+                quad.body.state(),
+                quad.body.escs_ready(),
+                quad.body.parameters().gyro_range,
+            );
             quad.motor_commands = quad
                 .flight_controller
                 .step(self.time, &readings, frame.as_ref());

@@ -17,19 +17,25 @@ expected = "0 ± 0"
 measured = "0"
 
 [[expect]]
-what     = "motor 2 drive at 2.2795 s"
+what     = "motor 2 drive, lowest over 0.600125 s to 2.3 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 drive at 2.35 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
 
 [[expect]]
-what     = "motor 2 restarts at 2.379375 s"
+what     = "motor 2 restarts at 2.5 s"
 basis    = "Source"
 expected = "1 ± 0"
 measured = "1.00"
 
 [[expect]]
-what     = "motor 2 restarts at 4.158625 s"
+what     = "motor 2 restarts at 4.3 s"
 basis    = "Source"
 expected = "2 ± 0"
 measured = "2.00"
@@ -41,7 +47,7 @@ expected = "2 ± 0"
 measured = "2.00"
 
 [[expect]]
-what     = "motor 2 drive, highest over 5.84 s to 7 s"
+what     = "motor 2 drive, highest over 6 s to 7 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
@@ -53,18 +59,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+quad = "e5f997741d5103b1"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "1cf123df8fcb25b6"   # test/block
-run  = "b88516e3e07dbd70"   # the whole state after each of 56000 steps at 8000 Hz, in order
+run  = "be1aa233e739339f"   # the whole state after each of 56000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.7 s" = "0e41d3ddd2a3351a"
-"1.4 s" = "4850769eea6a26f5"
-"2.1 s" = "8644e1c25d348ba4"
-"2.8 s" = "f34d076537505bd8"
-"3.5 s" = "2734277a46aec694"
-"4.2 s" = "57dea3c01d3a0d38"
-"4.9 s" = "0d150ce45ceaa57f"
-"5.6 s" = "72f7e5cc289b056d"
-"6.3 s" = "e9bdfcb1117c46a9"
-"7 s" = "70e13d5829eef0ed"
+"0.7 s" = "3b75a20ad9a52b3b"
+"1.4 s" = "49d1e704c1ffba4e"
+"2.1 s" = "a0f21c4b5376d17d"
+"2.8 s" = "42a874712cfa354b"
+"3.5 s" = "b4c53788828fa626"
+"4.2 s" = "3e818251b77b2a40"
+"4.9 s" = "ea76ccd94d2d387c"
+"5.6 s" = "7b6a474956f6ab28"
+"6.3 s" = "c3fcde2ae6abd904"
+"7 s" = "cbfc511c1df70361"

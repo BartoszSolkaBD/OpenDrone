@@ -6,17 +6,18 @@ use opendrone_flight_controller::{
     Tune,
 };
 use opendrone_maths::Fingerprinter;
-use opendrone_physics::{MotorCommand, MotorCommands, QuadState, SpinDirection};
+use opendrone_physics::{MotorCommand, MotorCommands, QuadState, SpinDirection, gyro_reading};
 
 use crate::auto_arm::AutoArm;
 use crate::{FlightControllerSeam, PhysicsRate, SimulationTime};
 
 /// What the sensors read from a Quad's state: the gyro (its true rotation,
-/// with no noise) and the true attitude, and whether its ESCs have played
-/// their ready beep. The gyro's ±2000 °/s limit arrives with #45.
-pub fn sensor_readings(state: &QuadState, escs_ready: bool) -> SensorReadings {
+/// with no noise, each axis clipped at the board's range, `gyro_range` in
+/// rad/s, #26 §4) and the true attitude, and whether its ESCs have played
+/// their ready beep.
+pub fn sensor_readings(state: &QuadState, escs_ready: bool, gyro_range: f64) -> SensorReadings {
     SensorReadings {
-        gyro: state.rotation,
+        gyro: gyro_reading(state.rotation, gyro_range),
         attitude: state.attitude,
         escs_ready,
     }
@@ -36,7 +37,8 @@ pub struct OurFlightController {
 
 impl OurFlightController {
     /// A "fresh" Flight Controller for a Quad starting in `start`, looping
-    /// once per physics step, armed or not, with Auto-arm on or off.
+    /// once per physics step, armed or not, with Auto-arm on or off; its
+    /// board's gyro reads up to ± `gyro_range` (rad/s).
     pub fn new(
         tune: Tune,
         rates: Rates,
@@ -44,6 +46,7 @@ impl OurFlightController {
         armed: bool,
         auto_arm: bool,
         start: &QuadState,
+        gyro_range: f64,
     ) -> OurFlightController {
         // Only the gyro is read here, for the D term's memory: the ESCs are
         // read every loop.
@@ -53,7 +56,7 @@ impl OurFlightController {
                 rates,
                 physics_rate.hz(),
                 armed,
-                &sensor_readings(start, false),
+                &sensor_readings(start, false, gyro_range),
             ),
             loop_hz: physics_rate.hz(),
             auto_arm: auto_arm.then(|| AutoArm::new(armed)),

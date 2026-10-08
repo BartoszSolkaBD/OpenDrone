@@ -23,31 +23,31 @@ expected = "1 ± 0"
 measured = "1.00"
 
 [[expect]]
-what     = "motor 2 speed, highest over 0.208 s to 5.445 s"
+what     = "motor 2 speed, highest over 0.208 s to 5.5 s"
 basis    = "Rule"
 expected = "0 RPM ± 190 RPM"
 measured = "4.49 RPM"
 
 [[expect]]
-what     = "motor 2 drive, lowest over 0.208 s to 1.887 s"
+what     = "motor 2 drive, lowest over 0.208 s to 1.91 s"
 basis    = "Source"
 expected = "1.96% ± 0.001%"
 measured = "1.96%"
 
 [[expect]]
-what     = "motor 2 drive at 1.8875 s"
+what     = "motor 2 drive at 1.95 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
 
 [[expect]]
-what     = "motor 2 restarts at 1.98725 s"
+what     = "motor 2 restarts at 2.1 s"
 basis    = "Source"
 expected = "2 ± 0"
 measured = "2.00"
 
 [[expect]]
-what     = "motor 2 restarts at 3.7665 s"
+what     = "motor 2 restarts at 3.9 s"
 basis    = "Source"
 expected = "3 ± 0"
 measured = "3.00"
@@ -59,25 +59,25 @@ expected = "3 ± 0"
 measured = "3.00"
 
 [[expect]]
-what     = "motor 2 drive, highest over 5.446 s to 8 s"
+what     = "motor 2 drive, highest over 5.6 s to 8 s"
 basis    = "Source"
 expected = "0% ± 0%"
 measured = "0%"
 
 [[expect]]
-what     = "motor 2 current, highest over 0.208 s to 5.446 s"
+what     = "motor 2 current, highest over 0.208 s to 5.5 s"
 basis    = "Rule"
 expected = "between 0 A and 2.61 A"
 measured = "2.60 A"
 
 [[expect]]
-what     = "battery current, highest over 0.208 s to 5.446 s"
+what     = "battery current, highest over 0.208 s to 5.5 s"
 basis    = "Rule"
 expected = "between 0 A and 0.052 A"
 measured = "0.0510 A"
 
 [[expect]]
-what     = "motor 2 restarts at 7.375 s"
+what     = "motor 2 restarts at 7.5 s"
 basis    = "Source"
 expected = "0 ± 0"
 measured = "0"
@@ -95,18 +95,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+quad = "e5f997741d5103b1"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "1cf123df8fcb25b6"   # test/block
-run  = "47f7ed8095a7d851"   # the whole state after each of 64801 steps at 8000 Hz, in order
+run  = "24a16525206f5321"   # the whole state after each of 64801 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.81 s" = "3c235075a520604a"
-"1.62 s" = "2e919e644b3f98bf"
-"2.43 s" = "898f57ecf25af2d7"
-"3.24 s" = "d5046150a1d18e5c"
-"4.05 s" = "c5406dce044e5aab"
-"4.86 s" = "0b1c8567fe576ea5"
-"5.67 s" = "84b683bf5e00e425"
-"6.48 s" = "e352b4d79346b8fb"
-"7.29 s" = "80603f166b2fb31f"
-"8.100125 s" = "000ee6e6a95dce6c"
+"0.81 s" = "4a25aa48d19cbba7"
+"1.62 s" = "d0fa7426a9c8024f"
+"2.43 s" = "2fec4e7fe1f124a9"
+"3.24 s" = "879dae2c354e8c5f"
+"4.05 s" = "d91b41326fffe4a4"
+"4.86 s" = "55252d8f6f5cf29f"
+"5.67 s" = "d70df9c689a50b56"
+"6.48 s" = "245fb8419718d227"
+"7.29 s" = "f0ffd4dc9a080f3f"
+"8.100125 s" = "530bf825cb597868"

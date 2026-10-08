@@ -256,6 +256,7 @@ fn simulate(
                     start.armed,
                     start.assists.auto_arm,
                     &state,
+                    quad.parameters.gyro_range,
                 )),
                 Some(PilotTrack::new(entries, start)),
             ),

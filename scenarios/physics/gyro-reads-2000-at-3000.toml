@@ -68,7 +68,19 @@ highest = "0 °/s ± 0 °/s"
 basis   = "rule: the Quad doesn't roll, and each axis is read on its own, so the yaw axis's saturation leaks into no other"
 
 [[expect]]
+what   = "gyro roll rate"
+over   = "0 s to 0.5 s"
+lowest = "0 °/s ± 0 °/s"
+basis  = "rule: the Quad doesn't roll; the lowest and the highest together show the gyro read exactly 0 °/s about the roll axis"
+
+[[expect]]
+what    = "gyro pitch rate"
+over    = "0 s to 0.5 s"
+highest = "0 °/s ± 0 °/s"
+basis   = "rule: the Quad doesn't pitch, and each axis is read on its own"
+
+[[expect]]
 what   = "gyro pitch rate"
 over   = "0 s to 0.5 s"
 lowest = "0 °/s ± 0 °/s"
-basis  = "rule: the Quad doesn't pitch, and each axis is read on its own"
+basis  = "rule: the Quad doesn't pitch; the lowest and the highest together show the gyro read exactly 0 °/s about the pitch axis"

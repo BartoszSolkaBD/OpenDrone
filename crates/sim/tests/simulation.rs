@@ -476,6 +476,7 @@ fn reset_puts_the_quad_on_its_launch_spot_still_disarmed_with_a_full_battery_and
         true,
         false,
         &quad.start,
+        quad.parameters.gyro_range,
     ));
     let mut set_up = set_up(8000, 1, vec![quad]);
     set_up.map = vec![floor];

@@ -93,13 +93,16 @@
 //!   cross), or, when the rotor doesn't answer, when its wait for that times
 //!   out (Timing.asm L533–575 and L640–652); it never leaves run mode on a
 //!   timeout during the start-up and initial-run phases (L771–776). So a
-//!   jammed motor still gets through its 15 electrical turns, at the
-//!   timeouts' pace, and the first timeout after them ends the try
+//!   jammed motor still gets through its 15 capped electrical turns, at the
+//!   timeouts' pace. Then it waits for one more zero cross, its drive still
+//!   capped (the low-speed limit `Pwm_Limit_By_Rpm` is still Startup Power
+//!   Max, Power.asm L65–96), and that wait's timeout ends the try
 //!   (`exit_run_mode_on_timeout`, L1033–1036). Here a start's turns go on at
-//!   the rotor's pace or the timeouts', whichever is faster, and a start
-//!   whose rotor turns the right way slower than the minimum speed when its
-//!   15 turns are done has failed. Worked from the timeouts, a jammed try
-//!   takes about 1.68 s:
+//!   the rotor's pace or the timeouts', whichever is faster; when its 15
+//!   turns are done, a rotor turning the right way at the minimum speed or
+//!   faster runs on, and a slower one has the closing wait to get there
+//!   before the start has failed. Worked from the timeouts, a jammed try
+//!   takes 1.711 s:
 //!   - Bluejay's commutation timers count 12 cycles of its 24.5 MHz clock
 //!     (L553–554), 0.49 µs. While the rotor doesn't answer, its estimate of
 //!     four commutations' time (`Comm_Period4x`) sits at its slowest, 0xFFFF
@@ -113,10 +116,23 @@
 //!   - In the initial-run phase (the other 11 turns, 66 commutations) each
 //!     waits 15°, 15° and 7.5°, then a zero-cross wait of a quarter of the
 //!     estimate, once: 26,615 counts, 13.0 ms.
+//!   - The closing wait. With no back-voltage the floating phase sits at the
+//!     star point, so the comparator compares two equal voltages and its
+//!     level is down to its offset. The model takes it to read the level
+//!     opposite to the one Bluejay waits for. That first reading clears the
+//!     demag flag that every wait starts with and sets a timeout of 65,280
+//!     counts, 32.0 ms (Timing.asm L599, L656–658, L671–673, L693–734);
+//!     while it keeps reading so, nothing can end the wait but that timeout,
+//!     which, with the flag clear, leaves run mode (L771–788). Had it read
+//!     the level Bluejay waits for instead, the demag flag would stay set,
+//!     the first wait's timeout (16,383 counts) wouldn't leave run mode
+//!     (L777), and the next wait, for the other level, would end the same
+//!     way: one commutation (26,615 counts, 13.0 ms) later, 1.724 s in all.
+//!     A comparator that flickers between the two could take longer still.
 //!
 //!   Bluejay builds for 48 MHz chips run the start-up phase's waits about a
-//!   quarter faster, about 1.5 s a try; these numbers are for the 24.5 MHz
-//!   chips' timing.
+//!   quarter faster and the closing wait twice as fast, about 1.5 s a try;
+//!   these numbers are for the 24.5 MHz chips' timing.
 //! - **Giving up.** Bluejay counts failed starts in a row
 //!   (`Startup_Stall_Cnt`: up one at each failed start, L1033–1036, back to
 //!   nought once the motor runs properly, L957–959, and at every stop at zero
@@ -142,8 +158,12 @@
 //! (`Pgm_Rpm_Power_Slope`; the measured spin-up times already include whatever
 //! a real ESC does), the beacon after 10 idle minutes, signal loss, a stall
 //! found by a zero-cross timeout above the minimum speed (a motor slowed
-//! suddenly but not stopped), and Bluejay's own direction change while
-//! running, which Crash Flip's ticket (#54) may need.
+//! suddenly but not stopped), Bluejay's own direction change while running,
+//! which Crash Flip's ticket (#54) may need, and the start-up power floor and
+//! stall boost: during the initial-run phase Bluejay raises a command to at
+//! least Startup Power Min (21 of 2047) and adds 40 of 2047 for each failed
+//! start in a row before the start-up cap (Isrs.asm L286–318), which matters
+//! only for commands below the cap.
 
 use core::f64::consts::TAU;
 
@@ -190,6 +210,10 @@ const START_UP_COMMUTATION: f64 = 69_659.0 * TIMER_COUNT;
 /// 15°, 15° and 7.5° of waits (10,232 counts) and the zero-cross wait timing
 /// out once (16,383 counts).
 const INITIAL_RUN_COMMUTATION: f64 = 26_615.0 * TIMER_COUNT;
+/// The wait for a zero cross after the 15 capped turns, when the rotor
+/// doesn't answer: a comparator reading the wrong level sets this timeout,
+/// 65,280 counts. See the module's "Stalls and restarts".
+const CLOSING_WAIT: f64 = 65_280.0 * TIMER_COUNT;
 
 /// How long a beep of `pulses` pulses at loop length `length` lasts, in
 /// seconds: the ESC Configurator's tone formula, which a cycle count of
@@ -375,6 +399,9 @@ pub(crate) struct Esc {
     /// How many electrical turns the current start has stepped the motor's
     /// field through.
     start_turns: f64,
+    /// Seconds the current start has waited for a zero cross since its 15
+    /// capped turns were done.
+    closing: f64,
     /// Failed starts in a row (`Startup_Stall_Cnt`).
     failed_starts: u32,
     /// Restarts since the motor last ran properly or stopped at zero
@@ -406,6 +433,7 @@ impl Esc {
             zero_counts: 0,
             overflow_pending: false,
             start_turns: 0.0,
+            closing: 0.0,
             failed_starts: 0,
             restarts: 0,
         }
@@ -479,13 +507,18 @@ impl Esc {
                     let rotor = functions::max(forward, 0.0) * pole_pairs / TAU * dt;
                     self.start_turns += functions::max(rotor, dt / (6.0 * commutation));
                     if self.start_turns >= CAPPED_ELECTRICAL_TURNS {
-                        if too_slow {
-                            self.failed_starts = self.failed_starts.saturating_add(1);
-                            self.stalled(parameters);
-                        } else {
+                        if !too_slow {
                             self.failed_starts = 0;
                             self.restarts = 0;
                             self.enter(EscState::Running);
+                        } else {
+                            // Still capped, waiting for a zero cross that
+                            // doesn't come.
+                            self.closing += dt;
+                            if self.closing >= CLOSING_WAIT - dt / 2.0 {
+                                self.failed_starts = self.failed_starts.saturating_add(1);
+                                self.stalled(parameters);
+                            }
                         }
                     }
                 }
@@ -649,6 +682,7 @@ impl Esc {
         self.state = state;
         self.in_state = 0.0;
         self.start_turns = 0.0;
+        self.closing = 0.0;
     }
 
     /// Feeds everything it remembers into a fingerprint.
@@ -665,6 +699,7 @@ impl Esc {
         f.write_u64(u64::from(self.zero_counts));
         f.write_u64(u64::from(self.overflow_pending));
         f.write_f64(self.start_turns);
+        f.write_f64(self.closing);
         f.write_u64(u64::from(self.failed_starts));
         f.write_u64(u64::from(self.restarts));
     }

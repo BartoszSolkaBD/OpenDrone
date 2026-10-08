@@ -2,8 +2,9 @@
 # the Thin rail Test Map, which stands 2 m tall at 3 m east, 10 m north. Its
 # motors are stopped, their ESCs letting the props turn freely. Its front prop
 # discs meet the stub first: the stub is just wider than the 29.5 mm gap
-# between them. Free to turn, the props are spun up by the stub as it squeezes
-# between them, and its body meets it next. Proves the thin-rail half of E29
+# between them. Free to turn, the props roll on the stub instead of locking
+# against it and are spun up as it squeezes between them; its pack and then
+# its body meet it next. Proves the thin-rail half of E29
 # in #10 with the 5″'s prop discs (#26 §6).
 format = 1
 name   = "A 5-inch at 30 m/s never passes through a 3 cm rebar stub"
@@ -61,10 +62,10 @@ basis = "observed: the stub's rub spins the free front props up from a standstil
 what  = "speed east"
 at    = "0.1 s"
 value = "-1.6 m/s ± 0.3 m/s"
-basis = "observed: its front props turn out of the stub's way instead of wedging on it, so its body meets the stub at about 11 m/s and it bounces back"
+basis = "observed: free to turn, its front props roll on the stub instead of locking against it, and the stub squeezes between them (it is 0.4 mm wider than the gap between the discs); they reach about 1,700 RPM, then its pack and then its body meet the stub at 11.4 m/s, and it bounces back"
 
 [[expect]]
 what  = "pitch rate"
 at    = "0.05 s"
 value = "1830 °/s ± 50 °/s"
-basis = "observed: the stub stops its body and the pack on top of it, above its centre of mass, so it tips nose up"
+basis = "observed: the stub stops its pack, above its centre of mass, and then its body, so it bounces back tipping nose up"

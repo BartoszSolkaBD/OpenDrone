@@ -66,22 +66,28 @@ value = "0 ± 0"
 basis = "source: Bluejay v0.21.0: this is a start from a standstill (`wait_for_start` to `motor_start`, L726–749), not a restart"
 
 [[expect]]
+what   = "motor 2 drive"
+over   = "0.600125 s to 2.3 s"
+lowest = "1.96% ± 0.001%"
+basis  = "source: Bluejay v0.21.0 (src/Modules/Timing.asm L533–575, L599–734, L771–788; src/Modules/Power.asm L65–96; src/Bluejay.asm L1033–1036): a start never gives up on a timeout during its start-up and initial-run phases, so the field steps on at its timeouts' pace through all 15 capped electrical turns, 24 commutations of 34.1 ms and 66 of 13.0 ms, then waits one more for a zero cross, still capped: 1.711 s if the comparator, with no back-voltage to read, reads the level opposite to the one Bluejay waits for (a 65,280-count timeout), as the model takes it, or 1.724 s if it reads the other level (one more commutation first); the esc module in crates/physics has the working. So the jammed prop's first start drives it, capped, until at least 0.600 s + 1.711 s = 2.311 s"
+
+[[expect]]
 what  = "motor 2 drive"
-at    = "2.2795 s"
+at    = "2.35 s"
 value = "0% ± 0%"
-basis = "source: Bluejay v0.21.0 (src/Modules/Timing.asm L533–575, L640–652, L771–788; src/Bluejay.asm L1033–1041): the jammed prop never answers, so the start runs its 15 capped electrical turns at its timeouts' pace, 1.679 s, then fails: 0.600 s + 1.679 s = 2.279 s. It counts as a failed start (`Startup_Stall_Cnt`, L1035), and the ESC switches the motor off for 100 ms"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1041: the start has failed, by 0.600 s + 1.724 s = 2.324 s whichever level the comparator reads (2.311 s in the model). It counts as a failed start (`Startup_Stall_Cnt`, L1035), and the ESC switches the motor off for 100 ms, until 2.411 s at the soonest"
 
 [[expect]]
 what  = "motor 2 restarts"
-at    = "2.379375 s"
+at    = "2.5 s"
 value = "1 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: one failed start in a row, fewer than 3, so it restarts the motor 0.1 s later"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: one failed start in a row, fewer than 3, so it restarts the motor 0.1 s later, by 2.424 s whichever level the comparator reads (2.411 s in the model)"
 
 [[expect]]
 what  = "motor 2 restarts"
-at    = "4.158625 s"
+at    = "4.3 s"
 value = "2 ± 0"
-basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: two failed starts in a row, fewer than 3, so it restarts once more"
+basis = "source: Bluejay v0.21.0, src/Bluejay.asm L1073–1086: two failed starts in a row, fewer than 3, so it restarts once more, by 4.249 s whichever level the comparator reads (4.222 s in the model), and that try can't fail before 5.93 s"
 
 [[expect]]
 what    = "motor 2 restarts"
@@ -91,6 +97,6 @@ basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1033–1036 and L1073–107
 
 [[expect]]
 what    = "motor 2 drive"
-over    = "5.84 s to 7 s"
+over    = "6 s to 7 s"
 highest = "0% ± 0%"
-basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1088–1107 and L633–656: having given up when its second restart failed, at 4.159 s + 1.679 s = 5.838 s, the ESC keeps the motor off until the throttle has been zero for ten counts of its timer, which never comes while the command stays at 3%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L1088–1107 and L633–656: it gives up when its second restart fails, by 5.973 s whichever level the comparator reads (5.934 s in the model), and keeps the motor off until the throttle has been zero for ten counts of its timer, which never comes while the command stays at 3%"

@@ -396,6 +396,16 @@ pub enum SetUpProblem {
     ShapeCantBeBuilt,
 }
 
+/// What a clean gyro whose range is `range` (rad/s) reads of `rotation`
+/// (body axes, rad/s): the true rotation, each axis clipped at ± `range`, as
+/// a real gyro saturates (#26 §4).
+pub fn gyro_reading(rotation: Vec3, range: f64) -> Vec3 {
+    let clip = |rate: f64| {
+        opendrone_maths::functions::min(opendrone_maths::functions::max(rate, -range), range)
+    };
+    Vec3::new(clip(rotation.x), clip(rotation.y), clip(rotation.z))
+}
+
 /// What one motor reports after a step.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MotorOutput {
@@ -585,12 +595,7 @@ impl QuadBody {
     /// clipped at the Quad definition's gyro range, as a real gyro saturates
     /// (#26 §4).
     pub fn gyro(&self) -> Vec3 {
-        let range = self.parameters.gyro_range;
-        let clip = |rate: f64| {
-            opendrone_maths::functions::min(opendrone_maths::functions::max(rate, -range), range)
-        };
-        let Vec3 { x, y, z } = self.state.rotation;
-        Vec3::new(clip(x), clip(y), clip(z))
+        gyro_reading(self.state.rotation, self.parameters.gyro_range)
     }
 
     /// How hard each prop rubbed the Map during the last step, in newtons, in
