@@ -184,18 +184,90 @@ pub(super) fn host_triple() -> Result<String, String> {
 pub(super) struct Built {
     /// Every library's compiled `.rlib` files, by package id.
     pub(super) rlibs: BTreeMap<String, Vec<PathBuf>>,
-    /// The `--with` packages' programs: the package id and the program's
-    /// name.
-    pub(super) programs: Vec<(String, String)>,
+    /// The `--with` packages' programs: the package id, the program's name
+    /// and the object file holding its compiled code.
+    pub(super) programs: Vec<(String, String, PathBuf)>,
 }
 
-/// Builds the core crates and `with` together.
+/// While this is set, xtask runs as the compiler wrapper `build` gives
+/// cargo, and keeps each program's compiled code in the folder it names.
+const OBJECTS: &str = "OPENDRONE_CORE_MATHS_OBJECTS";
+
+/// Builds the core crates and `with` together, in one `cargo build`, so every
+/// library and program is built with the features merged across them all.
+/// A program's own compiled code is otherwise gone once it is linked, so
+/// cargo runs the workspace's crates through this program, which also keeps
+/// each program's compiled code as one object file
+/// ([`compile_keeping_programs`]).
 pub(super) fn build(
     packages: &Packages,
     core: &[String],
     with: &[String],
     manifest_path: Option<&str>,
     target: &str,
+) -> Result<Built, String> {
+    let objects = packages.target_directory.join(target).join("core-maths");
+    std::fs::create_dir_all(&objects)
+        .map_err(|error| format!("can't make {}: {error}", objects.display()))?;
+    let wrapper = std::env::current_exe()
+        .map_err(|error| format!("can't find this program's own file: {error}"))?;
+    // Cargo builds a program again only when something it's made from
+    // changed, so a program's object file is its last build's. If one is
+    // gone, its package is cleaned and built again, once.
+    for attempt in 0..2 {
+        let built = build_once(
+            packages,
+            core,
+            with,
+            manifest_path,
+            target,
+            &wrapper,
+            &objects,
+        )?;
+        let missing: BTreeSet<&str> = built
+            .programs
+            .iter()
+            .filter(|(_, _, object)| !object.exists())
+            .map(|(id, _, _)| packages.name(id))
+            .collect();
+        if missing.is_empty() {
+            return Ok(built);
+        }
+        if attempt > 0 {
+            return Err(format!(
+                "cargo built {} without keeping its compiled code in {}",
+                missing.into_iter().collect::<Vec<_>>().join(", "),
+                objects.display()
+            ));
+        }
+        let mut clean = cargo();
+        clean.args(["clean", "--target", target]);
+        for package in missing {
+            clean.args(["-p", package]);
+        }
+        if let Some(path) = manifest_path {
+            clean.args(["--manifest-path", path]);
+        }
+        let status = clean
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .status()
+            .map_err(|error| format!("couldn't run cargo clean: {error}"))?;
+        if !status.success() {
+            return Err("cargo clean failed (its messages are above)".to_owned());
+        }
+    }
+    unreachable!("the loop returns on its second pass")
+}
+
+fn build_once(
+    packages: &Packages,
+    core: &[String],
+    with: &[String],
+    manifest_path: Option<&str>,
+    target: &str,
+    wrapper: &Path,
+    objects: &Path,
 ) -> Result<Built, String> {
     let mut command = cargo();
     command.args(["build", "--message-format=json", "--target", target]);
@@ -212,6 +284,8 @@ pub(super) fn build(
         command.args(["-p", package]);
     }
     let output = command
+        .env("RUSTC_WORKSPACE_WRAPPER", wrapper)
+        .env(OBJECTS, objects)
         .stderr(Stdio::inherit())
         .output()
         .map_err(|error| format!("couldn't run cargo build: {error}"))?;
@@ -239,7 +313,10 @@ pub(super) fn build(
             if with.iter().any(|name| name == packages.name(id))
                 && let Some(program) = message["target"]["name"].as_str()
             {
-                built.programs.push((id.to_owned(), program.to_owned()));
+                let object = objects.join(object_name(&program.replace('-', "_")));
+                built
+                    .programs
+                    .push((id.to_owned(), program.to_owned(), object));
             }
             continue;
         }
@@ -262,62 +339,51 @@ pub(super) fn build(
     Ok(built)
 }
 
-/// Builds one of the `--with` packages' programs again, keeping its compiled
-/// code as one object file (a program's own is otherwise gone once it is
-/// linked), and gives the file's path. Cargo builds it again only when
-/// something it's made from changed, so the file at that path is the last
-/// build's; if the file is gone, the package is cleaned and built afresh.
-pub(super) fn build_program(
-    packages: &Packages,
-    package: &str,
-    program: &str,
-    manifest_path: Option<&str>,
-    target: &str,
-) -> Result<PathBuf, String> {
-    let folder = packages.target_directory.join(target).join("core-maths");
-    std::fs::create_dir_all(&folder)
-        .map_err(|error| format!("can't make {}: {error}", folder.display()))?;
-    let object = folder.join(format!("{package}-{program}.o"));
-    for attempt in 0..2 {
-        if attempt > 0 {
-            let mut clean = cargo();
-            clean.args(["clean", "--target", target, "-p", package]);
-            if let Some(path) = manifest_path {
-                clean.args(["--manifest-path", path]);
-            }
-            run_cargo(clean, "cargo clean")?;
-        }
-        let mut command = cargo();
-        command.args(["rustc", "--target", target, "-p", package, "--bin", program]);
-        if let Some(path) = manifest_path {
-            command.args(["--manifest-path", path]);
-        }
-        // One codegen unit, so the object file is one file at this path.
-        command
-            .args(["--", "-C", "codegen-units=1"])
-            .arg(format!("--emit=link,obj={}", object.display()));
-        run_cargo(command, "cargo rustc")?;
-        if object.exists() {
-            return Ok(object);
-        }
-    }
-    Err(format!(
-        "cargo rustc didn't write {package}'s program {program} to {}",
-        object.display()
-    ))
+/// The object file a program's compiled code is kept in, by its crate name.
+fn object_name(crate_name: &str) -> String {
+    format!("{crate_name}.o")
 }
 
-/// Runs a cargo command whose messages go to the screen.
-fn run_cargo(mut command: Command, what: &str) -> Result<(), String> {
-    let status = command
-        .stdout(Stdio::null())
-        .stderr(Stdio::inherit())
-        .status()
-        .map_err(|error| format!("couldn't run {what}: {error}"))?;
-    if !status.success() {
-        return Err(format!("{what} failed (its messages are above)"));
+/// When cargo runs xtask as the compiler wrapper [`build`] gives it, compiles
+/// the crate and gives the compiler's exit code. A program built for the
+/// target (not a build script) is compiled as one codegen unit, keeping its
+/// compiled code as an object file as well. Returns `None` when xtask runs
+/// as itself.
+pub(crate) fn compile_keeping_programs() -> Option<std::process::ExitCode> {
+    let objects = PathBuf::from(std::env::var_os(OBJECTS)?);
+    let mut args = std::env::args_os().skip(1);
+    let rustc = args.next()?;
+    let args: Vec<std::ffi::OsString> = args.collect();
+    let value_after = |flag: &str| {
+        args.iter()
+            .position(|arg| arg == flag)
+            .and_then(|at| args.get(at + 1))
+            .and_then(|value| value.to_str())
+    };
+    let is_program = value_after("--crate-type") == Some("bin");
+    let for_the_target = args.iter().any(|arg| arg == "--target");
+    let mut command = Command::new(rustc);
+    command.args(&args);
+    if is_program
+        && for_the_target
+        && let Some(crate_name) = value_after("--crate-name")
+        && !crate_name.starts_with("build_script_")
+    {
+        command.args(["-C", "codegen-units=1"]).arg(format!(
+            "--emit=obj={}",
+            objects.join(object_name(crate_name)).display()
+        ));
     }
-    Ok(())
+    let code = match command.status() {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(error) => {
+            eprintln!("xtask couldn't run the compiler: {error}");
+            1
+        }
+    };
+    Some(std::process::ExitCode::from(
+        u8::try_from(code).unwrap_or(1),
+    ))
 }
 
 fn cargo() -> Command {

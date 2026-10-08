@@ -354,6 +354,102 @@ fn an_inline_core_function_calling_acos_compiled_into_the_scenario_runner_fails(
 }
 
 #[test]
+fn a_generic_copy_shared_from_a_crate_that_uses_only_a_core_library_is_read_too() {
+    // Crates built without optimisation share their generic copies: here
+    // `pictures` builds `glamx::eigen::<f32>`, and the game's copy of the
+    // physics' `hull::<f32>` calls that copy instead of building its own. The
+    // call to `acos` sits only in `pictures`, which uses glamx but no core
+    // crate.
+    let outcome = Fixture::new("shared-generic-copy")
+        .outside(
+            "glamx",
+            &[],
+            "pub fn eigen<T: Into<f64>>(x: T) -> f64 { x.into().acos() }",
+        )
+        .outside(
+            "pictures",
+            &["glamx"],
+            "pub fn shade(x: f32) -> f64 { glamx::eigen(x) }",
+        )
+        .member("opendrone-maths", &[], "")
+        .member(
+            "opendrone-physics",
+            &["opendrone-maths", "glamx"],
+            "pub fn hull<T: Into<f64>>(x: T) -> f64 { glamx::eigen(x) }",
+        )
+        .optimise("opendrone-physics")
+        .program(
+            "opendrone",
+            &["opendrone-physics", "pictures"],
+            "fn main() { println!(\"{} {}\", opendrone_physics::hull(0.5_f32), \
+             pictures::shade(0.25)); }",
+        )
+        .check_with(&["opendrone"]);
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("- `glamx` calls the operating system's `acos` (Rust's `f64::acos`) from ");
+}
+
+#[test]
+fn a_program_is_checked_with_the_features_every_package_turns_on_together() {
+    // The game turns on glamx's `std`, which makes its generic `eigen` call
+    // `acos`. The Scenario runner's program, built alone, would get glamx
+    // without it; built together with the game, as the check builds it, its
+    // copy of `eigen` calls `acos`.
+    let glamx = "#[cfg(feature = \"std\")]\n\
+                 pub fn eigen<T: Into<f64>>(x: T) -> f64 { x.into().acos() }\n\
+                 #[cfg(not(feature = \"std\"))]\n\
+                 pub fn eigen<T: Into<f64>>(x: T) -> f64 { x.into() * 0.5 }";
+    let outcome = Fixture::new("program-with-merged-features")
+        .outside("glamx", &[], glamx)
+        .features("glamx", &["std"])
+        .member("opendrone-maths", &[], "")
+        .member(
+            "opendrone-physics",
+            &["opendrone-maths", "glamx"],
+            "pub fn hull<T: Into<f64>>(x: T) -> f64 { glamx::eigen(x) }",
+        )
+        .member("opendrone", &["opendrone-physics", "glamx/std"], "")
+        .program(
+            "opendrone-scenario",
+            &["opendrone-physics"],
+            "fn main() { println!(\"{}\", opendrone_physics::hull(0.5_f32)); }",
+        )
+        .check_with(&["opendrone", "opendrone-scenario"]);
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("calls the operating system's `acos` (Rust's `f64::acos`) from ");
+    outcome.says("(compiled into the program `opendrone-scenario`)");
+}
+
+#[test]
+fn the_summary_counts_the_crates_read_and_those_holding_core_functions_apart() {
+    // The game calls a generic function of the physics, so its program holds
+    // a core function; the Scenario runner's library calls none.
+    let outcome = Fixture::new("summary-counts")
+        .member(
+            "opendrone-maths",
+            &[],
+            "pub fn twice<T: Copy + std::ops::Add<Output = T>>(x: T) -> T { x + x }",
+        )
+        .member(
+            "opendrone-scenario",
+            &["opendrone-maths"],
+            "pub fn name() -> &'static str { \"runner\" }",
+        )
+        .program(
+            "opendrone",
+            &["opendrone-maths", "opendrone-scenario"],
+            "fn main() { println!(\"{} {}\", opendrone_maths::twice(2.0_f64), \
+             opendrone_scenario::name()); }",
+        )
+        .check_with(&["opendrone"]);
+    assert!(outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "1 libraries checked, and 2 other crates' compiled code read for the core's functions \
+         (found in 1)",
+    );
+}
+
+#[test]
 fn link_time_optimisation_fails_the_check_instead_of_hiding_the_calls() {
     // With link-time optimisation, the libraries hold LLVM bitcode instead of
     // machine code, and their calls can't be read.

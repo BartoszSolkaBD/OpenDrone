@@ -27,10 +27,16 @@
 //! 4. A generic or `#[inline]` function is compiled into the crate that uses
 //!    it, so a core library's function can sit in another crate's compiled
 //!    code: the game's, say, when it calls a generic function of the physics.
-//!    So the check also reads the compiled code of every other crate in the
-//!    build that uses the core, including the `--with` packages' programs,
-//!    and counts the calls made there by a core library's functions. Symbol
-//!    names say whose function each one is ([`owner`]).
+//!    And a crate built without optimisation shares its generic copies: a
+//!    crate built later reuses one instead of building its own, so the
+//!    game's copy of a physics function may call glamx's copy built in a
+//!    crate that uses only glamx. So the check also reads the compiled code
+//!    of every other crate in the build that uses any library the core is
+//!    built with, including the `--with` packages' programs (kept from the
+//!    same build, so with the same features), and counts the calls made
+//!    there by a core library's functions. Symbol names say whose function
+//!    each one is ([`owner`]). A crate's own use of a core library's generic
+//!    maths counts too, which fails safe.
 //!
 //! Any call not allowed in `walls.toml`'s `[core-platform-maths]`, with its
 //! reason, fails the check with a plain sentence naming the library, the
@@ -63,8 +69,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::walls::{RULES_FILE, Rules};
-use build::{Packages, build, build_program, cargo_metadata, host_triple};
-use code::{Code, Place};
+pub(crate) use build::compile_keeping_programs;
+use build::{Packages, build, cargo_metadata, host_triple};
+use code::{Code, Depth, Place};
 
 /// The C maths library's functions whose results can differ from one
 /// operating system's library to another, as compiled code names them: in
@@ -213,10 +220,17 @@ pub fn run(args: &[String]) -> ExitCode {
         .iter()
         .partition(|call| rules.platform_maths_reason(call).is_some());
     if refused.is_empty() && found.bitcode.is_empty() {
-        let others = match found.others {
+        let others = match found.others_read {
             0 => String::new(),
-            1 => ", and the core's functions compiled into 1 other crate".to_owned(),
-            others => format!(", and the core's functions compiled into {others} other crates"),
+            1 => format!(
+                ", and 1 other crate's compiled code read for the core's functions (found in {})",
+                found.others_holding
+            ),
+            read => format!(
+                ", and {read} other crates' compiled code read for the core's functions (found in \
+                 {})",
+                found.others_holding
+            ),
         };
         let with = if with.is_empty() {
             String::new()
@@ -371,9 +385,11 @@ impl Call {
 struct Found {
     /// How many libraries the core is built with.
     libraries: usize,
-    /// How many other crates' compiled code was read for the core's
-    /// functions.
-    others: usize,
+    /// How many other crates' (and programs') compiled code was read for the
+    /// core's functions.
+    others_read: usize,
+    /// How many of those hold any of the core's functions.
+    others_holding: usize,
     /// Every call to the operating system's maths, in order of library and
     /// function.
     calls: Vec<Call>,
@@ -400,7 +416,10 @@ fn check(
     let mut owners = Owners::default();
     let mut core_code = Vec::new();
     for (id, name) in &core {
-        let code = read_rlibs(built.rlibs.get(id).map(Vec::as_slice).unwrap_or_default())?;
+        let code = read_code(
+            built.rlibs.get(id).map(Vec::as_slice).unwrap_or_default(),
+            Depth::Calls,
+        )?;
         if code.bitcode {
             bitcode.push(name.clone());
         }
@@ -411,53 +430,56 @@ fn check(
         core_calls(name, code, &owners, &mut calls);
     }
 
-    // Then every other crate in the build that uses a core crate: the core's
-    // generic and inline functions are compiled into them. A crate that uses
-    // none can't run the Simulation's code, so what it does with a library
-    // the core also uses is its own business.
-    let core_crates: BTreeMap<String, String> = core
-        .iter()
-        .filter(|(_, name)| rules.core.contains(name))
-        .map(|(id, name)| (id.clone(), name.clone()))
-        .collect();
-    let mut others = 0;
-    if bitcode.is_empty() {
-        for (id, rlibs) in &built.rlibs {
-            if core.contains_key(id) || !packages.uses_any(id, &core_crates) {
-                continue;
-            }
+    // Then every other crate in the build that uses any library the core is
+    // built with, and the `--with` packages' programs: the core's generic and
+    // inline functions are compiled into them, and a crate built without
+    // optimisation may hold a generic copy that the game's copy of a core
+    // function calls.
+    let mut others: Vec<(String, String, &[PathBuf])> = Vec::new();
+    for (id, rlibs) in &built.rlibs {
+        if !core.contains_key(id) && packages.uses_any(id, &core) {
             let name = packages.name(id);
-            let code = read_rlibs(rlibs)?;
-            others += 1;
-            if code.bitcode {
-                bitcode.push(name.to_owned());
-            }
-            other_calls(&format!("`{name}`"), &code, &owners, &mut calls);
+            others.push((name.to_owned(), format!("`{name}`"), rlibs));
         }
-        for (id, program) in &built.programs {
-            let name = packages.name(id);
-            let object = build_program(&packages, name, program, manifest_path, target)?;
-            let bytes = std::fs::read(&object)
-                .map_err(|error| format!("can't read {}: {error}", object.display()))?;
-            let mut code = Code::default();
-            code.read_object_file(&bytes)
-                .map_err(|error| format!("can't read {}: {error}", object.display()))?;
-            others += 1;
-            if code.bitcode {
-                bitcode.push(name.to_owned());
+    }
+    for (id, program, object) in &built.programs {
+        others.push((
+            packages.name(id).to_owned(),
+            format!("the program `{program}`"),
+            std::slice::from_ref(object),
+        ));
+    }
+    let mut others_read = 0;
+    let mut others_holding = 0;
+    if bitcode.is_empty() {
+        for (name, place, files) in others {
+            // Its names first, quickly: most crates name no maths function.
+            let code = read_code(files, Depth::Names)?;
+            others_read += 1;
+            if code
+                .functions
+                .iter()
+                .any(|function| owners.library(function).is_some())
+            {
+                others_holding += 1;
             }
-            other_calls(
-                &format!("the program `{program}`"),
-                &code,
-                &owners,
-                &mut calls,
-            );
+            if code.bitcode {
+                bitcode.push(name);
+            } else if !code.maths.is_empty() {
+                other_calls(
+                    &place,
+                    &read_code(files, Depth::Calls)?,
+                    &owners,
+                    &mut calls,
+                );
+            }
         }
     }
 
     Ok(Found {
         libraries: core.len(),
-        others,
+        others_read,
+        others_holding,
         calls: calls
             .into_iter()
             .map(|((library, function), callers)| Call {
@@ -470,13 +492,18 @@ fn check(
     })
 }
 
-fn read_rlibs(rlibs: &[PathBuf]) -> Result<Code, String> {
+/// Reads compiled code: `.rlib` archives, or a program's object file.
+fn read_code(files: &[PathBuf], depth: Depth) -> Result<Code, String> {
     let mut code = Code::default();
-    for rlib in rlibs {
-        let bytes = std::fs::read(rlib)
-            .map_err(|error| format!("can't read {}: {error}", rlib.display()))?;
-        code.read_rlib(&bytes)
-            .map_err(|error| format!("can't read {}: {error}", rlib.display()))?;
+    for file in files {
+        let bytes = std::fs::read(file)
+            .map_err(|error| format!("can't read {}: {error}", file.display()))?;
+        if file.extension().is_some_and(|ext| ext == "rlib") {
+            code.read_rlib(&bytes, depth)
+        } else {
+            code.read_object_file(&bytes, depth)
+        }
+        .map_err(|error| format!("can't read {}: {error}", file.display()))?;
     }
     Ok(code)
 }

@@ -63,12 +63,25 @@ pub fn runs_parry3ds_operating_system_maths(
     mesh: &mut parry3d_f64::shape::TriMesh,
     tree: &mut parry3d_f64::partitioning::Bvh,
     workspace: &mut parry3d_f64::partitioning::BvhWorkspace,
+    volume: &parry3d_f64::transformation::VolumeMeshParameters,
 ) {
-    use parry3d_f64::shape::{TriMesh, TriMeshFlags};
+    use parry3d_f64::shape::{SharedShape, TriMesh, TriMeshFlags};
     let corners = mesh.vertices().to_vec();
     let triangles = mesh.indices().to_vec();
     let _ = mesh.set_flags(TriMeshFlags::ORIENTED);
-    let _ = TriMesh::with_flags(corners.clone(), triangles, TriMeshFlags::ORIENTED);
+    let _ = TriMesh::with_flags(corners.clone(), triangles.clone(), TriMeshFlags::ORIENTED);
+    let _ = SharedShape::trimesh_with_flags(
+        corners.clone(),
+        triangles.clone(),
+        TriMeshFlags::ORIENTED,
+    );
+    let _ = mesh.connected_component_meshes(TriMeshFlags::ORIENTED);
+    if let Some(components) = mesh.connected_components() {
+        let _ = components.to_meshes(mesh, TriMeshFlags::ORIENTED);
+    }
+    let _ = parry3d_f64::transformation::volume_mesh(&corners, &triangles, volume);
+    let copy = mesh.clone();
+    mesh.append(&copy);
     mesh.update_vertices(|_| {});
     mesh.set_vertices(&corners);
     tree.optimize_incremental(workspace);

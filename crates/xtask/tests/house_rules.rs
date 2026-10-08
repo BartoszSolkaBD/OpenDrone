@@ -59,7 +59,8 @@ fn the_house_rules_ban_the_parry3d_functions_that_would_run_its_allowed_operatin
     // walls.toml lets parry3d keep its calls to the operating system's
     // `acos` (a mesh's pseudo-normals) and `log2` (rebalancing a tree of
     // moving shapes) only because the Simulation never runs them. These are
-    // the ways into them; the check below proves Clippy flags each one.
+    // every public way into them in parry3d 0.31.1; the check below proves
+    // Clippy flags each one.
     let settings: toml::Table = read(&crates().join("maths/clippy.toml"))
         .parse()
         .expect("clippy.toml is valid TOML");
@@ -71,6 +72,11 @@ fn the_house_rules_ban_the_parry3d_functions_that_would_run_its_allowed_operatin
         "parry3d_f64::shape::TriMesh::with_flags",
         "parry3d_f64::shape::TriMesh::update_vertices",
         "parry3d_f64::shape::TriMesh::set_vertices",
+        "parry3d_f64::shape::SharedShape::trimesh_with_flags",
+        "parry3d_f64::shape::TriMesh::connected_component_meshes",
+        "parry3d_f64::shape::TriMeshConnectedComponents::to_meshes",
+        "parry3d_f64::shape::TriMesh::append",
+        "parry3d_f64::transformation::volume_mesh",
         "parry3d_f64::partitioning::Bvh::optimize_incremental",
     ] {
         let entry = entries

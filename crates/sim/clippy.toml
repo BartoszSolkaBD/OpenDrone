@@ -87,11 +87,21 @@ disallowed-methods = [
     # xtask core-maths` allows only because the Simulation never runs them
     # ([core-platform-maths] in crates/xtask/walls.toml): `acos` to work out
     # a mesh's pseudo-normals, and `log2` to rebalance a tree of moving
-    # shapes. These keep it that way. Crates without parry3d ignore them.
+    # shapes. These are every public way into them in parry3d 0.31, and keep
+    # it that way. (TriMesh's intersection_with_aabb, intersection_with_cuboid
+    # and intersection_with_local_cuboid reach it too, but only on a mesh that
+    # already has pseudo-normals, and only with parry3d's spade feature, which
+    # the core isn't built with: Clippy can't name them here.) Crates without
+    # parry3d ignore these.
     { path = "parry3d_f64::shape::TriMesh::set_flags", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
     { path = "parry3d_f64::shape::TriMesh::with_flags", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
     { path = "parry3d_f64::shape::TriMesh::update_vertices", reason = "moving a mesh's corners redoes its pseudo-normals with the operating system's acos, which differs between platforms; build a new mesh with TriMesh::new instead (ADR-0001)" },
     { path = "parry3d_f64::shape::TriMesh::set_vertices", reason = "moving a mesh's corners redoes its pseudo-normals with the operating system's acos, which differs between platforms; build a new mesh with TriMesh::new instead (ADR-0001)" },
+    { path = "parry3d_f64::shape::SharedShape::trimesh_with_flags", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMesh::connected_component_meshes", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMeshConnectedComponents::to_meshes", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMesh::append", reason = "it builds the joined mesh again with its flags, which can make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build one mesh with TriMesh::new instead (ADR-0001)" },
+    { path = "parry3d_f64::transformation::volume_mesh", reason = "it builds an oriented mesh, working out pseudo-normals with the operating system's acos, which differs between platforms (ADR-0001)" },
     { path = "parry3d_f64::partitioning::Bvh::optimize_incremental", reason = "it rebalances the tree with the operating system's log2, which differs between platforms; the Map's solid parts never move, so the tree is built once (ADR-0001)" },
 
     # std's min and max may return either zero when given +0 and -0, and the

@@ -40,15 +40,25 @@ pub(crate) struct Code {
 /// (or else data).
 type Defined = (u64, String, bool);
 
+/// How much of the compiled code to read.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Depth {
+    /// Its functions, and which maths functions it names: enough to know
+    /// whether a crate's code needs reading in full, quickly.
+    Names,
+    /// Everything, calls included.
+    Calls,
+}
+
 impl Code {
     /// Adds one `.rlib`, an archive of object files.
-    pub fn read_rlib(&mut self, bytes: &[u8]) -> Result<(), String> {
+    pub fn read_rlib(&mut self, bytes: &[u8], depth: Depth) -> Result<(), String> {
         let archive = ArchiveFile::parse(bytes).map_err(|error| error.to_string())?;
         for member in archive.members() {
             let member = member.map_err(|error| error.to_string())?;
             let data = member.data(bytes).map_err(|error| error.to_string())?;
             match object::File::parse(data) {
-                Ok(file) => self.read_object(&file),
+                Ok(file) => self.read_object(&file, depth),
                 // The archive also holds Rust's own metadata, which isn't
                 // code. LLVM bitcode is code, which this check can't read.
                 Err(_) => self.bitcode |= is_bitcode(data),
@@ -58,17 +68,17 @@ impl Code {
     }
 
     /// Adds one object file.
-    pub fn read_object_file(&mut self, bytes: &[u8]) -> Result<(), String> {
+    pub fn read_object_file(&mut self, bytes: &[u8], depth: Depth) -> Result<(), String> {
         if is_bitcode(bytes) {
             self.bitcode = true;
             return Ok(());
         }
         let file = object::File::parse(bytes).map_err(|error| error.to_string())?;
-        self.read_object(&file);
+        self.read_object(&file, depth);
         Ok(())
     }
 
-    fn read_object(&mut self, file: &object::File<'_>) {
+    fn read_object(&mut self, file: &object::File<'_>, depth: Depth) {
         let mut maths: BTreeMap<usize, String> = BTreeMap::new();
         let mut defined: BTreeMap<usize, Vec<Defined>> = BTreeMap::new();
         for symbol in file.symbols() {
@@ -106,6 +116,9 @@ impl Code {
         // from code this check couldn't name.
         for name in maths.values() {
             self.maths.entry(name.clone()).or_default();
+        }
+        if depth == Depth::Names {
+            return;
         }
         for section in file.sections() {
             // Debug information describes the code; it never runs.

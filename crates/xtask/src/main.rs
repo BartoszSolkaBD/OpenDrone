@@ -87,6 +87,11 @@ Commands:
       the seconds given.";
 
 fn main() -> ExitCode {
+    // `core-maths` has cargo run xtask as its compiler wrapper, to keep each
+    // program's compiled code.
+    if let Some(code) = core_maths::compile_keeping_programs() {
+        return code;
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let Some((command, rest)) = args.split_first() else {
         eprintln!("{USAGE}\n{}", review::usage());
