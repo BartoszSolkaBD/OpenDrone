@@ -82,6 +82,21 @@ fn a_pull_request_that_only_changes_a_feel_test_log_in_a_non_ascii_pack_folder_r
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_adds_a_file_whose_name_ends_in_a_line_break_after_md_runs_the_rust_checks() {
+    // Reviewer's case on #99: `$(…)` drops the line breaks at the very end of
+    // what it reads, so a name ending in one, sorted last, read as Markdown.
+    // Its name ends in a line break, not ".md", so it isn't docs.
+    let repo = Repo::new("name-ending-in-a-line-break");
+    repo.write(
+        "docs/zz-notes.md\n",
+        "Not Markdown, whatever the name says.\n",
+    );
+    let outputs = repo.commit_and_check("pull_request");
+    assert_eq!(outputs["rust"], "true", "{outputs:?}");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
 fn a_pull_request_that_changes_a_text_file_under_docs_runs_the_rust_checks() {
     let repo = Repo::new("docs-text-file");
     repo.write(

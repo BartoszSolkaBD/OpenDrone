@@ -1,6 +1,6 @@
 //! A Pack's manifest, `pack.toml` (#16 §1 and §12, ADR-0011).
 
-use crate::document::{self, Document, Problems};
+use crate::document::{self, Document, Problems, Table};
 
 /// What a Pack says about itself.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,6 +17,24 @@ pub struct Manifest {
     pub licence: String,
     /// Files under another licence, by path, from the `[licences]` list.
     pub licences: Vec<LicenceOverride>,
+    /// The Quads taken out of this Pack, from the `[retired]` list, in the
+    /// order it writes them.
+    pub retired: Vec<Retired>,
+}
+
+/// One line of `[retired]`: a Quad taken out of the Pack, and why. A change
+/// that takes a Quad out must say so here, unless it only renames or moves
+/// it, and CI lists every one for the Reviewer (`cargo xtask feel-tests`).
+/// The Quad's folder must be gone.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Retired {
+    /// The Quad's folder name, its id inside the Pack, such as `whoop-65`
+    /// from the line `"quads/whoop-65" = "…"`.
+    pub quad: String,
+    /// Why it was taken out, in a sentence.
+    pub why: String,
+    /// The line of `pack.toml` that retires it.
+    pub line: usize,
 }
 
 /// One line of `[licences]`: files under a licence other than the Pack's.
@@ -39,6 +57,7 @@ const KEYS: &[&str] = &[
     "author",
     "licence",
     "licences",
+    "retired",
 ];
 
 /// The id kept for Test Quads and the built-in Test Maps (#16 §2).
@@ -131,6 +150,7 @@ pub fn read_manifest(file: &str, text: &str) -> Result<Manifest, Problems> {
             });
         }
     }
+    let retired = read_retired(&root, &mut problems);
     let manifest = (|| {
         Some(Manifest {
             id: id?.0,
@@ -140,12 +160,45 @@ pub fn read_manifest(file: &str, text: &str) -> Result<Manifest, Problems> {
             author: author?.0,
             licence: licence?.0,
             licences,
+            retired,
         })
     })();
     match manifest {
         Some(manifest) => problems.or(manifest),
         None => Err(problems),
     }
+}
+
+/// The `[retired]` list: each line names a Quad's folder and says why it was
+/// taken out, such as `"quads/whoop-65" = "Replaced by the Whoop 75."`.
+fn read_retired(root: &Table<'_, '_>, problems: &mut Problems) -> Vec<Retired> {
+    let mut retired = Vec::new();
+    let Some(table) = root.get("retired").and_then(|item| item.table(problems)) else {
+        return retired;
+    };
+    for (path, item) in table.entries() {
+        let Some(quad) = path.strip_prefix("quads/").filter(|quad| is_an_id(quad)) else {
+            problems.push(item.problem(format!(
+                "\"{path}\" isn't a Quad of this Pack: write its folder, such as \"quads/whoop-65\"; so far only Quads can be retired"
+            )));
+            continue;
+        };
+        let Some(why) = item.text(problems) else {
+            continue;
+        };
+        if why.trim().is_empty() {
+            problems.push(item.problem(format!(
+                "\"{path}\" needs a why: say in a sentence why it was taken out"
+            )));
+            continue;
+        }
+        retired.push(Retired {
+            quad: quad.to_string(),
+            why: why.to_string(),
+            line: item.line(),
+        });
+    }
+    retired
 }
 
 /// Lowercase words (letters and digits) joined by single dashes, such as

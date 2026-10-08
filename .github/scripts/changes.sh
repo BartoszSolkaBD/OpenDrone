@@ -35,7 +35,15 @@ fi
 # The NULs become line breaks for grep. A path holding a line break splits in
 # parts, which never skips a check: its last part ends in ".md" only if the
 # path does, and its first starts with "packs/" only if the path does.
-changed="$(git diff -z --name-only --no-renames HEAD^1 HEAD | tr '\0' '\n')"
+# `$(…)` drops every line break at the very end of what it reads, so a name
+# ending in one ("notes.md⏎"), sorted last, would read as Markdown. The "x"
+# keeps them: it comes off, then exactly one line break, the one after the
+# last path. Such a name then leaves an empty line, which isn't Markdown. The
+# `&&` adds the "x" only if git worked, so a failed `git diff` still stops the
+# script (pipefail) instead of reading as "nothing changed".
+changed="$(git diff -z --name-only --no-renames HEAD^1 HEAD | tr '\0' '\n' && echo x)"
+changed="${changed%x}"
+changed="${changed%$'\n'}"
 echo "Files this pull request changes:"
 sed 's/^/  /' <<< "$changed"
 

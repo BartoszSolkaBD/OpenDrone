@@ -154,8 +154,73 @@ fn a_manifest_lists_only_what_opendrone_reads() {
         at(
             MANIFEST,
             8,
-            "`website` isn't something OpenDrone reads in the top of the file; it reads `format`, `id`, `name`, `description`, `version`, `author`, `licence`, `licences`"
+            "`website` isn't something OpenDrone reads in the top of the file; it reads `format`, `id`, `name`, `description`, `version`, `author`, `licence`, `licences`, `retired`"
         )
+    );
+}
+
+/// The good fixture with its Quad taken out, and its Test Quad with it, which
+/// builds on that Quad.
+fn without_the_quad(case: &str) -> Fixture {
+    let fixture = Fixture::new(case);
+    std::fs::remove_dir_all(fixture.root.join("packs/fixture/quads/ducted")).unwrap();
+    fixture.remove(TEST_QUAD);
+    fixture
+}
+
+#[test]
+fn a_pack_retires_a_quad_it_took_out_by_naming_its_folder_and_saying_why() {
+    let fixture = without_the_quad("retired");
+    let manifest = fixture.read(MANIFEST)
+        + "\n[retired]\n\"quads/ducted\" = \"Replaced by a 75 mm whoop with the same ducts.\"\n";
+    fixture.write(MANIFEST, &manifest);
+    assert_eq!(fixture.problems(), Vec::<String>::new());
+    assert_eq!(
+        fixture.packs().manifests()[0].retired,
+        [opendrone_pack::Retired {
+            quad: "ducted".to_string(),
+            why: "Replaced by a 75 mm whoop with the same ducts.".to_string(),
+            line: common::line_of(&manifest, "\"quads/ducted\""),
+        }]
+    );
+}
+
+#[test]
+fn a_retired_quads_folder_must_be_gone() {
+    // Otherwise the Pack would still offer a Quad it says was taken out.
+    let fixture = Fixture::new("retired-but-still-here");
+    let manifest = fixture.read(MANIFEST) + "\n[retired]\n\"quads/ducted\" = \"Replaced.\"\n";
+    fixture.write(MANIFEST, &manifest);
+    assert_eq!(
+        fixture.problems(),
+        [at(
+            MANIFEST,
+            common::line_of(&manifest, "\"quads/ducted\""),
+            "quads/ducted is retired, but its folder is still here: take the folder out, or this line"
+        )]
+    );
+}
+
+#[test]
+fn a_retired_line_names_a_quads_folder_and_says_why() {
+    let fixture = without_the_quad("retired-lines");
+    let manifest = fixture.read(MANIFEST)
+        + "\n[retired]\n\"maps/skate-park\" = \"Rebuilt.\"\n\"quads/old-whoop\" = \"\"\n";
+    fixture.write(MANIFEST, &manifest);
+    assert_eq!(
+        fixture.problems()[..2],
+        [
+            at(
+                MANIFEST,
+                common::line_of(&manifest, "skate-park"),
+                "\"maps/skate-park\" isn't a Quad of this Pack: write its folder, such as \"quads/whoop-65\"; so far only Quads can be retired"
+            ),
+            at(
+                MANIFEST,
+                common::line_of(&manifest, "old-whoop"),
+                "\"quads/old-whoop\" needs a why: say in a sentence why it was taken out"
+            ),
+        ]
     );
 }
 
@@ -747,6 +812,101 @@ fn only_test_quads_live_in_the_test_quad_folder() {
     assert_eq!(
         fixture.problems(),
         ["test-quads/notes.txt: only Test Quads, each written as <id>.toml, live in test-quads"]
+    );
+}
+
+// Folders and links the checker refuses rather than skip
+
+const DOT_FOLDER: &str = "is a folder whose name starts with a dot, which most computers hide, so the Pack checker refuses it rather than skip it: rename it without the dot, or take it out";
+const LINK: &str = "is a symbolic link, which the Pack checker refuses rather than follow, so it never reads from outside the folder it checks: put the real file or folder here";
+
+#[test]
+fn a_folder_whose_name_starts_with_a_dot_is_refused_anywhere_rather_than_skipped() {
+    // Reviewer's case on #99: a Pack's folder renamed to `.opendrone` was
+    // skipped, so its Quads quietly left every check.
+    let fixture = Fixture::new("dot-named-folders");
+    fixture.write("packs/.archive/pack.toml", &fixture.read(MANIFEST));
+    fixture.write("packs/fixture/.git/HEAD", "ref: refs/heads/main\n");
+    fixture.write(
+        "packs/fixture/quads/.ducted-old/quad.toml",
+        &fixture.read(QUAD),
+    );
+    fixture.write("test-quads/.drafts/ducted-heavy.toml", "format = 1\n");
+    assert_eq!(
+        fixture.problems(),
+        [
+            format!("packs/.archive: {DOT_FOLDER}"),
+            format!("packs/fixture/.git: {DOT_FOLDER}"),
+            format!("packs/fixture/quads/.ducted-old: {DOT_FOLDER}"),
+            format!("test-quads/.drafts: {DOT_FOLDER}"),
+        ]
+    );
+    let loaded: Vec<String> = fixture
+        .packs()
+        .quads()
+        .iter()
+        .map(|q| q.id.clone())
+        .collect();
+    assert_eq!(loaded, ["fixture/ducted"]);
+}
+
+#[test]
+fn a_file_whose_name_starts_with_a_dot_such_as_ds_store_is_still_skipped() {
+    // macOS leaves a .DS_Store in every folder it shows; it holds nothing the
+    // checker reads.
+    let fixture = Fixture::new("dot-named-files");
+    for file in [
+        "packs/.DS_Store",
+        "packs/fixture/quads/ducted/.DS_Store",
+        "test-quads/.DS_Store",
+    ] {
+        fixture.write(file, "Finder's notes");
+    }
+    assert_eq!(fixture.problems(), Vec::<String>::new());
+}
+
+#[test]
+fn a_symbolic_link_anywhere_under_packs_or_the_test_quads_is_refused_rather_than_followed() {
+    // Reviewer's case on #99: git keeps a link as one small file, so the base
+    // revision had no Quads behind it while the working tree followed it.
+    let fixture = Fixture::new("symbolic-links");
+    fixture.write("elsewhere/pack.toml", &fixture.read(MANIFEST));
+    fixture.write("elsewhere/ducted-heavy.toml", &fixture.read(TEST_QUAD));
+    std::fs::rename(
+        fixture.root.join("packs/fixture/quads/ducted/picture.png"),
+        fixture.root.join("elsewhere/picture.png"),
+    )
+    .unwrap();
+    let links = [
+        ("../elsewhere", "packs/linked"),
+        (
+            "../../../../elsewhere/picture.png",
+            "packs/fixture/quads/ducted/picture.png",
+        ),
+        (
+            "../elsewhere/ducted-heavy.toml",
+            "test-quads/ducted-heavy.toml",
+        ),
+    ];
+    for (target, link) in links {
+        if common::symbolic_link(target, &fixture.root.join(link)).is_none() {
+            return;
+        }
+    }
+    assert_eq!(
+        fixture.problems(),
+        [
+            format!("packs/fixture/quads/ducted/picture.png: {LINK}"),
+            format!("packs/linked: {LINK}"),
+            format!("test-quads/ducted-heavy.toml: {LINK}"),
+            "test-quads/ducted-no-drag.toml line 3: can't build on \"fixture/ducted\" until its own problems are fixed".to_string(),
+        ]
+    );
+    let packs = fixture.packs();
+    assert_eq!(packs.manifests().len(), 1, "the linked Pack isn't read");
+    assert_eq!(
+        packs.quad("fixture/ducted").unwrap_err().to_string(),
+        format!("packs/fixture/quads/ducted/picture.png: {LINK}")
     );
 }
 

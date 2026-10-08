@@ -109,6 +109,33 @@ impl Fixture {
     }
 }
 
+/// Makes `link` a symbolic link to `target`, a path relative to the link's
+/// folder, as `ln -s` does. `None` means this computer can't make one: Windows
+/// lets only an administrator, or Developer Mode, make symbolic links, so
+/// there a check that needs one says why and skips. macOS and Linux CI always
+/// run it.
+pub fn symbolic_link(target: &str, link: &Path) -> Option<()> {
+    #[cfg(unix)]
+    let made = std::os::unix::fs::symlink(target, link);
+    #[cfg(windows)]
+    let made = if link.parent().unwrap().join(target).is_dir() {
+        std::os::windows::fs::symlink_dir(target, link)
+    } else {
+        std::os::windows::fs::symlink_file(target, link)
+    };
+    match made {
+        Ok(()) => Some(()),
+        Err(error) if cfg!(windows) => {
+            eprintln!(
+                "Skipped: Windows didn't make the symbolic link {} ({error}); it needs Developer Mode or an administrator. macOS and Linux CI run this check.",
+                link.display()
+            );
+            None
+        }
+        Err(error) => panic!("can't make the symbolic link {}: {error}", link.display()),
+    }
+}
+
 /// The line of `text` that holds `needle`.
 pub fn line_of(text: &str, needle: &str) -> usize {
     text.lines()

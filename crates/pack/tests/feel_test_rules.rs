@@ -6,7 +6,7 @@ mod common;
 
 use common::{LOG, QUAD, good_fixture, line_of};
 use opendrone_pack::feel_tests::{
-    FeelTestReport, QuadFiles, QuadVersion, check_feel_test_rules, compare_packs,
+    FeelTestReport, QuadFiles, QuadVersion, RetiredQuad, check_feel_test_rules, compare_packs,
 };
 
 /// The fixture's Quad definition and Feel Test log, before any change.
@@ -386,6 +386,7 @@ fn report(quad: &str, log: &str) -> FeelTestReport {
     compare_packs(
         &[files("fixture/ducted", &quad_before, &log_before)],
         &[files("fixture/ducted", quad, log)],
+        &[],
     )
 }
 
@@ -552,8 +553,49 @@ fn quads_are_paired_by_id_so_a_pure_rename_passes() {
     let found = compare_packs(
         &[files("fixture/ducted", &quad, &log)],
         &[files("fixture/ducted-pro", &quad, &log)],
+        &[],
     );
     assert_eq!(sentences(&found.problems), Vec::<String>::new());
+    assert_eq!(
+        found.taken_out,
+        ["fixture/ducted, renamed or moved to fixture/ducted-pro with every setting as it was"]
+    );
+}
+
+/// The removed Quad's problem when a change takes it out without saying so.
+const TAKEN_OUT: &str = "packs/fixture/quads/ducted/quad.toml: this change takes out the Quad fixture/ducted without saying so. Put it back, or retire it: add \"quads/ducted\" = \"<why>\" under [retired] in its Pack's pack.toml. To take a whole Pack out, retire its Quads in one change and take the Pack out in the next";
+
+#[test]
+fn a_quad_taken_out_without_saying_so_is_refused() {
+    // Reviewer's case on #99: a Quad that left the comparison (its folder
+    // hidden, linked or deleted) was never named, so a later change could
+    // bring it back as new with any numbers.
+    let (quad, log) = before();
+    let found = compare_packs(&[files("fixture/ducted", &quad, &log)], &[], &[]);
+    assert_eq!(sentences(&found.problems), [TAKEN_OUT]);
+    assert_eq!(found.taken_out, Vec::<String>::new());
+}
+
+#[test]
+fn a_quad_its_pack_retires_is_named_with_why_for_the_reviewer() {
+    let (quad, log) = before();
+    let found = compare_packs(
+        &[files("fixture/ducted", &quad, &log)],
+        &[],
+        &[RetiredQuad {
+            id: "fixture/ducted".to_string(),
+            manifest_file: "packs/fixture/pack.toml".to_string(),
+            line: 14,
+            why: "Replaced by a 75 mm whoop with the same ducts.".to_string(),
+        }],
+    );
+    assert_eq!(sentences(&found.problems), Vec::<String>::new());
+    assert_eq!(
+        found.taken_out,
+        [
+            "fixture/ducted, retired by packs/fixture/pack.toml line 14: \"Replaced by a 75 mm whoop with the same ducts.\""
+        ]
+    );
 }
 
 #[test]
@@ -569,6 +611,7 @@ fn a_rename_that_also_moves_a_number_is_refused() {
         let found = compare_packs(
             &[files("fixture/ducted", &quad, &log)],
             &[files(new_id, &moved, &log)],
+            &[],
         );
         let folder = format!(
             "packs/{}/quads/{}",
@@ -577,9 +620,12 @@ fn a_rename_that_also_moves_a_number_is_refused() {
         );
         assert_eq!(
             sentences(&found.problems),
-            [format!(
-                "{folder}/quad.toml: this change adds the Quad {new_id} and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another. To retire a Quad and add a different one, take it out in one change and add the new one in another"
-            )]
+            [
+                format!(
+                    "{folder}/quad.toml: this change adds the Quad {new_id} and removes fixture/ducted, so it reads as a rename or a move, which must keep every setting as it was; none of the removed Quads matches it. Rename or move a Quad in a change of its own, and change its numbers in another. To retire a Quad and add a different one, take it out in one change and add the new one in another"
+                ),
+                TAKEN_OUT.to_string(),
+            ]
         );
     }
 }
@@ -597,6 +643,7 @@ fn a_new_quad_beside_the_old_ones_has_nothing_to_compare() {
             files("fixture/ducted", &quad, &log),
             files("fixture/heavy", &other, &log),
         ],
+        &[],
     );
     assert_eq!(sentences(&found.problems), Vec::<String>::new());
 }

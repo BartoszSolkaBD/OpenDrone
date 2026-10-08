@@ -39,6 +39,7 @@ packs/opendrone/                 the Pack; its id comes from pack.toml
 - Ids are lowercase words joined by dashes. The id `test` is kept for Test Quads and Test Maps.
 - Two Packs can't share an id: the second is skipped.
 - A folder of a kind the game doesn't know, such as `modifiers/`, is skipped and reported.
+- **A folder whose name starts with a dot, and a symbolic link, are refused** anywhere in `packs/` or the Test Quad folder, and nothing in them is read. Most computers hide such a folder, and git keeps a link as one small file holding where it points, so either would let a Pack or a Quad quietly leave every check. A file whose name starts with a dot, such as the `.DS_Store` macOS leaves in every folder, holds nothing the checker reads, so it's still skipped.
 
 ## The manifest, `pack.toml`
 
@@ -53,9 +54,14 @@ licence     = "CC0-1.0"
 
 [licences]   # optional: files under another licence, by path
 "maps/harbour/textures/**" = { licence = "CC-BY-4.0", credit = "Rust texture by Jane Doe, example.com" }
+
+[retired]    # optional: Quads taken out of this Pack, and why
+"quads/whoop-65-v1" = "Replaced by the Whoop 65, which has the newer motors."
 ```
 
-Every key is required except `[licences]`, and nothing else may appear. Licences are standard SPDX names. Anything under a CC BY licence needs a credit line.
+Every key is required except `[licences]` and `[retired]`, and nothing else may appear. Licences are standard SPDX names. Anything under a CC BY licence needs a credit line.
+
+`[retired]` names each Quad the Pack took out by its folder, `quads/<id>`, with a sentence saying why. The folder must be gone. A change that takes a Quad out says so here, as the Feel Test log rules below explain. So far only Quads can be retired.
 
 ## A Quad definition, `quad.toml`
 
@@ -146,7 +152,7 @@ Each Quad keeps a log of every Estimate a Feel Test moves, oldest first:
 
 The values are written with their units, as `quad.toml` writes them; they're compared as numbers, so "300 ms" matches "0.3 s". The Pack checker refuses a row whose values don't read as its number.
 
-`cargo xtask feel-tests` compares each Quad with the same Quad before the change. Quads are paired by id (the Pack's id from its `pack.toml`, and the Quad's folder), so moving or renaming a Pack's folder changes nothing, whatever its new name (accents and all). It refuses:
+`cargo xtask feel-tests` compares each Quad with the same Quad before the change. Quads are paired by id (the Pack's id from its `pack.toml`, and the Quad's folder), so moving or renaming a Pack's folder changes nothing, whatever its new name (accents and all). It reads both versions by the Pack checker's rule: a folder whose name starts with a dot, and a symbolic link, hold no Quads. One in the change blocks it. One already in the version before is named, but doesn't block: the change can't make its base pass, and the change that removes one is its fix. It refuses:
 
 - an Estimate that moved without a new row naming it, its old value and its new one, even when its range was re-sourced in the same change;
 - a new row that doesn't record a move this change makes: the same Estimate, its value before the change as the old value, and its value after as the new one;
@@ -156,6 +162,7 @@ The values are written with their units, as `quad.toml` writes them; they're com
 - an Estimate moved with a new source whose row's why doesn't start with "New source", and a "New source" row with no real new source. A "New source" row starts the range afresh from its new value. One may also record a re-sourced range whose value stayed put, with the same old and new value; it still moves where the range is measured from, so CI lists it;
 - a number taken out, such as a whoop's `[ducts]` section, without a new source;
 - a change that removes a Quad and adds one, unless the added Quad keeps every setting of a removed one: a pure rename or move. Rename or move a Quad in a change of its own, and change its numbers in another. **Retiring a Quad and adding a different one takes two changes:** take the old one out in one, and add the new one in the next;
+- a Quad taken out without saying so. A change takes a Quad out only by renaming or moving it, as above, or by retiring it: taking its folder out and adding a line for it under `[retired]` in its Pack's `pack.toml`, saying why. To take a whole Pack out, retire its Quads in one change and take the Pack out in the next. Otherwise a Quad could leave the comparison unseen (its folder deleted, hidden or linked) and come back later as a new Quad with any numbers;
 - an earlier row changed or removed: the log only grows.
 
 "A new source" is easy to write, so CI lists every number that passes on its source alone, and the Reviewer judges whether each source is real:
@@ -165,7 +172,7 @@ The values are written with their units, as `quad.toml` writes them; they're com
 - a number taken out;
 - a number added to a Quad that already existed, such as a 5″ given `[ducts]`, with its Confidence and source.
 
-Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, and names every new Quad, so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
+Counts, choices, camera defaults and the sound block carry no Confidence and move freely. CI lists the counts and choices the Simulation receives that changed too; camera defaults and the sound block don't reach the Simulation, so they aren't listed. CI also says how many Quads it compared with their version before the change, names every new Quad, and names every Quad the change takes out with what became of it (renamed or moved, and where to, or retired, and why), so a Quad left out of the comparison stands out. A change under `packs/` always runs these checks in CI, even when only Markdown changed.
 
 ## Fingerprints
 
