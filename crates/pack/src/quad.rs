@@ -1302,11 +1302,7 @@ fn fingerprint(readings: &Readings, tune: &Tune) -> Fingerprint {
     for section in SECTIONS {
         for key in section.keys {
             let name = format!("{}.{}", section.name, key.name);
-            let simulated = match key.kind {
-                Kind::CameraLimit(_) | Kind::Plain(_) => false,
-                _ => section.simulated || name == "sound.esc_melody",
-            };
-            if !simulated {
+            if !schema::reaches_the_simulation(&name) {
                 continue;
             }
             match readings.get(&name) {

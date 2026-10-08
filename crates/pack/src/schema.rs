@@ -462,3 +462,14 @@ pub fn find(name: &str) -> Option<(&'static Section, &'static Key)> {
     let section = section(section_name)?;
     Some((section, section.key(key_name)?))
 }
+
+/// Whether the Simulation receives the setting `section.key`, so the
+/// fingerprint covers it. The camera sits outside the Simulation, its limits
+/// included, and so does the sound, all but the ESC start-up melody, which
+/// sets when the motors answer.
+pub fn reaches_the_simulation(name: &str) -> bool {
+    find(name).is_some_and(|(section, key)| match key.kind {
+        Kind::CameraLimit(_) | Kind::Plain(_) => false,
+        _ => section.simulated || name == "sound.esc_melody",
+    })
+}
