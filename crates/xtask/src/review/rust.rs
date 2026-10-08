@@ -1,161 +1,198 @@
 //! Telling Rust code from the words around it, for the Red Flags that look
 //! at code: new `unsafe` code and house-rule exceptions.
+//!
+//! It reads a file with rustc's own lexer, `ra-ap-rustc_lexer` 0.174.0, whose
+//! source is byte for byte the lexer of Rust 1.99.0, the pinned Rust, and goes
+//! the way rustc 1.99 goes for a source file:
+//!
+//! 1. drop a byte order mark, and read Windows line ends as plain ones;
+//! 2. skip the first line if `rustc_lexer::strip_shebang` calls it a shebang;
+//! 3. lex, with no frontmatter: Rust 1.99 refuses frontmatter in every file
+//!    but one `include!` pulls in as an expression, where `---` is code;
+//! 4. lex again where rustc's parser does, by edition (`rustc_parse::lexer`,
+//!    the only three places it does): before 2021, a C string's `c` or `cr`
+//!    is a name, and a raw lifetime's `'r` is a lifetime; before 2024, `#"` is
+//!    `#` and then a string, while in 2024 a whole `#"…"#` is one literal.
+//!
+//! So on every file that compiles with Rust 1.99, it finds the comments and
+//! literals rustc finds. The edition is the one the file's crate uses, read
+//! from its `Cargo.toml` ([`edition_of`]); `cargo xtask walls` keeps every
+//! crate on edition 2024, and the Report flags any change to an edition.
 
-/// A Rust file with every comment and the inside of every string and char
-/// literal blanked out, so only code is left. Strings (`"…"`, `b"…"`), raw
-/// strings (`r"…"`, `r#"…"#`, `br#"…"#`), char literals (`'"'`, `'\''`,
-/// `'\u{22}'`), line comments and nested block comments are all understood, so
-/// none of them can hide code from the checks or pass for code. The text keeps
-/// its lines, so line N of the result is line N of the file.
-pub fn code_only(text: &str) -> String {
-    let chars: Vec<char> = text.chars().collect();
-    let mut out = String::with_capacity(text.len());
-    // Blanks a character: a line break stays, so lines still line up.
-    let blank = |out: &mut String, c: char| out.push(if c == '\n' { '\n' } else { ' ' });
-    let is_name = |c: char| c.is_alphanumeric() || c == '_';
-    let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
-        let next = chars.get(i + 1).copied();
-        let after_name = i > 0 && is_name(chars[i - 1]);
-        if c == '/' && next == Some('/') {
-            while i < chars.len() && chars[i] != '\n' {
-                blank(&mut out, chars[i]);
-                i += 1;
-            }
-        } else if c == '/' && next == Some('*') {
-            let mut depth = 0;
-            while i < chars.len() {
-                if chars[i] == '/' && chars.get(i + 1) == Some(&'*') {
-                    depth += 1;
-                    blank(&mut out, chars[i]);
-                    blank(&mut out, '*');
-                    i += 2;
-                } else if chars[i] == '*' && chars.get(i + 1) == Some(&'/') {
-                    depth -= 1;
-                    blank(&mut out, '*');
-                    blank(&mut out, '/');
-                    i += 2;
-                    if depth == 0 {
-                        break;
-                    }
-                } else {
-                    blank(&mut out, chars[i]);
-                    i += 1;
-                }
-            }
-        } else if let Some((hashes, quote_at)) = raw_string_start(&chars, i).filter(|_| !after_name)
-        {
-            // r"…", r#"…"#, br"…": no escapes, ends at a quote and the same
-            // number of #s.
-            for &c in &chars[i..=quote_at] {
-                out.push(c);
-            }
-            i = quote_at + 1;
-            while i < chars.len() {
-                let closes =
-                    chars[i] == '"' && (0..hashes).all(|k| chars.get(i + 1 + k) == Some(&'#'));
-                if closes {
-                    out.push('"');
-                    for _ in 0..hashes {
-                        out.push('#');
-                    }
-                    i += 1 + hashes;
-                    break;
-                }
-                blank(&mut out, chars[i]);
-                i += 1;
-            }
-        } else if c == '"' || (c == 'b' && next == Some('"') && !after_name) {
-            if c == 'b' {
-                out.push('b');
-                i += 1;
-            }
-            out.push('"');
-            i += 1;
-            while i < chars.len() {
-                match chars[i] {
-                    '\\' => {
-                        blank(&mut out, '\\');
-                        if let Some(&escaped) = chars.get(i + 1) {
-                            blank(&mut out, escaped);
-                        }
-                        i += 2;
-                    }
-                    '"' => {
-                        out.push('"');
-                        i += 1;
-                        break;
-                    }
-                    other => {
-                        blank(&mut out, other);
-                        i += 1;
-                    }
-                }
-            }
-        } else if c == '\'' || (c == 'b' && next == Some('\'') && !after_name) {
-            let start = if c == 'b' { i + 1 } else { i };
-            match char_literal_end(&chars, start) {
-                Some(end) => {
-                    if c == 'b' {
-                        out.push('b');
-                    }
-                    out.push('\'');
-                    for &inner in &chars[start + 1..end] {
-                        blank(&mut out, inner);
-                    }
-                    out.push('\'');
-                    i = end + 1;
-                }
-                None => {
-                    // A lifetime, such as 'a: code.
-                    out.push(c);
-                    i += 1;
-                }
-            }
-        } else {
-            out.push(c);
-            i += 1;
+use ra_ap_rustc_lexer::{
+    Cursor, FrontmatterAllowed, LiteralKind, TokenKind, strip_shebang, tokenize,
+};
+
+/// A Rust edition, as far as reading a file goes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Edition {
+    E2015,
+    E2018,
+    E2021,
+    E2024,
+}
+
+impl Edition {
+    /// The edition a manifest names. Rust 1.99 knows no edition after 2024,
+    /// so an unknown name doesn't compile; it reads as 2024.
+    pub fn from_name(name: &str) -> Edition {
+        match name {
+            "2015" => Edition::E2015,
+            "2018" => Edition::E2018,
+            "2021" => Edition::E2021,
+            _ => Edition::E2024,
         }
+    }
+}
+
+/// The edition of the crate that holds `path` (from the repository's root,
+/// with `/` between folders), as cargo works it out: the nearest
+/// `Cargo.toml` above it with a `[package]` gives its `edition`, takes the
+/// workspace's with `edition.workspace = true`, or is 2015 without one. A file
+/// in no package reads with the workspace's edition, else 2024. `read` gives a
+/// file's text on one side of the pull request.
+pub fn edition_of(path: &str, read: impl Fn(&str) -> Option<String>) -> Edition {
+    let manifest = |folder: &str| -> Option<toml::Table> {
+        let file = if folder.is_empty() {
+            "Cargo.toml".to_string()
+        } else {
+            format!("{folder}/Cargo.toml")
+        };
+        read(&file)?.parse().ok()
+    };
+    let workspace = || {
+        manifest("")
+            .as_ref()
+            .and_then(|root| {
+                root.get("workspace")?
+                    .get("package")?
+                    .get("edition")?
+                    .as_str()
+            })
+            .map_or(Edition::E2024, Edition::from_name)
+    };
+    let mut folder = path;
+    while let Some((parent, _)) = folder.rsplit_once('/') {
+        folder = parent;
+        if let Some(package) = manifest(folder).as_ref().and_then(|m| m.get("package")) {
+            return package_edition(package, workspace);
+        }
+    }
+    match manifest("").as_ref().and_then(|m| m.get("package")) {
+        Some(package) => package_edition(package, workspace),
+        None => workspace(),
+    }
+}
+
+/// A `[package]` table's edition.
+fn package_edition(package: &toml::Value, workspace: impl Fn() -> Edition) -> Edition {
+    match package.get("edition") {
+        Some(toml::Value::String(name)) => Edition::from_name(name),
+        Some(toml::Value::Table(inherited)) if inherited.get("workspace").is_some() => workspace(),
+        Some(_) => Edition::E2024,
+        None => Edition::E2015,
+    }
+}
+
+/// A Rust file with every comment, every string and char literal and a
+/// skipped first line blanked out, so only code is left: the names, numbers,
+/// punctuation and literal suffixes rustc reads. The text
+/// keeps its lines, so line N of the result is line N of the file.
+pub fn code_only(text: &str, edition: Edition) -> String {
+    let text = text
+        .strip_prefix('\u{feff}')
+        .unwrap_or(text)
+        .replace("\r\n", "\n");
+    let mut out = String::with_capacity(text.len());
+    let mut at = 0;
+    if let Some(shebang) = strip_shebang(&text) {
+        blank(&mut out, &text[..shebang]);
+        at = shebang;
+    }
+    'lexing: while at < text.len() {
+        for token in tokenize(&text[at..], FrontmatterAllowed::No) {
+            let piece = &text[at..at + token.len as usize];
+            if let Some(again) = relex(token.kind, &text[at..], edition) {
+                match again {
+                    Again::AfterCode(len) => out.push_str(&text[at..at + len]),
+                    Again::AfterWords(len) => blank(&mut out, &text[at..at + len]),
+                }
+                at += again.len();
+                continue 'lexing;
+            }
+            match token.kind {
+                TokenKind::LineComment { .. } | TokenKind::BlockComment { .. } => {
+                    blank(&mut out, piece)
+                }
+                // A string, byte string, C string, raw string or char: its
+                // suffix, a name, is code; the rest is words.
+                TokenKind::Literal { kind, suffix_start }
+                    if !matches!(kind, LiteralKind::Int { .. } | LiteralKind::Float { .. }) =>
+                {
+                    let suffix = suffix_start as usize;
+                    blank(&mut out, &piece[..suffix]);
+                    out.push_str(&piece[suffix..]);
+                }
+                // Everything else is code.
+                _ => out.push_str(piece),
+            }
+            at += piece.len();
+        }
+        break;
     }
     out
 }
 
-/// If a raw string starts at `i` (`r"`, `r#"`, `br"`, …): its number of `#`s
-/// and where its opening quote is.
-fn raw_string_start(chars: &[char], i: usize) -> Option<(usize, usize)> {
-    let mut j = i;
-    if chars.get(j) == Some(&'b') {
-        j += 1;
-    }
-    if chars.get(j) != Some(&'r') {
-        return None;
-    }
-    j += 1;
-    let mut hashes = 0;
-    while chars.get(j) == Some(&'#') {
-        hashes += 1;
-        j += 1;
-    }
-    (chars.get(j) == Some(&'"')).then_some((hashes, j))
+/// Where rustc's parser lexes again, because of the edition, and what comes
+/// before that place.
+#[derive(Clone, Copy, Debug)]
+enum Again {
+    /// So many bytes of code.
+    AfterCode(usize),
+    /// So many bytes of a literal: words.
+    AfterWords(usize),
 }
 
-/// If a char literal starts at the quote at `i`, where its closing quote is.
-/// `'a'`, `'"'`, `'\''`, `'\n'` and `'\u{22}'` are char literals; `'a` in
-/// `&'a str` is a lifetime.
-fn char_literal_end(chars: &[char], i: usize) -> Option<usize> {
-    match chars.get(i + 1)? {
-        '\\' => {
-            if chars.get(i + 2) == Some(&'u') {
-                let close = (i + 3..chars.len().min(i + 14)).find(|&k| chars[k] == '}')?;
-                (chars.get(close + 1) == Some(&'\'')).then_some(close + 1)
-            } else if chars.get(i + 2) == Some(&'x') {
-                (chars.get(i + 5) == Some(&'\'')).then_some(i + 5)
-            } else {
-                (chars.get(i + 3) == Some(&'\'')).then_some(i + 3)
-            }
+impl Again {
+    fn len(self) -> usize {
+        match self {
+            Again::AfterCode(len) | Again::AfterWords(len) => len,
         }
-        '\n' => None,
-        _ => (chars.get(i + 2) == Some(&'\'')).then_some(i + 2),
     }
+}
+
+/// What rustc 1.99's parser does after the lexer gives it `kind` at the start
+/// of `rest`, when it doesn't take the token as it is (in
+/// `rustc_parse::lexer`):
+///
+/// - before 2021, a C string's `c` or `cr` is a name, and the rest is lexed
+///   again;
+/// - before 2021, a raw lifetime's `'r` (of `'r#name`) is a lifetime, and the
+///   rest, from `#`, is lexed again;
+/// - a guarded string's `#"` or `##` (the lexer's token takes the second
+///   character too): before 2024 the `#` alone is code, and the rest is
+///   lexed again; in 2024 a whole `#"…"#` is one literal (which 2024
+///   refuses), and a `##` without a string stays as it is.
+fn relex(kind: TokenKind, rest: &str, edition: Edition) -> Option<Again> {
+    match kind {
+        TokenKind::Literal {
+            kind: LiteralKind::CStr { .. },
+            ..
+        } if edition < Edition::E2021 => Some(Again::AfterCode(1)),
+        TokenKind::Literal {
+            kind: LiteralKind::RawCStr { .. },
+            ..
+        } if edition < Edition::E2021 => Some(Again::AfterCode(2)),
+        TokenKind::RawLifetime if edition < Edition::E2021 => Some(Again::AfterCode(2)),
+        TokenKind::GuardedStrPrefix if edition < Edition::E2024 => Some(Again::AfterCode(1)),
+        TokenKind::GuardedStrPrefix => Cursor::new(rest, FrontmatterAllowed::No)
+            .guarded_double_quoted_string()
+            .map(|guarded| Again::AfterWords(guarded.token_len as usize)),
+        _ => None,
+    }
+}
+
+/// Blanks text: each line break stays, so lines still line up.
+fn blank(out: &mut String, text: &str) {
+    out.extend(text.chars().map(|c| if c == '\n' { '\n' } else { ' ' }));
 }

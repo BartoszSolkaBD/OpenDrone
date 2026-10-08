@@ -39,6 +39,14 @@ object = { version = "=0.40.0", default-features = false, features = ["read_core
 rustc-demangle = "=0.1.28"
 # Only xtask uses it, to find the links in the docs when it builds the book.
 pulldown-cmark = { version = "=0.13.4", default-features = false }
+# rustc's own lexer, as rust-analyzer publishes it. Only xtask uses it, so the
+# Review Report reads Rust code exactly as the compiler does (#102). 0.174.0's
+# src/lib.rs is byte for byte compiler/rustc_lexer/src/lib.rs of Rust 1.99.0,
+# the pinned Rust; move it with the Rust version. It needs unicode-ident and
+# unicode-properties on the same Unicode version, so Cargo.lock keeps the pair
+# Rust 1.99.0's own Cargo.lock has: unicode-ident 1.0.24, unicode-properties
+# 0.1.4.
+ra-ap-rustc_lexer = "=0.174.0"
 # SDL 3.4, built from source and statically linked with only its joystick and
 # HIDAPI parts (ADR-0018). Zlib licence. Only opendrone-input uses it.
 sdl3-sys = { version = "=0.7.2", default-features = false }

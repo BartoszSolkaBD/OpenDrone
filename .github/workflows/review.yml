@@ -6,10 +6,10 @@
 # pull request. Its triggers (pull_request_target, issue_comment and push to
 # main) always run this file as it is on main. It checks out main only, builds
 # main's xtask, and fetches the pull request's commits as git objects, which it
-# reads only with `git show` and `git diff`: no checkout of the PR, no build,
-# no cargo, rustup or any other tool run on its files. The PR's comments come
-# from GitHub's API, and its new libraries' licences from crates.io's API; all
-# of that is data. xtask escapes every piece of text from the PR or crates.io
+# reads only with `git show`, `git diff` and `git ls-tree`: no checkout of the
+# PR, no build, no cargo, rustup or any other tool run on its files. The PR's
+# comments come from GitHub's API, and its new libraries' licences from
+# crates.io's API; all of that is data. xtask escapes every piece of text from the PR or crates.io
 # before it reaches the Report. Text from an event never reaches a shell
 # command except through an environment variable.
 #
@@ -18,12 +18,14 @@
 # land on main's commit instead. That is also why no job here is named "Red
 # Flag gate" or "Review check": a job with that name could pass for the status.
 # A status belongs to a commit, not to a PR, so only PRs into main set them,
-# and both fail when two open PRs into main hold the same commit.
+# and both fail when two open PRs into main have the same latest commit. When
+# one of those closes, gets a new commit or moves off main, the others are
+# judged again (the `others` and `again` jobs).
 #
-# Limit: any workflow with `statuses: write` can set those statuses too, and a
-# PR from a branch in this repo can change or add one. So for a PR that
-# changes CI's workflows the two statuses can't be trusted; the Report flags
-# such a PR (docs/review-report.md, Limits).
+# Limit: any workflow with `statuses: write` (or `permissions: write-all`) can
+# set those statuses too, and a PR from a branch in this repo can change or
+# add one. So for a PR that changes CI's workflows the two statuses can't be
+# trusted; the Report flags such a PR (docs/review-report.md, Limits).
 #
 # Changing this file is a Repo rules change: the Reviewer decides, and the
 # ticket must ask for it. A PR that changes it is still judged by main's copy.
@@ -32,9 +34,10 @@ name: Review
 
 on:
   # A PR opened, pushed to, reopened, or moved onto main. Any PR is reported
-  # on, but only one into main sets the two statuses.
+  # on, but only one into main sets the two statuses. A PR closed only has the
+  # PRs that shared its commit judged again.
   pull_request_target:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, closed]
   # A Verdict posted, edited or deleted.
   issue_comment:
     types: [created, edited, deleted]
@@ -52,6 +55,7 @@ jobs:
     # An edit counts only when it changes the base branch.
     if: >-
       (github.event_name == 'pull_request_target'
+       && github.event.action != 'closed'
        && (github.event.action != 'edited' || github.event.changes.base))
       || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
@@ -92,6 +96,92 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          XTASK: target/debug/xtask
+          # The commit and base branch a PR event names (empty for a comment):
+          # marked with error if GitHub's record of the PR can't be read.
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: bash .github/scripts/review.sh update
+
+  others:
+    name: Find the open PRs that had this PR's commit
+    # While two open PRs into main have the same latest commit, both statuses
+    # fail on it. When one of them closes, gets a new commit or moves off main
+    # (or a PR arrives with another's commit), the others must be judged
+    # again, or that failure, or a Report saying it is fine, stays. This only
+    # reads GitHub's API: no Rust, nothing from the PR.
+    if: >-
+      github.event_name == 'pull_request_target'
+      && (github.event.action != 'edited' || github.event.changes.base)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.find.outputs.prs }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Find them
+        id: find
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # The PR's latest commit before a push; empty for anything else.
+          BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/review.sh others
+
+  again:
+    name: Judge again a PR that had the same commit
+    needs: others
+    if: needs.others.outputs.prs != '' && needs.others.outputs.prs != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.others.outputs.prs) }}
+    # In that PR's own queue, so it never runs beside that PR's own update.
+    concurrency:
+      group: review-${{ matrix.pr }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The same as the update job above, for another PR.
+    permissions:
+      contents: read
+      issues: write # labels
+      pull-requests: write # the Review Report comment
+      statuses: write # the Red Flag gate and the Review check
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the pinned Rust (main's rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Build main's xtask
+        shell: bash
+        run: cargo build --locked --quiet --package xtask
+
+      - name: Work out and post the Review Report, the labels, the Red Flag gate and the Review check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.pr }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           XTASK: target/debug/xtask
         run: bash .github/scripts/review.sh update

@@ -11,11 +11,13 @@
 //! 2. [`check_quad`] reads every value through the shared unit list, checks it
 //!    is the right kind of number, inside its bounds and inside its range,
 //!    cross-checks the values that must agree (the Tune's `motor_poles` and
-//!    `yaw_motors_reversed` among them), and hands back the checked
+//!    `yaw_motors_reversed` among them), reads the Tune's settings the Flight
+//!    Controller reads through its own reader, and hands back the checked
 //!    [`QuadDefinition`] with its fingerprint.
 
 use std::collections::BTreeMap;
 
+use opendrone_flight_controller::Tune as FlightControllerTune;
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
     BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters,
@@ -415,15 +417,25 @@ fn plain_value(item: &Item<'_, '_>, key: &Key, problems: &mut Problems) -> Optio
         .map(|text| Value::Text(text.to_string()))
 }
 
-/// Reads a Test Quad over the file of the real Quad it builds on, and returns
-/// the real Quad's id and its settings with the Test Quad's changes. A Test
-/// Quad lists only what it changes, so a change to the real Quad carries into
-/// it.
+/// One Tune setting a Test Quad changes: its Betaflight name, the new value
+/// as Betaflight's CLI writes it, and the Test Quad's line that says so.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TuneChange {
+    pub name: String,
+    pub value: String,
+    pub line: usize,
+}
+
+/// Reads a Test Quad over the files of the real Quad it builds on, and
+/// returns the real Quad's id, its settings with the Test Quad's changes, and
+/// the changes to its Tune (its `[tune]` section, each value checked here as
+/// the Flight Controller reads it). A Test Quad lists only what it changes,
+/// so a change to the real Quad carries into it.
 pub fn read_test_quad(
     file: &str,
     text: &str,
     base: impl FnOnce(&str) -> Result<QuadFile, Problems>,
-) -> Result<(String, QuadFile), Problems> {
+) -> Result<(String, QuadFile, Vec<TuneChange>), Problems> {
     let text = migration::upgraded(file, text, FileKind::TestQuad)?;
     let doc = Document::parse(file, &text)?;
     let mut problems = Problems::new();
@@ -453,6 +465,7 @@ pub fn read_test_quad(
             return Err(problems);
         }
     };
+    let mut tune_changes = Vec::new();
     for (section, item) in root.entries() {
         if matches!(section.as_str(), "format" | "based_on" | "why") {
             continue;
@@ -460,6 +473,29 @@ pub fn read_test_quad(
         let Some(table) = item.table(&mut problems) else {
             continue;
         };
+        if section == "tune" {
+            // Tune values keep Betaflight's own units with no unit text
+            // (ADR-0015), so a whole number may go without quotes.
+            for (name, item) in table.entries() {
+                let value = match item.integer() {
+                    Some(n) => n.to_string(),
+                    None => match item.text(&mut problems) {
+                        Some(text) => text.to_string(),
+                        None => continue,
+                    },
+                };
+                if let Err(sentence) = FlightControllerTune::check(&name, &value) {
+                    problems.push(item.problem(sentence));
+                    continue;
+                }
+                tune_changes.push(TuneChange {
+                    name,
+                    value,
+                    line: item.line(),
+                });
+            }
+            continue;
+        }
         for (key, item) in table.entries() {
             let name = format!("{section}.{key}");
             let Some(setting) = quad.settings.get_mut(&name) else {
@@ -494,7 +530,7 @@ pub fn read_test_quad(
             };
         }
     }
-    problems.or((based_on.to_string(), quad))
+    problems.or((based_on.to_string(), quad, tune_changes))
 }
 
 /// A setting's value once read: numbers in SI units (in the order its form
@@ -715,6 +751,10 @@ pub struct QuadDefinition {
     pub camera: Camera,
     pub sound: Sound,
     pub tune: Tune,
+    /// The Tune's settings our Flight Controller reads, or the names of the
+    /// ones the Tune doesn't spell out yet: such a Quad can't fly until it
+    /// does (ADR-0015).
+    pub flight_controller: Result<FlightControllerTune, Vec<&'static str>>,
     fingerprint: Fingerprint,
 }
 
@@ -1143,6 +1183,21 @@ fn cross_check(
             _ => {}
         }
     }
+    // Every setting the Flight Controller reads that the Tune sets must be
+    // one it can read. Settings the Tune doesn't spell out yet keep the Quad
+    // from flying, which the Scenario runner reports when one tries.
+    if let Err(found) = flight_controller_tune(tune) {
+        let mut wrong: Vec<Problem> = found
+            .wrong
+            .into_iter()
+            .map(|(name, sentence)| tune.problem(name, sentence))
+            .collect();
+        // In the file's order, as a pilot reads it.
+        wrong.sort_by_key(|problem| problem.line);
+        for problem in wrong {
+            problems.push(problem);
+        }
+    }
     if readings.has("props.direction") {
         let direction = readings.word("props.direction");
         let expected = PropDirection::from_word(direction).yaw_motors_reversed();
@@ -1362,8 +1417,20 @@ fn definition(
             block,
         },
         tune: tune.clone(),
+        flight_controller: flight_controller_tune(tune).map_err(|found| found.missing),
         fingerprint: fingerprint(r, tune),
     }
+}
+
+/// The Tune's settings as the Flight Controller reads them.
+fn flight_controller_tune(
+    tune: &Tune,
+) -> Result<FlightControllerTune, opendrone_flight_controller::TuneProblems> {
+    FlightControllerTune::read(
+        tune.settings
+            .iter()
+            .map(|(name, setting)| (name.as_str(), setting.value.as_str())),
+    )
 }
 
 /// Every value the Simulation receives, in a fixed order: the schema's, then

@@ -1,0 +1,88 @@
+# Results of arming.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Arm switch arms with the throttle low and the Quad level enough, as in Betaflight"
+
+[[expect]]
+what     = "motor 1 DShot at 0.104 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.13 s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 1 DShot at 0.516 s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 1 DShot at 0.517 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 1.2 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 1.4 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 1.63 s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 1 DShot at 2.3 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 2.5 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 2.8 s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a9e587d4a888682"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "cbff6f0c970bf34e"   # the whole state after each of 22400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.28 s" = "821f22645ad6a41a"
+"0.56 s" = "8f0b6144f2265b9d"
+"0.84 s" = "cc8f057b1962538f"
+"1.12 s" = "3fadf9b2b8d30824"
+"1.4 s" = "fd47be009154a50c"
+"1.68 s" = "d09c454ec5525e07"
+"1.96 s" = "3a0877d242f31075"
+"2.24 s" = "31389134d289f12a"
+"2.52 s" = "e38abf0030b6a711"
+"2.8 s" = "8aeb34a756ddbfee"

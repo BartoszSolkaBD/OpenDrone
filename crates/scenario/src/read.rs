@@ -17,15 +17,76 @@ pub struct Scenario {
     pub file: String,
     pub name: String,
     pub start: Start,
-    /// The Timeline of a Physics or Thrust Stand Scenario: motor commands and
-    /// the moments they start, in time order.
-    pub timeline: Vec<(SimulationTime, MotorCommands)>,
+    /// Its Timeline: motor commands for a Physics or Thrust Stand Scenario,
+    /// the pilot's sticks and switches (and, for a Flight Controller
+    /// Scenario, the sensor readings) otherwise. Empty for a Flight
+    /// Controller Scenario fed a table of cases.
+    pub inputs: Inputs,
     pub expectations: Vec<Expectation>,
+    /// A Flight Controller Scenario's table of cases, each run on a fresh
+    /// Flight Controller.
+    pub cases: Vec<Case>,
     /// The run lasts until the last moment the file mentions.
     pub length: SimulationTime,
     /// The other runs its Expectations compare with: the same Scenario with
     /// a starting-state item or two changed.
     pub other_runs: Vec<OtherRun>,
+}
+
+/// A Timeline, in a run's own steps, in time order.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Inputs {
+    /// A Physics or Thrust Stand Scenario's motor commands and the moments
+    /// they start.
+    Motors(Vec<(SimulationTime, MotorCommands)>),
+    /// A Flight or Flight Controller Scenario's sticks, switches and sensor
+    /// readings, each moment with what changes then.
+    Pilot(Vec<PilotEntry>),
+}
+
+/// One moment of a pilot's Timeline: what changes then. Anything left out
+/// holds.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PilotEntry {
+    pub at: SimulationTime,
+    pub changes: PilotChanges,
+}
+
+/// What a Timeline moment (or a case) sets.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct PilotChanges {
+    /// Roll, pitch and yaw from −1 to +1 (right, forward, right positive);
+    /// throttle from 0 to 1.
+    pub roll: Option<Stick>,
+    pub pitch: Option<Stick>,
+    pub yaw: Option<Stick>,
+    pub throttle: Option<Stick>,
+    /// The Arm switch (AUX1): on is high.
+    pub arm: Option<bool>,
+    /// A Flight Controller Scenario's gyro reading from now on, in body axes
+    /// (forward, left, up), in radians per second.
+    pub rotation: Option<Vec3>,
+    /// A Flight Controller Scenario's attitude reading from now on.
+    pub attitude: Option<Attitude>,
+}
+
+/// A stick's new position, reached at once or by a ramp from where it was
+/// last set.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Stick {
+    pub share: f64,
+    pub ramp: bool,
+}
+
+/// One case of a Flight Controller Scenario's table: a fresh Flight
+/// Controller, one Radio Link frame with these Channels, and one loop with
+/// these sensor readings.
+#[derive(Clone, Debug)]
+pub struct Case {
+    /// The line its `[[case]]` starts on.
+    pub line: usize,
+    pub inputs: PilotChanges,
+    pub expectations: Vec<Expectation>,
 }
 
 /// Another run of the same Scenario, for Expectations that compare with it.
@@ -38,8 +99,10 @@ pub struct OtherRun {
     /// The battery's charge, from 0 to 1, or `None` for the same as this
     /// run's.
     pub battery: Option<f64>,
+    /// Whether its roll and yaw sticks are this run's, mirrored.
+    pub mirrored: bool,
     /// The Timeline, in that run's steps.
-    pub timeline: Vec<(SimulationTime, MotorCommands)>,
+    pub inputs: Inputs,
     /// It lasts until the last moment its Expectations need.
     pub length: SimulationTime,
 }
@@ -53,25 +116,40 @@ pub enum Kind {
     Physics,
 }
 
+impl Kind {
+    /// True for the kinds whose motors are scripted.
+    fn scripts_motors(self) -> bool {
+        matches!(self, Kind::Physics | Kind::ThrustStand)
+    }
+}
+
 /// A Scenario's starting state: every item that affects the Simulation, with
 /// no hidden defaults (ADR-0002).
 #[derive(Clone, Debug)]
 pub struct Start {
     pub kind: Kind,
     pub quad: Named,
-    pub map: Named,
-    /// From the Map's origin, in metres (east, north, up).
+    /// `None` for a Flight Controller Scenario, which runs the Flight
+    /// Controller alone, with no Map.
+    pub map: Option<Named>,
+    /// From the Map's origin, in metres (east, north, up); zero for a Flight
+    /// Controller Scenario.
     pub position: Vec3,
-    /// In m/s (east, north, up).
+    /// In m/s (east, north, up); zero for a Flight Controller Scenario.
     pub velocity: Vec3,
+    /// The attitude, or for a Flight Controller Scenario the attitude
+    /// reading it starts with.
     pub attitude: Attitude,
-    /// In body axes, in radians per second.
+    /// In body axes, in radians per second; for a Flight Controller Scenario
+    /// the gyro reading it starts with.
     pub rotation: Vec3,
     pub armed: bool,
-    pub motors: StartingMotors,
+    /// `None` for a Flight Controller Scenario, which has no motors.
+    pub motors: Option<StartingMotors>,
     pub flight_controller: StartingFlightController,
-    /// The battery's charge, from 0 to 1.
-    pub battery: f64,
+    /// The battery's charge, from 0 to 1; `None` for a Flight Controller
+    /// Scenario, which has no battery.
+    pub battery: Option<f64>,
     pub flight_mode: FlightMode,
     pub assists: Assists,
     /// The Radio Link's Packet Rate, in Hz.
@@ -211,7 +289,7 @@ impl BasisKind {
     }
 }
 
-const TOP: &[&str] = &["format", "name", "start", "inputs", "expect"];
+const TOP: &[&str] = &["format", "name", "start", "inputs", "expect", "case"];
 const START: &[&str] = &[
     "kind",
     "quad",
@@ -231,8 +309,14 @@ const START: &[&str] = &[
     "random_seed",
     "rates",
 ];
+/// The starting-state items a Flight Controller Scenario leaves out: it runs
+/// the Flight Controller alone, with no Map, place, motors or battery.
+const NOT_FOR_THE_FLIGHT_CONTROLLER_ALONE: &[&str] =
+    &["map", "position", "speed", "motors", "battery"];
 const ASSISTS: &[&str] = &["input_smoothing", "endless_battery", "auto_arm"];
 const PACKET_RATES: [u32; 7] = [50, 100, 150, 250, 333, 500, 1000];
+/// The sticks a pilot's Timeline moves, in the order they are read.
+const STICKS: [&str; 4] = ["roll", "pitch", "yaw", "throttle"];
 
 /// Reads a Scenario file, naming it `file` in problems. Every problem is
 /// listed at once.
@@ -248,7 +332,8 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         .as_ref()
         .and_then(|start| read_start(start, &mut problems));
     // The rest is read even when the starting state has problems, so every
-    // problem is listed at once; its moments need the physics rate.
+    // problem is listed at once; its moments need the physics rate and the
+    // kind.
     let rate = match (&start, &start_table) {
         (Some(start), _) => start.physics_rate,
         (None, Some(table)) => match physics_rate(table, &mut Problems::new()) {
@@ -257,24 +342,63 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         },
         (None, None) => return Err(problems),
     };
-    let kind = start.as_ref().map_or(Kind::Physics, |start| start.kind);
+    let kind = match (&start, &start_table) {
+        (Some(start), _) => start.kind,
+        (None, Some(table)) => kind(table, &mut Problems::new()).unwrap_or(Kind::Physics),
+        (None, None) => Kind::Physics,
+    };
     let mut reader = Reader {
         file: file.to_string(),
         problems: &mut problems,
         rate,
+        kind,
+        start: start.clone(),
         moments: Vec::new(),
         other_runs: Vec::new(),
     };
-    let timeline = reader.inputs(&root, kind);
-    let expectations = reader.expectations(&root);
+    let has_cases = root.get("case").is_some();
+    let inputs = if kind == Kind::FlightController && has_cases {
+        if let Some(inputs) = root.get("inputs") {
+            reader.problems.push(inputs.problem(
+                "a Flight Controller Scenario is fed either a Timeline in [inputs] or a table of [[case]]s, not both",
+            ));
+        }
+        Inputs::Pilot(Vec::new())
+    } else {
+        if has_cases && let Some(case) = root.get("case") {
+            reader.problems.push(case.problem(
+                "a table of [[case]]s feeds only a Flight Controller Scenario, which runs the Flight Controller alone",
+            ));
+        }
+        reader.inputs(&root)
+    };
+    let cases = if kind == Kind::FlightController && has_cases {
+        if let Some(expect) = root.get("expect") {
+            reader.problems.push(expect.problem(
+                "a Flight Controller Scenario fed a table of cases puts each Expectation in its [[case]], as [[case.expect]]",
+            ));
+        }
+        reader.cases(&root)
+    } else {
+        Vec::new()
+    };
+    let expectations = if cases.is_empty() {
+        reader.expectations(&root)
+    } else {
+        Vec::new()
+    };
     let other_runs = reader.other_runs;
-    let length = timeline
-        .iter()
-        .map(|(time, _)| time.ticks())
+    let last_input = match &inputs {
+        Inputs::Motors(timeline) => timeline.iter().map(|(time, _)| time.ticks()).max(),
+        Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
+    };
+    let length = last_input
+        .into_iter()
         .chain(expectations.iter().map(|e| match e.when {
             When::At(tick) => tick,
             When::Over { to, .. } => to,
         }))
+        .chain((!cases.is_empty()).then_some(1))
         .max()
         .unwrap_or(0);
     let (Some(name), Some(start)) = (name, start) else {
@@ -284,16 +408,16 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         file: file.to_string(),
         name,
         start,
-        timeline,
+        inputs,
         expectations,
+        cases,
         length: SimulationTime::from_ticks(length),
         other_runs,
     })
 }
 
-fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
-    start.refuse_unknown(START, problems);
-    let kind = choice(
+fn kind(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Kind> {
+    choice(
         start,
         "kind",
         &[
@@ -303,14 +427,24 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
             ("physics", Kind::Physics),
         ],
         problems,
-    );
-    if let (Some(kind), Some(item)) = (kind, start.get("kind"))
-        && matches!(kind, Kind::Flight | Kind::FlightController)
-    {
-        problems.push(item.problem(
-            "only Physics and Thrust Stand Scenarios can run so far: Flight and Flight Controller Scenarios arrive with the Flight Controller (#48)",
-        ));
+    )
+}
+
+fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
+    start.refuse_unknown(START, problems);
+    let kind = kind(start, problems);
+    let alone = kind == Some(Kind::FlightController);
+    if alone {
+        for key in NOT_FOR_THE_FLIGHT_CONTROLLER_ALONE {
+            if let Some(item) = start.get(key) {
+                problems.push(item.problem(format!(
+                    "a Flight Controller Scenario runs the Flight Controller alone, with no Map, place, motors or battery, so its [start] has no `{key}`"
+                )));
+            }
+        }
     }
+    // A Flight Controller Scenario has no physics items, so they are read
+    // only for the other kinds: `None` here means "not read".
     let id = |key: &str, problems: &mut Problems| {
         start.text(key, problems).map(|(id, item)| Named {
             id: id.to_string(),
@@ -318,30 +452,27 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         })
     };
     let quad = id("quad", problems);
-    let map = id("map", problems);
-    let position = vector(
-        start,
-        "position",
-        ["east", "north", "up"],
-        Dimension::LENGTH,
-        problems,
-    );
-    let velocity = vector(
-        start,
-        "speed",
-        ["east", "north", "up"],
-        Dimension::SPEED,
-        problems,
-    );
-    let attitude = attitude(start, problems);
-    let rotation = vector(
-        start,
-        "rotation",
-        ["roll", "pitch", "yaw"],
-        Dimension::ROTATION_SPEED,
-        problems,
-    )
-    .map(|[roll, pitch, yaw]| PilotRates { roll, pitch, yaw }.to_body());
+    let map = (!alone).then(|| id("map", problems));
+    let position = (!alone).then(|| {
+        vector(
+            start,
+            "position",
+            ["east", "north", "up"],
+            Dimension::LENGTH,
+            problems,
+        )
+    });
+    let velocity = (!alone).then(|| {
+        vector(
+            start,
+            "speed",
+            ["east", "north", "up"],
+            Dimension::SPEED,
+            problems,
+        )
+    });
+    let attitude = attitude(start, "attitude", problems);
+    let rotation = rotation(start, "rotation", problems);
     let armed = start.require("armed", problems).and_then(|item| {
         let armed = item.boolean();
         if armed.is_none() {
@@ -349,19 +480,21 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         }
         armed
     });
-    let motors = choice(
-        start,
-        "motors",
-        &[
-            ("powering up", StartingMotors::PoweringUp),
-            ("stopped", StartingMotors::Stopped),
-            ("settled", StartingMotors::Settled),
-        ],
-        problems,
-    );
+    let motors = (!alone).then(|| {
+        choice(
+            start,
+            "motors",
+            &[
+                ("powering up", StartingMotors::PoweringUp),
+                ("stopped", StartingMotors::Stopped),
+                ("settled", StartingMotors::Settled),
+            ],
+            problems,
+        )
+    });
     // A Quad on the thrust stand is held still, so there is no motion for
     // "settled" motors to hold.
-    if motors == Some(StartingMotors::Settled)
+    if motors == Some(Some(StartingMotors::Settled))
         && kind == Some(Kind::ThrustStand)
         && let Some(item) = start.get("motors")
     {
@@ -376,8 +509,8 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
     // Scenarios whose motors are scripted.
     if matches!(
         motors,
-        Some(StartingMotors::Stopped | StartingMotors::PoweringUp)
-    ) && matches!(kind, Some(Kind::Flight | Kind::FlightController))
+        Some(Some(StartingMotors::Stopped | StartingMotors::PoweringUp))
+    ) && kind == Some(Kind::Flight)
         && let Some(item) = start.get("motors")
     {
         problems.push(item.problem(
@@ -390,7 +523,7 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         &[("fresh", StartingFlightController::Fresh)],
         problems,
     );
-    let battery =
+    let battery = (!alone).then(|| {
         quantity(start, "battery", Dimension::PERCENT, problems).and_then(|(value, item)| {
             if (0.0..=1.0).contains(&value) {
                 Some(value)
@@ -398,7 +531,8 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
                 problems.push(item.problem("the battery's charge must be from 0% to 100%"));
                 None
             }
-        });
+        })
+    });
     let flight_mode = choice(
         start,
         "flight_mode",
@@ -409,9 +543,34 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         ],
         problems,
     );
+    let flies = matches!(kind, Some(Kind::Flight | Kind::FlightController));
+    if flies
+        && matches!(flight_mode, Some(FlightMode::Angle | FlightMode::Horizon))
+        && let Some(item) = start.get("flight_mode")
+    {
+        problems.push(item.problem(
+            "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)",
+        ));
+    }
     let assists = start.table("assists", problems).and_then(|table| {
         table.refuse_unknown(ASSISTS, problems);
-        let mut on = |key| choice(&table, key, &[("on", true), ("off", false)], problems);
+        let mut on = |key| {
+            let on = choice(&table, key, &[("on", true), ("off", false)], problems);
+            let waits_for = match key {
+                "input_smoothing" => "Input smoothing arrives with the Radio Link ticket (#56)",
+                "auto_arm" => "Auto-arm arrives with the arming ticket (#52)",
+                _ => "Endless Battery arrives with its ticket (#57)",
+            };
+            if flies
+                && on == Some(true)
+                && let Some(item) = table.get(key)
+            {
+                problems.push(item.problem(format!(
+                    "Assists don't run yet, so `{key}` must be \"off\": {waits_for}"
+                )));
+            }
+            on
+        };
         Some(Assists {
             input_smoothing: on("input_smoothing")?,
             endless_battery: on("endless_battery")?,
@@ -446,8 +605,9 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         .table("rates", problems)
         .and_then(|rates| rates::read_rates(&rates, problems));
     if kind == Some(Kind::ThrustStand) {
+        let moving = |v: &Option<Option<[f64; 3]>>| v.flatten().is_some_and(|v| v != [0.0; 3]);
         for (key, moving) in [
-            ("speed", velocity.is_some_and(|v| v != [0.0; 3])),
+            ("speed", moving(&velocity)),
             ("rotation", rotation.is_some_and(|r| r != Vec3::ZERO)),
         ] {
             if moving && let Some(item) = start.get(key) {
@@ -457,18 +617,25 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
             }
         }
     }
+    let kind = kind?;
+    let vector3 = |v: Option<Option<[f64; 3]>>| -> Option<Vec3> {
+        match v {
+            None => Some(Vec3::ZERO),
+            Some(v) => v.map(|[x, y, z]| Vec3::new(x, y, z)),
+        }
+    };
     Some(Start {
-        kind: kind?,
+        kind,
         quad: quad?,
-        map: map?,
-        position: position.map(|[x, y, z]| Vec3::new(x, y, z))?,
-        velocity: velocity.map(|[x, y, z]| Vec3::new(x, y, z))?,
+        map: optional(map)?,
+        position: vector3(position)?,
+        velocity: vector3(velocity)?,
         attitude: attitude?,
         rotation: rotation?,
         armed: armed?,
-        motors: motors?,
+        motors: optional(motors)?,
         flight_controller: flight_controller?,
-        battery: battery?,
+        battery: optional(battery)?,
         flight_mode: flight_mode?,
         assists: assists?,
         packet_rate: packet_rate?,
@@ -476,6 +643,15 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         random_seed: random_seed?,
         rates: rates?,
     })
+}
+
+/// An item only some kinds read: `None` (not read) stays `None`; one that was
+/// read gives its value, or `None` overall when it had a problem.
+fn optional<T>(item: Option<Option<T>>) -> Option<Option<T>> {
+    match item {
+        None => Some(None),
+        Some(value) => value.map(Some),
+    }
 }
 
 /// The starting state's physics rate: a whole number of steps a second.
@@ -539,6 +715,16 @@ fn vector(
     problems: &mut Problems,
 ) -> Option<[f64; 3]> {
     let (text, item) = table.text(key, problems)?;
+    vector_text(text, &item, labels, dimension, problems)
+}
+
+fn vector_text(
+    text: &str,
+    item: &Item<'_, '_>,
+    labels: [&str; 3],
+    dimension: Dimension,
+    problems: &mut Problems,
+) -> Option<[f64; 3]> {
     // One number on its own, with no label: only zero, meaning all three.
     let starts_with_a_number = text
         .trim_start()
@@ -610,9 +796,26 @@ fn example(labels: &[&str; 3], quantity: &Quantity) -> String {
     }
 }
 
+/// A rotation in pilot words, "roll 100 °/s, pitch 0 °/s, yaw 0 °/s", as body
+/// axes.
+fn rotation(table: &Table<'_, '_>, key: &str, problems: &mut Problems) -> Option<Vec3> {
+    vector(
+        table,
+        key,
+        ["roll", "pitch", "yaw"],
+        Dimension::ROTATION_SPEED,
+        problems,
+    )
+    .map(|[roll, pitch, yaw]| PilotRates { roll, pitch, yaw }.to_body())
+}
+
 /// "level, heading 0°" or "roll 10°, pitch -5°, heading 90°".
-fn attitude(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Attitude> {
-    let (text, item) = start.text("attitude", problems)?;
+fn attitude(table: &Table<'_, '_>, key: &str, problems: &mut Problems) -> Option<Attitude> {
+    let (text, item) = table.text(key, problems)?;
+    attitude_text(text, &item, problems)
+}
+
+fn attitude_text(text: &str, item: &Item<'_, '_>, problems: &mut Problems) -> Option<Attitude> {
     let (level, rest) = match text.trim().strip_prefix("level") {
         Some(rest) => (true, rest.trim_start().trim_start_matches(',').trim()),
         None => (false, text),
@@ -667,13 +870,30 @@ fn attitude(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Attitude> 
     }))
 }
 
+/// One Timeline moment as written, in seconds, so another run can count it in
+/// its own steps.
+#[derive(Clone, Debug)]
+struct Moment {
+    seconds: f64,
+    line: usize,
+    text: String,
+    entry: Entry,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Entry {
+    Motors(MotorCommands),
+    Pilot(PilotChanges),
+}
+
 struct Reader<'p> {
     file: String,
     problems: &'p mut Problems,
     rate: PhysicsRate,
-    /// Every Timeline moment, in seconds, with its line and its text, so
-    /// another run can count it in its own steps.
-    moments: Vec<(f64, usize, String, MotorCommands)>,
+    kind: Kind,
+    start: Option<Start>,
+    /// Every Timeline moment.
+    moments: Vec<Moment>,
     other_runs: Vec<OtherRun>,
 }
 
@@ -709,39 +929,214 @@ impl Reader<'_> {
         Some((whole as u64, quantity))
     }
 
-    fn inputs(&mut self, root: &Table<'_, '_>, kind: Kind) -> Vec<(SimulationTime, MotorCommands)> {
-        let mut moments = Vec::new();
+    fn inputs(&mut self, root: &Table<'_, '_>) -> Inputs {
         let Some(inputs) = root.table("inputs", self.problems) else {
-            return moments;
+            return self
+                .timeline_at(self.rate, false)
+                .unwrap_or(Inputs::Motors(Vec::new()));
         };
         inputs.refuse_unknown(&["timeline"], self.problems);
         let Some(timeline) = inputs
             .require("timeline", self.problems)
             .and_then(|t| t.array(self.problems))
         else {
-            return moments;
+            return self
+                .timeline_at(self.rate, false)
+                .unwrap_or(Inputs::Motors(Vec::new()));
+        };
+        let known: &[&str] = match self.kind {
+            Kind::Physics | Kind::ThrustStand => &["at", "motors"],
+            Kind::Flight => &["at", "roll", "pitch", "yaw", "throttle", "arm"],
+            Kind::FlightController => &[
+                "at", "roll", "pitch", "yaw", "throttle", "arm", "rotation", "attitude",
+            ],
         };
         for entry in timeline {
             let line = entry.line();
             let Some(entry) = entry.table(self.problems) else {
                 continue;
             };
-            if matches!(kind, Kind::Physics | Kind::ThrustStand) {
-                entry.refuse_unknown(&["at", "motors"], self.problems);
-            }
+            entry.refuse_unknown(known, self.problems);
             let at = entry
                 .text("at", self.problems)
                 .and_then(|(text, item)| self.moment(text, &item));
-            let motors = entry
-                .text("motors", self.problems)
-                .and_then(|(text, item)| self.motor_commands(text, &item));
-            if let (Some((tick, quantity)), Some(motors)) = (at, motors) {
-                moments.push((SimulationTime::from_ticks(tick), motors));
-                self.moments
-                    .push((quantity.value, line, quantity.text(), motors));
+            let read = if self.kind.scripts_motors() {
+                entry
+                    .text("motors", self.problems)
+                    .and_then(|(text, item)| self.motor_commands(text, &item))
+                    .map(Entry::Motors)
+            } else {
+                self.pilot_changes(&entry).map(Entry::Pilot)
+            };
+            if let (Some((_, quantity)), Some(read)) = (at, read) {
+                self.moments.push(Moment {
+                    seconds: quantity.value,
+                    line,
+                    text: quantity.text(),
+                    entry: read,
+                });
             }
         }
-        moments
+        if !self.kind.scripts_motors() {
+            self.check_pilot_timeline(&inputs);
+        }
+        self.timeline_at(self.rate, false)
+            .unwrap_or(Inputs::Motors(Vec::new()))
+    }
+
+    /// A pilot's Timeline must set every stick and the Arm switch at 0 s, so
+    /// the run starts from values the file states (ADR-0002); a ramp needs a
+    /// value to ramp from.
+    fn check_pilot_timeline(&mut self, inputs: &Table<'_, '_>) {
+        // Every moment at 0 s counts, in case the file splits them.
+        let at_the_start = || self.moments.iter().filter(|m| m.seconds == 0.0);
+        let first: Option<&Moment> = at_the_start().next();
+        let mut given = [false; 5];
+        for moment in at_the_start() {
+            if let Entry::Pilot(changes) = moment.entry {
+                let sets = [
+                    changes.roll.is_some(),
+                    changes.pitch.is_some(),
+                    changes.yaw.is_some(),
+                    changes.throttle.is_some(),
+                    changes.arm.is_some(),
+                ];
+                for (given, sets) in given.iter_mut().zip(sets) {
+                    *given |= sets;
+                }
+            }
+        }
+        let missing: Vec<&str> = ["roll", "pitch", "yaw", "throttle", "arm"]
+            .into_iter()
+            .zip(given)
+            .filter(|(_, given)| !given)
+            .map(|(name, _)| name)
+            .collect();
+        let problem = |sentence: String| match first {
+            Some(moment) => Problem::of(self.file.clone(), moment.line, sentence),
+            None => inputs.problem(sentence),
+        };
+        if !missing.is_empty() {
+            let found = problem(format!(
+                "the Timeline starts with a moment at 0 s that sets every stick and the Arm switch (ADR-0002); it doesn't set {}",
+                missing
+                    .iter()
+                    .map(|m| format!("`{m}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            self.problems.push(found);
+        }
+        let mut ramps = Vec::new();
+        for (index, moment) in self.moments.iter().enumerate() {
+            let Entry::Pilot(changes) = moment.entry else {
+                continue;
+            };
+            for (name, stick) in STICKS.into_iter().zip(sticks(&changes)) {
+                if stick.is_some_and(|s| s.ramp) {
+                    let earlier = self.moments[..index].iter().any(|m| {
+                        m.seconds < moment.seconds
+                            && matches!(m.entry, Entry::Pilot(c) if sticks(&c)[stick_index(name)].is_some())
+                    });
+                    if !earlier {
+                        ramps.push(Problem::of(
+                            self.file.clone(),
+                            moment.line,
+                            format!(
+                                "`{name}` ramps to its value from where an earlier moment set it, but no earlier moment sets `{name}`"
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        for found in ramps {
+            self.problems.push(found);
+        }
+    }
+
+    /// The Timeline at `rate` steps a second, with roll and yaw mirrored if
+    /// asked; `None` (with a problem) when a moment falls between two steps.
+    fn timeline_at(&self, rate: PhysicsRate, mirrored: bool) -> Option<Inputs> {
+        let hz = f64::from(rate.hz());
+        let mut motors = Vec::new();
+        let mut pilot: Vec<PilotEntry> = Vec::new();
+        let mut fine = true;
+        for moment in &self.moments {
+            let Some(tick) = whole_steps(moment.seconds, hz) else {
+                fine = false;
+                continue;
+            };
+            let at = SimulationTime::from_ticks(tick);
+            match moment.entry {
+                Entry::Motors(commands) => motors.push((at, commands)),
+                Entry::Pilot(mut changes) => {
+                    if mirrored {
+                        for stick in [&mut changes.roll, &mut changes.yaw].into_iter().flatten() {
+                            stick.share = -stick.share;
+                        }
+                    }
+                    pilot.push(PilotEntry { at, changes });
+                }
+            }
+        }
+        if !fine {
+            return None;
+        }
+        // In time order; moments at the same time keep the file's order.
+        if self.kind.scripts_motors() {
+            Some(Inputs::Motors(motors))
+        } else {
+            pilot.sort_by_key(|e| e.at);
+            Some(Inputs::Pilot(pilot))
+        }
+    }
+
+    /// The sticks, the Arm switch and, for a Flight Controller Scenario, the
+    /// sensor readings a Timeline moment or a case sets.
+    fn pilot_changes(&mut self, entry: &Table<'_, '_>) -> Option<PilotChanges> {
+        let mut changes = PilotChanges::default();
+        let mut fine = true;
+        for name in STICKS {
+            let Some(item) = entry.get(name) else {
+                continue;
+            };
+            let Some(text) = item.text(self.problems) else {
+                fine = false;
+                continue;
+            };
+            match stick(name, text) {
+                Ok(stick) => *sticks_mut(&mut changes)[stick_index(name)] = Some(stick),
+                Err(sentence) => {
+                    self.problems.push(item.problem(sentence));
+                    fine = false;
+                }
+            }
+        }
+        if let Some(item) = entry.get("arm") {
+            match item.text(self.problems) {
+                Some("on") => changes.arm = Some(true),
+                Some("off") => changes.arm = Some(false),
+                Some(other) => {
+                    self.problems.push(item.problem(format!(
+                        "`arm` is the Arm switch on AUX1: \"on\" (high, armed) or \"off\", not \"{other}\""
+                    )));
+                    fine = false;
+                }
+                None => fine = false,
+            }
+        }
+        if entry.get("rotation").is_some() {
+            changes.rotation = rotation(entry, "rotation", self.problems);
+            fine &= changes.rotation.is_some();
+        }
+        if let Some(item) = entry.get("attitude") {
+            changes.attitude = item
+                .text(self.problems)
+                .and_then(|text| attitude_text(text, &item, self.problems));
+            fine &= changes.attitude.is_some();
+        }
+        fine.then_some(changes)
     }
 
     /// "0%" for all four motors, or four percentages in Betaflight's motor
@@ -802,6 +1197,160 @@ impl Reader<'_> {
             .collect()
     }
 
+    /// A Flight Controller Scenario's `[[case]]`s, each with its inputs and
+    /// its `[[case.expect]]`s.
+    fn cases(&mut self, root: &Table<'_, '_>) -> Vec<Case> {
+        let Some(list) = root
+            .require("case", self.problems)
+            .and_then(|c| c.array(self.problems))
+        else {
+            return Vec::new();
+        };
+        let mut cases = Vec::new();
+        for item in list {
+            let line = item.line();
+            let Some(table) = item.table(self.problems) else {
+                continue;
+            };
+            table.refuse_unknown(
+                &[
+                    "roll", "pitch", "yaw", "throttle", "arm", "rotation", "attitude", "expect",
+                ],
+                self.problems,
+            );
+            let inputs = self.pilot_changes(&table);
+            if let Some(inputs) = &inputs {
+                let missing: Vec<String> = ["roll", "pitch", "yaw", "throttle", "arm"]
+                    .into_iter()
+                    .zip([
+                        inputs.roll.is_some(),
+                        inputs.pitch.is_some(),
+                        inputs.yaw.is_some(),
+                        inputs.throttle.is_some(),
+                        inputs.arm.is_some(),
+                    ])
+                    .filter(|(_, given)| !given)
+                    .map(|(name, _)| format!("`{name}`"))
+                    .collect();
+                if !missing.is_empty() {
+                    self.problems.push(table.problem(format!(
+                        "a case sets every stick and the Arm switch (ADR-0002); this one doesn't set {}",
+                        missing.join(", ")
+                    )));
+                }
+                for name in STICKS {
+                    if sticks(inputs)[stick_index(name)].is_some_and(|s| s.ramp) {
+                        self.problems.push(table.problem(format!(
+                            "a case is one loop, so `{name}` can't ramp: give the value itself"
+                        )));
+                    }
+                }
+            }
+            let words = inputs.as_ref().map_or_else(String::new, case_words);
+            let Some(expect) = table
+                .require("expect", self.problems)
+                .and_then(|e| e.array(self.problems))
+            else {
+                continue;
+            };
+            if expect.is_empty() {
+                self.problems
+                    .push(table.problem("a case needs at least one [[case.expect]]"));
+            }
+            let expectations: Vec<Expectation> = expect
+                .iter()
+                .filter_map(|item| {
+                    let table = item.table(self.problems)?;
+                    self.case_expectation(&table, item.line(), &words)
+                })
+                .collect();
+            if let Some(inputs) = inputs {
+                cases.push(Case {
+                    line,
+                    inputs,
+                    expectations,
+                });
+            }
+        }
+        cases
+    }
+
+    /// One `[[case.expect]]`: `what`, `value` and `basis`, measured after the
+    /// case's one loop.
+    fn case_expectation(
+        &mut self,
+        table: &Table<'_, '_>,
+        line: usize,
+        words: &str,
+    ) -> Option<Expectation> {
+        table.refuse_unknown(&["what", "value", "basis"], self.problems);
+        let measure = self.measure(table);
+        let basis = table
+            .text("basis", self.problems)
+            .and_then(|(text, item)| self.basis(text, &item));
+        let expected =
+            table.text("value", self.problems).and_then(
+                |(text, item)| match units::parse_expected(text) {
+                    Ok(expected) => Some((expected, item)),
+                    Err(p) => {
+                        self.problems.push(item.problem(p.0));
+                        None
+                    }
+                },
+            );
+        let (measure, basis, (expected, item)) = (measure?, basis?, expected?);
+        if expected.dimension() != measure.dimension() {
+            self.problems.push(item.problem(format!(
+                "{} is {}",
+                measure.name(),
+                measure.dimension().described()
+            )));
+            return None;
+        }
+        Some(Expectation {
+            measure,
+            when: When::At(1),
+            expected,
+            basis,
+            line,
+            description: format!("{} with {words}", measure.name()),
+            compared: None,
+        })
+    }
+
+    /// `what`: something this kind of Scenario can measure.
+    fn measure(&mut self, table: &Table<'_, '_>) -> Option<Measure> {
+        let (text, item) = table.text("what", self.problems)?;
+        let Some(measure) = Measure::named(text) else {
+            self.problems.push(item.problem(format!(
+                "the runner can't measure \"{text}\" yet; it measures {}",
+                Measure::names().join(", ")
+            )));
+            return None;
+        };
+        let refusal = match self.kind {
+            Kind::FlightController if !measure.of_the_flight_controller() => Some(format!(
+                "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller does, not {text}"
+            )),
+            Kind::Physics | Kind::ThrustStand if measure.of_the_flight_controller() => {
+                Some(format!(
+                    "{text} is our Flight Controller's, but a {} Scenario's motors are scripted",
+                    if self.kind == Kind::Physics {
+                        "Physics"
+                    } else {
+                        "Thrust Stand"
+                    }
+                ))
+            }
+            _ => None,
+        };
+        if let Some(sentence) = refusal {
+            self.problems.push(item.problem(sentence));
+            return None;
+        }
+        Some(measure)
+    }
+
     fn expectation(&mut self, table: &Table<'_, '_>, line: usize) -> Option<Expectation> {
         table.refuse_unknown(
             &[
@@ -810,16 +1359,7 @@ impl Reader<'_> {
             ],
             self.problems,
         );
-        let measure = table.text("what", self.problems).and_then(|(text, item)| {
-            let measure = Measure::named(text);
-            if measure.is_none() {
-                self.problems.push(item.problem(format!(
-                    "the runner can't measure \"{text}\" yet; it measures {}",
-                    Measure::names().join(", ")
-                )));
-            }
-            measure
-        });
+        let measure = self.measure(table);
         let basis = table
             .text("basis", self.problems)
             .and_then(|(text, item)| self.basis(text, &item));
@@ -931,6 +1471,13 @@ impl Reader<'_> {
             )));
             return None;
         }
+        if measure.of_the_flight_controller() && when == When::At(0) {
+            self.problems.push(expected_item.problem(format!(
+                "{} is what a Flight Controller loop did, and the first loop runs during the first step, so it can't be measured at 0 s",
+                measure.name()
+            )));
+            return None;
+        }
         let mut description = match when {
             When::At(_) => format!("{} {description_time}", measure.name()),
             When::Over { .. } => format!("{}, {description_time}", measure.name()),
@@ -1000,12 +1547,18 @@ impl Reader<'_> {
     /// unless an earlier Expectation named the same one.
     fn other_run(&mut self, against: &Item<'_, '_>) -> Option<usize> {
         let table = against.table(self.problems)?;
-        table.refuse_unknown(&["physics_rate", "battery"], self.problems);
+        table.refuse_unknown(&["physics_rate", "battery", "sticks"], self.problems);
         let mut problems = Problems::new();
         let rate = table
             .get("physics_rate")
             .map(|_| physics_rate(&table, &mut problems));
-        let battery = table.get("battery").map(|_| {
+        let battery = table.get("battery").map(|item| {
+            if self.kind == Kind::FlightController {
+                problems.push(item.problem(
+                    "a Flight Controller Scenario has no battery, so its other run can't change one",
+                ));
+                return None;
+            }
             quantity(&table, "battery", Dimension::PERCENT, &mut problems).and_then(
                 |(value, item)| {
                     if (0.0..=1.0).contains(&value) {
@@ -1017,19 +1570,47 @@ impl Reader<'_> {
                 },
             )
         });
+        let mirrored = table.get("sticks").map(|item| {
+            match item.text(&mut problems) {
+                Some("mirrored") => {}
+                Some(other) => {
+                    problems.push(item.problem(format!(
+                        "`sticks` says how the other run's sticks differ: \"mirrored\" (roll and yaw the other way), not \"{other}\""
+                    )));
+                    return false;
+                }
+                None => return false,
+            }
+            if self.kind != Kind::Flight {
+                problems.push(item.problem(
+                    "only a Flight Scenario's sticks can be mirrored, where the pilot flies the Quad",
+                ));
+                return false;
+            }
+            if let Some(start) = &self.start
+                && !mirror_symmetric(start)
+            {
+                problems.push(item.problem(
+                    "mirrored sticks give a mirrored flight only from a start that is its own mirror image: no roll, no roll or yaw rotation, and no speed sideways to the heading",
+                ));
+                return false;
+            }
+            true
+        });
         let failed = !problems.is_empty();
         self.problems.extend(problems);
         if failed {
             return None;
         }
-        if rate.is_none() && battery.is_none() {
+        if rate.is_none() && battery.is_none() && mirrored.is_none() {
             self.problems.push(against.problem(
-                "`against` names what the other run changes: `physics_rate`, `battery`, or both, written as in [start]",
+                "`against` names what the other run changes: `physics_rate`, `battery` or `sticks`, written as in [start], or `sticks = \"mirrored\"`",
             ));
             return None;
         }
         let rate = rate.flatten().unwrap_or(self.rate);
         let battery = battery.flatten();
+        let mirrored = mirrored.unwrap_or(false);
         let mut words = Vec::new();
         if rate != self.rate {
             words.push(format!("at {}", rate_words(rate)));
@@ -1037,42 +1618,51 @@ impl Reader<'_> {
         if let Some((_, text)) = &battery {
             words.push(format!("with the battery at {text}"));
         }
+        if mirrored {
+            words.push("with roll and yaw mirrored".to_string());
+        }
         let words = if words.is_empty() {
             "with the same starting state".to_string()
         } else {
             words.join(" ")
         };
         let battery = battery.map(|(value, _)| value);
-        if let Some(found) = self
-            .other_runs
-            .iter()
-            .position(|run| run.physics_rate == rate && run.battery == battery)
-        {
+        if let Some(found) = self.other_runs.iter().position(|run| {
+            run.physics_rate == rate && run.battery == battery && run.mirrored == mirrored
+        }) {
             return Some(found);
         }
         let hz = f64::from(rate.hz());
-        let mut timeline = Vec::new();
-        for (seconds, line, text, motors) in &self.moments {
-            match whole_steps(*seconds, hz) {
-                Some(tick) => timeline.push((SimulationTime::from_ticks(tick), *motors)),
-                None => self.problems.push(Problem::of(
-                    self.file.clone(),
-                    *line,
-                    format!(
-                        "\"{text}\" isn't a whole number of physics steps at {} Hz, the rate of the run compared with on line {}: there one step is {} s",
-                        rate.hz(),
-                        against.line(),
-                        1.0 / hz
-                    ),
-                )),
+        let in_steps = self.timeline_at(rate, mirrored);
+        if in_steps.is_none() {
+            for moment in &self.moments {
+                if whole_steps(moment.seconds, hz).is_none() {
+                    self.problems.push(Problem::of(
+                        self.file.clone(),
+                        moment.line,
+                        format!(
+                            "\"{}\" isn't a whole number of physics steps at {} Hz, the rate of the run compared with on line {}: there one step is {} s",
+                            moment.text,
+                            rate.hz(),
+                            against.line(),
+                            1.0 / hz
+                        ),
+                    ));
+                }
             }
         }
-        let length = timeline.iter().map(|(t, _)| t.ticks()).max().unwrap_or(0);
+        let inputs = in_steps.unwrap_or(Inputs::Motors(Vec::new()));
+        let length = match &inputs {
+            Inputs::Motors(timeline) => timeline.iter().map(|(t, _)| t.ticks()).max(),
+            Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
+        }
+        .unwrap_or(0);
         self.other_runs.push(OtherRun {
             words,
             physics_rate: rate,
             battery,
-            timeline,
+            mirrored,
+            inputs,
             length: SimulationTime::from_ticks(length),
         });
         Some(self.other_runs.len() - 1)
@@ -1172,6 +1762,114 @@ impl Reader<'_> {
             text: rest.trim().to_string(),
         })
     }
+}
+
+/// A stick's text: "50%", "-100%", or "ramp to 100%". Roll, pitch and yaw go
+/// from −100% to +100%, the throttle from 0% to 100%.
+fn stick(name: &str, text: &str) -> Result<Stick, String> {
+    let (ramp, value) = match text.trim().strip_prefix("ramp to ") {
+        Some(rest) => (true, rest),
+        None => (false, text),
+    };
+    let share = units::parse_quantity(value)
+        .and_then(|q| q.as_a(Dimension::PERCENT))
+        .map_err(|p| p.0)?;
+    let throttle = name == "throttle";
+    let range = if throttle { 0.0..=1.0 } else { -1.0..=1.0 };
+    if !range.contains(&share) {
+        return Err(if throttle {
+            "the throttle goes from 0% (bottom) to 100% (top)".to_string()
+        } else {
+            format!("{name} goes from -100% to 100%")
+        });
+    }
+    Ok(Stick { share, ramp })
+}
+
+fn sticks(changes: &PilotChanges) -> [Option<Stick>; 4] {
+    [changes.roll, changes.pitch, changes.yaw, changes.throttle]
+}
+
+fn sticks_mut(changes: &mut PilotChanges) -> [&mut Option<Stick>; 4] {
+    [
+        &mut changes.roll,
+        &mut changes.pitch,
+        &mut changes.yaw,
+        &mut changes.throttle,
+    ]
+}
+
+fn stick_index(name: &str) -> usize {
+    STICKS.iter().position(|s| *s == name).unwrap_or(0)
+}
+
+/// A case in words, for its Expectations' descriptions: what it sets that
+/// isn't at rest, such as "roll 50%, arm on".
+fn case_words(changes: &PilotChanges) -> String {
+    let mut words = Vec::new();
+    for (name, stick) in STICKS.into_iter().zip(sticks(changes)) {
+        if let Some(stick) = stick
+            && stick.share != 0.0
+        {
+            words.push(format!("{name} {}", percent(stick.share)));
+        }
+    }
+    if changes.arm == Some(true) {
+        words.push("arm on".to_string());
+    }
+    if let Some(rotation) = changes.rotation {
+        let r = PilotRates::from_body(rotation);
+        words.push(format!(
+            "rotation roll {}, pitch {}, yaw {}",
+            degrees_per_second(r.roll),
+            degrees_per_second(r.pitch),
+            degrees_per_second(r.yaw)
+        ));
+    }
+    if let Some(attitude) = changes.attitude {
+        let a = attitude.pilot_angles();
+        words.push(format!(
+            "attitude roll {}°, pitch {}°",
+            round(a.roll / DEGREE),
+            round(a.pitch / DEGREE)
+        ));
+    }
+    if words.is_empty() {
+        "the sticks at rest".to_string()
+    } else {
+        words.join(", ")
+    }
+}
+
+fn percent(share: f64) -> String {
+    format!("{}%", round(share * 100.0))
+}
+
+fn degrees_per_second(rate: f64) -> String {
+    format!("{} °/s", round(rate / DEGREE))
+}
+
+/// A number written plainly, to at most six decimals.
+fn round(value: f64) -> String {
+    let text = format!("{:.6}", value);
+    let text = text.trim_end_matches('0').trim_end_matches('.');
+    if text == "-0" {
+        "0".to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+/// True when a start is its own mirror image across the Quad's own upright
+/// plane through its nose: no roll, no roll or yaw rotation, and no speed
+/// sideways to its heading.
+fn mirror_symmetric(start: &Start) -> bool {
+    let angles = start.attitude.pilot_angles();
+    let rates = PilotRates::from_body(start.rotation);
+    let (sin, cos) = opendrone_maths::functions::sin_cos(angles.heading);
+    // The heading's right-hand side, in world axes (east, north).
+    let sideways = start.velocity.x * cos - start.velocity.y * sin;
+    angles.roll.abs() < 1e-12 && rates.roll == 0.0 && rates.yaw == 0.0 && sideways.abs() < 1e-12
 }
 
 /// `seconds` as a whole number of steps at `hz` steps a second, or `None`

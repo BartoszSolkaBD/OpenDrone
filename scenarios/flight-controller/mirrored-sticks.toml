@@ -1,0 +1,98 @@
+# Mirrored sticks give a mirrored flight. The Freestyle 5″ is its own mirror
+# image left to right: an X frame with props-in, the right props turning one
+# way and the left the other. So from a start that is its own mirror image,
+# the same flight with roll and yaw the other way rolls and yaws the other
+# way, drifts the other way sideways, and pitches, climbs and goes forward
+# just the same: the Flight Controller and the physics together keep the
+# symmetry.
+#
+# The sticks stay at full deflection on roll and yaw, where both directions
+# reach Betaflight as exactly ±500 µs from centre. A centred stick isn't its
+# own mirror image on ELRS: step 992 reads 1500.77 µs (see actual-rates.toml),
+# asking for 0.11 °/s the same way in both runs. The throttle ramps, which
+# changes nothing about the mirror.
+format = 1
+name   = "Mirrored sticks give a mirrored flight"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "100%", throttle = "30%", arm = "on" },
+  { at = "0.3 s", roll = "-100%" },
+  { at = "0.6 s", yaw = "-100%", throttle = "30%" },
+  { at = "1 s",   throttle = "ramp to 60%" },
+]
+
+[[expect]]
+what    = "roll rate"
+at      = "0.9 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: the mirrored run is this run's mirror image, so it rolls exactly the other way"
+
+[[expect]]
+what    = "yaw rate"
+at      = "0.9 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: the mirrored run is this run's mirror image, so it yaws exactly the other way"
+
+[[expect]]
+what    = "pitch rate"
+at      = "0.9 s"
+value   = "0 °/s ± 0.001 °/s"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: pitching nose up or down looks the same in a mirror held to the side, so both runs pitch alike"
+
+[[expect]]
+what    = "distance east"
+at      = "1 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: starting level with the nose north, the mirror swaps east and west, so the mirrored run drifts as far west as this one drifts east"
+
+[[expect]]
+what    = "distance north"
+at      = "1 s"
+value   = "0 m ± 0.000001 m"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: the mirror leaves north where it is, so both runs go as far north"
+
+[[expect]]
+what    = "height"
+at      = "1 s"
+value   = "0 m ± 0.000001 m"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: the mirror leaves up where it is, so both runs climb alike"

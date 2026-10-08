@@ -1,0 +1,45 @@
+# Results of motor-idle-and-output-limit.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Motor idle and the output limit set the motors' range, as Betaflight does"
+
+[[expect]]
+what     = "motor 1 DShot with arm on"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "motor 1 DShot with throttle 50%, arm on"
+basis    = "Source"
+expected = "1051 ± 1"
+measured = "1050"
+
+[[expect]]
+what     = "motor 3 DShot with throttle 100%, arm on"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot with throttle 100%, arm on"
+basis    = "Source"
+expected = "2046 ± 1"
+measured = "2050"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "9871f658ec26c669"   # test/freestyle-5-filters-and-shaping-off: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "eb9f005492ff50f1"   # the Flight Controller's whole state after each of 3 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "513b5965e5d604c5"
+"case 2" = "ebc77070fb95f1ed"
+"case 3" = "fc209b8030b67b4c"

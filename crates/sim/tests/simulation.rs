@@ -2,13 +2,17 @@
 //! the scripted-motors stand-in. What the Quads do in flight is proved by the
 //! Scenarios in `scenarios/`.
 
+use opendrone_maths::Fingerprinter;
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
-    BatteryParameters, Drag, DuctRings, EscParameters, EscState, FlightControllerSeam, MapShape,
-    MotorCommands, MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters,
-    QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp,
-    SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors, World,
+    BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
+    FlightControllerSeam, FlightInput, MapShape, MotorCommands, MotorParameters, Mount, PacketRate,
+    PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadPart, QuadSetUp, QuadShape,
+    QuadState, RotorLayout, ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem,
+    Simulation, SimulationTime, StartingMotors, World,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 const WORLD: World = World {
     gravity: 9.81,
@@ -98,6 +102,7 @@ fn quad_at(height: f64) -> QuadSetUp {
         motors: StartingMotors::Stopped,
         battery: 1.0,
         mount: Mount::Free,
+        packet_rate: PacketRate::from_hz(250).unwrap(),
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }
@@ -182,7 +187,7 @@ fn scripted_motors_hold_each_command_until_the_next() {
         (at(10), MotorCommands::all(0.5)),
         (at(2), MotorCommands::all(0.25)),
     ]);
-    let throttle = |motors: &mut ScriptedMotors, tick| motors.step(at(tick)).0[0].throttle;
+    let throttle = |motors: &mut ScriptedMotors, tick| motors.at(at(tick)).0[0].throttle;
     assert_eq!(throttle(&mut motors, 0), 0.0);
     assert_eq!(throttle(&mut motors, 1), 0.0);
     assert_eq!(throttle(&mut motors, 2), 0.25);
@@ -271,4 +276,109 @@ fn each_tick_reports_every_motor_and_its_esc_and_the_battery() {
     }
     assert!(after.battery.voltage < before.battery.voltage);
     assert!(after.battery.charge_used > 0.0 && after.battery.charge < 1.0);
+}
+
+/// A stand-in for the Flight Controller that writes down the tick of every
+/// Radio Link frame it is handed, and the frame's roll Channel.
+struct Listener {
+    heard: Rc<RefCell<Vec<(u64, u16)>>>,
+}
+
+impl FlightControllerSeam for Listener {
+    fn step(
+        &mut self,
+        time: SimulationTime,
+        _readings: &SensorReadings,
+        frame: Option<&Channels>,
+    ) -> MotorCommands {
+        if let Some(channels) = frame {
+            self.heard
+                .borrow_mut()
+                .push((time.ticks(), channels.roll.step()));
+        }
+        MotorCommands::STOPPED
+    }
+
+    fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+/// Runs a Quad with a [`Listener`] for `ticks` steps at `physics_hz`, with
+/// the Radio Link at `packet_hz`, giving it these Flight Inputs first. Gives
+/// back every frame the listener heard.
+fn listen(
+    physics_hz: u32,
+    packet_hz: u32,
+    inputs: &[(u64, Channels)],
+    ticks: u64,
+) -> Vec<(u64, u16)> {
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let mut quad = quad_at(10.0);
+    quad.packet_rate = PacketRate::from_hz(packet_hz).unwrap();
+    quad.flight_controller = Box::new(Listener {
+        heard: Rc::clone(&heard),
+    });
+    let mut sim = Simulation::new(set_up(physics_hz, 1, vec![quad])).unwrap();
+    for (tick, channels) in inputs {
+        sim.flight_input(
+            0,
+            SimulationTime::from_ticks(*tick),
+            FlightInput::Channels(*channels),
+        );
+    }
+    for _ in 0..ticks {
+        sim.step();
+    }
+    heard.take()
+}
+
+fn rolled(step: u16) -> Channels {
+    Channels {
+        roll: Channel::from_step(step).unwrap(),
+        ..Channels::RESTING
+    }
+}
+
+#[test]
+fn the_radio_link_sends_a_frame_every_32_steps_at_250_hz_and_8_khz() {
+    let heard = listen(8000, 250, &[(0, rolled(992))], 8000);
+    assert_eq!(heard.len(), 250, "250 frames in one second");
+    for (k, (tick, _)) in heard.iter().enumerate() {
+        assert_eq!(*tick, 32 * k as u64);
+    }
+}
+
+#[test]
+fn the_radio_link_sends_nothing_until_the_first_channels_arrive() {
+    // The Channels arrive at step 100; the first frame due after that leaves
+    // at step 128.
+    let heard = listen(8000, 250, &[(100, rolled(992))], 200);
+    assert_eq!(heard, vec![(128, 992), (160, 992), (192, 992)]);
+}
+
+#[test]
+fn channels_between_two_frames_wait_for_the_next_frame_and_the_newest_wins() {
+    let inputs = [(0, rolled(992)), (5, rolled(1000)), (20, rolled(1811))];
+    let heard = listen(8000, 250, &inputs, 64);
+    assert_eq!(heard, vec![(0, 992), (32, 1811)]);
+}
+
+#[test]
+fn a_frame_due_between_two_physics_steps_leaves_on_the_later_one() {
+    // 333 Hz at 8 kHz: frame k is due 8000 k / 333 steps from the start,
+    // 24.024… steps apart, so it leaves on the step that rounds that up.
+    let heard = listen(8000, 333, &[(0, rolled(992))], 8000);
+    assert_eq!(heard.len(), 333);
+    for (k, (tick, _)) in heard.iter().enumerate() {
+        assert_eq!(*tick, (k as u64 * 8000).div_ceil(333));
+    }
+}
+
+#[test]
+fn only_the_packet_rates_a_pilot_can_pick_are_accepted() {
+    for hz in [50, 100, 150, 250, 333, 500, 1000] {
+        assert!(PacketRate::from_hz(hz).is_some(), "{hz} Hz");
+    }
+    for hz in [0, 200, 2000] {
+        assert!(PacketRate::from_hz(hz).is_none(), "{hz} Hz");
+    }
 }

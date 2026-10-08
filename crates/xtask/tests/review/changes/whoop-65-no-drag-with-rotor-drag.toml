@@ -1,0 +1,11 @@
+# A fixture: the same Test Quad, now with some rotor drag, so every Scenario
+# that flies it flies differently.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No drag of any kind, so free fall follows the rigid-body rules alone"
+
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0.2 s⁻¹"

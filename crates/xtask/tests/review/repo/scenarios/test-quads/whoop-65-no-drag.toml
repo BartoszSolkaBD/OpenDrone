@@ -1,0 +1,10 @@
+# A fixture: the Test Quad free-fall.toml flies.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "No drag of any kind, so free fall follows the rigid-body rules alone"
+
+[frame]
+drag_area = "front 0, side 0, top 0 cm²"
+
+[props]
+rotor_drag = "0 s⁻¹"

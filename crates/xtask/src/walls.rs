@@ -11,12 +11,17 @@
 //!   library on the never-in-core list, or any outside library missing from
 //!   the core-libraries list;
 //! - no library the core reaches has a feature on the never-in-core-features
-//!   list turned on.
+//!   list turned on;
+//! - no core crate has a `.clippy.toml`, which Clippy would read instead of
+//!   the `clippy.toml` that holds the house rules ([ADR-0001]);
+//! - every crate, and each of its targets, is on the Rust edition `walls.toml`
+//!   names, the one the Review Report reads code in.
 //!
+//! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
 use std::collections::{BTreeMap, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use serde_json::Value;
@@ -78,10 +83,37 @@ fn check(workspace: &Workspace, rules: &Rules) -> Vec<String> {
                 "{RULES_FILE} names `{name}` as a core crate but gives no rule for it."
             ));
         }
+        if let Some(dotted) = workspace
+            .member_named(name)
+            .map(|id| workspace.folder(id).join(".clippy.toml"))
+            .filter(|path| path.exists())
+        {
+            problems.push(format!(
+                "`{name}` has a `.clippy.toml` ({}). Clippy reads it instead of the crate's \
+                 `clippy.toml`, which holds the house rules (ADR-0001), so it turns them off. \
+                 Keep the house rules in `clippy.toml` only, and remove the `.clippy.toml`.",
+                workspace.relative(&dotted)
+            ));
+        }
     }
 
     for member in &workspace.members {
         let name = workspace.name(member);
+        for (target, edition) in workspace.editions(member) {
+            if *edition != rules.edition {
+                let what = match target {
+                    None => format!("`{name}`"),
+                    Some(target) => format!("`{name}`'s target {target}"),
+                };
+                problems.push(format!(
+                    "{what} is on Rust edition {edition} ({}), but every crate is on edition {} \
+                     ({RULES_FILE}): the Review Report reads code the way rustc reads it in that \
+                     edition. Take the workspace's with `edition.workspace = true`.",
+                    workspace.relative_manifest(member),
+                    rules.edition
+                ));
+            }
+        }
         let Some(rule) = rules.crates.get(name) else {
             problems.push(format!(
                 "`{name}` ({}) isn't one of the crates in {RULES_FILE}. ADR-0003 decides which \
@@ -201,6 +233,8 @@ fn reached_from_core(workspace: &Workspace, rules: &Rules) -> Vec<(String, Vec<S
 /// The rules in `walls.toml`.
 pub(crate) struct Rules {
     pub(crate) core: Vec<String>,
+    /// The Rust edition every crate is on.
+    edition: String,
     crates: BTreeMap<String, CrateRule>,
     core_libraries: BTreeMap<String, String>,
     never_in_core: BTreeMap<String, String>,
@@ -264,6 +298,11 @@ impl Rules {
         }
         Ok(Rules {
             core: strings(table.get("core"), "core")?,
+            edition: table
+                .get("edition")
+                .and_then(toml::Value::as_str)
+                .ok_or(format!("{RULES_FILE} names no `edition`"))?
+                .to_owned(),
             crates,
             core_libraries: reasons(&table, "core-libraries")?,
             never_in_core: reasons(&table, "never-in-core")?,
@@ -349,6 +388,9 @@ struct Workspace {
     /// The features cargo turns on in each package, merged across the whole
     /// workspace.
     features: BTreeMap<String, Vec<String>>,
+    /// Each package's Rust edition (no target), and each of its targets' (a
+    /// target such as `lib \`opendrone_sim\``).
+    editions: BTreeMap<String, Vec<(Option<String>, String)>>,
 }
 
 struct Dependency {
@@ -383,10 +425,30 @@ impl Workspace {
     fn from_metadata(metadata: &Value) -> Result<Workspace, String> {
         let mut names = BTreeMap::new();
         let mut manifests = BTreeMap::new();
+        let mut editions = BTreeMap::new();
         for package in list(&metadata["packages"], "packages")? {
             let id = text(&package["id"], "a package id")?;
             names.insert(id.clone(), text(&package["name"], "a package name")?);
-            manifests.insert(id, text(&package["manifest_path"], "a manifest path")?);
+            manifests.insert(
+                id.clone(),
+                text(&package["manifest_path"], "a manifest path")?,
+            );
+            let mut found = vec![(None, text(&package["edition"], "a package's edition")?)];
+            for target in list(&package["targets"], "a package's targets")? {
+                let kind = list(&target["kind"], "a target's kinds")?
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                found.push((
+                    Some(format!(
+                        "{kind} `{}`",
+                        text(&target["name"], "a target's name")?
+                    )),
+                    text(&target["edition"], "a target's edition")?,
+                ));
+            }
+            editions.insert(id, found);
         }
         let name_of = |id: &str| names.get(id).cloned().unwrap_or_else(|| id.to_owned());
 
@@ -428,7 +490,13 @@ impl Workspace {
             manifests,
             dependencies,
             features,
+            editions,
         })
+    }
+
+    /// A package's Rust edition, and each of its targets'.
+    fn editions(&self, id: &str) -> &[(Option<String>, String)] {
+        self.editions.get(id).map_or(&[], Vec::as_slice)
     }
 
     fn name<'a>(&'a self, id: &'a str) -> &'a str {
@@ -457,9 +525,26 @@ impl Workspace {
 
     fn relative_manifest(&self, id: &str) -> String {
         let manifest = self.manifests.get(id).map_or(id, String::as_str);
-        Path::new(manifest)
-            .strip_prefix(&self.root)
-            .map_or_else(|_| manifest.to_owned(), |path| path.display().to_string())
+        self.relative(Path::new(manifest))
+    }
+
+    /// The folder that holds a package's `Cargo.toml`.
+    fn folder(&self, id: &str) -> PathBuf {
+        let manifest = Path::new(self.manifests.get(id).map_or(id, String::as_str));
+        manifest.parent().unwrap_or(manifest).to_path_buf()
+    }
+
+    /// A path from the workspace's root, with `/` between folders.
+    fn relative(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root).map_or_else(
+            |_| path.display().to_string(),
+            |path| {
+                path.components()
+                    .map(|part| part.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            },
+        )
     }
 }
 

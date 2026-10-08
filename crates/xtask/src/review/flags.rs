@@ -8,10 +8,10 @@
 use std::collections::BTreeSet;
 
 use super::areas::{Areas, REPO_RULES};
-use super::changes::Changes;
+use super::changes::{Changes, Side};
 use super::libraries::{self, NewLibrary};
 use super::markdown::{code, plain};
-use super::rust::code_only;
+use super::rust::{code_only, edition_of};
 use super::scenarios;
 
 /// What a Red Flag asks for.
@@ -76,6 +76,7 @@ pub fn detect(changes: &Changes, areas: &Areas, new_libraries: &[NewLibrary]) ->
     bevy_and_wgpu(changes, &mut flags);
     house_rules(changes, &mut flags);
     unsafe_code(changes, &mut flags);
+    other_files(changes, &mut flags);
     workflows(changes, &mut flags);
     repo_rules(changes, areas, &mut flags);
     for library in new_libraries {
@@ -163,25 +164,42 @@ fn core_folders() -> Vec<String> {
 
 /// Whether allowing a lint turns a house rule off. Clippy's `disallowed_*`
 /// lints carry the house rules (ADR-0001); `clippy::style` holds them,
-/// `clippy::all` holds that, and `warnings` covers everything CI denies.
+/// `clippy::all` holds that, and `warnings` covers everything CI denies. A
+/// lint, or a lint attribute, that a macro's argument names (`$lint`) could be
+/// any of them.
 fn turns_off_a_house_rule(lint: &str) -> bool {
-    lint.starts_with("clippy::disallowed_")
+    lint.contains('$')
+        || lint.starts_with("clippy::disallowed_")
         || matches!(
             lint,
             "clippy" | "clippy::all" | "clippy::style" | "clippy::restriction" | "warnings"
         )
 }
 
-/// Every lint a Rust file allows or expects, by name: in `#[allow(…)]`,
+/// A Rust file's code on one side, with comments and literals blanked out,
+/// read as rustc 1.99 reads it in its crate's edition ([`super::rust`]).
+fn code_of(side: &Side, path: &str) -> Option<String> {
+    let text = side.text(path)?;
+    Some(code_only(&text, edition_of(path, |file| side.text(file))))
+}
+
+/// Every lint a Rust file's code allows or expects, by name: in `#[allow(…)]`,
 /// `#![allow(…)]`, `#[expect(…)]` or inside a `cfg_attr`, however the
-/// attribute is spread over lines. Comments, strings and char literals don't
-/// count, and can't hide one.
-fn allowed_lints(text: &str) -> Vec<String> {
-    let compact: String = code_only(text)
-        .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+/// attribute is spread over lines. `code` comes from [`code_of`], so
+/// comments, strings and char literals don't count, and hide one only
+/// where they would hide it from rustc. Inside a macro, a lint named by an
+/// argument (`#[allow($lint)]`) comes back as `$lint`, and an attribute named
+/// by one (`#[$level(…)]`) as the whole attribute.
+fn allowed_lints(code: &str) -> Vec<String> {
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
     let mut lints = Vec::new();
+    for opening in ["#[$", "#![$"] {
+        for (at, _) in compact.match_indices(opening) {
+            let inside = &compact[at + opening.len() - 1..];
+            let end = inside.find(']').unwrap_or(inside.len());
+            lints.push(inside[..end].to_string());
+        }
+    }
     for keyword in ["allow(", "expect("] {
         for (at, _) in compact.match_indices(keyword) {
             let before = compact[..at].chars().next_back();
@@ -203,12 +221,16 @@ fn allowed_lints(text: &str) -> Vec<String> {
 
 /// A house-rule exception in a core crate: newly allowing a lint that carries
 /// a house rule, a change to a core crate's lint settings in its `Cargo.toml`,
-/// or a change to its `clippy.toml`, which holds the house rules.
+/// a change to its `clippy.toml`, which holds the house rules, or a
+/// `.clippy.toml`, which Clippy reads instead of the `clippy.toml` beside it.
 fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
     let mut settings = Vec::new();
+    let mut dotted = Vec::new();
     for folder in core_folders() {
         for path in changes.under(&folder) {
-            if path.ends_with("/clippy.toml") {
+            if path.ends_with("/.clippy.toml") {
+                dotted.push(code(path));
+            } else if path.ends_with("/clippy.toml") {
                 settings.push(code(path));
             } else if path == format!("{folder}Cargo.toml") {
                 if lints_of(changes.base.text(path)) != lints_of(changes.head.text(path)) {
@@ -219,21 +241,20 @@ fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
                     ));
                 }
             } else if path.ends_with(".rs") {
-                let mut before: Vec<String> = changes
-                    .base
-                    .text(path)
-                    .map(|t| allowed_lints(&t))
+                let mut before: Vec<String> = code_of(&changes.base, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default();
                 let mut new = Vec::new();
-                for lint in changes
-                    .head
-                    .text(path)
-                    .map(|t| allowed_lints(&t))
+                for lint in code_of(&changes.head, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default()
                 {
                     match before.iter().position(|b| *b == lint) {
                         Some(at) => {
                             before.remove(at);
+                        }
+                        None if lint.contains('$') => {
+                            new.push(format!("{} (named by a macro's argument)", code(&lint)))
                         }
                         None if turns_off_a_house_rule(&lint) => new.push(code(&lint)),
                         None => {}
@@ -259,6 +280,50 @@ fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
             ),
         ));
     }
+    if !dotted.is_empty() {
+        flags.push(RedFlag::new(
+            Level::ReviewerDecides,
+            "A house-rule exception in a core crate",
+            format!(
+                "{}. Clippy reads a `.clippy.toml` instead of the `clippy.toml` beside it, which \
+                 holds the house rules, so even an empty one turns them off. The walls check \
+                 refuses one in a core crate.",
+                dotted.join(", ")
+            ),
+        ));
+    }
+}
+
+/// Every Rust edition a manifest sets, with where: the workspace's, the
+/// package's (or that it takes the workspace's), and each target's.
+fn editions(manifest: Option<String>) -> Vec<(String, toml::Value)> {
+    let Some(table) = manifest.and_then(|m| m.parse::<toml::Table>().ok()) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    let mut add = |place: String, table: Option<&toml::Value>| {
+        if let Some(edition) = table.and_then(|t| t.get("edition")) {
+            found.push((place, edition.clone()));
+        }
+    };
+    add(
+        "workspace.package".to_string(),
+        table.get("workspace").and_then(|w| w.get("package")),
+    );
+    add("package".to_string(), table.get("package"));
+    add("lib".to_string(), table.get("lib"));
+    for kind in ["bin", "example", "test", "bench"] {
+        for (i, target) in table
+            .get(kind)
+            .and_then(toml::Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            add(format!("{kind}[{i}]"), Some(target));
+        }
+    }
+    found
 }
 
 /// A manifest's `[lints]` table, if it can be read.
@@ -290,9 +355,9 @@ fn workspace_unsafe_setting(manifest: Option<String>) -> Option<toml::Value> {
 /// alone: a line counts only if its code, without comments, strings and char
 /// literals, is new.
 fn added_code_lines(changes: &Changes, path: &str) -> Vec<(String, String)> {
-    let base = code_only(&changes.base.text(path).unwrap_or_default());
+    let base = code_of(&changes.base, path).unwrap_or_default();
     let head_text = changes.head.text(path).unwrap_or_default();
-    let head = code_only(&head_text);
+    let head = code_of(&changes.head, path).unwrap_or_default();
     let mut base_lines: Vec<&str> = base.lines().map(str::trim_end).collect();
     base_lines.sort_unstable();
     let mut added = Vec::new();
@@ -321,14 +386,15 @@ fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
                     .filter(|(code, _)| has_word(code, "unsafe"))
                     .map(|(_, line)| code(&line)),
             );
-            let allows = |text: Option<String>| {
-                text.map(|t| allowed_lints(&t))
+            let allows = |side: &Side| {
+                code_of(side, path)
+                    .map(|code| allowed_lints(&code))
                     .unwrap_or_default()
                     .iter()
                     .filter(|lint| lint.as_str() == "unsafe_code")
                     .count()
             };
-            if allows(changes.head.text(path)) > allows(changes.base.text(path)) {
+            if allows(&changes.head) > allows(&changes.base) {
                 found.push("an allowance of the `unsafe_code` lint".to_string());
             }
         } else if path == "Cargo.toml" {
@@ -369,6 +435,54 @@ fn unsafe_code(changes: &Changes, flags: &mut Vec<RedFlag>) {
     }
 }
 
+/// How many times a Rust file's code compiles another file's text as Rust:
+/// `include!(…)`, or a `path = "…"` attribute (`#[path = "…"] mod m;`, also
+/// inside a `cfg_attr`).
+fn other_file_uses(code: &str) -> usize {
+    let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    let is_name = |c: char| c.is_alphanumeric() || c == '_';
+    let includes = compact
+        .match_indices("include!")
+        .filter(|(at, _)| !compact[..*at].chars().next_back().is_some_and(is_name))
+        .count();
+    let paths = compact
+        .match_indices("path=")
+        .filter(|(at, _)| {
+            matches!(compact[..*at].chars().next_back(), Some('[' | '(' | ','))
+                && !compact[at + 5..].starts_with('=')
+        })
+        .count();
+    includes + paths
+}
+
+/// Rust that compiles another file's text: a new `include!` or `#[path]` in a
+/// Rust file. The Report reads only `.rs` files, so the file it names, which
+/// may end in anything, is for the Reviewer to read.
+fn other_files(changes: &Changes, flags: &mut Vec<RedFlag>) {
+    let files: Vec<String> = changes
+        .paths
+        .iter()
+        .filter(|path| path.ends_with(".rs"))
+        .filter(|path| {
+            let uses = |side: &Side| code_of(side, path).map_or(0, |c| other_file_uses(&c));
+            uses(&changes.head) > uses(&changes.base)
+        })
+        .map(|path| code(path))
+        .collect();
+    if !files.is_empty() {
+        flags.push(RedFlag::new(
+            Level::ReviewerDecides,
+            "Code read from another file",
+            format!(
+                "{} adds `include!` or `#[path]`, which compile another file's text as Rust. \
+                 The Red Flags read only `.rs` files, so read the file it names for new \
+                 `unsafe` code or a house-rule exception.",
+                listed(&files, 10, "files")
+            ),
+        ));
+    }
+}
+
 /// The folders whose files GitHub runs as workflows, or as their actions.
 const WORKFLOWS: [&str; 2] = [".github/workflows/", ".github/actions/"];
 
@@ -389,8 +503,8 @@ fn workflows(changes: &Changes, flags: &mut Vec<RedFlag>) {
             format!(
                 "{}. A workflow can set any commit status, so for this PR the Red Flag gate's and \
                  the Review check's own results can't be trusted. Check that no workflow it \
-                 changes or adds asks for `statuses: write` or sets a status, and the maintainer \
-                 should merge it by hand.",
+                 changes or adds asks for `statuses: write` or `permissions: write-all`, or sets \
+                 a status, and the maintainer should merge it by hand.",
                 listed(&files, 10, "files")
             ),
         ));
@@ -410,11 +524,24 @@ fn has_word(text: &str, word: &str) -> bool {
 /// A change to the Repo rules Area: CI, lint settings, the licence policy,
 /// CODEOWNERS, the Rust version, xtask or AGENTS.md.
 fn repo_rules(changes: &Changes, areas: &Areas, flags: &mut Vec<RedFlag>) {
+    let edition_changes = |path: &str| {
+        (path == "Cargo.toml" || path.ends_with("/Cargo.toml"))
+            && editions(changes.base.text(path)) != editions(changes.head.text(path))
+    };
+    // A changed Rust edition, in any manifest, first: it changes how every
+    // file of the crate reads.
     let files: Vec<String> = changes
         .paths
         .iter()
-        .filter(|path| areas.of(path) == Some(REPO_RULES))
-        .map(|path| code(path))
+        .filter(|path| edition_changes(path))
+        .map(|path| format!("{} (a Rust edition changes)", code(path)))
+        .chain(
+            changes
+                .paths
+                .iter()
+                .filter(|path| !edition_changes(path) && areas.of(path) == Some(REPO_RULES))
+                .map(|path| code(path)),
+        )
         .collect();
     if !files.is_empty() {
         flags.push(RedFlag::new(

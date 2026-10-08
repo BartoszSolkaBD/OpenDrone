@@ -737,7 +737,115 @@ fn a_tune_must_set_the_two_settings_the_quad_cross_checks() {
     );
 }
 
+#[test]
+fn a_tune_value_the_flight_controller_cant_read_is_refused() {
+    let fixture = Fixture::new("tune-bad-value")
+        .change(TUNE, "set motor_idle = 600", "set motor_idle = 6.0")
+        .change(TUNE, "set small_angle = 180", "set small_angle = 200");
+    assert_eq!(
+        fixture.quad_problems(),
+        [
+            at(
+                TUNE,
+                6,
+                "`motor_idle` is a whole number from 0 to 2000, not \"6.0\""
+            ),
+            at(
+                TUNE,
+                7,
+                "`small_angle` is a whole number from 0 to 180, not \"200\""
+            ),
+        ]
+    );
+}
+
+#[test]
+fn a_betaflight_setting_opendrone_doesnt_simulate_is_refused_with_the_reason() {
+    let fixture = Fixture::new("tune-linear-mixer").change(
+        TUNE,
+        "set crashflip_rate = 0",
+        "set mixer_type = LINEAR                # 2026.6 default\nset crashflip_rate = 0",
+    );
+    assert_eq!(
+        fixture.quad_problems(),
+        [at(
+            TUNE,
+            9,
+            "`mixer_type` is LINEAR, but only the Legacy mixer is simulated; LINEAR, DYNAMIC and EZLANDING aren't"
+        )]
+    );
+}
+
+#[test]
+fn a_quad_whose_tune_lacks_flight_controller_settings_loads_naming_what_it_lacks() {
+    // ADR-0015: a Tune spells out every setting the Flight Controller reads.
+    // The fixture's Tune sets only a few, so the Quad loads but can't fly.
+    let packs = Fixture::new("tune-lacks").packs();
+    let ducted = packs.quad("fixture/ducted").unwrap();
+    let missing = ducted.flight_controller.unwrap_err();
+    assert_eq!(missing[0], "p_roll");
+    assert!(!missing.contains(&"small_angle") && !missing.contains(&"motor_idle"));
+    assert!(missing.contains(&"mixer_type"));
+}
+
 // Test Quads
+
+#[test]
+fn a_test_quad_may_change_a_setting_of_its_quads_tune() {
+    let packs = Fixture::new("test-quad-tune")
+        .change(
+            TEST_QUAD,
+            "[props]\n",
+            "[tune]\nsmall_angle = 25\n\n[props]\n",
+        )
+        .packs();
+    let ducted = packs.quad("fixture/ducted").unwrap();
+    let changed = packs.quad("test/ducted-no-drag").unwrap();
+    assert_eq!(ducted.tune.settings["small_angle"].value, "180");
+    assert_eq!(changed.tune.settings["small_angle"].value, "25");
+    assert_eq!(
+        changed.tune.settings["small_angle"].mark,
+        "hand-set: Test Quad test/ducted-no-drag"
+    );
+    assert_eq!(
+        changed.tune.settings["motor_idle"],
+        ducted.tune.settings["motor_idle"]
+    );
+}
+
+#[test]
+fn a_test_quad_changing_a_tune_setting_its_quad_lacks_is_refused() {
+    let fixture = Fixture::new("test-quad-tune-lacks").change(
+        TEST_QUAD,
+        "[props]\n",
+        "[tune]\np_roll = 45\n\n[props]\n",
+    );
+    assert_eq!(
+        fixture.problems(),
+        [at(
+            TEST_QUAD,
+            11,
+            "`p_roll` isn't a setting of fixture/ducted's Tune, so it can't be changed here"
+        )]
+    );
+}
+
+#[test]
+fn a_test_quads_tune_change_is_checked_as_the_flight_controller_reads_it() {
+    let fixture = Fixture::new("test-quad-tune-bad").change(
+        TEST_QUAD,
+        "[props]\n",
+        "[tune]\nsmall_angle = 200\n\n[props]\n",
+    );
+    assert_eq!(
+        fixture.problems(),
+        [at(
+            TEST_QUAD,
+            11,
+            "`small_angle` is a whole number from 0 to 180, not \"200\""
+        )]
+    );
+}
 
 #[test]
 fn a_test_quad_changes_only_what_it_lists() {

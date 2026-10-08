@@ -13,6 +13,8 @@ use serde_json::{Value, json};
 
 const HEAD: &str = "1111111111111111111111111111111111111111";
 const OLDER: &str = "2222222222222222222222222222222222222222";
+/// A later commit, on a branch stacked on this PR's.
+const LATER: &str = "3333333333333333333333333333333333333333";
 const MAINTAINER: &str = "BartoszSolkaBD";
 
 // The Review check.
@@ -282,7 +284,7 @@ fn a_pr_into_another_branch_sets_neither_status_and_the_report_says_why() {
 #[test]
 fn both_checks_fail_while_another_open_pr_into_main_holds_the_same_commit() {
     let update = Pr::new("shared-head")
-        .sharing_with(78, "open", "main")
+        .sharing_with(78, "open", "main", HEAD)
         .comment(MAINTAINER, &verdict(HEAD, "pass"))
         .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
         .update();
@@ -294,19 +296,56 @@ fn both_checks_fail_while_another_open_pr_into_main_holds_the_same_commit() {
         "failure",
         "Other open PRs into main share this commit (#78): keep one",
     );
-    update.says("**Both checks fail:** other open PRs into `main` hold this same commit (#78).");
+    update.says(
+        "**Both checks fail:** other open PRs into `main` have this same latest commit (#78).",
+    );
+    update.says("The PR left with this commit is then judged again.");
 }
 
 #[test]
 fn a_closed_pr_or_one_into_another_branch_with_the_same_commit_changes_nothing() {
     let update = Pr::new("shared-head-elsewhere")
-        .sharing_with(78, "closed", "main")
-        .sharing_with(79, "open", "ticket/41-thrust-stand")
+        .sharing_with(78, "closed", "main", HEAD)
+        .sharing_with(79, "open", "ticket/41-thrust-stand", HEAD)
         .comment(MAINTAINER, &verdict(HEAD, "pass"))
         .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
         .update();
     update.gate_is("success", "No Red Flag waits for the maintainer");
     update.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+}
+
+#[test]
+fn a_pr_into_main_stacked_on_this_one_s_branch_does_not_share_its_commit() {
+    // The Reviewer's case on #92: GitHub lists every PR that contains the
+    // commit, so a PR built on this one's branch is listed too, with a later
+    // latest commit of its own, where its own statuses land.
+    let update = Pr::new("stacked-pr")
+        .sharing_with(78, "open", "main", LATER)
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[])
+        .update();
+    update.gate_is("success", "No Red Flag waits for the maintainer");
+    update.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+    assert!(
+        !update.comment.contains("Both checks fail"),
+        "{}",
+        update.comment
+    );
+}
+
+#[test]
+fn a_pr_listed_without_its_latest_commit_counts_as_sharing_it() {
+    // A gap in GitHub's answer fails closed.
+    let mut pr = Pr::new("sharing-without-a-head")
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .report(HEAD, "### Red Flags\n\nNone.\n", false, &[]);
+    pr.sharing
+        .push(json!({ "number": 78, "state": "open", "base": { "ref": "main" } }));
+    let update = pr.update();
+    update.gate_is(
+        "failure",
+        "Other open PRs into main share this commit (#78): keep one",
+    );
 }
 
 #[test]
@@ -493,7 +532,12 @@ impl Pr {
             comments: Vec::new(),
             report: None,
             skipped: Vec::new(),
-            sharing: vec![json!({ "number": 77, "state": "open", "base": { "ref": "main" } })],
+            sharing: vec![json!({
+                "number": 77,
+                "state": "open",
+                "base": { "ref": "main" },
+                "head": { "sha": HEAD },
+            })],
         }
     }
 
@@ -513,10 +557,15 @@ impl Pr {
         self
     }
 
-    /// Another PR holding the same head commit.
-    fn sharing_with(mut self, number: u64, state: &str, branch: &str) -> Pr {
-        self.sharing
-            .push(json!({ "number": number, "state": state, "base": { "ref": branch } }));
+    /// Another PR GitHub lists for the head commit, with its own latest
+    /// commit: the same one, or a later one on a branch stacked on this.
+    fn sharing_with(mut self, number: u64, state: &str, branch: &str, head: &str) -> Pr {
+        self.sharing.push(json!({
+            "number": number,
+            "state": state,
+            "base": { "ref": branch },
+            "head": { "sha": head },
+        }));
         self
     }
 

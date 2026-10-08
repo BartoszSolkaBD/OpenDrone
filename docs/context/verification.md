@@ -80,5 +80,5 @@ _Avoid_: Changelog, tuning notes
 - The Test Pilot moves only the sticks, as a human would, and never touches the physics. Pilots never get it.
 - Rust and maths-library updates count as behaviour changes, and each one gets its own PR.
 - To test one effect alone, a Scenario uses a Test Quad. The physics has no hidden switches that turn effects off.
-- A Test Quad is written as the Quad it's based on, plus only the numbers it changes and why. A change to the real Quad carries into its Test Quads.
+- A Test Quad is written as the Quad it's based on, plus only the numbers and Tune settings it changes, and why. A change to the real Quad carries into its Test Quads.
 - Every Estimate a Feel Test moves is logged beside its Quad: the date, the old and new value, and the reason. It stays inside its range.

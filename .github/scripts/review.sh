@@ -10,20 +10,30 @@
 #                      from the PR's comments; then post the Review Report
 #                      comment, the labels, and the Red Flag gate's and the
 #                      Review check's commit statuses.
-#                      Needs REPO, XTASK and PR_NUMBER; RUN_URL is optional.
+#                      Needs REPO, XTASK and PR_NUMBER; RUN_URL is optional,
+#                      and so are EVENT_HEAD_SHA, EVENT_BASE_REF and
+#                      DEFAULT_BRANCH, the commit a PR event names, marked
+#                      with error if the PR's record can't be read.
+#   review.sh others   After a PR closes, gets a new commit or moves onto or
+#                      off the default branch: list the other open PRs into
+#                      the default branch whose latest commit is (or, before a
+#                      push, was) this PR's, as the step output `prs`, so each
+#                      is judged again. Needs REPO, PR_NUMBER, DEFAULT_BRANCH
+#                      and HEAD_SHA; BEFORE_SHA is the commit before a push.
 #   review.sh merged   After a push to main: if the merged PR hadn't passed
 #                      every required check, label it skipped-a-check and say
 #                      so on it. Needs REPO, XTASK, SHA and BRANCH.
 #
-# GH_TOKEN is the workflow's token. Readable checks for xtask's side:
-# crates/xtask/tests/review_report.rs and review_check.rs.
+# GH_TOKEN is the workflow's token. Readable checks: crates/xtask/tests/
+# review_report.rs and review_check.rs for xtask's side, review_script.rs for
+# this script.
 #
 # To try it by hand without posting anything, set DRY_RUN=1: every call that
 # would change something on GitHub is printed instead. It still fetches the
 # PR's commits into refs/review/ in the local repository.
 set -Eeuo pipefail
 
-: "${REPO:?}" "${XTASK:?}"
+: "${REPO:?}"
 work="${RUNNER_TEMP:-/tmp}/review-post"
 rm -rf "$work"
 mkdir -p "$work"
@@ -67,12 +77,17 @@ add_label() {
   echo "Added the label \`$name\` to #$pr."
 }
 
-# The commit the gate is judging, once known, so a failure can say so on it.
+# The commit being judged, once known, so a failure can say so on it. The
+# script's own output is kept as file 3: a failure inside a call whose output
+# goes to a file still logs what it posted.
 judged=""
+exec 3>&1
 on_error() {
   if [[ -n "$judged" ]]; then
     post_status "$judged" "Red Flag gate" error \
-      "The review workflow failed: see its run" "${RUN_URL:-}" || true
+      "The review workflow failed: see its run" "${RUN_URL:-}" >&3 || true
+    post_status "$judged" "Review check" error \
+      "The review workflow failed: see its run" "${RUN_URL:-}" >&3 || true
   fi
 }
 trap on_error ERR
@@ -105,17 +120,22 @@ licences() {
 }
 
 update() {
+  : "${XTASK:?}"
   local pr="${PR_NUMBER:-}"
   if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
     echo "No pull request to update."
     return 0
   fi
 
-  api "repos/$REPO/pulls/$pr" > "$work/pr.json"
-  if [[ "$(jq -r .state "$work/pr.json")" != "open" ]]; then
-    echo "#$pr is closed, so its Review Report stays as it is."
-    return 0
+  # Until GitHub's record of the PR is read, a failure marks the commit the
+  # event named, if it named one on a PR into the default branch. A comment
+  # names no commit: its failed run is the only trace.
+  if [[ "${EVENT_HEAD_SHA:-}" =~ ^[0-9a-f]{40}$ && -n "${DEFAULT_BRANCH:-}" \
+    && "${EVENT_BASE_REF:-}" == "${DEFAULT_BRANCH:-}" ]]; then
+    judged="$EVENT_HEAD_SHA"
   fi
+
+  api "repos/$REPO/pulls/$pr" > "$work/pr.json"
   local head base_ref default_branch
   head="$(jq -r .head.sha "$work/pr.json")"
   base_ref="$(jq -r .base.ref "$work/pr.json")"
@@ -125,6 +145,21 @@ update() {
     echo "#$pr's latest commit or base branch looks wrong: $head, $base_ref" >&2
     return 1
   fi
+  # From here on, GitHub's record decides which commit is judged.
+  judged=""
+  if [[ "$(jq -r .state "$work/pr.json")" != "open" ]]; then
+    echo "#$pr is closed, so its Review Report stays as it is."
+    return 0
+  fi
+
+  # Only a PR into the default branch sets the statuses (xtask decides; this
+  # only says "pending" first). Both go pending before anything is fetched,
+  # so a run that stops early never leaves an older result on the commit.
+  if [[ "$base_ref" == "$default_branch" ]]; then
+    judged="$head"
+    post_status "$head" "Red Flag gate" pending "Working out the Red Flags" "${RUN_URL:-}"
+    post_status "$head" "Review check" pending "Working out the Review check" "${RUN_URL:-}"
+  fi
 
   # The PR's latest commit, by its SHA, and its base branch, as git objects
   # only: nothing is checked out or run.
@@ -132,16 +167,11 @@ update() {
     "+$head:refs/review/head" "+refs/heads/$base_ref:refs/review/base"
   local base
   base="$(git merge-base refs/review/base refs/review/head)"
-  # Only a PR into the default branch sets the statuses (xtask decides; this
-  # only says "pending" first).
-  if [[ "$base_ref" == "$default_branch" ]]; then
-    judged="$head"
-    post_status "$head" "Red Flag gate" pending "Working out the Red Flags" "${RUN_URL:-}"
-  fi
 
   api --paginate "repos/$REPO/issues/$pr/comments?per_page=100" > "$work/comments.json"
-  # Every PR holding this same commit: if another one into the default branch
-  # is open, the commit can't carry this PR's results alone.
+  # Every PR holding this same commit: if another open one into the default
+  # branch has it as its latest commit, the commit can't carry this PR's
+  # results alone (xtask decides).
   api "repos/$REPO/commits/$head/pulls?per_page=100" > "$work/head-pulls.json"
   api "search/issues?q=repo:$REPO+is:pr+is:merged+label:skipped-a-check&per_page=20" \
     > "$work/skipped.json" || echo '{"items": []}' > "$work/skipped.json"
@@ -207,8 +237,47 @@ update() {
   judged=""
 }
 
+# Statuses belong to a commit, so while two open PRs into the default branch
+# have the same latest commit, both statuses fail on it. Once one of them
+# closes, gets a new commit or moves off the default branch, the others must
+# be judged again, or that failure stays. Which PRs to run again is no
+# judgment: each run works everything out afresh, and xtask decides there.
+others() {
+  local pr="${PR_NUMBER:-}" main="${DEFAULT_BRANCH:-}" sha found='[]'
+  if [[ ! "$pr" =~ ^[0-9]+$ || ! "$main" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] || [[ "$main" == *..* ]]; then
+    echo "The PR number or the default branch looks wrong: $pr, $main" >&2
+    return 1
+  fi
+  for sha in "${BEFORE_SHA:-}" "${HEAD_SHA:-}"; do
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
+    if ! api "repos/$REPO/commits/$sha/pulls?per_page=100" > "$work/pulls.json" \
+      2> "$work/pulls.err"; then
+      # A commit GitHub doesn't have (after a force-push) is in no PR. Any
+      # other error fails this job, so it shows instead of passing quietly.
+      if grep -qE '\(HTTP (404|422)\)' "$work/pulls.err"; then
+        echo "GitHub has no commit $sha, so no PR has it."
+        echo '[]' > "$work/pulls.json"
+      else
+        cat "$work/pulls.err" >&2
+        echo "GitHub couldn't say which PRs have $sha, so none is judged again." >&2
+        return 1
+      fi
+    fi
+    found="$(jq -c --argjson found "$found" --argjson pr "$pr" --arg sha "$sha" --arg main "$main" \
+      '$found + [.[] | select(.state == "open" and .base.ref == $main
+                         and .head.sha == $sha and .number != $pr) | .number]
+       | unique | .[:20]' "$work/pulls.json")"
+  done
+  if [[ "$found" == '[]' ]]; then
+    echo "No other open PR into $main has #$pr's commit as its latest one."
+  else
+    echo "These open PRs into $main had #$pr's commit as their latest one, so they are judged again: $found"
+  fi
+  echo "prs=$found" >> "${GITHUB_OUTPUT:-/dev/stdout}"
+}
+
 merged() {
-  : "${SHA:?}" "${BRANCH:?}"
+  : "${SHA:?}" "${BRANCH:?}" "${XTASK:?}"
   local merged_pr pr head
   merged_pr="$(api "repos/$REPO/commits/$SHA/pulls" \
     --jq '[.[] | select(.merged_at != null)][0] // empty')"
@@ -244,9 +313,10 @@ merged() {
 
 case "${1:-}" in
   update) update ;;
+  others) others ;;
   merged) merged ;;
   *)
-    echo "Usage: review.sh update|merged" >&2
+    echo "Usage: review.sh update|others|merged" >&2
     exit 2
     ;;
 esac

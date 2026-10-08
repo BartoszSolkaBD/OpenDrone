@@ -1,0 +1,8 @@
+# A fixture workspace manifest: every crate takes its edition from here, as in
+# the real repo.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2024"

@@ -211,6 +211,60 @@ fn a_crate_that_adr_0003_doesnt_name_breaks_the_walls() {
     outcome.says("isn't one of the crates in crates/xtask/walls.toml");
 }
 
+#[test]
+fn a_dotted_clippy_toml_in_a_core_crate_breaks_the_walls() {
+    // Clippy reads `.clippy.toml` instead of the `clippy.toml` beside it, so
+    // even an empty one turns the house rules off (the Reviewer's case on #92).
+    let outcome = Fixture::new("core-crate-dotted-clippy-toml")
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths"])
+        .file("opendrone-physics", ".clippy.toml", "")
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "`opendrone-physics` has a `.clippy.toml` (opendrone-physics/.clippy.toml). Clippy reads \
+         it instead of the crate's `clippy.toml`, which holds the house rules (ADR-0001), so it \
+         turns them off.",
+    );
+}
+
+#[test]
+fn an_edge_crate_may_have_a_dotted_clippy_toml() {
+    let outcome = Fixture::new("edge-crate-dotted-clippy-toml")
+        .member("opendrone-input", &[])
+        .file("opendrone-input", ".clippy.toml", "")
+        .check_walls();
+    assert!(outcome.passed, "{}", outcome.output);
+}
+
+#[test]
+fn a_crate_on_another_rust_edition_breaks_the_walls() {
+    // The Review Report reads code the way rustc reads it in edition 2024; in
+    // 2018 a raw lifetime or a C string ends somewhere else (#102).
+    let outcome = Fixture::new("crate-on-edition-2018")
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths"])
+        .edition("opendrone-physics", "2018", "2018")
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "`opendrone-physics` is on Rust edition 2018 (opendrone-physics/Cargo.toml), but every \
+         crate is on edition 2024 (crates/xtask/walls.toml): the Review Report reads code the \
+         way rustc reads it in that edition. Take the workspace's with \
+         `edition.workspace = true`.",
+    );
+}
+
+#[test]
+fn one_target_on_another_rust_edition_breaks_the_walls() {
+    let outcome = Fixture::new("target-on-edition-2021")
+        .member("opendrone-input", &[])
+        .edition("opendrone-input", "2024", "2021")
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("`opendrone-input`'s target lib `opendrone_input` is on Rust edition 2021");
+}
+
 /// What the walls check printed, and whether it passed.
 struct Outcome {
     passed: bool,
@@ -259,6 +313,12 @@ struct Fixture {
     outside: Vec<(String, Vec<String>)>,
     /// Features an outside library declares.
     features: Vec<(String, Vec<String>)>,
+    /// Other files in a member's folder: the member, the file's name, and
+    /// what it holds.
+    files: Vec<(String, String, String)>,
+    /// A member on another edition: the member, its package's edition and
+    /// its library target's (2024 for every other member).
+    editions: Vec<(String, String, String)>,
 }
 
 impl Fixture {
@@ -271,7 +331,23 @@ impl Fixture {
             test_only: Vec::new(),
             outside: Vec::new(),
             features: Vec::new(),
+            files: Vec::new(),
+            editions: Vec::new(),
         }
+    }
+
+    /// A member's package and library target on these Rust editions.
+    fn edition(mut self, member: &str, package: &str, lib: &str) -> Fixture {
+        self.editions
+            .push((member.to_owned(), package.to_owned(), lib.to_owned()));
+        self
+    }
+
+    /// Another file in a member's folder, beside its `Cargo.toml`.
+    fn file(mut self, member: &str, name: &str, contents: &str) -> Fixture {
+        self.files
+            .push((member.to_owned(), name.to_owned(), contents.to_owned()));
+        self
     }
 
     /// An OpenDrone crate in the workspace, and what it depends on.
@@ -331,13 +407,24 @@ impl Fixture {
         for (name, uses) in &self.outside {
             self.write_package(&self.root.join("outside").join(name), name, uses, &[]);
         }
+        for (member, name, contents) in &self.files {
+            write(&workspace.join(member).join(name), contents);
+        }
         walls(&workspace.join("Cargo.toml"), true)
     }
 
     fn write_package(&self, folder: &Path, name: &str, uses: &[String], dev: &[String]) {
+        let (package, lib) = self
+            .editions
+            .iter()
+            .find(|(member, _, _)| member == name)
+            .map_or(("2024", "2024"), |(_, package, lib)| {
+                (package.as_str(), lib.as_str())
+            });
         let mut manifest = format!(
-            "[package]\nname = {name:?}\nversion = \"0.1.0\"\nedition = \"2024\"\n\
-             publish = false\n\n[lib]\npath = \"lib.rs\"\n\n[dependencies]\n"
+            "[package]\nname = {name:?}\nversion = \"0.1.0\"\nedition = {package:?}\n\
+             publish = false\n\n[lib]\npath = \"lib.rs\"\nedition = {lib:?}\n\n\
+             [dependencies]\n"
         );
         for dependency in uses {
             let (dependency, features) = match dependency.split_once('/') {

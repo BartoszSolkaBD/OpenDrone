@@ -187,13 +187,17 @@ impl SkippedMerge {
     }
 }
 
-/// A PR that shares the head commit, from GitHub's list of the commit's PRs
-/// (`GET /repos/{owner}/{repo}/commits/{sha}/pulls`).
+/// A PR that may share the head commit, from GitHub's list of the commit's
+/// PRs (`GET /repos/{owner}/{repo}/commits/{sha}/pulls`). That list holds
+/// every PR that *contains* the commit, such as a PR stacked on this one's
+/// branch, so only one whose latest commit is this same commit shares it.
 #[derive(Clone, Debug)]
 pub struct SharingPr {
     pub number: u64,
     pub open: bool,
     pub base_ref: String,
+    /// Its latest commit, or none if GitHub's record leaves it out.
+    pub head_sha: Option<String>,
 }
 
 impl SharingPr {
@@ -207,9 +211,28 @@ impl SharingPr {
                     number: pr.get("number")?.as_u64()?,
                     open: pr.get("state").and_then(Value::as_str) == Some("open"),
                     base_ref: pr.pointer("/base/ref")?.as_str()?.to_string(),
+                    head_sha: pr
+                        .pointer("/head/sha")
+                        .and_then(Value::as_str)
+                        .map(str::to_ascii_lowercase),
                 })
             })
             .collect()
+    }
+
+    /// Whether this other PR shares `pr`'s latest commit, so the commit's
+    /// statuses would have to carry both: it is open, it merges into the
+    /// default branch too, and its latest commit is the same. A record with no
+    /// latest commit counts as sharing, so a gap in GitHub's answer fails
+    /// closed.
+    pub fn shares_with(&self, pr: &PullRequest) -> bool {
+        self.open
+            && self.number != pr.number
+            && self.base_ref == pr.default_branch
+            && self
+                .head_sha
+                .as_deref()
+                .is_none_or(|sha| sha == pr.head_sha.to_ascii_lowercase())
     }
 }
 
@@ -239,14 +262,16 @@ pub struct Update {
 }
 
 /// Works out the update. `known_areas` are the Areas in main's CODEOWNERS:
-/// only those become labels. `sharing` are the PRs that hold the same head
+/// only those become labels. `sharing` are the PRs GitHub lists for the head
 /// commit, this one included or not.
 ///
 /// A commit status belongs to a commit, not to a PR, so:
 /// - only a PR into the default branch gets the two statuses; one into any
 ///   other branch is reported on but never sets them;
-/// - if another open PR into the default branch shares the commit, both
-///   statuses fail, since one commit can't carry two PRs' results.
+/// - if another open PR into the default branch has the same latest commit,
+///   both statuses fail, since one commit can't carry two PRs' results. A PR
+///   stacked on this one's branch has a later commit of its own, so it
+///   doesn't count.
 pub fn update(
     pr: &PullRequest,
     comments: &[Comment],
@@ -276,7 +301,7 @@ pub fn update(
 
     let others: Vec<String> = sharing
         .iter()
-        .filter(|p| p.open && p.base_ref == pr.default_branch && p.number != pr.number)
+        .filter(|p| p.shares_with(pr))
         .map(|p| format!("#{}", p.number))
         .collect();
     let (statuses, note) = if !pr.merges_into_default_branch() {
@@ -313,8 +338,9 @@ pub fn update(
                 },
             ],
             Some(format!(
-                "**Both checks fail:** other open PRs into {} hold this same commit ({}). A \
-                 commit's checks can carry only one PR's results, so close all but one.",
+                "**Both checks fail:** other open PRs into {} have this same latest commit ({}). \
+                 A commit's checks can carry only one PR's results, so close the others or push \
+                 a new commit to them. The PR left with this commit is then judged again.",
                 code(&pr.default_branch),
                 others.join(", ")
             )),

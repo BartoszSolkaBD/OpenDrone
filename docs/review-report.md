@@ -23,13 +23,14 @@ The **Red Flag gate** is a required check. It fails when a Red Flag waits for yo
 | A Source or Rule Expectation changed, including a loosened tolerance | **Waits for you** | It compares every Scenario file with where the PR branched off main. Any change to such an Expectation counts: its value or tolerance (even a tighter one), its Basis, any other field, or removing it. Expectations are matched by what they measure and when, with the moment read as a time, so "1 s" and "1.0 s" are the same. Reordering them, respacing the file, or adding a new one doesn't count. When a Scenario file is deleted, its Expectations are looked for in every Scenario the PR adds, whatever its file or name: one found unchanged has only moved, and a Source or Rule one found changed, or nowhere, waits. |
 | An existing ADR edited | **Waits for you** | Any change to a file in `docs/adr/` that exists on main: an edit, a rename or a deletion. |
 | Bevy moving to a new 0.N, with its wgpu major | **Waits for you** | It compares `Cargo.lock` with main. A patch release, a release candidate becoming the release, or Bevy's first arrival doesn't count. |
-| A Scenario's setup changed under its Source or Rule Expectations | The Reviewer decides | In a Scenario that holds Source or Rule Expectations, any field other than its Expectations, its name and its format changed: its starting state, its inputs, an `[osd]` option. The changed fields are listed. Those Expectations then check a different flight. It doesn't wait for you, because the format migration tool (#60) adds new starting-state items to every Scenario. |
+| A Scenario's setup changed under its Source or Rule Expectations | The Reviewer decides | In a Scenario that holds Source or Rule Expectations, any field other than its Expectations, its name and its format changed: its starting state, its inputs, an `[osd]` option. So did the Test Quad it flies, if the PR changes that Test Quad's file, even when the Scenario itself is untouched. The changed fields are listed. When a deleted Scenario's Expectations turn up in several new files, the setup of each new file holding one of its Source or Rule Expectations is compared with the old one. Those Expectations then check a different flight. It doesn't wait for you, because the format migration tool (#60) adds new starting-state items to every Scenario. |
 | A deleted Scenario | The Reviewer decides | A Scenario file is gone, and not every one of its Expectations turns up in a Scenario the PR adds. Its Source and Rule Expectations also wait for you, as above, so this alone applies to a Scenario with only Observed ones. |
 | A loosened tolerance on an Observed Expectation | The Reviewer decides | The range it accepts got wider, compared in the same units, so "± 1 mm/s" is the same as "± 0.001 m/s". Removing an Observed Expectation counts here too. |
-| A house-rule exception in a core crate | The Reviewer decides | In a core crate: a newly allowed or expected `clippy::disallowed_*` lint, or a group that holds them (`clippy::style`, `clippy::all`, `clippy::restriction`, `clippy`, `warnings`), however the attribute is spread over lines and whatever comes before it on its line; a change to the `[lints]` in its `Cargo.toml`; or a change to its `clippy.toml`. |
-| New `unsafe` code | The Reviewer decides | The word `unsafe` in a new line of Rust code. Comments, strings, raw strings and char literals are read the way Rust reads them, so none of them can hide code or pass for it. It also covers a newly allowed `unsafe_code` lint, a crate's own `unsafe_code` setting, a crate other than `opendrone-input` and the game that stops taking the workspace's lints (which forbid `unsafe`), and a change to the workspace's `unsafe_code = "forbid"`. |
-| A change to CI workflows | The Reviewer decides | Any file in `.github/workflows/` or `.github/actions/`. The Report says plainly that, for this PR, the Red Flag gate's and the Review check's own results can't be trusted (see Limits). |
-| A change to the Repo rules | The Reviewer decides | Any file in the Repo rules Area of main's `.github/CODEOWNERS`: CI, the root Cargo files, `.cargo/`, the Rust version (`rust-toolchain.toml` or the older `rust-toolchain`), lint and format settings, the licence policy, CODEOWNERS, xtask and `AGENTS.md`. |
+| A house-rule exception in a core crate | The Reviewer decides | In a core crate: a newly allowed or expected `clippy::disallowed_*` lint, or a group that holds them (`clippy::style`, `clippy::all`, `clippy::restriction`, `clippy`, `warnings`), however the attribute is spread over lines and whatever comes before it on its line; a lint, or a lint attribute, that a macro's argument names (`#[allow($lint)]`, `#[$level(…)]`), which could be any of them; a change to the `[lints]` in its `Cargo.toml`; a change to its `clippy.toml`; or a `.clippy.toml`, which Clippy reads instead of `clippy.toml`, so even an empty one turns the house rules off. The walls check (`cargo xtask walls`) also refuses a `.clippy.toml` in a core crate. |
+| New `unsafe` code | The Reviewer decides | The word `unsafe` in a new line of Rust code. Comments and literals are found with rustc's own lexer, in the copy that is Rust 1.99's (`ra-ap-rustc_lexer` 0.174.0). A file is read the way rustc 1.99 reads it in its crate's edition (from the crate's `Cargo.toml`): a skipped `#!` first line, no frontmatter (Rust 1.99 refuses it except in a file `include!` pulls in as an expression, where `---` is code), and the three places rustc's parser lexes again by edition. So on any file that compiles with Rust 1.99, a comment or a literal hides code, or passes for it, only where it does for rustc itself. `cargo xtask walls` keeps every crate and target on edition 2024, and a change to an edition is a Repo rules change. Only `.rs` files are read: a file `include!` or `#[path]` pulls in has its own Red Flag below. The same reading finds the house-rule exceptions above. It also covers a newly allowed `unsafe_code` lint, a crate's own `unsafe_code` setting, a crate other than `opendrone-input` and the game that stops taking the workspace's lints (which forbid `unsafe`), and a change to the workspace's `unsafe_code = "forbid"`. |
+| Code read from another file | The Reviewer decides | A new `include!(…)` or `path = …` attribute (`#[path = …] mod m;`, also inside `cfg_attr`) in a Rust file. It compiles another file's text as Rust, whatever that file's name, and the Red Flags read only `.rs` files, so the Reviewer reads the file it names. A change to a file that existing code already pulls in this way isn't seen; no crate does that yet. |
+| A change to CI workflows | The Reviewer decides | Any file in `.github/workflows/` or `.github/actions/`. The Report says plainly that, for this PR, the Red Flag gate's and the Review check's own results can't be trusted (see Limits). The Reviewer checks that no workflow asks for `statuses: write` or `permissions: write-all`, or sets a status. |
+| A change to the Repo rules | The Reviewer decides | Any file in the Repo rules Area of main's `.github/CODEOWNERS`: CI, the root Cargo files, `.cargo/`, the Rust version (`rust-toolchain.toml` or the older `rust-toolchain`), lint and format settings (a crate's `clippy.toml` or `.clippy.toml` included), the licence policy, CODEOWNERS, xtask and `AGENTS.md`. Also any change to a Rust edition in any `Cargo.toml`: the workspace's, a crate's or one of its targets'. |
 | An Observed Expectation updated | Listed | Its value changed. The new basis line is its one-line reason. |
 | A new outside library | Listed | A library in the PR's `Cargo.lock` whose name main's lacks, with its licence as crates.io gives it (at most 30 are looked up). cargo-deny checks the licence. |
 | A new ADR, or a new glossary term | Listed | A new file in `docs/adr/`, or a new `**Term**:` line in a deep dive. |
@@ -64,7 +65,7 @@ The workflow that posts the Report can write to the PR, so it must never run any
 
 **It runs:**
 
-- after every push to a PR, when a PR is opened or reopened, and when a PR's base branch changes (`pull_request_target`);
+- after every push to a PR, when a PR is opened, reopened or closed, and when a PR's base branch changes (`pull_request_target`). A closed PR's own Report stays as it is; only the PRs that had its commit are judged again (see below);
 - whenever the maintainer's account comments on a PR (`issue_comment`);
 - after a merge into main (`push`).
 
@@ -79,7 +80,7 @@ For all three, GitHub runs the workflow file as it is on main, even when the PR 
 
 **Data only, never run, built or checked out:**
 
-- **The PR's latest commit.** It is fetched by its SHA as git objects and read only with `git show` and `git diff`, against the commit where the PR branched off main. No `cargo`, `rustup` or other tool ever runs on the PR's files, so its `rust-toolchain`, `.cargo/config.toml` and build scripts have no effect on this workflow.
+- **The PR's latest commit.** It is fetched by its SHA as git objects and read only with `git show`, `git diff` and `git ls-tree`, against the commit where the PR branched off main. No `cargo`, `rustup` or other tool ever runs on the PR's files, so its `rust-toolchain`, `.cargo/config.toml` and build scripts have no effect on this workflow.
 - **The PR's comments and details,** from GitHub's API. Only the maintainer's account's comments count as Verdicts.
 - **The new libraries' licences,** from crates.io's API. The names and versions come from the PR's `Cargo.lock`, so they are checked before they go into a web address: a name of letters, digits, `-` and `_`, and a version that starts with a digit and holds no `..`.
 
@@ -87,8 +88,10 @@ For all three, GitHub runs the workflow file as it is on main, even when the PR 
 
 **What the workflow posts:**
 
-- **The Red Flag gate,** as a commit status on the PR's latest commit: failure when a Red Flag waits for you. It is pending while being worked out, and an error if that fails. A run that times out or is cancelled leaves it pending, so it never passes by accident.
+- **The Red Flag gate,** as a commit status on the PR's latest commit: failure when a Red Flag waits for you.
 - **The Review check,** as a commit status on the same commit.
+- **Both go pending first.** As soon as a run has read GitHub's record of the PR and knows it merges into main, before it fetches anything, it sets both statuses to pending, and to error if the run then fails. A run that times out or is cancelled leaves them pending. So neither passes by accident, and no older result stays on the commit.
+- **If GitHub's record of the PR can't be read,** a run started by a PR event marks the commit that event named with error, when the event says the PR merges into main. A run started by a comment names no commit, so it changes no status, and its failed run is the trace.
 - **The Review Report comment.** It is found by its hidden marker, and only if CI posted it.
 - **The labels.** Only Areas in main's CODEOWNERS become labels.
 
@@ -96,7 +99,8 @@ For all three, GitHub runs the workflow file as it is on main, even when the PR 
 
 - A status belongs to a commit, not to a PR. So only a PR into main sets them.
 - A PR into any other branch still gets a Report, which says it isn't judged, but it never sets either status. It is judged afresh when its base changes to main.
-- If two open PRs into main hold the same commit, both statuses fail until one is closed.
+- If two open PRs into main have the same latest commit, both statuses fail. A PR built on another PR's branch doesn't count: its latest commit is a later one.
+- When one of those PRs closes, gets a new commit or moves off main, the others are judged again at once, each in its own run. So is an open PR into main when another PR into main arrives with its latest commit. If GitHub can't say which PRs have that commit, the job that asks fails and shows on the PR, rather than judging nobody quietly.
 
 No job is named "Red Flag gate" or "Review check", so a job in this workflow can't pass for either status.
 
@@ -108,7 +112,7 @@ You can work out the Report locally: `cargo xtask review-report --base origin/ma
 
 **A PR that changes CI's workflows can set both statuses itself.**
 
-- Any workflow with `statuses: write` can set any commit status, the Red Flag gate and the Review check included.
+- Any workflow with `statuses: write`, or with `permissions: write-all`, which grants it, can set any commit status, the Red Flag gate and the Review check included.
 - A PR from a branch in this repo can change `ci.yml`, or add a workflow, that asks for that permission and sets both statuses to success after this workflow has run. That would get past the gate and a Reviewer's changes needed, and the merge check couldn't tell.
 - Forks and Dependabot can't do this: their workflows get a read-only token.
 - Nothing inside the repo can fully stop it. So the Report flags every change to `.github/workflows/` or `.github/actions/` and says the PR's statuses can't be trusted. The Reviewer judges such a PR from its diff, and the maintainer should merge it by hand.
@@ -124,5 +128,6 @@ You can work out the Report locally: `cargo xtask review-report --base origin/ma
 
 - A change to the review workflow, its script or xtask takes effect only once it is on main. Until then the PR is judged by main's copy. That is why such a change is a Repo rules change: the Reviewer judges it from the diff, not from the Report.
 - CI (`ci.yml`) runs the PR's code, as it must. Unchanged, it has a read-only token, and nothing it produces reaches the Red Flag gate or the Report.
-- If a run stops early, for example if GitHub doesn't have the PR's latest commit yet, that commit keeps its pending or missing statuses until the next push or comment. That fails closed: the PR waits.
+- If a run stops early, for example if GitHub doesn't have the PR's latest commit yet, that commit keeps its pending or error statuses until the next push or comment. That fails closed: the PR waits. A comment's run that can't read the PR's record at all changes nothing; its failed run is the trace.
 - Dependabot's own runs get a read-only token. So on a Dependabot PR, the Report and both statuses appear once the maintainer's account comments.
+- Code examples in doc comments are doctests. rustc reads them as comments, and they build as crates of their own that ship nowhere and that neither the house rules nor `unsafe_code = "forbid"` reach (a doctest with `unsafe` runs in `cargo test --doc` even so). The Red Flags don't read them; the Reviewer does.

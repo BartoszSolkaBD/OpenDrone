@@ -1,14 +1,76 @@
 # Freestyle 5″ Tune: Betaflight 2026.6 names and units.
-# Betaflight 2026.6.2's firmware defaults, read from its source (#21), so most
-# lines are marked "2026.6 default". Each line's mark says where its value
+# Betaflight 2026.6.2's firmware defaults, read from its source (#21), so the
+# lines are marked "2026.6.2 default". Each line's mark says where its value
 # came from:
-#   2026.6 default  Betaflight 2026.6.2's default
-#   hand-set: …     changed by hand, with the reason
+#   2026.6.2 default  Betaflight 2026.6.2's default
+#   hand-set: …       changed by hand, with the reason
 #
-# So far this holds only the settings the Pack checker compares with the Quad
-# definition. The Flight Controller tickets spell out every other setting
-# (ADR-0015).
+# It spells out every setting the Flight Controller reads so far, grouped by
+# the Betaflight App's tabs in their order, with each tab's CLI-only settings
+# after the ones the tab shows (ADR-0015). Later Flight Controller tickets add
+# the settings they read.
+
+# Configuration
+set small_angle = 25                   # 2026.6.2 default; the most it may tilt and still arm, in degrees
+
+# PID Tuning
+set p_roll = 45                        # 2026.6.2 default
+set i_roll = 80                        # 2026.6.2 default
+set d_roll = 30                        # 2026.6.2 default
+set p_pitch = 47                       # 2026.6.2 default
+set i_pitch = 84                       # 2026.6.2 default
+set d_pitch = 34                       # 2026.6.2 default
+set p_yaw = 45                         # 2026.6.2 default
+set i_yaw = 80                         # 2026.6.2 default
+set d_yaw = 0                          # 2026.6.2 default
+set motor_output_limit = 100           # 2026.6.2 default; percent
+# PID Tuning, CLI only
+set pidsum_limit = 500                 # 2026.6.2 default; 1000 is the whole motor range
+set pidsum_limit_yaw = 400             # 2026.6.2 default
+set iterm_windup = 80                  # 2026.6.2 default; the I limit, in percent of the PID-sum limit
+set pid_at_min_throttle = ON           # 2026.6.2 default
+
+# Receiver
+set min_check = 1050                   # 2026.6.2 default; µs
+set mid_rc = 1500                      # 2026.6.2 default; µs
+set deadband = 0                       # 2026.6.2 default; µs
+set yaw_deadband = 0                   # 2026.6.2 default; µs
+# Receiver, CLI only
+set yaw_control_reversed = OFF         # 2026.6.2 default
+set airmode_start_throttle_percent = 25 # 2026.6.2 default
 
 # Motors
-set motor_poles = 14                   # 2026.6 default; must match [motors] poles (the Velox V2207 V3 is 12N14P)
-set yaw_motors_reversed = OFF          # 2026.6 default; must match [props] direction, props-in
+set motor_pwm_protocol = DSHOT600      # 2026.6.2 default
+set motor_idle = 550                   # 2026.6.2 default; hundredths of a percent: 5.5%
+set motor_poles = 14                   # 2026.6.2 default; must match [motors] poles (the Velox V2207 V3 is 12N14P)
+set yaw_motors_reversed = OFF          # 2026.6.2 default; must match [props] direction, props-in
+# Motors, CLI only
+set mixer_type = LEGACY                # 2026.6.2 default
+
+# Not simulated yet. The Flight Controller checks these values but flies as
+# if each were off until its ticket lands: the filters, RC smoothing and
+# feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA and
+# throttle boost with #50 (ADR-0015).
+# PID Tuning
+set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
+set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
+set f_yaw = 120                        # 2026.6.2 default; not simulated yet (#49)
+set d_max_roll = 40                    # 2026.6.2 default; not simulated yet (#50)
+set d_max_pitch = 46                   # 2026.6.2 default; not simulated yet (#50)
+set d_max_yaw = 0                      # 2026.6.2 default; not simulated yet (#50)
+set iterm_relax = RP                   # 2026.6.2 default; not simulated yet (#50)
+set anti_gravity_gain = 80             # 2026.6.2 default; not simulated yet (#50)
+set tpa_rate = 65                      # 2026.6.2 default; not simulated yet (#50)
+set tpa_low_rate = 20                  # 2026.6.2 default; not simulated yet (#50)
+set throttle_boost = 5                 # 2026.6.2 default; not simulated yet (#50)
+# PID Tuning, filters
+set gyro_lpf1_static_hz = 250          # 2026.6.2 default; not simulated yet (#49)
+set gyro_lpf1_dyn_min_hz = 250         # 2026.6.2 default; not simulated yet (#49)
+set gyro_lpf2_static_hz = 500          # 2026.6.2 default; not simulated yet (#49)
+set dyn_notch_count = 3                # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf1_static_hz = 75          # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf1_dyn_min_hz = 75         # 2026.6.2 default; not simulated yet (#49)
+set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#49)
+set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
+# Receiver
+set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)

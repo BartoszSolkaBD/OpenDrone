@@ -4,15 +4,20 @@
 //! Results and `.bbl` files. It uses the Simulation, the Flight Controller, the
 //! Test Pilot, `opendrone-pack` and `opendrone-blackbox`.
 //!
-//! So far it runs Physics and Thrust Stand Scenarios: scripted motors stand
-//! in for the Flight Controller, and on the thrust stand the Quad is held
-//! still. For each Scenario in `scenarios/` it:
+//! It runs all four kinds: Flight Scenarios fly our Flight Controller and
+//! the physics together, the pilot's sticks entering as Flight Inputs;
+//! Physics and Thrust Stand Scenarios script the motors in its place (on the
+//! thrust stand the Quad is held still); Flight Controller Scenarios run the
+//! Flight Controller alone, fed a Timeline of sticks and sensor readings or a
+//! table of cases. For each Scenario in `scenarios/` it:
 //!
 //! 1. reads the file with the shared unit list, refusing any starting state
 //!    that leaves an item out (ADR-0002) and naming the file and line of every
 //!    problem ([`read_scenario`]);
-//! 2. builds the Simulation from the starting state and the Packs, and steps
-//!    it at the physics rate up to the last moment the file mentions,
+//! 2. builds the Simulation (or the Flight Controller alone) from the
+//!    starting state and the Packs, turns the sticks in percent into
+//!    whole-number Channels, and steps it at the physics rate up to the last
+//!    moment the file mentions,
 //!    measuring every Expectation at its moment or over its stretch, plus the
 //!    automatic "no broken numbers" check ([`run()`]); an Expectation that
 //!    compares with another run gets that run too, the same Scenario with a
@@ -46,12 +51,13 @@ use std::path::{Path, PathBuf};
 use opendrone_pack::{Packs, Problems};
 
 pub use format::{SCENARIO_FORMAT, SCENARIO_STEPS};
-pub use measure::Measure;
+pub use measure::{Axis, Measure, Sample, Term};
 pub use opendrone_sim::StartingMotors;
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
-    Assists, Basis, BasisKind, Compared, Comparison, Expectation, FlightMode, Kind, Named,
-    OtherRun, Scenario, Start, StartingFlightController, Statistic, When, read_scenario,
+    Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, FlightMode, Inputs, Kind,
+    Named, OtherRun, PilotChanges, PilotEntry, Scenario, Start, StartingFlightController,
+    Statistic, Stick, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, run};
