@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 object.workspace = true
+opendrone-flight-controller.workspace = true
 opendrone-input.workspace = true
 opendrone-pack.workspace = true
 opendrone-scenario.workspace = true
