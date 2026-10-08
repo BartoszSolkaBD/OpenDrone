@@ -409,7 +409,17 @@ fn a_pack_folder_replaced_by_a_symbolic_link_is_refused_so_no_number_moves_throu
     assert!(!passed, "{text}");
     let (passed, text) = xtask(&scratch.root, &["feel-tests", "--base", "HEAD^1"]);
     assert!(!passed, "{text}");
-    assert!(text.contains(&format!("- packs/fixture: {LINK}")), "{text}");
+    // The link is in the base too now, as git keeps it, and in the change.
+    assert!(
+        text.contains(&format!("At HEAD^1, these broke the Pack rules, so nothing in them was compared:\n- packs/fixture: {LINK}")),
+        "{text}"
+    );
+    assert!(
+        text.contains(&format!(
+            "The Feel Test log rules are broken, compared with HEAD^1:\n- packs/fixture: {LINK}"
+        )),
+        "{text}"
+    );
 }
 
 #[test]
