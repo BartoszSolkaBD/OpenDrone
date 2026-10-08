@@ -141,7 +141,24 @@ fn a_ramp_needs_an_earlier_value_to_ramp_from() {
 #[test]
 fn a_quad_whose_tune_doesnt_spell_out_every_flight_controller_setting_cant_fly() {
     // ADR-0015: a Tune spells out every setting the Flight Controller reads.
-    // The Whoop 65's Tune gets its settings from the importer (#53).
+    // A copy of the built-in Pack whose Whoop 65 Tune has lost two lines.
+    let scratch = Path::new(env!("CARGO_TARGET_TMPDIR")).join("flight-fixtures/short-tune");
+    let _ = fs::remove_dir_all(&scratch);
+    copy(&repo().root.join("packs"), &scratch.join("packs"));
+    let tune = scratch.join("packs/opendrone/quads/whoop-65/tune.txt");
+    let short: String = fs::read_to_string(&tune)
+        .unwrap()
+        .lines()
+        .filter(|line| !line.starts_with("set p_roll ") && !line.starts_with("set mixer_type "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    fs::write(&tune, short).unwrap();
+    let packs = Packs::open(&scratch.join("packs"), "packs")
+        .unwrap()
+        .with_test_quads(
+            &repo().scenarios_folder().join("test-quads"),
+            "scenarios/test-quads",
+        );
     let text = tracer();
     let file = changed(
         "whoop-tune",
@@ -149,16 +166,27 @@ fn a_quad_whose_tune_doesnt_spell_out_every_flight_controller_setting_cant_fly()
         "\"opendrone/freestyle-5\"",
         "\"opendrone/whoop-65\"",
     );
-    let found = failures(&report(&file));
-    assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(
-        found[0].starts_with(&format!(
-            "scenarios/whoop-tune.toml line {}: the Quad \"opendrone/whoop-65\" can't fly with our Flight Controller yet: its Tune doesn't spell out `small_angle`, `rx_min_usec`, ",
+    let found = failures(&run_one(&file, &packs, ResultsFile::Write, None));
+    assert_eq!(
+        found,
+        [format!(
+            "scenarios/whoop-tune.toml line {}: the Quad \"opendrone/whoop-65\" can't fly with our Flight Controller yet: its Tune doesn't spell out `p_roll`, `mixer_type` (ADR-0015)",
             line_of(&text, "quad              =")
-        )),
-        "{found:#?}"
+        )]
     );
-    assert!(found[0].ends_with("`mixer_type` (ADR-0015)"), "{found:#?}");
+}
+
+fn copy(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
 }
 
 #[test]
