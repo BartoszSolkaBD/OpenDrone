@@ -8,7 +8,11 @@ use core::f64::consts::PI;
 use std::fs;
 
 use common::repo;
-use opendrone_pack::{Confidence, Packs, PropDirection, QuadDefinition, read_quad_file};
+use opendrone_maths::{Fingerprinter, Vec3};
+use opendrone_pack::{
+    Confidence, Packs, PropDirection, QuadDefinition, read_quad_file, test_map_ids,
+};
+use opendrone_physics::MapCollision;
 
 fn built_in() -> Packs {
     Packs::open(&repo().join("packs"), "packs")
@@ -45,6 +49,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
         test_ids,
         [
             "test/freestyle-5-bench-supply",
+            "test/freestyle-5-no-drag",
             "test/whoop-65-bench-supply",
             "test/whoop-65-no-drag"
         ]
@@ -203,11 +208,73 @@ fn the_empty_air_test_map_has_standard_gravity_and_sea_level_air() {
 }
 
 #[test]
+fn every_test_map_reads_and_each_of_its_shapes_is_a_solid_the_physics_can_build() {
+    // Basis: Rule (#43: a Map's shapes reach the Simulation as plain data,
+    // and the Simulation refuses one that isn't a solid).
+    let packs = built_in();
+    for id in test_map_ids() {
+        let map = packs.map(&id).unwrap();
+        assert_eq!(map.world.gravity, GRAVITY, "{id}");
+        assert_eq!(map.world.air_density, AIR_DENSITY, "{id}");
+        assert!(MapCollision::new(&map.shapes).is_ok(), "{id}");
+        assert_eq!(map.shapes.is_empty(), id == "test/empty-air", "{id}");
+    }
+}
+
+#[test]
+fn a_maps_fingerprint_follows_its_shapes_and_empty_air_keeps_its_world_values_alone() {
+    // Basis: Rule (#16 §9: the fingerprint covers what the Simulation
+    // receives, and empty air has no shapes to add).
+    let packs = built_in();
+    let empty_air = packs.map("test/empty-air").unwrap();
+    let mut world_alone = Fingerprinter::new();
+    empty_air.world.write_fingerprint(&mut world_alone);
+    assert_eq!(empty_air.fingerprint(), world_alone.finish());
+    let floor = packs.map("test/flat-floor").unwrap();
+    assert_ne!(floor.fingerprint(), empty_air.fingerprint());
+    let mut moved = floor.clone();
+    moved.shapes.reverse();
+    moved.shapes.push(moved.shapes[0].clone());
+    assert_ne!(moved.fingerprint(), floor.fingerprint());
+}
+
+#[test]
+fn each_quads_collision_shape_comes_from_its_definition() {
+    // Basis: Rule (#26 §1: the body, the pack where it really sits, the
+    // whoop's duct rings and a disc per prop, all from the Quad definition).
+    // Millimetres become metres, so each length is compared to within a
+    // femtometre.
+    let close = |a: f64, b: f64| (a - b).abs() < 1e-15;
+    let close3 = |a: Vec3, b: [f64; 3]| close(a.x, b[0]) && close(a.y, b[1]) && close(a.z, b[2]);
+    let whoop = quad("opendrone/whoop-65").parameters.shape;
+    assert!(close3(whoop.body, [0.035, 0.030, 0.020]), "{whoop:?}");
+    assert!(close3(whoop.pack, [0.064, 0.010, 0.006]), "{whoop:?}");
+    assert!(close(whoop.pack_height, -0.006));
+    assert!(close(whoop.diagonal, 0.066));
+    assert!(close(whoop.rotor_height, 0.008));
+    assert!(close(whoop.prop_diameter, 0.035));
+    let rings = whoop.duct_rings.expect("the whoop has ducts");
+    assert!(close(rings.inside_diameter, 0.037) && close(rings.wall, 0.0015));
+    assert!(close(rings.height, 0.014));
+    assert_eq!((whoop.bounce, whoop.friction), (0.3, 0.5));
+
+    let freestyle = quad("opendrone/freestyle-5").parameters.shape;
+    assert_eq!(freestyle.duct_rings, None);
+    assert!(
+        close3(freestyle.body, [0.080, 0.045, 0.035]),
+        "{freestyle:?}"
+    );
+    assert!(close(freestyle.pack_height, 0.026));
+    assert!(close(freestyle.diagonal, 0.225));
+    assert!(close(freestyle.prop_diameter, 0.1295));
+}
+
+#[test]
 fn a_map_that_isnt_built_in_yet_is_refused() {
     let problems = built_in().map("opendrone/skate-park").unwrap_err();
     assert_eq!(
         problems.to_string(),
-        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air"
+        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge"
     );
 }
 

@@ -1,0 +1,10 @@
+# The built-in Test Map test/thin-rail. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Thin rail"
+description = "The flat floor with the alpha Maps' thinnest parts: a round rail 6 cm across, 1 m up, running north–south through 3 m east from 5 m south to 5 m north; and a rebar stub 3 cm across standing 2 m tall at 3 m east, 10 m north. Both are 16-sided convex shapes."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"

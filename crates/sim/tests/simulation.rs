@@ -4,10 +4,10 @@
 
 use opendrone_maths::{Attitude, Mat3, Vec3};
 use opendrone_sim::{
-    BatteryParameters, Drag, EscParameters, EscState, FlightControllerSeam, MotorCommands,
-    MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters, QuadParameters, QuadSetUp,
-    QuadState, RotorLayout, ScriptedMotors, SetUp, SetUpProblem, Simulation, SimulationTime,
-    StartingMotors, World,
+    BatteryParameters, Drag, DuctRings, EscParameters, EscState, FlightControllerSeam, MapShape,
+    MotorCommands, MotorParameters, Mount, PhysicsRate, PropDirection, PropParameters,
+    QuadParameters, QuadPart, QuadSetUp, QuadShape, QuadState, RotorLayout, ScriptedMotors, SetUp,
+    SetUpError, SetUpProblem, Simulation, SimulationTime, StartingMotors, World,
 };
 
 const WORLD: World = World {
@@ -62,6 +62,26 @@ fn parameters() -> QuadParameters {
             recovery: 3.3,
             slow_sag: 0.0,
         },
+        shape: whoop_shape(),
+    }
+}
+
+/// The Whoop 65's collision shape, as its Quad definition gives it.
+fn whoop_shape() -> QuadShape {
+    QuadShape {
+        body: Vec3::new(0.035, 0.030, 0.020),
+        pack: Vec3::new(0.064, 0.010, 0.006),
+        pack_height: -0.006,
+        diagonal: 0.066,
+        rotor_height: 0.008,
+        prop_diameter: 0.035,
+        duct_rings: Some(DuctRings {
+            inside_diameter: 0.037,
+            wall: 0.0015,
+            height: 0.014,
+        }),
+        bounce: 0.3,
+        friction: 0.5,
     }
 }
 
@@ -85,6 +105,7 @@ fn set_up(hz: u32, random_seed: u64, quads: Vec<QuadSetUp>) -> SetUp {
     SetUp {
         physics_rate: PhysicsRate::from_hz(hz).unwrap(),
         world: WORLD,
+        map: Vec::new(),
         random_seed,
         quads,
     }
@@ -190,8 +211,39 @@ fn a_set_up_with_a_quad_the_physics_cant_move_is_refused_naming_the_quad() {
     let error = Simulation::new(set_up(8000, 1, vec![quad_at(0.0), massless]))
         .err()
         .expect("a Quad without mass can't be set up");
-    assert_eq!(error.quad, 1);
-    assert_eq!(error.problem, SetUpProblem::MassNotAboveZero);
+    assert_eq!(
+        error,
+        SetUpError::Quad {
+            quad: 1,
+            problem: SetUpProblem::MassNotAboveZero
+        }
+    );
+}
+
+#[test]
+fn each_ticks_output_names_where_the_map_pushed_the_quad() {
+    // The whoop rests on a floor whose top is at 0 m: its body box, 20 mm
+    // tall round its centre, touches it at its four bottom corners.
+    let floor = MapShape::Box {
+        centre: Vec3::new(0.0, 0.0, -1.0),
+        size: Vec3::new(200.0, 200.0, 2.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    };
+    let mut landed = set_up(8000, 1, vec![quad_at(0.010), quad_at(5.0)]);
+    landed.map = vec![floor];
+    let mut sim = Simulation::new(landed).unwrap();
+    assert!(sim.contacts(0).is_empty(), "nothing has happened yet");
+    sim.step();
+    let contacts = sim.contacts(0);
+    assert_eq!(contacts.len(), 4, "{contacts:?}");
+    for contact in contacts {
+        assert_eq!(contact.part, QuadPart::Body);
+        assert_eq!(contact.shape, 0);
+        assert_eq!(contact.normal, Vec3::new(0.0, 0.0, 1.0));
+        assert!(contact.push > 0.0);
+    }
+    // The Quad 5 m up touches nothing.
+    assert!(sim.contacts(1).is_empty());
 }
 
 #[test]

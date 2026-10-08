@@ -24,6 +24,12 @@
 //!   state, and the battery's voltage, current and charge.
 //! - [`Simulation::fingerprint`]: a fingerprint of the whole state, the same on
 //!   every computer, for the repeat and agreement checks.
+//! - After each tick, every Quad's state and its contacts with the Map
+//!   ([`Simulation::contacts`]).
+//! - The read-only line question ([`Simulation::line_question`]): which Map
+//!   surfaces a straight line passes through, and where it goes in and comes
+//!   out, for the Video Signal and the Where-you-stand sound. It never
+//!   changes the Simulation.
 //!
 //! The Radio Link, Assists, Rates and the session state arrive with their
 //! tickets.
@@ -52,14 +58,17 @@
 mod motors;
 mod time;
 
-use opendrone_maths::{Fingerprint, Fingerprinter};
-use opendrone_physics::{QuadBody, QuadStart};
+use opendrone_maths::{Fingerprint, Fingerprinter, Vec3};
+use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 
 pub use motors::{FlightControllerSeam, ScriptedMotors};
 pub use opendrone_physics::{
     BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
     MotorOutput, MotorParameters, Mount, PropDirection, PropParameters, QuadParameters, QuadState,
     RotorLayout, SetUpProblem, SpinDirection, StartUpStep, StartingMotors, World,
+};
+pub use opendrone_physics::{
+    Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
 };
 pub use time::{PhysicsRate, SimulationTime};
 
@@ -69,6 +78,9 @@ pub struct SetUp {
     pub physics_rate: PhysicsRate,
     /// The Map's world values.
     pub world: World,
+    /// The Map's solid parts, as plain data, in a fixed order: contacts and
+    /// the line question name them by their place in this list.
+    pub map: Vec<MapShape>,
     /// The seed for the Simulation's random numbers, kept in its state. Nothing
     /// draws random numbers yet; Prop Wash will (#46).
     pub random_seed: u64,
@@ -102,16 +114,26 @@ pub struct QuadOutput {
 
 /// A set-up the Simulation can't start from.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SetUpError {
-    /// Which Quad, counting from 0 in the set-up's order.
-    pub quad: usize,
-    pub problem: SetUpProblem,
+pub enum SetUpError {
+    /// A Quad the physics can't move: which one, counting from 0 in the
+    /// set-up's order, and why.
+    Quad { quad: usize, problem: SetUpProblem },
+    /// A Map shape that can't be a solid part: which one, counting from 0 in
+    /// the set-up's order, and why.
+    MapShape {
+        shape: usize,
+        problem: MapShapeProblem,
+    },
 }
 
 /// The world that moves every Quad forward in fixed steps.
 pub struct Simulation {
     physics_rate: PhysicsRate,
     world: World,
+    /// The Map's solid parts. They never change, so they are set-up rather
+    /// than state: the Map's fingerprint covers them, the Simulation's
+    /// doesn't.
+    map: MapCollision,
     random_seed: u64,
     time: SimulationTime,
     quads: Vec<SimulatedQuad>,
@@ -125,6 +147,10 @@ struct SimulatedQuad {
 
 impl Simulation {
     pub fn new(set_up: SetUp) -> Result<Simulation, SetUpError> {
+        let map = MapCollision::new(&set_up.map).map_err(|error| SetUpError::MapShape {
+            shape: error.shape,
+            problem: error.problem,
+        })?;
         let mut quads = Vec::with_capacity(set_up.quads.len());
         for (index, quad) in set_up.quads.into_iter().enumerate() {
             let start = QuadStart {
@@ -134,7 +160,7 @@ impl Simulation {
                 mount: quad.mount,
             };
             let body = QuadBody::new(quad.parameters, start, &set_up.world).map_err(|problem| {
-                SetUpError {
+                SetUpError::Quad {
                     quad: index,
                     problem,
                 }
@@ -148,6 +174,7 @@ impl Simulation {
         Ok(Simulation {
             physics_rate: set_up.physics_rate,
             world: set_up.world,
+            map,
             random_seed: set_up.random_seed,
             time: SimulationTime::START,
             quads,
@@ -156,12 +183,14 @@ impl Simulation {
 
     /// One tick: for every Quad in order, the Flight Controller seam gives the
     /// motor commands, then the physics moves the Quad on by one step with
-    /// them. Then Simulation Time moves on by one step.
+    /// them, colliding with the Map. Then Simulation Time moves on by one
+    /// step.
     pub fn step(&mut self) {
         let dt = self.physics_rate.step_length();
         for quad in &mut self.quads {
             quad.motor_commands = quad.flight_controller.step(self.time);
-            quad.body.step(&self.world, &quad.motor_commands, dt);
+            quad.body
+                .step(&self.world, &self.map, &quad.motor_commands, dt);
         }
         self.time = self.time.next();
     }
@@ -200,6 +229,22 @@ impl Simulation {
         }
     }
 
+    /// Every place where the Map pushed a Quad during the last tick, by part
+    /// and then by Map shape (none before the first tick, and none on the
+    /// thrust stand).
+    pub fn contacts(&self, quad: usize) -> &[Contact] {
+        self.quads[quad].body.contacts()
+    }
+
+    /// The line question: every Map surface the straight line from `from` to
+    /// `to` (world axes, metres) passes through, with where the line goes in
+    /// and comes out, in order along the line. Each names its Map shape by its
+    /// place in the set-up's list. It reads the Map only, so it never changes
+    /// the Simulation, and it may be asked between any two ticks.
+    pub fn line_question(&self, from: Vec3, to: Vec3) -> Vec<LineCrossing> {
+        self.map.line_question(from, to)
+    }
+
     /// The motor commands the Flight Controller seam gave a Quad on the last
     /// tick (all stopped before the first).
     pub fn motor_commands(&self, quad: usize) -> MotorCommands {
@@ -218,6 +263,12 @@ impl Simulation {
     /// (with its motors, ESCs and battery), motor commands and Flight
     /// Controller seam. Two runs, or two computers,
     /// that give the same fingerprint are in exactly the same state.
+    ///
+    /// The Map's solid parts never change, so they are left out, as the
+    /// Quads' parameters are; the Results' Map fingerprint covers them. So
+    /// are the contacts: they are what happened during the last tick, worked
+    /// out from the state, and every push they report is already in the
+    /// Quad's speeds.
     pub fn fingerprint(&self) -> Fingerprint {
         let mut f = Fingerprinter::new();
         f.write_u64(self.time.ticks());

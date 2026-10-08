@@ -1,12 +1,14 @@
-//! Maps: so far their world values, and the Test Maps built into the code
-//! for Scenarios (#16 §7). A Map's `.glb` shapes and Launch Spot arrive with
-//! the Map tickets (#43, #63).
+//! Maps: so far their world values and solid parts, and the Test Maps built
+//! into the code for Scenarios (#16 §7). Reading a Map's `.glb` (its collider
+//! tags and Launch Spot) arrives with the Map ticket (#63); its colliders
+//! become the same plain [`MapShape`]s the Test Maps are written as.
 
 use opendrone_maths::{Fingerprint, Fingerprinter};
-use opendrone_physics::World;
+use opendrone_physics::{MapShape, World};
 
 use crate::document::{Document, FORMAT, Problems};
 use crate::migration::{self, FileKind, PACK_STEPS, Step};
+use crate::test_maps::TEST_MAPS;
 use crate::units::{self, Dimension};
 
 /// A checked Map: what the Simulation receives from it.
@@ -17,14 +19,23 @@ pub struct MapDefinition {
     /// The on-screen name.
     pub name: String,
     pub world: World,
+    /// Its solid parts, in a fixed order: contacts and the line question
+    /// name each by its place in this list.
+    pub shapes: Vec<MapShape>,
 }
 
 impl MapDefinition {
-    /// The fingerprint of what the Simulation receives from this Map: so far
-    /// its world values (#16 §9).
+    /// The fingerprint of what the Simulation receives from this Map: its
+    /// world values, then its solid parts in order (#16 §9). Each shape
+    /// starts with its kind and spells out its own lengths, so a run of them
+    /// reads back one way only, and a Map with none, such as
+    /// `test/empty-air`, keeps the fingerprint its world values alone give.
     pub fn fingerprint(&self) -> Fingerprint {
         let mut f = Fingerprinter::new();
         self.world.write_fingerprint(&mut f);
+        for shape in &self.shapes {
+            shape.write_fingerprint(&mut f);
+        }
         f.finish()
     }
 }
@@ -34,34 +45,36 @@ impl MapDefinition {
 /// migrate` rewrites them like any Pack file, so their `format` keeps up.
 pub const TEST_MAPS_FOLDER: &str = "crates/pack/test-maps";
 
-/// The Test Maps, built into the code for Scenarios only, each the text of a
-/// `map.toml` in [`TEST_MAPS_FOLDER`]. They use the `test/` prefix (#16 §2).
-const TEST_MAPS: &[(&str, &str)] = &[("empty-air", include_str!("../test-maps/empty-air.toml"))];
-
-/// A Test Map by the part of its id after `test/`, such as `empty-air`.
+/// A Test Map by the part of its id after `test/`, such as `empty-air`: its
+/// `map.toml` (in [`TEST_MAPS_FOLDER`]) read like any Map's, with its solid
+/// parts, which are written in the code (`test_maps.rs`) because a Test Map
+/// has no `.glb`.
 pub fn test_map(name: &str) -> Option<Result<MapDefinition, Problems>> {
-    TEST_MAPS
-        .iter()
-        .find(|(map, _)| *map == name)
-        .map(|(map, text)| {
-            read_map_file(
-                &format!("test/{map}"),
-                &format!("the built-in Test Map test/{map}"),
-                text,
-            )
+    TEST_MAPS.iter().find(|map| map.name == name).map(|map| {
+        read_map_file(
+            &format!("test/{}", map.name),
+            &format!("the built-in Test Map test/{}", map.name),
+            map.text,
+        )
+        .map(|definition| MapDefinition {
+            shapes: (map.shapes)(),
+            ..definition
         })
+    })
 }
 
 /// The ids of every Test Map.
 pub fn test_map_ids() -> Vec<String> {
     TEST_MAPS
         .iter()
-        .map(|(map, _)| format!("test/{map}"))
+        .map(|map| format!("test/{}", map.name))
         .collect()
 }
 
 /// Reads a `map.toml`: its name and its world values. An older file is
-/// upgraded in memory first, like every Pack file.
+/// upgraded in memory first, like every Pack file. Its solid parts come from
+/// elsewhere (a Test Map's code, later a Map's `.glb`), so they are empty
+/// here.
 pub fn read_map_file(id: &str, file: &str, text: &str) -> Result<MapDefinition, Problems> {
     read_map_file_with_steps(id, file, text, PACK_STEPS)
 }
@@ -114,5 +127,6 @@ pub fn read_map_file_with_steps(
             gravity,
             air_density,
         },
+        shapes: Vec::new(),
     })
 }

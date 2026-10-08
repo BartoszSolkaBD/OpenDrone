@@ -186,7 +186,7 @@ fn an_unknown_measurement_is_refused_listing_what_the_runner_measures() {
     assert_eq!(
         failures(&report(&file, ResultsFile::Write)),
         [format!(
-            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag"
+            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag"
         )]
     );
 }

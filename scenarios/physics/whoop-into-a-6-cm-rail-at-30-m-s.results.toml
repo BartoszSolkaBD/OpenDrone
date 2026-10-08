@@ -1,0 +1,46 @@
+# Results of whoop-into-a-6-cm-rail-at-30-m-s.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A whoop at 30 m/s never passes through a 6 cm rail"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.04 s"
+basis    = "Rule"
+expected = "between 2 m and 2.97 m"
+measured = "2.93 m"
+
+[[expect]]
+what     = "speed east at 0.25 s"
+basis    = "Observed"
+expected = "-7.83 m/s ± 0.5 m/s"
+measured = "-7.83 m/s"
+
+[[expect]]
+what     = "distance east at 0.25 s"
+basis    = "Observed"
+expected = "1.21 m ± 0.05 m"
+measured = "1.21 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "19dcc67dc9d24c34"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "61249da54cc5d1fa"   # test/thin-rail
+run  = "e2f2041c7de7c3b7"   # the whole state after each of 2000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.025 s" = "7c493dbf5f875a5e"
+"0.05 s" = "f5186cc643e43dee"
+"0.075 s" = "f7618bb4d2835771"
+"0.1 s" = "7ddb0b8804df66ce"
+"0.125 s" = "283a7f6b4fb52431"
+"0.15 s" = "b00bcc8210b9746f"
+"0.175 s" = "91d6497d38eaed48"
+"0.2 s" = "64ea2c932d268d20"
+"0.225 s" = "b8dd75541476faa5"
+"0.25 s" = "bb10a243d7850d0c"

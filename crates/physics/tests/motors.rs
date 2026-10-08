@@ -7,13 +7,14 @@ mod common;
 use common::{STEP, WORLD, start, whoop};
 use opendrone_maths::PilotRates;
 use opendrone_physics::{
-    EscState, MotorCommand, MotorCommands, Mount, PropDirection, QuadBody, SpinDirection,
-    StartUpStep, StartingMotors,
+    EscState, MapCollision, MotorCommand, MotorCommands, Mount, PropDirection, QuadBody,
+    SpinDirection, StartUpStep, StartingMotors,
 };
 
 fn run(quad: &mut QuadBody, commands: MotorCommands, seconds: f64) {
+    let empty_air = MapCollision::default();
     for _ in 0..(seconds / STEP).round() as u64 {
-        quad.step(&WORLD, &commands, STEP);
+        quad.step(&WORLD, &empty_air, &commands, STEP);
     }
 }
 
@@ -131,7 +132,12 @@ fn settled_motors_carry_a_level_quads_weight_from_the_first_step() {
     let thrust: f64 = quad.motors().iter().map(|m| m.thrust).sum();
     assert!((thrust - 0.0312 * 9.81).abs() < 1e-12);
     assert!(quad.motors().iter().all(|m| m.esc == EscState::Running));
-    quad.step(&WORLD, &MotorCommands::all(0.0), STEP);
+    quad.step(
+        &WORLD,
+        &MapCollision::default(),
+        &MotorCommands::all(0.0),
+        STEP,
+    );
     // One step on, the motors have barely started to slow: the Quad has
     // hardly begun to fall.
     assert!(quad.state().velocity.z.abs() < 1e-4);

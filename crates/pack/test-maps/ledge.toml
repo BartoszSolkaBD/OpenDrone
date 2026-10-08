@@ -1,0 +1,10 @@
+# The built-in Test Map test/ledge. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Ledge"
+description = "The flat floor with a platform 1 m high covering everything west of the origin (20 m west and 20 m either side), its edge running north–south through the origin: a convex shape."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"

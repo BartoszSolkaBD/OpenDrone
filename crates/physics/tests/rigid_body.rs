@@ -7,8 +7,8 @@ mod common;
 use common::{STEP, WORLD, still_at, whoop};
 use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
 use opendrone_physics::{
-    MotorCommands, Mount, QuadBody, QuadParameters, QuadStart, QuadState, SetUpProblem,
-    StartingMotors,
+    MapCollision, MotorCommands, Mount, QuadBody, QuadParameters, QuadStart, QuadState,
+    SetUpProblem, StartingMotors,
 };
 
 fn with_inertia(inertia: Vec3) -> QuadParameters {
@@ -48,8 +48,9 @@ fn a_tumble_about_a_tilted_axis_keeps_its_angular_momentum() {
         state.attitude.body_to_world(body)
     };
     let before = momentum(quad.state());
+    let empty_air = MapCollision::default();
     for _ in 0..8000 {
-        quad.step(&WORLD, &MotorCommands::STOPPED, STEP);
+        quad.step(&WORLD, &empty_air, &MotorCommands::STOPPED, STEP);
     }
     let after = momentum(quad.state());
     let drift = (after - before).length() / before.length();

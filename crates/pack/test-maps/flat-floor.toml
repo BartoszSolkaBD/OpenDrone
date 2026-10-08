@@ -1,0 +1,10 @@
+# The built-in Test Map test/flat-floor. Built into the code for Scenarios
+# only (crates/pack/src/test_maps.rs, which also holds its solid parts);
+# `cargo xtask migrate` rewrites it like any Pack file.
+format      = 1
+name        = "Flat floor"
+description = "A flat floor, 200 m square, its top at 0 m: a box. Nothing else."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"

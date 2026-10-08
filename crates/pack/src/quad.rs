@@ -18,8 +18,8 @@ use std::collections::BTreeMap;
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, EscParameters, MotorParameters, PropParameters, QuadParameters,
-    RotorLayout,
+    BatteryParameters, Drag, DuctRings, EscParameters, MotorParameters, PropParameters,
+    QuadParameters, QuadShape, RotorLayout,
 };
 
 use crate::document::{Document, Item, Problem, Problems, Table};
@@ -700,7 +700,8 @@ pub struct QuadDefinition {
     pub based_on: Option<String>,
     /// What the physics receives: the mass (dry mass plus the battery, stored
     /// apart and added here), the inertia, the drag, the rotors' layout, the
-    /// props, motors and ESCs, and the battery.
+    /// props, motors and ESCs, the battery, and the collision shape with its
+    /// bounce and friction.
     pub parameters: QuadParameters,
     pub frame: Frame,
     pub collision: Collision,
@@ -1224,6 +1225,17 @@ fn definition(
     };
     let [roll, pitch, yaw] = frame.inertia;
     let [front, side, top] = frame.drag_area;
+    let collision = Collision {
+        body: r.three("collision.body"),
+        pack: r.three("collision.pack"),
+        pack_height: r.one("collision.pack_height"),
+        duct_rings: r
+            .has("collision.duct_rings")
+            .then(|| r.three("collision.duct_rings")),
+        bounce: r.one("collision.bounce"),
+        friction: r.one("collision.friction"),
+    };
+    let size = |[a, b, c]: [f64; 3]| Vec3::new(a, b, c);
     let parameters = QuadParameters {
         // Stored apart, added here, so a heavier pack can't be counted twice
         // (#16 §4).
@@ -1276,6 +1288,23 @@ fn definition(
             recovery: battery.recovery,
             slow_sag: battery.slow_sag,
         },
+        shape: QuadShape {
+            body: size(collision.body),
+            pack: size(collision.pack),
+            pack_height: collision.pack_height,
+            diagonal: frame.diagonal,
+            rotor_height: frame.rotor_height,
+            prop_diameter: props.diameter,
+            duct_rings: collision
+                .duct_rings
+                .map(|[inside_diameter, wall, height]| DuctRings {
+                    inside_diameter,
+                    wall,
+                    height,
+                }),
+            bounce: collision.bounce,
+            friction: collision.friction,
+        },
     };
     let block = SECTIONS
         .iter()
@@ -1304,16 +1333,7 @@ fn definition(
         based_on,
         parameters,
         frame,
-        collision: Collision {
-            body: r.three("collision.body"),
-            pack: r.three("collision.pack"),
-            pack_height: r.one("collision.pack_height"),
-            duct_rings: r
-                .has("collision.duct_rings")
-                .then(|| r.three("collision.duct_rings")),
-            bounce: r.one("collision.bounce"),
-            friction: r.one("collision.friction"),
-        },
+        collision,
         props,
         motors,
         battery,

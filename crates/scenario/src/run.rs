@@ -4,8 +4,8 @@ use opendrone_maths::{Fingerprint, Fingerprinter, functions};
 use opendrone_pack::{MapDefinition, QuadDefinition};
 use opendrone_pack::{Packs, Problem, Problems};
 use opendrone_sim::{
-    MotorCommands, Mount, PhysicsRate, QuadOutput, QuadSetUp, QuadState, ScriptedMotors, SetUp,
-    SetUpProblem, Simulation, SimulationTime,
+    MapShapeProblem, MotorCommands, Mount, PhysicsRate, QuadOutput, QuadSetUp, QuadState,
+    ScriptedMotors, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime,
 };
 
 use crate::measure::angle_near;
@@ -175,6 +175,7 @@ fn simulate(
     let set_up = SetUp {
         physics_rate: plan.physics_rate,
         world: map.world,
+        map: map.shapes.clone(),
         random_seed: start.random_seed,
         quads: vec![QuadSetUp {
             parameters: quad.parameters.clone(),
@@ -191,18 +192,51 @@ fn simulate(
         }],
     };
     let mut sim = Simulation::new(set_up).map_err(|error| {
-        let sentence = match error.problem {
-            SetUpProblem::MassNotAboveZero => "its mass must be above zero".to_string(),
-            SetUpProblem::InertiaHasNoInverse => {
-                "its inertia can't be turned around (no inverse)".to_string()
+        let (line, sentence) = match error {
+            SetUpError::Quad { problem, .. } => {
+                let why = match problem {
+                    SetUpProblem::MassNotAboveZero => "its mass must be above zero".to_string(),
+                    SetUpProblem::InertiaHasNoInverse => {
+                        "its inertia can't be turned around (no inverse)".to_string()
+                    }
+                    SetUpProblem::NotAboveZero(what) => format!("{what} must be above zero"),
+                    SetUpProblem::NoVoltageCurve => {
+                        "its battery's voltage curve has no points".to_string()
+                    }
+                    SetUpProblem::ShapeCantBeBuilt => {
+                        "its collision shape needs every size above zero, a bounce from 0 to 1 and a friction of 0 or more".to_string()
+                    }
+                };
+                (
+                    start.quad.line,
+                    format!("the Quad \"{}\" can't fly: {why}", start.quad.id),
+                )
             }
-            SetUpProblem::NotAboveZero(what) => format!("{what} must be above zero"),
-            SetUpProblem::NoVoltageCurve => "its battery's voltage curve has no points".to_string(),
+            SetUpError::MapShape { shape, problem } => {
+                let why = match problem {
+                    MapShapeProblem::NotARealNumber => "a number in it isn't a real number",
+                    MapShapeProblem::BoxHasNoSize => "a box needs a size above zero each way",
+                    MapShapeProblem::ConvexHasNoVolume => {
+                        "a convex shape needs four corners that aren't all in one plane"
+                    }
+                    MapShapeProblem::MeshHasNoTriangles => "a triangle mesh needs a triangle",
+                    MapShapeProblem::MeshCornerMissing => {
+                        "a triangle names a corner the mesh doesn't have"
+                    }
+                };
+                (
+                    start.map.line,
+                    format!(
+                        "the Map \"{}\" can't be flown: its shape {shape} (counting from 0) isn't solid: {why}",
+                        start.map.id
+                    ),
+                )
+            }
         };
         Problems(vec![Problem {
             file: scenario.file.clone(),
-            line: start.quad.line,
-            sentence: format!("the Quad \"{}\" can't fly: {sentence}", start.quad.id),
+            line,
+            sentence,
         }])
     })?;
 

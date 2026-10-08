@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 opendrone-maths.workspace = true
+parry3d-f64.workspace = true
 
 [lints]
 workspace = true

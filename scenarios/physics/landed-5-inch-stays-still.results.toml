@@ -1,0 +1,106 @@
+# Results of landed-5-inch-stays-still.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A landed 5-inch stays still for two minutes"
+
+[[expect]]
+what     = "height, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0.0175 m ± 0.000001 m"
+measured = "0.0175 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0.0175 m ± 0.000001 m"
+measured = "0.0175 m"
+
+[[expect]]
+what     = "distance east, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance north, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance north, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "speed, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "roll, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "roll, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, lowest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, highest over 0 s to 120 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "feedd43ca918ebf2"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "fd5b0b58aeb0abe4"   # the whole state after each of 960000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"12 s" = "733c910dd10b3126"
+"24 s" = "1acca0cf8e1c8496"
+"36 s" = "7a27699a19fa05f5"
+"48 s" = "97dd436526cabc03"
+"60 s" = "e91907cfee707b04"
+"72 s" = "c3134645e43bde40"
+"84 s" = "6add3ecbe6534af7"
+"96 s" = "fa5af8ce8e9fc5d1"
+"108 s" = "f9da95faa54d46e2"
+"120 s" = "0d451694c3d39a7a"

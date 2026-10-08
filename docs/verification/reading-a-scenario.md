@@ -25,7 +25,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 |---|---|---|
 | `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`. So far Physics and Thrust Stand Scenarios run: scripted motors stand in for the Flight Controller. On the thrust stand the Quad is held still, so its `speed` and `rotation` must be zero, while its motors, ESCs and battery work as in flight. |
 | `quad` | `"test/whoop-65-no-drag"` | The Quad, by id. Its numbers come from its Quad definition, never from the Scenario. |
-| `map` | `"test/empty-air"` | The Map, by id. Gravity and air density come from the Map. `test/empty-air` is built into the code: 9.81 m/s² and 1.225 kg/m³, with nothing to hit. |
+| `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. |
 | `position` | `"0 m east, 0 m north, 0 m up"` | From the Map's origin. |
 | `attitude` | `"level, heading 0°"` or `"roll 0°, pitch 30°, heading 45°"` | Heading is a compass heading (0° north, 90° east). Pitch is nose up, roll is right side down. |
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
@@ -57,6 +57,21 @@ Each ESC copies Bluejay v0.21.0 ([`crates/physics/src/esc.rs`](../../crates/phys
 
 - **Starting a stopped motor:** on the first command above 0%, a ready ESC waits the Quad's start wait (0.1 s), then starts the motor with its drive held at the Quad's start-up power limit (1.96%) for 15 electrical turns (Bluejay's 24 start-up commutations, then its initial-run countdown of 12 turns, which starts on the fourth), and then runs it as commanded.
 - **Stopping:** at 0% it brakes the motor, and below Bluejay's minimum speed, about 1,330 electrical RPM, switches it off and is ready again.
+
+### Test Maps
+
+The Test Maps are simple Maps built into the code for Scenarios only, each with the `test/` prefix. Each one's `map.toml` is a file in [`crates/pack/test-maps/`](../../crates/pack/test-maps/), so `cargo xtask migrate` keeps its format up, and its solid parts are written in [`crates/pack/src/test_maps.rs`](../../crates/pack/src/test_maps.rs). All have standard gravity (9.81 m/s²) and sea-level air (1.225 kg/m³). Every one but empty air stands on the same ground: a box 200 m square whose top is the origin's height, 0 m. Positions are from the Map's origin.
+
+| Id | What is in it |
+|---|---|
+| `test/empty-air` | Nothing: no floor, no walls. |
+| `test/flat-floor` | The ground. |
+| `test/wall` | The ground and a wall 20 m wide, 5 m tall and 0.2 m thick, its face 5 m east, facing west. |
+| `test/thin-rail` | The ground, a round rail 6 cm across running north–south at 3 m east, 1 m up, from 5 m south to 5 m north, and a rebar stub 3 cm across standing 2 m tall at 3 m east, 10 m north: the alpha Maps' thinnest parts. |
+| `test/floor-and-ceiling` | A floor and a concrete ceiling 3.1 m above it, as on the Bando's floors: the floor a sheet at 0 m, the ceiling a slab from 3.1 m to 3.3 m, both triangle meshes 40 m square. |
+| `test/ledge` | The ground and a platform 1 m high covering everything west of the origin, its edge running north–south through the origin. |
+
+Between them they use all three kinds of solid shape a Map's `.glb` gives: boxes, convex shapes (the rail, the stub and the ledge) and triangle meshes (the floor and ceiling). A Quad resting on a floor has its centre half its body box's height above it: 10 mm for the Whoop 65, 17.5 mm for the Freestyle 5″.
 
 ### The Rates
 
@@ -120,7 +135,7 @@ basis  = "rule: ..."
 ```
 
 - **`what`** is one of:
-  - **how the Quad moves:** height, distance east, distance north, vertical speed, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
+  - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
   - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %). **Total thrust** is all four motors' thrust.
   - **the battery:** **battery voltage** (at its terminals, past the connector), **battery current** (drawn from it; negative while braking motors give some back), **battery charge used** (since the start, in mAh) and **battery sag** (how far the voltage sits below the pack's resting voltage at its charge).
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
@@ -162,7 +177,7 @@ measured = "-4.91 m"
 - Each Expectation's **measured** value, to 3 significant figures, in the unit its expected value uses. The check itself uses the full number: -4.9056 m passes "-4.905 m ± 0.001 m", and the Results show it as -4.91 m.
 - The Results are the same on every computer, so a pull request's diff shows every value that moved, even inside its tolerance.
 - `[fingerprints]`: short codes that change if anything changes by even one bit.
-  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition changed.
+  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition changed; if `map` moved, the Map's world values or its solid shapes did.
   - `run`: the whole state after every step, in order. Any change to the flight changes it.
   - `[fingerprints.checkpoints]`: the whole state after each tenth of the run, so you can see how far into the run nothing changed.
 

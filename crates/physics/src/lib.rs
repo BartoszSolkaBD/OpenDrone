@@ -15,12 +15,13 @@
 //!   power limit ([`esc`]);
 //! - the battery: its voltage curve, sag, recovery and charge counting, with
 //!   no cutoff (E13, E14; [`battery`]);
+//! - collisions with the Map (E29, #43; see "Collisions" below);
 //! - the thrust stand: a Quad held still, its motors, ESCs and battery working
 //!   as in flight ([`Mount::ThrustStand`]).
 //!
 //! The other effects arrive with their own tickets and Scenarios: drag, the
-//! rest of the air and the rotors' own spin effects (#42), collisions (#43),
-//! Prop Strikes and stalled motors' restarts (#45), and so on.
+//! rest of the air and the rotors' own spin effects (#42), Prop Strikes and
+//! stalled motors' restarts (#45), and so on.
 //!
 //! # How one step moves the Quad
 //!
@@ -44,8 +45,73 @@
 //! 7. The attitude turns by the new rotation over the step, with the
 //!    exponential map, which is exact for a steady rotation and never drifts
 //!    (flight-dynamics research §2.3).
+//! 8. The collision stage (below): if that move would touch the Map, the Map
+//!    pushes back, friction holds or drags, the Quad bounces and the move is
+//!    redone, so no part ever passes through a surface between steps. It
+//!    starts from the speed and rotation steps 5 and 6 gave, so the motors'
+//!    thrust and torques are already in them.
 //!
-//! On the thrust stand, steps 4 to 7 are skipped: the Quad doesn't move.
+//! On the thrust stand, steps 4 to 8 are skipped: the Quad doesn't move.
+//!
+//! # Collisions
+//!
+//! parry3d's 64-bit edition (`parry3d-f64`), in its `enhanced-determinism`
+//! mode, answers the geometry questions only: what touches what and where,
+//! and how far along a move the Quad first meets something ([ADR-0004]). The
+//! bounce and the slide are ours. Its types never leave this crate: every
+//! conversion is in the `geometry` module, the Quad's shape comes from its
+//! definition ([`QuadShape`]) and the Map arrives as plain data
+//! ([`MapShape`]). The same Map answers the read-only line question
+//! ([`MapCollision::line_question`]).
+//!
+//! # The collision stage
+//!
+//! 1. **What could it reach?** Every surface within this step's reach: the
+//!    distance its speed and spin can carry any part in one step, plus
+//!    [`SKIN`], so a Quad resting on a surface always finds it.
+//! 2. **Push and friction.** At each contact point the Map may push the Quad
+//!    out, never pull it in, and friction may hold or drag it sideways, up to
+//!    the Quad's friction times the push (Coulomb's law). A surface still a
+//!    gap away may only be closed to, never crossed: that is the continuous
+//!    check that stops a Quad passing through a thin rail between steps. The
+//!    pushes are worked out together, point by point, [`PASSES`] times, with
+//!    the Quad's mass and inertia, so a hit off its centre also spins it.
+//! 3. **Bounce.** A point that hit at more than [`BOUNCE_SPEED`] comes back
+//!    out at the Quad's bounce times the speed it came in at
+//!    ([`BOUNCE_PASSES`] times through). A hit found a gap away bounces from
+//!    where the step started, at most one step's travel short of the surface:
+//!    3.75 mm at 30 m/s and 8 kHz. Friction was worked out in step 2, so it
+//!    is capped by the push that stops the Quad, not by the bigger push that
+//!    also bounces it. So on a slanting hit, friction takes at most friction
+//!    × the speed into the surface off the speed along it, not friction ×
+//!    (1 + bounce) × that. Many physics engines simplify the same way, and
+//!    bounce and friction are Estimates that Feel Tests tune.
+//! 4. **Rest.** When the Map holds the Quad (it pushes and nothing bounced)
+//!    and what is left of its motion is below [`REST_SPEED`] and
+//!    [`REST_TURN`], the Quad stays exactly still. Step 2 works the pushes out
+//!    point by point a fixed number of times, so on a Quad resting on several
+//!    points it leaves a tiny motion behind, which would make a landed Quad
+//!    creep. A step's gravity alone gives a Quad 1.2 mm/s at 8 kHz, a hundred
+//!    times [`REST_SPEED`], so a Quad that friction can't hold still slides
+//!    away; only on a slope within about half a degree of the steepest its
+//!    friction holds does it stay put instead of creeping off. The rule acts
+//!    on each step's leftover motion, so what it holds depends on the physics
+//!    rate: any net push below [`REST_SPEED`] per step's length (0.08 m/s² at
+//!    8 kHz, 0.01 m/s² at 1 kHz) and any net turning below [`REST_TURN`] per
+//!    step's length (about 0.8 rad/s² at 8 kHz) is held too.
+//! 5. **The move,** redone from where the step started with the new speeds,
+//!    as the free move does it (steps 5 and 7 above).
+//! 6. **The guard.** parry3d sweeps the Quad's shape along that move (a
+//!    time-of-impact shape cast). If it meets a surface before the move ends,
+//!    the Quad stops there: whatever step 2 missed, no part ever crosses a
+//!    surface between steps.
+//! 7. **Out of the Map.** A part more than [`SINK_ALLOWANCE`] inside a
+//!    surface, as when a Scenario starts a Quad sunk into the floor, is moved
+//!    straight out, without changing its speed.
+//!
+//! The collision stage remembers nothing from one step to the next, so it
+//! adds nothing to the Simulation's state. Each step's [`Contact`]s say where
+//! the Map pushed.
 //!
 //! # House rules
 //!
@@ -68,6 +134,12 @@
 //! [#10]: https://github.com/BartoszSolkaBD/OpenDrone/issues/10
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
+//! [ADR-0004]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0004-parry3d-geometry-only-f64.md
+
+mod collide;
+mod geometry;
+mod map;
+mod shape;
 
 pub mod battery;
 mod commands;
@@ -82,10 +154,18 @@ use esc::Esc;
 use motor::{Model, Motor};
 
 pub use battery::{BatteryOutput, BatteryParameters};
+pub use collide::{
+    BOUNCE_PASSES, BOUNCE_SPEED, Contact, PASSES, REST_SPEED, REST_TURN, SINK_ALLOWANCE, SKIN,
+};
 pub use commands::{MotorCommand, MotorCommands, SpinDirection};
 pub use esc::{EscParameters, EscState, StartUpStep};
+pub use map::{LineCrossing, MapCollision, MapShape, MapShapeError, MapShapeProblem};
 pub use motor::{MotorParameters, PropParameters};
 pub use rotors::{PropDirection, RotorLayout};
+pub use shape::{DUCT_RING_SEGMENTS, DuctRings, PROP_DISC_THICKNESS, QuadPart, QuadShape};
+
+use collide::{Collider, collide};
+use shape::Part;
 
 /// The Map's world values: what the air and the planet are like.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -117,6 +197,8 @@ pub struct QuadParameters {
     pub motors: MotorParameters,
     pub esc: EscParameters,
     pub battery: BatteryParameters,
+    /// The Quad's collision shape, and how it bounces and slides.
+    pub shape: QuadShape,
 }
 
 /// The Quad's drag numbers.
@@ -220,6 +302,9 @@ pub enum SetUpProblem {
     NotAboveZero(&'static str),
     /// The battery's voltage curve has no points.
     NoVoltageCurve,
+    /// Every size in the collision shape must be above zero, its bounce from
+    /// 0 to 1 and its friction 0 or more.
+    ShapeCantBeBuilt,
 }
 
 /// What one motor reports after a step.
@@ -255,6 +340,12 @@ pub struct QuadBody {
     turning: [f64; 4],
     /// The air density the motors were last worked out in.
     air_density: f64,
+    /// The collision shape's simple shapes, built once.
+    parts: Vec<Part>,
+    /// How far the shape's farthest point is from the centre of mass.
+    reach: f64,
+    /// Where the Map pushed the Quad during the last step.
+    contacts: Vec<Contact>,
 }
 
 impl QuadBody {
@@ -291,6 +382,9 @@ impl QuadBody {
         if parameters.battery.voltage_curve.is_empty() {
             return Err(SetUpProblem::NoVoltageCurve);
         }
+        if !parameters.shape.is_buildable() {
+            return Err(SetUpProblem::ShapeCantBeBuilt);
+        }
 
         let battery = Battery::new(&parameters.battery, start.battery);
         let model = Model::new(&parameters.motors, &parameters.props, world.air_density);
@@ -308,6 +402,11 @@ impl QuadBody {
         };
         let positions = parameters.rotors.positions();
         let turning = parameters.rotors.turning();
+        let parts = parameters.shape.parts();
+        let reach = parts
+            .iter()
+            .map(|part| part.reach)
+            .fold(0.0, opendrone_maths::functions::max);
         Ok(QuadBody {
             parameters,
             inertia_inverse,
@@ -319,6 +418,9 @@ impl QuadBody {
             positions,
             turning,
             air_density: world.air_density,
+            parts,
+            reach,
+            contacts: Vec::new(),
         })
     }
 
@@ -362,6 +464,12 @@ impl QuadBody {
         self.battery.output(&self.parameters.battery)
     }
 
+    /// Every place where the Map pushed the Quad during the last step, in a
+    /// fixed order: by part, then by Map shape. On the thrust stand, none.
+    pub fn contacts(&self) -> &[Contact] {
+        &self.contacts
+    }
+
     fn model(&self) -> Model {
         Model::new(
             &self.parameters.motors,
@@ -371,8 +479,9 @@ impl QuadBody {
     }
 
     /// Moves the Quad on by one fixed step of `dt` seconds, with these motor
-    /// commands (see the crate's "How one step moves the Quad").
-    pub fn step(&mut self, world: &World, commands: &MotorCommands, dt: f64) {
+    /// commands, through the Map's world values and solid parts (see the
+    /// crate's "How one step moves the Quad").
+    pub fn step(&mut self, world: &World, map: &MapCollision, commands: &MotorCommands, dt: f64) {
         self.air_density = world.air_density;
         let model = self.model();
 
@@ -396,7 +505,33 @@ impl QuadBody {
             return;
         }
 
-        // 4–7: the rigid body.
+        // 4–7: the free move, with the motors' thrust and torques. 8: the
+        // collision stage starts from the speeds the free move gave, so the
+        // motors' push is in them, and redoes the move from where the step
+        // started.
+        let before = self.state;
+        self.move_freely(world, &model, dt);
+        let collider = Collider {
+            mass: self.parameters.mass,
+            inertia_inverse: self.inertia_inverse,
+            bounce: self.parameters.shape.bounce,
+            friction: self.parameters.shape.friction,
+            parts: &self.parts,
+            reach: self.reach,
+        };
+        collide(
+            &collider,
+            map,
+            &before,
+            &mut self.state,
+            dt,
+            &mut self.contacts,
+        );
+    }
+
+    /// Steps 4 to 7: the move as if nothing were in the way, under gravity
+    /// and the motors' thrust and torques.
+    fn move_freely(&mut self, world: &World, model: &Model, dt: f64) {
         let state = &mut self.state;
         let mut thrust = 0.0;
         let mut torque = Vec3::ZERO;
