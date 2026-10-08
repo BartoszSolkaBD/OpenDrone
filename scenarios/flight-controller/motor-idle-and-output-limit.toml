@@ -12,10 +12,11 @@
 # It flies the Test Quad test/freestyle-5-filters-and-shaping-off: the
 # Freestyle 5″ with the Flight Controller's filters and loop shaping switched
 # off in its Tune, the way Betaflight 2026.6.2 reads "off": the gyro, D-term
-# and yaw P low-passes, the dynamic notch, RC smoothing and feedforward
-# (which come with #49), and Dynamic D, I-term relax, anti-gravity, TPA and
-# throttle boost (#50). So every number here is what Betaflight 2026.6.2
-# gives on that Tune, and stays so when those tickets land. On the 5″'s own
+# and yaw P low-passes, RC smoothing and feedforward (which come with #49),
+# the dynamic notch (which waits for gyro noise, #21), and Dynamic D,
+# I-term relax, anti-gravity, TPA and throttle boost (#50). So every number
+# here is what Betaflight 2026.6.2 gives on that Tune, and stays so when
+# those tickets land. On the 5″'s own
 # Tune they would come out otherwise: on a case's first frame RC smoothing
 # would hold the throttle back, and throttle boost would push it.
 format = 1

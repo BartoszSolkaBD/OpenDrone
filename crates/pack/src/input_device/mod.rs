@@ -17,7 +17,10 @@
 //!   where the Pack has none.
 //!
 //! `opendrone-input` turns a device's values into Channels with these.
+//! [`switches_from_aux`] turns pasted Betaflight `aux` lines into a Radio's
+//! switches.
 
+mod aux_paste;
 pub mod controls;
 mod read;
 
@@ -27,6 +30,7 @@ use controls::{
     AXIS_MAX, AXIS_MIN, Key, PadButton, PadControl, Position, Stick, Trigger, value_at_percent,
 };
 
+pub use aux_paste::{PastedSwitches, switches_from_aux};
 pub use read::{read_input_device_file, read_input_device_file_with_steps};
 
 /// Radio or Gamepad (#19 §1).
