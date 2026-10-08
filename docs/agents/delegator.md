@@ -141,10 +141,12 @@ Everything else the author needs is on the ticket and in the brief. That way a f
 
 - **Pass:** merge when every merge condition below holds.
 - **Changes needed:**
-  1. Read the blocking list. If every item on it is an edge case beyond the ticket, or a hardening idea for tooling, the Reviewer has missed its calibration. Ask the maintainer instead of spending a round.
-  2. Otherwise start a fix round, at the tier the table gives.
-  3. The fixer pushes. Then start a **new** Reviewer. Never reuse one.
-- **Three failed rounds:** the Review check fails and the PR gets `needs-maintainer`. Leave it, tell the maintainer, and move on.
+  1. Start a fix round, at the tier the table gives.
+  2. The fixer pushes. Then start a **new** Reviewer. Never reuse one.
+  3. Sometimes every blocking item is an edge case beyond the ticket, or a hardening idea for tooling. Fix those too, since they're usually small. Note them for your end-of-batch report, so the Reviewer page's calibration can be tuned.
+- **Three failed rounds:** the Review check fails and the PR gets `needs-maintainer`. Leave it, tell the maintainer, and carry on in the other Lanes.
+  - The maintainer decided on 8 October 2026 that a PR shouldn't wait for them because its rounds ran out.
+  - [#120](https://github.com/BartoszSolkaBD/OpenDrone/issues/120) changes the Review check to allow five rounds, then move what's left into its own issue. Until #120 merges, the three-round rule stands.
 
 ## Merging
 
@@ -207,10 +209,11 @@ A Verdict may list "Follow-ups (not blocking)". After the PR merges:
 
 Some decisions belong to the maintainer:
 
-- whatever the Red Flag gate holds for them;
+- whatever the Red Flag gate holds for them, such as a changed Source or Rule Expectation;
 - a ticket that turns out wrong or impossible;
-- an ADR that doesn't fit what was found;
-- a Reviewer that missed its calibration, as above.
+- an ADR that doesn't fit what was found.
+
+The maintainer doesn't read code, so never ask them to judge a code problem.
 
 Here's how to raise one:
 
