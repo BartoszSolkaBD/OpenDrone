@@ -31,7 +31,7 @@ measured = "0 N"
 [[expect]]
 what     = "motor 2 speed at 0.0055 s"
 basis    = "Rule"
-expected = "between 190 RPM and 9400 RPM"
+expected = "between 190 RPM and 9250 RPM"
 measured = "7530 RPM"
 
 [[expect]]
