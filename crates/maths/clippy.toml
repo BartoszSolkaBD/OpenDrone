@@ -11,7 +11,9 @@ disallowed-methods = [
     # std's maths functions call the platform's maths library, so their
     # results differ between Windows, macOS and Linux. Use the `libm` crate.
     # The exact operations stay allowed: + - * / %, sqrt, mul_add, abs,
-    # floor, ceil, round, trunc, div_euclid and clamp.
+    # floor, ceil, round, trunc, div_euclid and clamp. `cargo xtask
+    # core-maths` lets through what they compile to as well, such as the
+    # operating system's fmod for % and fma for mul_add.
     { path = "f64::sin", reason = "use libm::sin: std maths gives different results on different platforms (ADR-0001)" },
     { path = "f64::cos", reason = "use libm::cos: std maths gives different results on different platforms (ADR-0001)" },
     { path = "f64::tan", reason = "use libm::tan: std maths gives different results on different platforms (ADR-0001)" },
@@ -80,6 +82,17 @@ disallowed-methods = [
     { path = "f32::algebraic_mul", reason = "use *: the algebraic operations may give different results from run to run (ADR-0001)" },
     { path = "f32::algebraic_div", reason = "use /: the algebraic operations may give different results from run to run (ADR-0001)" },
     { path = "f32::algebraic_rem", reason = "use %: the algebraic operations may give different results from run to run (ADR-0001)" },
+
+    # parry3d keeps two calls to the operating system's maths, which `cargo
+    # xtask core-maths` allows only because the Simulation never runs them
+    # ([core-platform-maths] in crates/xtask/walls.toml): `acos` to work out
+    # a mesh's pseudo-normals, and `log2` to rebalance a tree of moving
+    # shapes. These keep it that way. Crates without parry3d ignore them.
+    { path = "parry3d_f64::shape::TriMesh::set_flags", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMesh::with_flags", reason = "mesh flags make parry3d work out pseudo-normals with the operating system's acos, which differs between platforms; build every mesh with TriMesh::new and no flags (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMesh::update_vertices", reason = "moving a mesh's corners redoes its pseudo-normals with the operating system's acos, which differs between platforms; build a new mesh with TriMesh::new instead (ADR-0001)" },
+    { path = "parry3d_f64::shape::TriMesh::set_vertices", reason = "moving a mesh's corners redoes its pseudo-normals with the operating system's acos, which differs between platforms; build a new mesh with TriMesh::new instead (ADR-0001)" },
+    { path = "parry3d_f64::partitioning::Bvh::optimize_incremental", reason = "it rebalances the tree with the operating system's log2, which differs between platforms; the Map's solid parts never move, so the tree is built once (ADR-0001)" },
 
     # std's min and max may return either zero when given +0 and -0, and the
     # two kinds of processor pick differently. Use opendrone-maths' own, which

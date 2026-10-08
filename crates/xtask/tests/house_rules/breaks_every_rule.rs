@@ -59,6 +59,21 @@ pub fn std_maths_f32(x: f32) -> f32 {
         + algebraic
 }
 
+pub fn runs_parry3ds_operating_system_maths(
+    mesh: &mut parry3d_f64::shape::TriMesh,
+    tree: &mut parry3d_f64::partitioning::Bvh,
+    workspace: &mut parry3d_f64::partitioning::BvhWorkspace,
+) {
+    use parry3d_f64::shape::{TriMesh, TriMeshFlags};
+    let corners = mesh.vertices().to_vec();
+    let triangles = mesh.indices().to_vec();
+    let _ = mesh.set_flags(TriMeshFlags::ORIENTED);
+    let _ = TriMesh::with_flags(corners.clone(), triangles, TriMeshFlags::ORIENTED);
+    mesh.update_vertices(|_| {});
+    mesh.set_vertices(&corners);
+    tree.optimize_incremental(workspace);
+}
+
 pub fn order_changes_from_run_to_run() -> usize {
     let map: HashMap<u8, u8> = HashMap::new();
     let set: HashSet<u8> = HashSet::new();

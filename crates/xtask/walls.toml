@@ -183,8 +183,8 @@ wide = "SIMD number types simba keeps compiled; parry3d's 64-bit queries never c
 # library the core is built with and fails on any other call, or on one of
 # these made from anywhere else (ADR-0001).
 [core-platform-maths]
-"parry3d-f64/acos" = { from = ["<parry3d_f64::shape::trimesh::TriMesh>::compute_pseudo_normals"], reason = "it runs only once a mesh has the ORIENTED or FIX_INTERNAL_EDGES flag (parry3d's TriMesh::set_flags), or to redo pseudo-normals a mesh already has; opendrone-physics builds every mesh with TriMesh::new and no flags and never changes one (map.rs, whose test checks every Map mesh has no flags and no pseudo-normals)" }
-"parry3d-f64/log2" = { from = ["<parry3d_f64::partitioning::bvh::bvh_tree::Bvh>::optimize_incremental"], reason = "it rebalances a tree whose shapes move; nothing in parry3d's own code calls it (only its tests do), and opendrone-physics never does" }
+"parry3d-f64/acos" = { from = ["<parry3d_f64::shape::trimesh::TriMesh>::compute_pseudo_normals"], reason = "it runs only once a mesh has the ORIENTED or FIX_INTERNAL_EDGES flag (parry3d's TriMesh::set_flags), or to redo pseudo-normals a mesh already has; opendrone-physics builds every mesh with TriMesh::new and no flags and never changes one (map.rs, whose test checks every Map mesh has no flags and no pseudo-normals), and the core crates' clippy.toml bans set_flags, with_flags, update_vertices and set_vertices" }
+"parry3d-f64/log2" = { from = ["<parry3d_f64::partitioning::bvh::bvh_tree::Bvh>::optimize_incremental"], reason = "it rebalances a tree whose shapes move; nothing in parry3d's own code calls it (only its tests do), and the core crates' clippy.toml bans it, so opendrone-physics never does" }
 
 # Outside libraries the core must never reach, with why. A name ending in `*`
 # covers every library whose name starts that way. None of these may be added
