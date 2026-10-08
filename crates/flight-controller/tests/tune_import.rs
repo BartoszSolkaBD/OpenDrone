@@ -258,7 +258,7 @@ fn the_i_limit_4_3_called_iterm_limit_becomes_2026_6s_iterm_windup() {
         got(&meteor, "iterm_windup"),
         is(
             "80",
-            "ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500"
+            "ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500 (yaw's I limit becomes 320, was 400)"
         )
     );
     let lower = import(&changed(
@@ -448,7 +448,7 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
         "set angle_earth_ref = 0                # ADR-0008; percent",
         "set d_max_advance = 7                  # ADR-0008;",
         "set crashflip_rate = 0                 # ADR-0008;",
-        "set failsafe_delay = 15                # 4.3 default; tenths of a second",
+        "set failsafe_switch_mode = STAGE1      # 4.3 default",
         "set blackbox_sample_rate = 1/2         # diff",
         "set dyn_notch_q = 350                  # diff",
     ] {
@@ -688,6 +688,79 @@ fn the_cetus_xs_diff_all_from_betaflight_4_4_imports_too() {
             .map(|(n, v, _)| (n.as_str(), v.as_str())),
     );
     assert!(tune.is_ok(), "{tune:?}");
+}
+
+#[test]
+fn an_export_not_taken_bare_is_imported_with_a_warning_and_a_diff_all_bare_is_refused() {
+    // Basis: Source (4.3.0's cli.c: without `bare`, `diff` first applies the
+    // board's own defaults, and `diff all bare` leaves out the line that
+    // selects the active profile again).
+    let meteor = meteor();
+    assert_eq!(meteor.warnings.len(), 1);
+    assert!(
+        meteor.warnings[0].starts_with(
+            "This `diff all` lists what differs from the board's own defaults, not Betaflight's:"
+        ),
+        "{:?}",
+        meteor.warnings
+    );
+    assert!(
+        meteor
+            .report()
+            .contains("- Note: This `diff all` lists what differs")
+    );
+    let bare = changed(METEOR, "# diff all\n", "# diff bare\n");
+    assert_eq!(import(&bare).warnings, Vec::<String>::new());
+    let all_bare = changed(METEOR, "# diff all\n", "# diff all bare\n");
+    assert!(
+        refusal(&all_bare).starts_with(
+            "A `diff all bare` doesn't say which of Betaflight's PID profiles is active"
+        )
+    );
+}
+
+#[test]
+fn a_failsafe_procedure_the_flight_controller_doesnt_simulate_yet_is_noted() {
+    // Basis: Rule (#21: a Tune set to LAND or GPS Rescue imports with a "not
+    // simulated yet" note and flies DROP).
+    let landing = import(&changed(
+        METEOR,
+        "set small_angle = 180",
+        "set small_angle = 180\nset failsafe_procedure = AUTO-LAND",
+    ));
+    let procedure = landing.setting("failsafe_procedure").unwrap();
+    assert_eq!(procedure.value, "AUTO-LAND");
+    assert_eq!(procedure.note, "not simulated yet (#21)");
+    assert!(
+        landing
+            .warnings
+            .iter()
+            .any(|w| w.starts_with("`failsafe_procedure` is AUTO-LAND, which isn't simulated yet")),
+        "{:?}",
+        landing.warnings
+    );
+}
+
+#[test]
+fn a_2026_6_export_reads_its_active_battery_profile_with_the_rest() {
+    // Basis: Source (2026.6.2's cli.c lists `battery_profile` sections after
+    // the rate profiles and selects the active one again at the end).
+    let text = "# diff all\n# version\n# Betaflight / STM32H743 (SH74) 2026.6.2 Jun  1 2026 / 12:00:00 (abcdef0) MSP API: 1.48\nbatch start\ndefaults nosave\nprofile 0\nset p_roll = 50\nprofile 0\nrateprofile 0\nset roll_srate = 80\nbattery_profile 0\nset vbat_max_cell_voltage = 435\nbattery_profile 1\nset vbat_max_cell_voltage = 420\nrateprofile 0\nbattery_profile 0\nsave\n";
+    let latest = import(text);
+    assert_eq!(got(&latest, "p_roll"), is("50", "diff"));
+    assert_eq!(got(&latest, "vbat_max_cell_voltage"), is("435", "diff"));
+    assert!(
+        latest
+            .left_out
+            .iter()
+            .any(|l| l.text == "set vbat_max_cell_voltage = 420" && l.why == Why::OtherProfile)
+    );
+    assert!(
+        latest
+            .left_out
+            .iter()
+            .any(|l| l.text == "set roll_srate = 80" && l.why == Why::RateProfile)
+    );
 }
 
 #[test]

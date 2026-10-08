@@ -177,13 +177,14 @@ impl fmt::Display for Refusal {
     }
 }
 
-/// Where a line of CLI text sits: before any profile, or in a PID profile or
-/// a rate profile, by number.
+/// Where a line of CLI text sits: before any profile, or in a PID profile, a
+/// rate profile or (from 2026.6) a battery profile, by number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Section {
     Master,
     Profile(u8),
     RateProfile(u8),
+    BatteryProfile(u8),
 }
 
 /// What one line of CLI text says.
@@ -195,6 +196,8 @@ pub(crate) enum Command<'a> {
     Profile(u8),
     /// `rateprofile <n>`: from here on, rate profile n.
     RateProfile(u8),
+    /// `battery_profile <n>`: from here on, battery profile n.
+    BatteryProfile(u8),
     /// Any other command, by its first word, such as `aux` or `feature`.
     Other(&'a str),
 }
@@ -279,6 +282,7 @@ impl<'a> CliText<'a> {
             match command {
                 Command::Profile(n) => section = Section::Profile(n),
                 Command::RateProfile(n) => section = Section::RateProfile(n),
+                Command::BatteryProfile(n) => section = Section::BatteryProfile(n),
                 Command::Set { name, value }
                     if section == Section::Master
                         && matches!(name, "name" | "craft_name")
@@ -316,6 +320,22 @@ impl<'a> CliText<'a> {
             Command::RateProfile(n) => Some(n),
             _ => None,
         })
+    }
+
+    /// The active battery profile (2026.6 has them): the last
+    /// `battery_profile` line's.
+    pub fn active_battery_profile(&self) -> Option<u8> {
+        self.lines.iter().rev().find_map(|line| match line.command {
+            Command::BatteryProfile(n) => Some(n),
+            _ => None,
+        })
+    }
+
+    /// Whether the CLI echoed a `bare` export, which compares with
+    /// Betaflight's own defaults rather than the board's.
+    pub fn bare(&self) -> bool {
+        self.echo
+            .is_some_and(|echo| echo.split_whitespace().any(|word| word == "bare"))
     }
 
     /// The Betaflight version, or why there isn't one the translator reads.
@@ -369,6 +389,9 @@ fn command(line: &str) -> Command<'_> {
         "rateprofile" => rest
             .parse()
             .map_or(Command::Other(word), Command::RateProfile),
+        "battery_profile" => rest
+            .parse()
+            .map_or(Command::Other(word), Command::BatteryProfile),
         _ => Command::Other(word),
     }
 }

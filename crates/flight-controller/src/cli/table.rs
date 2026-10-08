@@ -201,7 +201,11 @@ const D_ROLL: &[(&str, &str)] = &[("d_roll", "40"), ("d_min_roll", "30")];
 const D_PITCH: &[(&str, &str)] = &[("d_pitch", "46"), ("d_min_pitch", "34")];
 const D_YAW: &[(&str, &str)] = &[("d_yaw", "0"), ("d_min_yaw", "0")];
 const ADVANCE: &[(&str, &str)] = &[("d_max_gain", "37"), ("d_max_advance", "20")];
-const WINDUP: &[(&str, &str)] = &[("iterm_limit", "400"), ("pidsum_limit", "500")];
+const WINDUP: &[(&str, &str)] = &[
+    ("iterm_limit", "400"),
+    ("pidsum_limit", "500"),
+    ("pidsum_limit_yaw", "400"),
+];
 
 /// Every setting the translator knows, in the order a Tune lists them: by
 /// [`Place`], and within a place as the App shows them.
@@ -211,11 +215,16 @@ pub const SETTINGS: &[Setting] = &[
     all("small_angle", Configuration, "degrees: the most it may tilt and still arm", "25"),
     all("yaw_spin_recovery", ConfigurationCli, "", "AUTO"),
     all("yaw_spin_threshold", ConfigurationCli, "°/s", "1950"),
-    // Failsafe
+    // Runaway takeoff prevention guards against wiring and orientation
+    // mistakes the sim can't have (#21).
+    all("runaway_takeoff_prevention", ConfigurationCli, "", "ON"),
+    // Failsafe. A Channel outside rx_min_usec to rx_max_usec is invalid.
+    all("rx_min_usec", Failsafe, "µs", "885"),
+    all("rx_max_usec", Failsafe, "µs", "2115"),
     all("failsafe_delay", Failsafe, "tenths of a second", "15"),
     all("failsafe_procedure", Failsafe, "", "DROP"),
+    all("failsafe_throttle", Failsafe, "µs", "1000"),
     all("failsafe_switch_mode", Failsafe, "", "STAGE1"),
-    all("failsafe_throttle", FailsafeCli, "µs", "1000"),
     all("failsafe_throttle_low_delay", FailsafeCli, "tenths of a second", "100"),
     row("failsafe_recovery_delay", FailsafeCli, "tenths of a second",
         [Same("10"), Same("10"), Same("5"), Same("5"), Same("5")]),
@@ -556,8 +565,6 @@ const HARDWARE_PREFIXES: &[&str] = &[
     "can_",
     "i2c",
     "gimbal_",
-    "rx_min_usec",
-    "rx_max_usec",
     "cpu_",
 ];
 

@@ -89,10 +89,11 @@ Commands:
       its raw values, and how often they change. Runs until Ctrl+C, or for
       the seconds given.
   import-tune <export file> (<quad folder> | --print)
-      Import a quad's Betaflight diff all (or diff, or dump, from Betaflight
-      4.3 or newer) as the Quad's tune.txt, in Betaflight 2026.6's names with
-      every line marked (ADR-0008, ADR-0015), and list what was translated and
-      left out. --print prints the Tune instead of writing it.";
+      Import a quad's Betaflight diff bare (or diff all, or dump, from
+      Betaflight 4.3 or newer) as the Quad's tune.txt, in Betaflight 2026.6's
+      names with every line marked (ADR-0008, ADR-0015), and list what was
+      translated and left out. --print prints the Tune instead of writing
+      it.";
 
 fn main() -> ExitCode {
     // `core-maths` has cargo run xtask as its compiler wrapper, to keep each

@@ -52,6 +52,11 @@ pub struct TuneImport {
     /// [`Tune::check`] says. The Tune is still written; the Pack checker
     /// refuses it until they're fixed by hand (`hand-set: <reason>`).
     pub problems: Vec<String>,
+    /// What the person importing should know, in plain sentences: that an
+    /// export not taken `bare` is relative to the board's own defaults, and
+    /// any value the Flight Controller reads but doesn't simulate yet, such as
+    /// a `failsafe_procedure` of AUTO-LAND, which flies DROP (#21).
+    pub warnings: Vec<String>,
 }
 
 /// One setting of the imported Tune.
@@ -106,7 +111,8 @@ pub enum Why {
     HardwareOnly,
     /// A `simplified_*` slider: the importer reads the numbers it set.
     Slider,
-    /// A setting of a PID profile that isn't the active one.
+    /// A setting of a PID profile (or battery profile) that isn't the
+    /// active one.
     OtherProfile,
     /// A rate profile's setting: Rates belong to the pilot (ADR-0015).
     RateProfile,
@@ -154,6 +160,23 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
         ));
     };
     let rate_profile = cli.active_rate_profile();
+    let battery_profile = cli.active_battery_profile();
+    let all = cli
+        .echo
+        .is_some_and(|echo| echo.split_whitespace().any(|word| word == "all"));
+    if cli.bare() && all {
+        return Err(Refusal::one(
+            "A `diff all bare` doesn't say which of Betaflight's PID profiles is active: it leaves out the line that selects it again. Export with `diff bare`, which holds just the active profiles, compared with Betaflight's own defaults.",
+        ));
+    }
+    let mut warnings = Vec::new();
+    if cli.echo.is_some() && !cli.bare() {
+        warnings.push(format!(
+            "This `{}` lists what differs from the board's own defaults, not Betaflight's: a setting the board's defaults change that the pilot left alone isn't in it, so it imports at Betaflight {}'s default. Export with `diff bare` to compare with Betaflight's own defaults.",
+            cli.echo.unwrap_or("diff"),
+            family.name()
+        ));
+    }
     let read_in_rate_profile = |name: &str| {
         table::TUNE_IN_RATE_PROFILE
             .iter()
@@ -172,7 +195,9 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
         };
         let (name, value) = match line.command {
             Command::Set { name, value } => (name, value),
-            Command::Profile(_) | Command::RateProfile(_) => continue,
+            Command::Profile(_) | Command::RateProfile(_) | Command::BatteryProfile(_) => {
+                continue;
+            }
             Command::Other(_) => {
                 left_out.push(leave(Why::NotASetting));
                 continue;
@@ -182,11 +207,12 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
             Section::Master => true,
             Section::Profile(n) => n == profile,
             Section::RateProfile(n) => Some(n) == rate_profile && read_in_rate_profile(name),
+            Section::BatteryProfile(n) => Some(n) == battery_profile,
         };
         let why = if !in_tune {
             Some(match line.section {
-                Section::Profile(_) => Why::OtherProfile,
-                _ => Why::RateProfile,
+                Section::RateProfile(_) => Why::RateProfile,
+                _ => Why::OtherProfile,
             })
         } else if table::is_slider(name) {
             Some(Why::Slider)
@@ -308,6 +334,23 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
         });
     }
 
+    // Values the Flight Controller reads but flies otherwise for now: noted
+    // on their line, and said in the report (#21).
+    let read = settings
+        .iter()
+        .filter(|s| matches!(s.written, Where::UnderItsTab | Where::FlownAsOff));
+    if let Ok(tune) = Tune::read(read.map(|s| (s.name.as_str(), s.value.as_str()))) {
+        for (name, sentence) in tune.not_simulated_values() {
+            if let Some(setting) = settings.iter_mut().find(|s| s.name == name) {
+                setting.note = match setting.note.as_str() {
+                    "" => "not simulated yet (#21)".to_string(),
+                    note => format!("{note}; not simulated yet (#21)"),
+                };
+            }
+            warnings.push(sentence);
+        }
+    }
+
     Ok(TuneImport {
         version,
         family,
@@ -319,6 +362,7 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
         settings,
         left_out,
         problems,
+        warnings,
     })
 }
 
@@ -358,7 +402,11 @@ fn apply(rule: Rule, family: Family, inputs: &[Old<'_>]) -> Result<(String, Stri
             ))
         }
         Rule::ItermWindup => {
-            let (limit, pidsum) = (inputs[0].number()?, inputs[1].number()?);
+            let (limit, pidsum, pidsum_yaw) = (
+                inputs[0].number()?,
+                inputs[1].number()?,
+                inputs[2].number()?,
+            );
             if pidsum == 0 {
                 return Err(format!("`{}` can't be 0", inputs[1].name));
             }
@@ -369,10 +417,18 @@ fn apply(rule: Rule, family: Family, inputs: &[Old<'_>]) -> Result<(String, Stri
             } else {
                 format!(", held within 2026.6's 20 to 100 from {percent}")
             };
+            // Yaw's limit was iterm_limit too; now it's the same percentage
+            // of pidsum_limit_yaw.
+            let yaw = held * pidsum_yaw / 100;
+            let yaw = if yaw == limit {
+                String::new()
+            } else {
+                format!(" (yaw's I limit becomes {yaw}, was {limit})")
+            };
             Ok((
                 held.to_string(),
                 format!(
-                    "ADR-0008; {version}'s {} {limit} is {percent}% of {} {pidsum}{within}",
+                    "ADR-0008; {version}'s {} {limit} is {percent}% of {} {pidsum}{within}{yaw}",
                     inputs[0].name, inputs[1].name
                 ),
             ))
@@ -571,6 +627,9 @@ impl TuneImport {
             self.version,
             self.profile
         ));
+        for warning in &self.warnings {
+            out.push_str(&format!("- Note: {warning}\n"));
+        }
         let count = |w: Where| self.settings.iter().filter(|s| s.written == w).count();
         out.push_str(&format!(
             "- {} settings the Flight Controller reads (or the Pack checker compares with the Quad), under their tabs.\n",

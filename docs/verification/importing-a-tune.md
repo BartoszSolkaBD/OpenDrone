@@ -6,7 +6,7 @@ The Whoop 65's Tune is made this way, from the maintainer's Meteor65 Pro.
 
 ## Import a quad's Tune
 
-1. In the Betaflight App's CLI tab, type `diff all` and save everything it prints to a text file. The maintainer's two quads are in [`docs/research/quad-settings/`](../research/quad-settings/README.md).
+1. In the Betaflight App's CLI tab, type `diff bare` and save everything it prints to a text file (see [What it accepts](#what-it-accepts) for why `bare`). The maintainer's two quads are in [`docs/research/quad-settings/`](../research/quad-settings/README.md), exported with `diff all`.
 2. Run the importer with that file and the Quad's folder:
 
    ```sh
@@ -20,7 +20,8 @@ Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is
 
 ## What it accepts
 
-- `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find Betaflight's PID profile (the part of Betaflight's settings that becomes most of a Tune). `diff all` is the best choice, because it lists only what the quad changed.
+- `diff`, `diff all` and `dump`, from Betaflight **4.3 or newer**, pasted whole: the importer needs the `# version` line to know the version and the `profile` lines to find Betaflight's PID profile (the part of Betaflight's settings that becomes most of a Tune).
+- **`diff bare` is the best choice.** Without `bare`, Betaflight first applies the board's own defaults (its manufacturer's settings for that flight controller board) and lists what differs from those. A setting the board's defaults change that the pilot left alone is then missing, so it imports at Betaflight's own default for that version, which isn't what the quad flies. The Meteor's own `diff all` shows it: it lists `min_throttle = 1070` and `motor_pwm_rate = 480`, which are Betaflight 4.3's own defaults, because the board's settings change them. So the importer says so whenever an export isn't `bare`. `diff bare` compares with Betaflight's own defaults, and holds just the active profiles. `diff all bare` is refused: it lists every profile but leaves out the line that says which one is active.
 - It knows the settings and defaults of every Betaflight release from 4.3 to 2026.6: **4.3, 4.4, 4.5, 2025.12 and 2026.6**, each read from its source (4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2). A version's patch releases share its defaults. Older than 4.3, and newer than 2026.6, are refused with a sentence saying so.
 
 ## What it reads
@@ -75,14 +76,18 @@ Once a ticket makes the Flight Controller read a setting, importing again moves 
 
 ## What still differs from the real quad
 
-ADR-0008 lists them: 2026's Angle and Horizon are softer around the centre, 4.3's anti-gravity punch-out boost was stronger, and 2026's feedforward jitter attenuation is slightly stronger.
+ADR-0008 lists three: 2026's Angle and Horizon are softer around the centre, 4.3's anti-gravity punch-out boost was stronger, and 2026's feedforward jitter attenuation is slightly stronger. The translation adds three more:
+
+- **Yaw's I limit is 320, not 400.** 4.3 held every axis's I term to `iterm_limit` (400). 2026.6 holds roll and pitch to `iterm_windup` percent of `pidsum_limit` (80% of 500 is 400), and yaw to the same percentage of `pidsum_limit_yaw` (80% of 400 is 320). No single `iterm_windup` gives both, so the `iterm_windup` line says so.
+- **4.3's slow-down of yaw's I term is gone.** Above 85% of the motors' range, 4.3's `iterm_windup` slowed yaw's I term (every axis's in 4.4 and 4.5). 2026.6 has no such slow-down, so that setting is left out.
+- **Dynamic D's stick boost is 7, not 7.4.** 4.3 boosted D on stick moves by `d_max_gain` × `d_max_advance` ÷ 100: 37 × 20 ÷ 100 = 7.4. 2026.6's `d_max_advance` is a whole number, so it's 7.
 
 ## Pasting Rates and switches
 
 The same translator reads two pastes a pilot makes from their own quad's CLI. The settings screens (#69, #71) will show what each would change, Now and After, before the pilot applies it.
 
 - **Rates** ([#13](https://github.com/BartoszSolkaBD/OpenDrone/issues/13)): from a pasted `diff`, `diff all` or `dump`, only the **active rate profile's** rate settings are read, the one the last `rateprofile` line selects. Every other line is ignored, and the paste says so. For the Cetus X's `diff all`: "Used rate profile 0 (3 rate settings); ignored 104 lines." A rate setting the profile doesn't set keeps Betaflight's default, which has been the same since 4.3: Actual, 70 °/s at centre and 670 °/s at full stick.
-- **Switches** ([#19](https://github.com/BartoszSolkaBD/OpenDrone/issues/19) §5): from pasted `aux` lines, ARM, ANGLE, HORIZON and FLIP OVER AFTER CRASH are read. AUX*n* is the radio's CH(*n*+4). Each switch position a radio sends (988, 1500 and 2012 µs) is tested against the pasted ranges as Betaflight does, so any ranges work. Angle beats Horizon, and Acro is wherever neither is on. Other modes, such as the Cetus X's BEEPER, are listed as ignored. AND logic and linked modes are refused with a note, as is anything a profile can't hold, such as Arm on two switches. The result is the Input Device profile's `[switches]`. The Meteor65 Pro's lines give exactly the Radiomaster Pocket's starting layout.
+- **Switches** ([#19](https://github.com/BartoszSolkaBD/OpenDrone/issues/19) §5): from pasted `aux` lines, ARM, ANGLE, HORIZON and FLIP OVER AFTER CRASH are read. AUX*n* is the radio's CH(*n*+4). Each switch position a Radio sends (988, 1500 and 2012 µs) is tested against the pasted ranges as Betaflight does. A profile's switch is on in one position, so a range that covers two neighbouring positions, such as ARM at 1500–2100 µs on a 2-position switch, is read as on at the end one, with a note. Angle beats Horizon, and Acro is wherever neither is on. Other modes, such as the Cetus X's BEEPER, are listed as ignored. AND logic and linked modes are refused with a note, as is anything a profile can't hold, such as Arm on two switches, or on at every position. The result is the Input Device profile's `[switches]`. The Meteor65 Pro's lines give exactly the Radiomaster Pocket's starting layout.
 
 ## Adding a setting
 

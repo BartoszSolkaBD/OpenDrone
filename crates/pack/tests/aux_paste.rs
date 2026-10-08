@@ -57,12 +57,55 @@ fn the_cetus_xs_aux_lines_put_angle_at_the_bottom_of_ch6_and_ignore_its_beeper()
 }
 
 #[test]
-fn a_switch_on_in_two_positions_is_refused_because_a_profiles_switch_is_on_in_one() {
-    // Basis: Rule (#19 §5: an on/off switch Channel is on in one position).
+fn a_switch_on_at_middle_and_high_is_read_as_on_at_high_as_a_2_position_switch_sends() {
+    // Basis: Rule. A profile's on/off switch is on in one position (#19 §8),
+    // and a 2-position switch sends only its ends (988 and 2012 µs), so ARM
+    // at 1500–2100 µs, a common range, arms at high.
+    let pasted = switches_from_aux("aux 0 0 0 1500 2100 0 0").unwrap();
     assert_eq!(
-        switches_from_aux("aux 0 0 0 1300 2100 0 0").unwrap_err(),
+        pasted.switches.arm,
+        Some(OnOffSwitch::Channel {
+            channel: 5,
+            on: Position::High
+        })
+    );
+    assert_eq!(
+        pasted.notes,
         [
-            "Arm on AUX1 (CH5) is on at middle and high: a profile's Arm switch is on in one position."
+            "Arm on AUX1 (CH5) is on at middle and high: a profile's switch is on in one position, so OpenDrone reads it as on at high, as a 2-position switch sends."
+        ]
+    );
+    // And low and middle as low.
+    let low = switches_from_aux("aux 0 35 2 900 1700 0 0").unwrap();
+    assert_eq!(
+        low.switches.crash_flip,
+        Some(OnOffSwitch::Channel {
+            channel: 7,
+            on: Position::Low
+        })
+    );
+    // The Meteor's switches each sit in one position, so nothing is noted.
+    assert!(
+        switches_from_aux(&export("meteor65-pro.diff-all.txt"))
+            .unwrap()
+            .notes
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_switch_on_at_every_position_or_at_both_ends_is_refused() {
+    // Basis: Rule (#19 §8: a profile's on/off switch is on in one position).
+    assert_eq!(
+        switches_from_aux("aux 0 0 0 900 2100 0 0").unwrap_err(),
+        [
+            "Arm on AUX1 (CH5) is on at low and middle and high: a profile's switch is on in one position, and no switch reads this as one."
+        ]
+    );
+    assert_eq!(
+        switches_from_aux("aux 0 0 0 900 1300 0 0\naux 1 0 0 1700 2100 0 0").unwrap_err(),
+        [
+            "Arm on AUX1 (CH5) is on at low and high: a profile's switch is on in one position, and no switch reads this as one."
         ]
     );
 }

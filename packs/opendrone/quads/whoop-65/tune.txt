@@ -21,6 +21,15 @@
 # Configuration
 set small_angle = 180                  # diff; degrees: the most it may tilt and still arm
 
+# Failsafe
+set rx_min_usec = 885                  # 4.3 default; µs
+set rx_max_usec = 2115                 # 4.3 default; µs
+set failsafe_delay = 15                # 4.3 default; tenths of a second
+set failsafe_procedure = DROP          # 4.3 default
+set failsafe_throttle = 1000           # 4.3 default; µs
+# Failsafe, CLI only
+set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
+
 # PID Tuning
 set p_roll = 40                        # diff
 set i_roll = 64                        # diff
@@ -35,7 +44,7 @@ set motor_output_limit = 100           # 4.3 default; percent
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 4.3 default
-set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500; the I limit, in percent of the PID-sum limit
+set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500 (yaw's I limit becomes 320, was 400); the I limit, in percent of the PID-sum limit
 set pid_at_min_throttle = ON           # 4.3 default
 
 # Receiver
@@ -80,6 +89,8 @@ set dterm_lpf2_static_hz = 165         # diff; not simulated yet (#49)
 set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
+# Configuration
+set runaway_takeoff_prevention = ON    # 4.3 default; not simulated yet (later)
 
 # Not simulated yet either: settings the Flight Controller doesn't know
 # yet, which later tickets read or the alpha leaves out.
@@ -87,12 +98,8 @@ set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
 set yaw_spin_recovery = AUTO           # 4.3 default
 set yaw_spin_threshold = 1950          # 4.3 default; °/s
 # Failsafe
-set failsafe_delay = 15                # 4.3 default; tenths of a second
-set failsafe_procedure = DROP          # 4.3 default
 set failsafe_switch_mode = STAGE1      # 4.3 default
-set failsafe_throttle = 1000           # 4.3 default; µs
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
-set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
 set failsafe_stick_threshold = 30      # 4.3 default; percent
 # PID Tuning
 set feedforward_transition = 0         # 4.3 default

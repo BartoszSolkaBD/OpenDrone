@@ -8,7 +8,8 @@
 #
 # The Flight Controller flies the Tune's "Not simulated yet" settings as off
 # until their tickets land: feedforward and the filters (#49), Dynamic D and
-# I-term relax (#50). So the roll spins up on P and I alone and overshoots.
+# I-term relax (#50). So the roll spins up on P, I and D, without
+# feedforward, and overshoots.
 # The Source Expectations hold either way; the Observed overshoot and
 # bounce-back will move when those land.
 format = 1
