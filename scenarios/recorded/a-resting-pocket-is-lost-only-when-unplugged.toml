@@ -1,0 +1,67 @@
+# A Radiomaster Pocket reports only when a value changes: at rest it sends
+# nothing at all (#18), so silence can't tell a resting Pocket from a hung
+# one. It counts as lost only when the computer reports it removed (#27, the
+# Input deep dive), and the Radio Link then sends no frames.
+#
+# The Input Track is the maintainer's Pocket over USB, RF off: plugged in and
+# left alone for 11.27 s, then fast circles, switches and buttons, then
+# unplugged at 45.215 s (pocket-rest-and-unplug.csv). At 250 Hz the link
+# locks to its 1 kHz beat, a frame every four reports.
+format = 1
+name   = "A resting Pocket is never lost for silence, only when unplugged"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+input_track  = "pocket-rest-and-unplug.csv"
+input_device = { report_rate = "1000 Hz", reports_at_rest = false }
+
+[[expect]]
+what  = "the Flying Input Device is lost"
+over  = "0 s to 45.2 s"
+first = "never"
+basis = "source: #27 and #18: a device that reports only changes is lost only when unplugged; the Pocket sends nothing for its first 11.27 s"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "0.01 s to 11.27 s"
+highest = "0 ± 0"
+basis   = "rule: ADR-0020: through the rest the beat carries on by itself, each frame repeating the Channels with no fresh report"
+
+[[expect]]
+what    = "reports in the frame"
+over    = "11.27 s to 45.2 s"
+highest = "4 ± 0"
+basis   = "rule: ADR-0020: 250 Hz divides the Pocket's 1000 Hz, so each frame leaves 0.75 ms after every fourth report is due and carries at most the four reports due since the last"
+
+[[expect]]
+what  = "the Flying Input Device is lost"
+over  = "45 s to 45.3 s"
+first = "0.21525 s ± 0.000001 s"
+basis = "rule: the Input Track's row at 45.215125 s says the computer reported it removed; shown after that step (0.125 ms at 8 kHz)"
+
+[[expect]]
+what  = "RXLOSS blocks arming"
+over  = "45 s to 45.5 s"
+first = "between 0.361 s and 0.3655 s"
+basis = "source: rx.c, rxFrameCheck: once the Pocket is lost no frame leaves, and 150 ms (RXLOSS_TRIGGER_INTERVAL) after the last frame, less than 4 ms before the unplug, on the first loop past it, the Flight Controller counts the signal as lost"

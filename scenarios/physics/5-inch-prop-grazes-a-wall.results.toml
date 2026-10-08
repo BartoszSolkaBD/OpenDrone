@@ -79,16 +79,16 @@ measured = "none broken"
 [fingerprints]
 quad = "ad78c1f099c487ec"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "b07c7e6f8a5f3bc4"   # the whole state after each of 400 steps at 8000 Hz, in order
+run  = "e87955b8e8d9dcfe"   # the whole state after each of 400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.005 s" = "75d2d8d770ae736a"
-"0.01 s" = "37fbf6ab8ee36f5e"
-"0.015 s" = "ed7216095679ce8b"
-"0.02 s" = "a6cc52196787fdcc"
-"0.025 s" = "eae257fff22cb497"
-"0.03 s" = "d7fce5cc3a714fcf"
-"0.035 s" = "1e9e00bcd8ad8f64"
-"0.04 s" = "d02fa64da91029d1"
-"0.045 s" = "f7175b2bb49e2fb8"
-"0.05 s" = "4956c1da0441b8c8"
+"0.005 s" = "e75155d58b6f9682"
+"0.01 s" = "361f897f08326476"
+"0.015 s" = "2f129a2bb3687a63"
+"0.02 s" = "84ddbca3641b9684"
+"0.025 s" = "bea276bb5efb752f"
+"0.03 s" = "8b1c6080d4351a67"
+"0.035 s" = "2145521accc3669c"
+"0.04 s" = "17a00cc3b04467c9"
+"0.045 s" = "c5eabbf59577afb0"
+"0.05 s" = "9b6b7122baf32c40"

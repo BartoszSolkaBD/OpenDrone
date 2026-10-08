@@ -1,0 +1,46 @@
+# Results of dualsense-runs-on-its-own-clock-at-100-hz.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A DualSense's Radio Link frames at 100 Hz run on the link's own clock and carry two or three reports"
+
+[[expect]]
+what     = "reports in the frame, lowest over 0.005 s to 6 s"
+basis    = "Rule"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "reports in the frame, highest over 0.005 s to 6 s"
+basis    = "Rule"
+expected = "3 ± 0"
+measured = "3.00"
+
+[[expect]]
+what     = "reports in the frame, mean over 0.005 s to 6 s"
+basis    = "Rule"
+expected = "2.5 ± 0.01"
+measured = "2.50"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "ddb4f1d476d2c790"   # the whole state after each of 48000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.6 s" = "c34c26ea4fb475b5"
+"1.2 s" = "455795206c043dec"
+"1.8 s" = "497b36fa82754dfb"
+"2.4 s" = "302c7ce2dd12aa16"
+"3 s" = "5e1e5d23f27a1f33"
+"3.6 s" = "eff081913d8e1e12"
+"4.2 s" = "aea7847604e21e61"
+"4.8 s" = "587537f21e08fe25"
+"5.4 s" = "bb5978dcae46b7fd"
+"6 s" = "6ee91713565318da"

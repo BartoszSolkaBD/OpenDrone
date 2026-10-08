@@ -1,0 +1,52 @@
+# Results of dualsense-without-its-heartbeat-is-never-lost-for-silence.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A DualSense without its heartbeat is never lost for silence"
+
+[[expect]]
+what     = "the Flying Input Device is lost, first over 0 s to 7.5 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "reports in the frame, highest over 0 s to 1.9 s"
+basis    = "Rule"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "reports in the frame, mean over 0 s to 1.9 s"
+basis    = "Observed"
+expected = "0.99 ± 0.01"
+measured = "0.992"
+
+[[expect]]
+what     = "frame age, highest over 0 s to 1.9 s"
+basis    = "Rule"
+expected = "0.75 ms ± 0.000001 ms"
+measured = "0.750 ms"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "d9b847c3eddafdcb"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "8b942acab62d0a20"   # the whole state after each of 60000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.75 s" = "0c3f372b34a63bb8"
+"1.5 s" = "fd435aae7a91b39b"
+"2.25 s" = "a6e333a36789f426"
+"3 s" = "c406ed5390882fe2"
+"3.75 s" = "b602aac11a1b1490"
+"4.5 s" = "e1b671ff11fd1e38"
+"5.25 s" = "2b12538bb81c7d8e"
+"6 s" = "2d7c8d3cd98d09a0"
+"6.75 s" = "f09ee9db4e709b71"
+"7.5 s" = "9e58c59efb012595"

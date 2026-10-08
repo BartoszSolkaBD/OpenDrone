@@ -43,16 +43,16 @@ measured = "none broken"
 [fingerprints]
 quad = "765504c4f5730a8c"   # test/whoop-65-ducts-only: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "426322e68d0bffda"   # the whole state after each of 400 steps at 8000 Hz, in order
+run  = "d16c216c474c17d0"   # the whole state after each of 400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.005 s" = "95ed7f11e8be8ad3"
-"0.01 s" = "b5c97b78e8a24138"
-"0.015 s" = "a46f0a67779c7b62"
-"0.02 s" = "3843c639c21a6e79"
-"0.025 s" = "968759d44986ec65"
-"0.03 s" = "86835e0c011fb5f4"
-"0.035 s" = "0c735cd13af0f11b"
-"0.04 s" = "2417ede182a9e147"
-"0.045 s" = "ecfd4b919d08c224"
-"0.05 s" = "d47cfd5f817ae558"
+"0.005 s" = "8f861a4fb0cb52ab"
+"0.01 s" = "8f4c1b86d4d523f0"
+"0.015 s" = "9a356fe0f948049a"
+"0.02 s" = "399bc0bd5ef4d311"
+"0.025 s" = "0b5c4227a9abba3d"
+"0.03 s" = "f335be8e6330eaac"
+"0.035 s" = "fcbf77089c3fefb3"
+"0.04 s" = "6879e5a52c880a1f"
+"0.045 s" = "a29545295ff0b71c"
+"0.05 s" = "1a366019e87cf510"

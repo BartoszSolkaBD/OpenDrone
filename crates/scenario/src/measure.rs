@@ -2,15 +2,26 @@
 
 use opendrone_maths::{DEGREE, PilotRates, functions};
 use opendrone_pack::units::Dimension;
-use opendrone_sim::{DebugRecord, QuadOutput};
+use opendrone_sim::{Channel, DebugRecord, QuadOutput, RadioLinkOutput};
 
 /// What one step gave, to measure: the Quad's output (none where the Flight
-/// Controller runs alone), and what our Flight Controller's loop did (none
-/// where the motors are scripted, and before the first loop).
+/// Controller runs alone), what our Flight Controller's loop did (none
+/// where the motors are scripted, and before the first loop), and what the
+/// Radio Link did (none where the motors are scripted, and at the start).
 #[derive(Clone, Copy, Debug)]
 pub struct Sample {
     pub quad: Option<QuadOutput>,
     pub flight_controller: Option<DebugRecord>,
+    pub radio_link: Option<RadioLinkOutput>,
+}
+
+/// One of the four sticks, as a Channel the Radio Link carries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stick {
+    Roll,
+    Pitch,
+    Yaw,
+    Throttle,
 }
 
 /// One of the three rotation axes, as pilots name them.
@@ -121,6 +132,19 @@ pub enum Measure {
     /// 100%, before Airmode moves it: what Betaflight's Blackbox logs as the
     /// mixer's throttle.
     MixerThrottle,
+    /// How many reports from the Input Device reached the Radio Link since
+    /// its last frame: the fresh ones the frame carries, the newest winning
+    /// (see `opendrone_sim::Frame::reports`). Read on each step a frame
+    /// leaves.
+    ReportsInTheFrame,
+    /// How long before a frame left the newest fresh report it carries
+    /// arrived. Read on each step a frame carrying a fresh report leaves.
+    FrameAge,
+    /// A stick as the last Radio Link frame carried it, in percent as a
+    /// Timeline writes sticks: roll, pitch and yaw from −100% to 100%, the
+    /// throttle from 0% to 100%, read through ELRS's µs (988 µs + 0.625 µs a
+    /// step from step 172).
+    Channel(Stick),
     /// Something that happens: measured as how long after a stretch's start
     /// it first does (the "when something happens" Expectation).
     Happens(Event),
@@ -143,10 +167,15 @@ pub enum Event {
     FailsafeEnds,
     /// Every ESC has played its ready beep.
     EscsReady,
+    /// The Radio Link counts the Flying Input Device as lost: unplugged, or
+    /// silent too long.
+    InputDeviceLost,
+    /// The Radio Link counts the Flying Input Device as back.
+    InputDeviceBack,
 }
 
 /// Every event's words, as a Scenario's `what` names it.
-const EVENTS: [(&str, Event); 19] = [
+const EVENTS: [(&str, Event); 21] = [
     ("the Quad arms", Event::Arms),
     ("the Quad disarms", Event::Disarms),
     ("Failsafe's stage 2 starts", Event::FailsafeStarts),
@@ -250,6 +279,8 @@ const EVENTS: [(&str, Event); 19] = [
             raised: false,
         },
     ),
+    ("the Flying Input Device is lost", Event::InputDeviceLost),
+    ("the Flying Input Device is back", Event::InputDeviceBack),
 ];
 
 impl Event {
@@ -261,9 +292,18 @@ impl Event {
             .map_or("", |(words, _)| words)
     }
 
-    /// True for what our Flight Controller does; false for the ESCs.
+    /// True for what our Flight Controller does; false for the ESCs and the
+    /// Radio Link.
     fn of_the_flight_controller(self) -> bool {
-        self != Event::EscsReady
+        !matches!(
+            self,
+            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack
+        )
+    }
+
+    /// True for what the Radio Link does.
+    fn of_the_radio_link(self) -> bool {
+        matches!(self, Event::InputDeviceLost | Event::InputDeviceBack)
     }
 
     /// Whether it happened between the step before and this one: `None` when
@@ -280,6 +320,14 @@ impl Event {
             };
             return Some(!ready(before)? && ready(now)?);
         }
+        if self.of_the_radio_link() {
+            let lost = |sample: &Sample| sample.radio_link.map(|link| link.lost);
+            let (was, is) = (lost(before)?, lost(now)?);
+            return Some(match self {
+                Event::InputDeviceLost => !was && is,
+                _ => was && !is,
+            });
+        }
         let (before, now) = (before.flight_controller?, now.flight_controller?);
         Some(match self {
             Event::Arms => !before.armed && now.armed,
@@ -291,12 +339,12 @@ impl Event {
                 let is = now.arming_blocks.flags()[flag];
                 was != raised && is == raised
             }
-            Event::EscsReady => false,
+            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack => false,
         })
     }
 }
 
-const ALL: [(&str, Measure); 73] = [
+const ALL: [(&str, Measure); 79] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -370,6 +418,12 @@ const ALL: [(&str, Measure); 73] = [
     ("motor 3 DShot", Measure::MotorDshot(2)),
     ("motor 4 DShot", Measure::MotorDshot(3)),
     ("mixer throttle", Measure::MixerThrottle),
+    ("reports in the frame", Measure::ReportsInTheFrame),
+    ("frame age", Measure::FrameAge),
+    ("roll channel", Measure::Channel(Stick::Roll)),
+    ("pitch channel", Measure::Channel(Stick::Pitch)),
+    ("yaw channel", Measure::Channel(Stick::Yaw)),
+    ("throttle channel", Measure::Channel(Stick::Throttle)),
 ];
 
 impl Measure {
@@ -423,7 +477,11 @@ impl Measure {
         {
             names.insert(at + k, motor);
         }
-        names.push("motor N DShot");
+        let at = names
+            .iter()
+            .position(|n| *n == "mixer throttle")
+            .map_or(names.len(), |i| i + 1);
+        names.insert(at, "motor N DShot");
         names
     }
 
@@ -467,6 +525,9 @@ impl Measure {
             Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
             Measure::PidTerm(..) | Measure::MotorDshot(_) => Dimension::NONE,
             Measure::MixerThrottle => Dimension::PERCENT,
+            Measure::ReportsInTheFrame => Dimension::NONE,
+            Measure::FrameAge => Dimension::TIME,
+            Measure::Channel(_) => Dimension::PERCENT,
             Measure::Happens(_) => Dimension::TIME,
         }
     }
@@ -481,6 +542,17 @@ impl Measure {
             | Measure::MotorDshot(_)
             | Measure::MixerThrottle => true,
             Measure::Happens(event) => event.of_the_flight_controller(),
+            _ => false,
+        }
+    }
+
+    /// True for what the Radio Link does: measured in Flight and Flight
+    /// Controller Scenarios, where the pilot's sticks reach a Flight
+    /// Controller, and never where the motors are scripted.
+    pub fn of_the_radio_link(self) -> bool {
+        match self {
+            Measure::ReportsInTheFrame | Measure::FrameAge | Measure::Channel(_) => true,
+            Measure::Happens(event) => event.of_the_radio_link(),
             _ => false,
         }
     }
@@ -521,6 +593,26 @@ impl Measure {
         }
         if self.of_the_flight_controller() {
             return self.read_flight_controller(now.flight_controller.as_ref()?);
+        }
+        if self.of_the_radio_link() {
+            let link = now.radio_link?;
+            return Some(match self {
+                Measure::ReportsInTheFrame => f64::from(link.frame?.reports),
+                Measure::FrameAge => {
+                    let frame = link.frame.filter(|frame| frame.reports > 0)?;
+                    frame.age as f64 * step
+                }
+                Measure::Channel(stick) => {
+                    let channels = link.last_frame?;
+                    match stick {
+                        Stick::Roll => stick_share(channels.roll),
+                        Stick::Pitch => stick_share(channels.pitch),
+                        Stick::Yaw => stick_share(channels.yaw),
+                        Stick::Throttle => (elrs_micros(channels.throttle) - 988.0) / 1024.0,
+                    }
+                }
+                _ => return None,
+            });
         }
         let before = before.and_then(|b| b.quad.as_ref());
         let now = now.quad.as_ref()?;
@@ -566,6 +658,9 @@ impl Measure {
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)
             | Measure::MixerThrottle
+            | Measure::ReportsInTheFrame
+            | Measure::FrameAge
+            | Measure::Channel(_)
             | Measure::Happens(_) => return None,
         })
     }
@@ -600,6 +695,17 @@ impl Measure {
             _ => return None,
         })
     }
+}
+
+/// A Channel in µs as ELRS means it: 988 µs at step 172 (−100%), 1500 µs at
+/// 992 (centre, 1500.31 µs to be exact) and 2012 µs at 1811 (+100%).
+fn elrs_micros(channel: Channel) -> f64 {
+    988.0 + (f64::from(channel.step()) - 172.0) * 1024.0 / 1639.0
+}
+
+/// A roll, pitch or yaw Channel as a stick from −1 to +1.
+fn stick_share(channel: Channel) -> f64 {
+    (elrs_micros(channel) - 1500.0) / 512.0
 }
 
 /// `angle` (radians) moved by whole turns to lie within half a turn of
