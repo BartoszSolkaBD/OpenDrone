@@ -117,11 +117,12 @@ impl Fixture {
 pub fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     #[cfg(unix)]
     let made = std::os::unix::fs::symlink(target, link);
+    // Windows follows a link only when its target is written with `\`.
     #[cfg(windows)]
     let made = if link.parent().unwrap().join(target).is_dir() {
-        std::os::windows::fs::symlink_dir(target, link)
+        std::os::windows::fs::symlink_dir(target.replace('/', "\\"), link)
     } else {
-        std::os::windows::fs::symlink_file(target, link)
+        std::os::windows::fs::symlink_file(target.replace('/', "\\"), link)
     };
     match made {
         Ok(()) => Some(()),

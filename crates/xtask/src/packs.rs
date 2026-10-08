@@ -32,10 +32,15 @@ use opendrone_pack::{
 };
 
 /// The repo around the current folder: the nearest folder holding `packs/`.
+/// A `packs` that is a symbolic link counts too, even one pointing nowhere,
+/// so the checks refuse it there rather than look for a `packs/` further up.
 pub(crate) fn repo() -> Result<PathBuf, String> {
     let here = std::env::current_dir().map_err(|e| format!("can't tell where this is: {e}"))?;
     here.ancestors()
-        .find(|folder| folder.join("packs").is_dir())
+        .find(|folder| {
+            fs::symlink_metadata(folder.join("packs"))
+                .is_ok_and(|found| found.is_dir() || found.file_type().is_symlink())
+        })
         .map(Path::to_path_buf)
         .ok_or_else(|| {
             "Run this inside the OpenDrone repo: no folder here or above holds packs/.".into()

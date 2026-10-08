@@ -386,8 +386,9 @@ fn a_pack_folder_renamed_to_a_dot_name_is_refused_so_no_number_moves_behind_it()
 fn symbolic_link(target: &str, link: &Path) -> Option<()> {
     #[cfg(unix)]
     let made = std::os::unix::fs::symlink(target, link);
+    // Windows follows a link only when its target is written with `\`.
     #[cfg(windows)]
-    let made = std::os::windows::fs::symlink_dir(target, link);
+    let made = std::os::windows::fs::symlink_dir(target.replace('/', "\\"), link);
     match made {
         Ok(()) => Some(()),
         Err(error) if cfg!(windows) && std::env::var_os("CI").is_none() => {
@@ -432,6 +433,27 @@ fn the_packs_folder_replaced_by_a_symbolic_link_is_refused_so_no_number_moves_th
         INERTIA_20X,
     );
     scratch.commit("step 2: move the inertia 20× in stash/packs, with no row");
+    for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
+        let (passed, text) = xtask(&scratch.root, args);
+        assert!(!passed, "{args:?}\n{text}");
+        assert!(
+            text.contains(&format!("- packs: {LINK}")),
+            "{args:?}\n{text}"
+        );
+    }
+}
+
+#[test]
+fn a_packs_link_that_points_nowhere_is_refused_rather_than_looked_past() {
+    // Found on Windows CI for #103: a `packs` link that didn't resolve looked
+    // like no packs/ at all, so the commands looked further up for one, and
+    // checked another folder's Packs instead, which passed.
+    let scratch = Scratch::new("packs-link-to-nowhere").with_base();
+    fs::remove_dir_all(scratch.root.join("packs")).unwrap();
+    if symbolic_link("nowhere", &scratch.root.join("packs")).is_none() {
+        return;
+    }
+    scratch.commit("replace packs/ with a link to nowhere");
     for args in [&["packs"][..], &["feel-tests", "--base", "HEAD^1"]] {
         let (passed, text) = xtask(&scratch.root, args);
         assert!(!passed, "{args:?}\n{text}");
