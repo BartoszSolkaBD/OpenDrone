@@ -8,10 +8,12 @@ Scenarios and Pack files are numbered apart, so a new starting-state item never 
 
 | Files | Format today | Its steps live in |
 |---|---|---|
-| Every Scenario in `scenarios/` | 1 | `SCENARIO_STEPS`, in [`crates/scenario/src/format.rs`](../crates/scenario/src/format.rs) |
+| Every Scenario in `scenarios/`, and every Scenario the checks keep as a fixture under `crates/` | 1 | `SCENARIO_STEPS`, in [`crates/scenario/src/format.rs`](../crates/scenario/src/format.rs) |
 | Every Pack file (`pack.toml`, `quad.toml`, `map.toml`, Input Device profiles), every Test Quad in `scenarios/test-quads/` and every built-in Test Map in [`crates/pack/test-maps/`](../crates/pack/test-maps/empty-air.toml) | 1 | `PACK_STEPS`, in [`crates/pack/src/migration.rs`](../crates/pack/src/migration.rs) |
 
 The built-in Test Maps, such as `test/empty-air`, are built into the code, but each one's `map.toml` is a file of its own in `crates/pack/test-maps/`, so the tool rewrites them like any Pack file. A new Test Map goes there too, never as text inside the Rust code, and a readable check makes sure of it.
+
+Scenarios are never upgraded in memory, so a Scenario step rewrites the checks' fixture Scenarios too, found by their `[start]` table. The Pack checker's fixture Packs in `crates/pack/tests/fixtures/` are left as they are: the Pack reader upgrades them in memory, which the checks then exercise.
 
 Results files are never migrated: the Scenario runner writes them, with a `format` line of their own. `tune.txt` stays Betaflight CLI text with no `format` line ([ADR-0015](adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)), and a Feel Test log is Markdown.
 
