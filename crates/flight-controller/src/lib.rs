@@ -1,6 +1,7 @@
 //! Our Betaflight-style Flight Controller, plus the Betaflight CLI translator
-//! (Rates paste, `diff all` import), which takes text in and opens no files,
-//! and Betaflight's OSD logic, which runs beside the Simulation ([ADR-0022]).
+//! (`diff all` import, Rates paste, `aux` paste), which takes text in and
+//! opens no files, and Betaflight's OSD logic, which runs beside the
+//! Simulation ([ADR-0022]).
 //!
 //! It uses only `opendrone-maths`, and never the physics: the two meet only
 //! inside `opendrone-sim`.
@@ -24,12 +25,13 @@
 //! - the Radio Link's loss and Failsafe, flying DROP ([`failsafe`]);
 //! - the PID loop with Betaflight's scaling, I limit and PID-sum limits;
 //! - the Legacy mixer with Airmode always on, motor idle and the motor output
-//!   limit.
+//!   limit;
+//! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
+//!   a 2026.6 Tune, and the pilot's pasted Rates and `aux` switches.
 //!
 //! The filters, RC smoothing and feedforward (#49), the rest of the loop
-//! shaping (#50), Angle and Horizon (#51), the CLI translator (#53), Crash
-//! Flip and yaw spin recovery (#54) and the OSD logic (#59) arrive with their
-//! tickets.
+//! shaping (#50), Angle and Horizon (#51), Crash Flip and yaw spin recovery
+//! (#54), the OSD paste and the OSD logic (#59) arrive with their tickets.
 //!
 //! # Power-up
 //!
@@ -94,6 +96,7 @@
 
 pub mod arming;
 mod channels;
+pub mod cli;
 pub mod failsafe;
 mod mixer;
 mod pid;

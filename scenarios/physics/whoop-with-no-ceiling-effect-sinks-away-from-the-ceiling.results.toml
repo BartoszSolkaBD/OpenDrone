@@ -29,7 +29,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "f9d1923032863a3e"   # test/whoop-65-no-ceiling-effect: what the Simulation receives from it
+quad = "1a2471e1ab9f7fae"   # test/whoop-65-no-ceiling-effect: what the Simulation receives from it
 map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
 run  = "b4cff2317b19f227"   # the whole state after each of 16000 steps at 8000 Hz, in order
 

@@ -336,6 +336,64 @@ fn the_freestyle_5_test_quads_for_the_flight_controller_switch_off_what_isnt_sim
 }
 
 #[test]
+fn the_whoop_65s_tune_is_the_meteor65_pros_diff_all_imported() {
+    // Basis: Source (#21's alpha Tunes: the whoop takes the Meteor65 Pro's
+    // diff all, Betaflight 4.3.0, translated into 2026.6 settings). The
+    // committed tune.txt is exactly what `cargo xtask import-tune` writes
+    // from it, so a change to the importer or to what the Flight Controller
+    // reads shows here until the Tune is imported again.
+    const EXPORT: &str = "docs/research/quad-settings/meteor65-pro.diff-all.txt";
+    let export = fs::read_to_string(repo().join(EXPORT)).unwrap();
+    let imported = opendrone_flight_controller::cli::import_tune(&export).unwrap();
+    assert_eq!(imported.problems, Vec::<String>::new());
+    let committed =
+        fs::read_to_string(repo().join("packs/opendrone/quads/whoop-65/tune.txt")).unwrap();
+    assert!(
+        committed == imported.tune_txt("Whoop 65", EXPORT),
+        "packs/opendrone/quads/whoop-65/tune.txt isn't the importer's output: run `cargo xtask import-tune {EXPORT} packs/opendrone/quads/whoop-65`"
+    );
+}
+
+#[test]
+fn the_whoop_65s_tune_spells_out_every_setting_the_flight_controller_reads() {
+    // Basis: Rule (ADR-0015), so the Whoop 65 flies on its own Tune.
+    let whoop = quad("opendrone/whoop-65");
+    assert!(
+        whoop.flight_controller.is_ok(),
+        "{:?}",
+        whoop.flight_controller
+    );
+    let tune = &whoop.tune.settings;
+    let mark = |name: &str| (tune[name].value.as_str(), tune[name].mark.as_str());
+    assert_eq!(mark("p_roll"), ("40", "diff"));
+    assert_eq!(mark("d_roll"), ("45", "diff (was d_min_roll)"));
+    assert_eq!(
+        mark("motor_idle"),
+        (
+            "600",
+            "diff (was dshot_idle_value); hundredths of a percent"
+        )
+    );
+    assert_eq!(mark("small_angle").0, "180");
+    // What the Flight Controller knows but doesn't simulate yet is spelled
+    // out too, from the diff or 4.3's defaults, flown as off for now.
+    assert_eq!(mark("f_roll"), ("125", "diff; not simulated yet (#49)"));
+    assert_eq!(
+        mark("rc_smoothing"),
+        ("ON", "4.3 default; not simulated yet (#49)")
+    );
+    assert_eq!(
+        mark("dyn_notch_count"),
+        ("2", "diff; not simulated yet (waits for gyro noise, #21)")
+    );
+    for (name, _) in opendrone_flight_controller::Tune::not_simulated_yet() {
+        assert!(tune.contains_key(name), "{name}");
+    }
+    // The other settings the diff sets stay too.
+    assert_eq!(mark("dshot_bidir"), ("ON", "diff"));
+}
+
+#[test]
 fn the_5_inchs_reverse_thrust_is_measured_and_locked_and_the_whoops_is_an_estimate() {
     // Basis: Source (#16 §4 and #26 §3: 48% Measured on a similar 5.1″ prop;
     // the whoop's 50% is an Estimate, range 25–75%).

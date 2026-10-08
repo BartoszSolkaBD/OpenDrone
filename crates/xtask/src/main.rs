@@ -27,6 +27,8 @@
 //!   pull request ([`review`]).
 //! - `input-monitor`: every connected Input Device live, with its Channels
 //!   and their stamps ([`input_monitor`]).
+//! - `import-tune`: imports a quad's Betaflight `diff all` as a Quad
+//!   definition's `tune.txt` ([`import_tune`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -34,6 +36,7 @@ use std::process::ExitCode;
 
 mod book;
 mod core_maths;
+mod import_tune;
 mod input_monitor;
 mod migrate;
 mod packs;
@@ -84,7 +87,13 @@ Commands:
       Show every connected Input Device live, read by SDL on its own thread as
       the game reads it: what was found and its profile, its Channels in µs,
       its raw values, and how often they change. Runs until Ctrl+C, or for
-      the seconds given.";
+      the seconds given.
+  import-tune <export file> (<quad folder> | --print)
+      Import a quad's Betaflight diff all (diff bare on 4.3 and 4.4, or a
+      dump, from Betaflight 4.3 or newer) as the Quad's tune.txt, in
+      Betaflight 2026.6's names with every line marked (ADR-0008, ADR-0015),
+      and list what was translated and left out. --print prints the Tune
+      instead of writing it.";
 
 fn main() -> ExitCode {
     // `core-maths` has cargo run xtask as its compiler wrapper, to keep each
@@ -112,6 +121,7 @@ fn main() -> ExitCode {
         "new-libraries" => review::run_new_libraries(rest),
         "merge-check" => review::run_merge_check(rest),
         "input-monitor" => input_monitor::run(rest),
+        "import-tune" => import_tune::run(rest),
         _ => {
             eprintln!("{USAGE}\n{}", review::usage());
             ExitCode::from(2)
