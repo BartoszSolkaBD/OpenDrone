@@ -1,0 +1,42 @@
+# The Freestyle 5″ with the Flight Controller's filters and loop shaping off.    id: test/freestyle-5-filters-and-shaping-off
+#
+# The Flight Controller Scenarios that check the PID loop's scaling, the mixer
+# and Airmode, and the motors' range work their numbers out from Betaflight's
+# maths with nothing in between. On the 5″'s own Tune, Betaflight 2026.6.2
+# puts more in between: low-passes on the gyro, the D term and yaw's P term,
+# the dynamic notch, RC smoothing, feedforward, Dynamic D, I-term relax,
+# anti-gravity, TPA and throttle boost. The Flight Controller doesn't simulate
+# those yet (#49, #50); this Test Quad switches each one off in the Tune, the
+# way Betaflight reads "off", so those Scenarios' numbers are what Betaflight
+# 2026.6.2 gives on this Tune today, and still will once #49 and #50 land.
+# Everything else is the Freestyle 5″'s.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "The filters, RC smoothing, feedforward, Dynamic D, I-term relax, anti-gravity, TPA and throttle boost off, so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own"
+
+# Tune changes keep Betaflight's own units, as `tune.txt` does. Each is off as
+# Betaflight 2026.6.2 reads it.
+[tune]
+f_roll = 0                 # feedforward: no gain, no F term (pid_init.c, pidInitConfig)
+f_pitch = 0
+f_yaw = 0
+d_max_roll = 0             # Dynamic D: a D max not above D gives no boost (pid_init.c)
+d_max_pitch = 0
+iterm_relax = "OFF"        # I-term relax off
+anti_gravity_gain = 0      # anti-gravity: no I or P boost (pid.c, pidController)
+tpa_rate = 0               # TPA: no cut above the breakpoint (pid_init.c)
+tpa_low_rate = 0           # low-throttle TPA: no cut below its breakpoint
+throttle_boost = 0         # no throttle boost (mixer.c, mixTable)
+gyro_lpf1_static_hz = 0    # gyro low-pass 1 off, static and dynamic (gyro_init.c)
+gyro_lpf1_dyn_min_hz = 0
+gyro_lpf2_static_hz = 0    # gyro low-pass 2 off
+dyn_notch_count = 0        # the dynamic notch off (dyn_notch_filter.c, isDynNotchActive)
+dterm_lpf1_static_hz = 0   # D-term low-pass 1 off, static and dynamic (pid_init.c)
+dterm_lpf1_dyn_min_hz = 0
+dterm_lpf2_static_hz = 0   # D-term low-pass 2 off
+yaw_lowpass_hz = 0         # yaw P low-pass off (pid_init.c)
+rc_smoothing = "OFF"       # setpoints and throttle straight from each frame (rc.c)

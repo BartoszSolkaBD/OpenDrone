@@ -173,7 +173,10 @@ impl Scenario {
             name: read.name,
             kind: read.start.kind,
             quad: read.start.quad.id,
-            map: read.start.map.id,
+            map: read.start.map.map_or_else(
+                || "none (the Flight Controller alone)".to_string(),
+                |map| map.id,
+            ),
             results,
             expectations,
         }

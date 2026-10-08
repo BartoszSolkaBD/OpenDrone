@@ -20,6 +20,28 @@ pub struct MotorCommand {
     pub direction: SpinDirection,
 }
 
+impl MotorCommand {
+    /// What Bluejay v0.21.0 makes of a DShot throttle value from the Flight
+    /// Controller (`Isrs.asm` L196–L290, reimplemented): 0 to 47 are "stop"
+    /// and DShot's special commands, so no drive; 48 to 2047 give 0 to 1999,
+    /// which Bluejay stretches to its 2048 steps of power by adding a
+    /// fortieth (in whole numbers: twice the value, ÷ 16, ÷ 5), held at 2047,
+    /// its full power.
+    pub fn from_dshot(value: u16, direction: SpinDirection) -> MotorCommand {
+        let throttle = if value < 48 {
+            0.0
+        } else {
+            let x = u32::from(value.min(2047) - 48);
+            let power = (x + (2 * x / 16) / 5).min(2047);
+            f64::from(power) / 2047.0
+        };
+        MotorCommand {
+            throttle,
+            direction,
+        }
+    }
+}
+
 /// The four motor commands, in Betaflight's motor order (1 to 4: rear right,
 /// front right, rear left, front left).
 #[derive(Clone, Copy, Debug, PartialEq)]

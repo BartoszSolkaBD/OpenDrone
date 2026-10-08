@@ -1,0 +1,128 @@
+# The Arm switch arms only with the throttle low and the Quad tilted no
+# further than the Tune's `small_angle`, and once arming was refused, the
+# switch must go off before it can arm, as in Betaflight 2026.6.2
+# (`processRcStickPositions`, src/main/fc/rc_controls.c; `tryArm` and
+# `updateArmingStatus`, src/main/fc/core.c). The full arming rules and
+# power-up come with #52.
+#
+# The Flight Controller alone, disarmed at the start, with the Arm switch on
+# AUX1 (ADR-0017). How a Betaflight board takes each Radio Link frame (every
+# 4 ms at 250 Hz): it reads the Arm switch through its Modes table as the
+# frame before left it, then updates the table. So the Quad arms one frame
+# after the switch goes on, and disarms more than three frames after it goes
+# off (`rcDisarmTicks`). Armed, the motors idle at DShot 158 (48 + 5.5% × 1999
+# = 157.9); disarmed, the Flight Controller sends 0, DShot's "stop".
+#
+# On arming, Betaflight first sends each ESC the DShot command "spin the
+# normal way" (`setMotorSpinDirection`, src/main/fc/core.c): after a 10 ms
+# wait, ten times 1 ms apart (src/main/drivers/dshot_command.c), so the idle
+# throttle reaches the ESCs about 20 ms after the arming frame. The Flight
+# Controller doesn't send DShot commands yet (Crash Flip, #54), so the idle is
+# checked 26 ms after arming, where both agree.
+format = 1
+name   = "The Arm switch arms with the throttle low and the Quad level enough, as in Betaflight"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  # Throttle low, level: arms.
+  { at = "0.1 s", arm = "on" },
+  { at = "0.5 s", arm = "off" },
+  # Throttle up, then the switch: refused, and still refused once the
+  # throttle comes down, until the switch goes off and on again.
+  { at = "1 s",   throttle = "50%" },
+  { at = "1.1 s", arm = "on" },
+  { at = "1.3 s", throttle = "0%" },
+  { at = "1.5 s", arm = "off" },
+  { at = "1.6 s", arm = "on" },
+  { at = "2 s",   arm = "off" },
+  # Tilted 30°, past the 5″'s small_angle of 25°: refused, and still refused
+  # once tilted back to 20°, until the switch goes off and on again.
+  { at = "2.1 s", attitude = "roll 30°, pitch 0°, heading 0°" },
+  { at = "2.2 s", arm = "on" },
+  { at = "2.4 s", attitude = "roll 20°, pitch 0°, heading 0°" },
+  { at = "2.6 s", arm = "off" },
+  { at = "2.7 s", arm = "on" },
+]
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.104 s"
+value = "0 ± 0"
+basis = "source: processRcStickPositions and updateActivatedModes: the frame at 0.1 s turns Arm on in the Modes table after the stick checks have read it, so the Quad is still disarmed until the next frame, at 0.104 s"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.13 s"
+value = "158 ± 0"
+basis = "source: tryArm: with the throttle below min_check (988.46 µs < 1050 µs) and level, the frame at 0.104 s arms, and the motors idle at 158 once the spin-direction command is sent, about 20 ms later (dshot_command.c; #54 sends it)"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.516 s"
+value = "158 ± 0"
+basis = "source: processRcStickPositions: the switch went off at 0.5 s; Betaflight disarms only after more than three frames read it off, at the frame at 0.516 s"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.517 s"
+value = "0 ± 0"
+basis = "source: processRcStickPositions: disarmed by the frame at 0.516 s, the Flight Controller sends DShot 0, stop"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.2 s"
+value = "0 ± 0"
+basis = "source: updateArmingStatus: with the throttle at 1500.77 µs, not below min_check 1050 µs, arming is refused (THROTTLE), and the switch on while refused blocks it too (ARMSWITCH)"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.4 s"
+value = "0 ± 0"
+basis = "source: updateArmingStatus: the throttle came down at 1.3 s, but ARMSWITCH clears only when the switch goes off"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.63 s"
+value = "158 ± 0"
+basis = "source: updateArmingStatus and tryArm: the switch went off at 1.5 s, clearing ARMSWITCH; on again at 1.6 s with the throttle low, it arms a frame later, at 1.604 s, and idles once the spin-direction command is sent, about 20 ms later (#54)"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.3 s"
+value = "0 ± 0"
+basis = "source: updateArmingStatus and isUpright (src/main/flight/imu.c): tilted 30°, cos 30° = 0.866 isn't above cos 25° = 0.906, so arming is refused (ANGLE), and ARMSWITCH with it"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.5 s"
+value = "0 ± 0"
+basis = "source: updateArmingStatus: tilted back to 20°, within small_angle, but ARMSWITCH clears only when the switch goes off"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "2.8 s"
+value = "158 ± 0"
+basis = "source: updateArmingStatus, isUpright and tryArm: off at 2.6 s and on at 2.7 s, tilted 20°: cos 20° = 0.940 is above cos 25° = 0.906, so it arms"

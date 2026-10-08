@@ -70,8 +70,8 @@ pub use map::{
 };
 pub use quad::{
     Battery, Board, Camera, Chemistry, Collision, Confidence, Ducts, Feel, Frame, Motors,
-    PropDirection, Props, QuadDefinition, QuadFile, Setting, Sound, Value, check_quad, label,
-    read_quad_file, read_test_quad,
+    PropDirection, Props, QuadDefinition, QuadFile, Setting, Sound, TuneChange, Value, check_quad,
+    label, read_quad_file, read_test_quad,
 };
 pub use tune::{Tune, TuneSetting, read_tune};
 
@@ -497,12 +497,32 @@ impl Packs {
     fn read_test_quad(&self, file: &Folder, id: &str) -> Result<QuadDefinition, Problems> {
         let text = file.read()?;
         let mut base_tune = None;
-        let (based_on, quad) = read_test_quad(&file.label, &text, |based_on| {
+        let (based_on, quad, tune_changes) = read_test_quad(&file.label, &text, |based_on| {
             let (quad, tune) = self.quad_files(based_on)?;
             base_tune = Some(tune.clone());
             Ok(quad.clone())
         })?;
-        let tune = base_tune.expect("a Test Quad that read has its real Quad's Tune");
+        let mut tune = base_tune.expect("a Test Quad that read has its real Quad's Tune");
+        let mut problems = Problems::new();
+        for change in tune_changes {
+            match tune.settings.get_mut(&change.name) {
+                Some(setting) => {
+                    setting.value = change.value;
+                    setting.mark = format!("hand-set: Test Quad {id}");
+                }
+                None => problems.push(Problem::of(
+                    &file.label,
+                    change.line,
+                    format!(
+                        "`{}` isn't a setting of {based_on}'s Tune, so it can't be changed here",
+                        change.name
+                    ),
+                )),
+            }
+        }
+        if !problems.is_empty() {
+            return Err(problems);
+        }
         check_quad(id, Some(based_on), &quad, &tune)
     }
 

@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 opendrone-maths.workspace = true
 opendrone-physics.workspace = true
+opendrone-flight-controller.workspace = true
 toml.workspace = true
 toml_edit.workspace = true
 

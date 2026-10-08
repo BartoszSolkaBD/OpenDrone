@@ -26,7 +26,7 @@ Results files are never migrated: the Scenario runner writes them, with a `forma
 
 A change that only edits values, such as moving an Estimate in a Feel Test, needs no step.
 
-Before the 0.1.0 alpha ships, no Pack or Scenario exists outside this repo, so a PR may add a new required key at the current format without a step, as long as it writes the key into every file in the repo and says so in its description. From 0.1.0 on, every new key needs a step.
+Before the 0.1.0 alpha ships, no Pack exists outside this repo, so a PR may add a new key to a Pack file, required or optional, at the current format without a step, as long as it writes the key into every Pack file in the repo and says so in its description. From 0.1.0 on, every new Pack key needs a step. This never covers Scenarios: every new starting-state item gets a step, as ADR-0002 asks.
 
 **The step writes the value that keeps today's behaviour.** A new Assist is written off, a new number takes the value the code used before it was a number, a renamed key keeps its value. So a step never moves a Result. If the new item should change a flight, that's a separate change in the same pull request, after the step, whose moved Results are explained like any other.
 

@@ -1,0 +1,81 @@
+# Results of actual-rates.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Actual rates turn each stick into the rotation speed Betaflight gives"
+
+[[expect]]
+what     = "roll setpoint with the sticks at rest"
+basis    = "Source"
+expected = "0.11 °/s ± 0.01 °/s"
+measured = "0.109 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 25%"
+basis    = "Source"
+expected = "36.20 °/s ± 0.01 °/s"
+measured = "36.2 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 50%"
+basis    = "Source"
+expected = "114.28 °/s ± 0.01 °/s"
+measured = "114 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 75%"
+basis    = "Source"
+expected = "283.81 °/s ± 0.01 °/s"
+measured = "284 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll 100%"
+basis    = "Source"
+expected = "670.00 °/s ± 0.01 °/s"
+measured = "670 °/s"
+
+[[expect]]
+what     = "roll setpoint with roll -50%"
+basis    = "Source"
+expected = "-113.51 °/s ± 0.01 °/s"
+measured = "-114 °/s"
+
+[[expect]]
+what     = "pitch setpoint with pitch 50%"
+basis    = "Source"
+expected = "-114.28 °/s ± 0.01 °/s"
+measured = "-114 °/s"
+
+[[expect]]
+what     = "yaw setpoint with yaw 50%"
+basis    = "Source"
+expected = "312.74 °/s ± 0.01 °/s"
+measured = "313 °/s"
+
+[[expect]]
+what     = "yaw setpoint with yaw 100%"
+basis    = "Source"
+expected = "800.00 °/s ± 0.01 °/s"
+measured = "800 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "4a9e587d4a888682"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "b111b46625e21d01"   # the Flight Controller's whole state after each of 9 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "7aeaa57149263a44"
+"case 2" = "4eb21b4bc5bbc679"
+"case 3" = "99411826f0a25af5"
+"case 4" = "c1ed5b0fd29bda37"
+"case 5" = "7da221f0170580df"
+"case 6" = "cf4cade2288f698a"
+"case 7" = "058b21aa6aaf0a87"
+"case 8" = "b5845741a3879ec3"
+"case 9" = "d8b489ac2cf9ebb0"

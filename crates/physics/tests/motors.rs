@@ -203,3 +203,19 @@ fn a_motor_with_its_esc_off_spins_down_freely_and_stops_without_turning_back() {
     assert!(motor.speed >= 0.0 && motor.speed < 30.0);
     assert_eq!(motor.current, 0.0);
 }
+
+#[test]
+fn bluejay_reads_dshot_48_as_no_drive_idle_158_as_5_47_percent_and_2047_as_full_drive() {
+    // Basis: Source (Bluejay v0.21.0, Isrs.asm L196–L290: DShot 48 to 2047
+    // become 0 to 1999, stretched to 2048 steps of power by adding a fortieth
+    // in whole numbers, and held at 2047). Idle 158 is 110 + (220 ÷ 16 ÷ 5 =
+    // 2) = 112 of 2047.
+    let drive = |value| MotorCommand::from_dshot(value, SpinDirection::Normal).throttle;
+    assert_eq!(drive(0), 0.0);
+    assert_eq!(drive(47), 0.0);
+    assert_eq!(drive(48), 0.0);
+    assert_eq!(drive(158), 112.0 / 2047.0);
+    assert_eq!(drive(2047), 1.0);
+    let reversed = MotorCommand::from_dshot(1000, SpinDirection::Reversed);
+    assert_eq!(reversed.direction, SpinDirection::Reversed);
+}

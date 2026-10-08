@@ -13,15 +13,23 @@
 //! - [`Simulation`]: steps every Quad once per tick, in a fixed order, and
 //!   counts [`SimulationTime`] in whole ticks at the set-up's [`PhysicsRate`]
 //!   (8 kHz in the alpha), never with the computer's clock.
-//! - [`FlightControllerSeam`]: what turns readings into the four motor
-//!   commands each tick. So far only the [`ScriptedMotors`] stand-in plugs in,
-//!   for Physics and Thrust Stand Scenarios; our Flight Controller follows
-//!   (#48), and later perhaps a SITL bridge in its own crate.
+//! - Flight Inputs, the one way in: [`Simulation::flight_input`] takes them,
+//!   stamped with Simulation Time; so far, Channels ([`FlightInput`]).
+//! - The Radio Link: each Quad's Channels reach its Flight Controller in
+//!   regular frames at the pilot's [`PacketRate`], like an ELRS link on CRSF
+//!   (ADR-0007).
+//! - [`FlightControllerSeam`]: what turns sensor readings and Radio Link
+//!   frames into the four motor commands each tick, one Flight Controller
+//!   loop per physics step. Our Flight Controller plugs in as
+//!   [`OurFlightController`], the [`ScriptedMotors`] stand-in for Physics and
+//!   Thrust Stand Scenarios, and later perhaps a SITL bridge in its own
+//!   crate.
 //! - The thrust-stand set-up: a Quad set up with [`Mount::ThrustStand`] is
 //!   held still while its motors, ESCs and battery work as in flight.
 //! - [`Simulation::quad_output`]: each tick's output per Quad: where it is and
 //!   how it moves, each motor's speed, thrust, torque and current, each ESC's
-//!   state, and the battery's voltage, current and charge.
+//!   state, the battery's voltage, current and charge, the motor commands,
+//!   and what our Flight Controller's loop did.
 //! - [`Simulation::fingerprint`]: a fingerprint of the whole state, the same on
 //!   every computer, for the repeat and agreement checks.
 //! - After each tick, every Quad's state and its contacts with the Map
@@ -31,8 +39,14 @@
 //!   out, for the Video Signal and the Where-you-stand sound. It never
 //!   changes the Simulation.
 //!
-//! The Radio Link, Assists, Rates and the session state arrive with their
-//! tickets.
+//! Each tick, for every Quad in order: the Flight Inputs stamped with this
+//! moment arrive; the Radio Link sends a frame if one is due; the Flight
+//! Controller seam reads the sensors (the state at the tick's start) and the
+//! frame and gives the motor commands; the physics moves the Quad on by one
+//! step with them.
+//!
+//! Assists, the rest of the Radio Link (#56), and the session state arrive
+//! with their tickets.
 //!
 //! # House rules
 //!
@@ -55,13 +69,19 @@
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
+mod flight_controller;
 mod motors;
+mod radio_link;
 mod time;
 
 use opendrone_maths::{Fingerprint, Fingerprinter, Vec3};
 use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 
+pub use flight_controller::{OurFlightController, sensor_readings};
 pub use motors::{FlightControllerSeam, ScriptedMotors};
+pub use opendrone_flight_controller::{
+    Channel, Channels, DebugRecord, Rates, SensorReadings, Terms, Tune,
+};
 pub use opendrone_physics::{
     BatteryOutput, BatteryParameters, Drag, EscParameters, EscState, MotorCommand, MotorCommands,
     MotorOutput, MotorParameters, Mount, PropDirection, PropParameters, QuadParameters, QuadState,
@@ -70,6 +90,7 @@ pub use opendrone_physics::{
 pub use opendrone_physics::{
     Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
 };
+pub use radio_link::{FlightInput, PacketRate, RadioLink};
 pub use time::{PhysicsRate, SimulationTime};
 
 /// What a Simulation starts from.
@@ -98,6 +119,9 @@ pub struct QuadSetUp {
     pub battery: f64,
     /// Free to fly, or held on the thrust stand.
     pub mount: Mount,
+    /// The pilot's Packet Rate: how often the Radio Link carries this Quad's
+    /// Channels to its Flight Controller.
+    pub packet_rate: PacketRate,
     /// What plugs into the Flight Controller seam for this Quad.
     pub flight_controller: Box<dyn FlightControllerSeam>,
 }
@@ -110,6 +134,12 @@ pub struct QuadOutput {
     /// Each motor, in Betaflight's motor order, with its ESC's state.
     pub motors: [MotorOutput; 4],
     pub battery: BatteryOutput,
+    /// The motor commands the Flight Controller seam gave on the tick (all
+    /// stopped before the first).
+    pub commands: MotorCommands,
+    /// What our Flight Controller's loop did on the tick; `None` before the
+    /// first and for anything else in the seam.
+    pub flight_controller: Option<DebugRecord>,
 }
 
 /// A set-up the Simulation can't start from.
@@ -143,6 +173,11 @@ struct SimulatedQuad {
     body: QuadBody,
     flight_controller: Box<dyn FlightControllerSeam>,
     motor_commands: MotorCommands,
+    radio_link: RadioLink,
+    /// Flight Inputs not yet arrived, in the order of their moments.
+    inputs: Vec<(SimulationTime, FlightInput)>,
+    /// Whether the seam has run a loop yet.
+    stepped: bool,
 }
 
 impl Simulation {
@@ -169,6 +204,9 @@ impl Simulation {
                 body,
                 flight_controller: quad.flight_controller,
                 motor_commands: MotorCommands::STOPPED,
+                radio_link: RadioLink::new(quad.packet_rate, set_up.physics_rate),
+                inputs: Vec::new(),
+                stepped: false,
             });
         }
         Ok(Simulation {
@@ -181,14 +219,37 @@ impl Simulation {
         })
     }
 
-    /// One tick: for every Quad in order, the Flight Controller seam gives the
-    /// motor commands, then the physics moves the Quad on by one step with
-    /// them, colliding with the Map. Then Simulation Time moves on by one
-    /// step.
+    /// The one way in: a Flight Input for a Quad (counting from 0 in the
+    /// set-up's order), stamped with the Simulation Time it arrives at. It
+    /// takes effect at the start of the tick at that moment, or of the next
+    /// tick if that moment has passed. Inputs stamped with the same moment
+    /// arrive in the order they were given.
+    pub fn flight_input(&mut self, quad: usize, at: SimulationTime, input: FlightInput) {
+        let inputs = &mut self.quads[quad].inputs;
+        let place = inputs.partition_point(|(time, _)| *time <= at);
+        inputs.insert(place, (at, input));
+    }
+
+    /// One tick: for every Quad in order, the Flight Inputs stamped up to now
+    /// arrive, the Radio Link sends a frame if one is due, the Flight
+    /// Controller seam reads the sensors and the frame and gives the motor
+    /// commands, then the physics moves the Quad on by one step with them,
+    /// colliding with the Map. Then Simulation Time moves on by one step.
     pub fn step(&mut self) {
         let dt = self.physics_rate.step_length();
         for quad in &mut self.quads {
-            quad.motor_commands = quad.flight_controller.step(self.time);
+            let arrived = quad.inputs.partition_point(|(time, _)| *time <= self.time);
+            for (_, input) in quad.inputs.drain(..arrived) {
+                match input {
+                    FlightInput::Channels(channels) => quad.radio_link.hear(channels),
+                }
+            }
+            let frame = quad.radio_link.frame(self.time);
+            let readings = sensor_readings(quad.body.state());
+            quad.motor_commands = quad
+                .flight_controller
+                .step(self.time, &readings, frame.as_ref());
+            quad.stepped = true;
             quad.body
                 .step(&self.world, &self.map, &quad.motor_commands, dt);
         }
@@ -221,11 +282,18 @@ impl Simulation {
     /// A Quad's output after the last tick (at the start before the first):
     /// where it is and how it moves, each motor and its ESC, and the battery.
     pub fn quad_output(&self, quad: usize) -> QuadOutput {
-        let body = &self.quads[quad].body;
+        let quad = &self.quads[quad];
+        let body = &quad.body;
         QuadOutput {
             state: *body.state(),
             motors: body.motors(),
             battery: body.battery(),
+            commands: quad.motor_commands,
+            flight_controller: if quad.stepped {
+                quad.flight_controller.debug()
+            } else {
+                None
+            },
         }
     }
 
@@ -260,8 +328,8 @@ impl Simulation {
 
     /// A fingerprint of the whole state, in a fixed order: Simulation Time,
     /// the physics rate, the world, the random seed, then every Quad's state
-    /// (with its motors, ESCs and battery), motor commands and Flight
-    /// Controller seam. Two runs, or two computers,
+    /// (with its motors, ESCs and battery), motor commands, Radio Link and
+    /// Flight Controller seam. Two runs, or two computers,
     /// that give the same fingerprint are in exactly the same state.
     ///
     /// The Map's solid parts never change, so they are left out, as the
@@ -279,6 +347,7 @@ impl Simulation {
         for quad in &self.quads {
             quad.body.write_fingerprint(&mut f);
             quad.motor_commands.write_fingerprint(&mut f);
+            quad.radio_link.write_fingerprint(&mut f);
             quad.flight_controller.write_fingerprint(&mut f);
         }
         f.finish()

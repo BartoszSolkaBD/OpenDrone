@@ -186,7 +186,7 @@ fn an_unknown_measurement_is_refused_listing_what_the_runner_measures() {
     assert_eq!(
         failures(&report(&file, ResultsFile::Write)),
         [format!(
-            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag"
+            "scenarios/unknown-measure.toml line {line}: the runner can't measure \"sink rate\" yet; it measures height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading, motor N speed (N from 1 to 4, in Betaflight's motor order), motor N thrust, motor N torque, motor N current, motor N drive, total thrust, battery voltage, battery current, battery charge used, battery sag, roll setpoint, pitch setpoint, yaw setpoint, roll P term, roll I term, roll D term, roll PID sum, pitch P term, pitch I term, pitch D term, pitch PID sum, yaw P term, yaw I term, yaw D term, yaw PID sum, motor N DShot"
         )]
     );
 }
@@ -308,24 +308,6 @@ fn stopped_motors_are_only_for_scenarios_that_script_their_motors() {
 }
 
 #[test]
-fn flight_and_flight_controller_scenarios_wait_for_the_flight_controller() {
-    for kind in ["flight", "flight controller"] {
-        let file = changed(
-            "flight-kind",
-            "kind              = \"physics\"",
-            &format!("kind              = \"{kind}\""),
-        );
-        let found = failures(&report(&file, ResultsFile::Write));
-        assert!(
-            found[0].ends_with(
-                "only Physics and Thrust Stand Scenarios can run so far: Flight and Flight Controller Scenarios arrive with the Flight Controller (#48)"
-            ),
-            "{found:#?}"
-        );
-    }
-}
-
-#[test]
 fn a_quad_on_the_thrust_stand_is_held_still_so_it_starts_still_and_never_settled() {
     let text = free_fall()
         .replacen(
@@ -425,8 +407,8 @@ fn a_comparison_needs_both_its_other_run_and_how_to_compare() {
     let ends = [
         "`compare` needs `against`: the other run to compare with, such as `against = { physics_rate = \"4 kHz\" }`",
         "an Expectation `against` another run needs `compare`: `compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's)",
-        "`wind` isn't something OpenDrone reads in [expect[8].against]; it reads `physics_rate`, `battery`",
-        "`against` names what the other run changes: `physics_rate`, `battery`, or both, written as in [start]",
+        "`wind` isn't something OpenDrone reads in [expect[8].against]; it reads `physics_rate`, `battery`, `sticks`",
+        "`against` names what the other run changes: `physics_rate`, `battery` or `sticks`, written as in [start], or `sticks = \"mirrored\"`",
         "`compare` says how this run's value meets the other's: \"difference\" (this run's minus the other's) or \"ratio\" (this run's as a share of the other's), not \"sum\"",
     ];
     assert_eq!(found.len(), ends.len(), "{found:#?}");

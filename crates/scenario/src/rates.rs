@@ -22,67 +22,16 @@
 //! except Raceflight's rate and Actual's center sensitivity and max rate (× 10,
 //! in °/s), Quick's max rate (× 10, in °/s), and Raceflight's acro+ and expo
 //! (as stored). A number between two of the stored steps is refused.
+//!
+//! The Rates themselves, and their curves, belong to the Flight Controller
+//! (`opendrone_flight_controller::rates`).
 
 use opendrone_maths::DEGREE;
 use opendrone_pack::Problems;
 use opendrone_pack::document::Table;
 use opendrone_pack::units::{self, Dimension};
 
-/// The active Rates: every field of a Betaflight 2026.6 rate profile, as the
-/// CLI stores it.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Rates {
-    /// `rates_type`.
-    pub rates_type: RatesType,
-    pub roll: AxisRates,
-    pub pitch: AxisRates,
-    pub yaw: AxisRates,
-    /// `roll_rate_limit`, `pitch_rate_limit` and `yaw_rate_limit`, in °/s,
-    /// from 200 to 1998.
-    pub rate_limit: [u16; 3],
-    /// `thr_mid`: where on the stick the hover point sits, from 0 to 100.
-    pub thr_mid: u8,
-    /// `thr_hover`: the throttle at the hover point, from 0 to 100.
-    pub thr_hover: u8,
-    /// `thr_expo`, from 0 to 100.
-    pub thr_expo: u8,
-    /// `throttle_limit_type`.
-    pub throttle_limit_type: ThrottleLimitType,
-    /// `throttle_limit_percent`, from 25 to 100. Betaflight keeps it while the
-    /// limit is off, unused; then it is 100, Betaflight's default.
-    pub throttle_limit_percent: u8,
-    /// `quickrates_rc_expo`.
-    pub quickrates_rc_expo: bool,
-}
-
-/// One axis's three stored numbers, such as `roll_rc_rate`, `roll_srate` and
-/// `roll_expo`. What each means depends on the Rates type (see the module).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AxisRates {
-    pub rc_rate: u8,
-    pub srate: u8,
-    pub expo: u8,
-}
-
-/// Betaflight's five Rates types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RatesType {
-    Betaflight,
-    Raceflight,
-    Kiss,
-    Actual,
-    Quick,
-}
-
-/// `throttle_limit_type`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ThrottleLimitType {
-    Off,
-    /// Scales the whole throttle range down to the limit.
-    Scale,
-    /// Cuts the throttle off at the limit.
-    Clip,
-}
+pub use opendrone_flight_controller::{AxisRates, Rates, RatesType, ThrottleLimitType};
 
 /// How the Betaflight App shows one stored number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,48 +93,46 @@ const fn field(label: &'static str, shown: Shown, lowest: u32, highest: u32) -> 
     }
 }
 
-impl RatesType {
-    const ALL: [(&'static str, RatesType); 5] = [
-        ("Betaflight", RatesType::Betaflight),
-        ("Raceflight", RatesType::Raceflight),
-        ("KISS", RatesType::Kiss),
-        ("Actual", RatesType::Actual),
-        ("Quick", RatesType::Quick),
-    ];
+/// The five Rates types as the App names them.
+const RATES_TYPES: [(&str, RatesType); 5] = [
+    ("Betaflight", RatesType::Betaflight),
+    ("Raceflight", RatesType::Raceflight),
+    ("KISS", RatesType::Kiss),
+    ("Actual", RatesType::Actual),
+    ("Quick", RatesType::Quick),
+];
 
-    /// The three numbers of each axis, as the App labels them, with the
-    /// stored ranges: 1 up to this type's `rc_rate` limit, 0 up to its `srate`
-    /// limit and 0 to 100 for `expo` (`ratesSettingLimits` in
-    /// `controlrate_profile.c`).
-    fn fields(self) -> [Field; 3] {
-        use Shown::{Hundredths, Percent, TensOfDegreesPerSecond};
-        match self {
-            RatesType::Betaflight => [
-                field("rc rate", Hundredths, 1, 255),
-                field("rate", Hundredths, 0, 100),
-                field("rc expo", Hundredths, 0, 100),
-            ],
-            RatesType::Raceflight => [
-                field("rate", TensOfDegreesPerSecond, 1, 200),
-                field("acro+", Percent, 0, 255),
-                field("expo", Percent, 0, 100),
-            ],
-            RatesType::Kiss => [
-                field("rc rate", Hundredths, 1, 255),
-                field("rate", Hundredths, 0, 99),
-                field("rc curve", Hundredths, 0, 100),
-            ],
-            RatesType::Actual => [
-                field("center sensitivity", TensOfDegreesPerSecond, 1, 200),
-                field("max rate", TensOfDegreesPerSecond, 0, 200),
-                field("expo", Hundredths, 0, 100),
-            ],
-            RatesType::Quick => [
-                field("rc rate", Hundredths, 1, 255),
-                field("max rate", TensOfDegreesPerSecond, 0, 200),
-                field("expo", Hundredths, 0, 100),
-            ],
-        }
+/// The three numbers of each axis, as the App labels them, with the stored
+/// ranges: 1 up to this type's `rc_rate` limit, 0 up to its `srate` limit and
+/// 0 to 100 for `expo` (`ratesSettingLimits` in `controlrate_profile.c`).
+fn fields(rates_type: RatesType) -> [Field; 3] {
+    use Shown::{Hundredths, Percent, TensOfDegreesPerSecond};
+    match rates_type {
+        RatesType::Betaflight => [
+            field("rc rate", Hundredths, 1, 255),
+            field("rate", Hundredths, 0, 100),
+            field("rc expo", Hundredths, 0, 100),
+        ],
+        RatesType::Raceflight => [
+            field("rate", TensOfDegreesPerSecond, 1, 200),
+            field("acro+", Percent, 0, 255),
+            field("expo", Percent, 0, 100),
+        ],
+        RatesType::Kiss => [
+            field("rc rate", Hundredths, 1, 255),
+            field("rate", Hundredths, 0, 99),
+            field("rc curve", Hundredths, 0, 100),
+        ],
+        RatesType::Actual => [
+            field("center sensitivity", TensOfDegreesPerSecond, 1, 200),
+            field("max rate", TensOfDegreesPerSecond, 0, 200),
+            field("expo", Hundredths, 0, 100),
+        ],
+        RatesType::Quick => [
+            field("rc rate", Hundredths, 1, 255),
+            field("max rate", TensOfDegreesPerSecond, 0, 200),
+            field("expo", Hundredths, 0, 100),
+        ],
     }
 }
 
@@ -204,7 +151,7 @@ pub const KEYS: &[&str] = &[
 pub fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rates> {
     rates.refuse_unknown(KEYS, problems);
     let rates_type = rates.text("type", problems).and_then(|(text, item)| {
-        let found = RatesType::ALL.iter().find(|(name, _)| *name == text);
+        let found = RATES_TYPES.iter().find(|(name, _)| *name == text);
         if found.is_none() {
             problems.push(item.problem(format!(
                 "`type` must be one of \"Betaflight\", \"Raceflight\", \"KISS\", \"Actual\", \"Quick\", not \"{text}\""
@@ -275,7 +222,7 @@ pub fn read_rates(rates: &Table<'_, '_>, problems: &mut Problems) -> Option<Rate
 
 /// One axis, such as "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00".
 fn axis_rates(rates_type: RatesType, text: &str) -> Result<AxisRates, String> {
-    let fields = rates_type.fields();
+    let fields = fields(rates_type);
     let labels: Vec<&str> = fields.iter().map(|f| f.label).collect();
     let example = || {
         fields
@@ -295,7 +242,7 @@ fn axis_rates(rates_type: RatesType, text: &str) -> Result<AxisRates, String> {
             .collect::<Vec<_>>()
             .join(", ")
     };
-    let type_name = RatesType::ALL
+    let type_name = RATES_TYPES
         .iter()
         .find(|(_, t)| *t == rates_type)
         .map_or("", |(name, _)| name);

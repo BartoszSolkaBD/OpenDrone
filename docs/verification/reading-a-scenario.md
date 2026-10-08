@@ -4,9 +4,9 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 ## Where they live
 
-- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `physics/`, and `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios.
+- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, and `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios.
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
-- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, and `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on.
+- `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, and `freestyle-5-filters-and-shaping-off.toml`, the Freestyle 5″ with the Flight Controller's filters and loop shaping off in its Tune, which the Flight Controller doesn't simulate yet (#49, #50), so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own.
 
 ## The Scenario file
 
@@ -23,7 +23,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 
 | Item | Example | Meaning |
 |---|---|---|
-| `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`. So far Physics and Thrust Stand Scenarios run: scripted motors stand in for the Flight Controller. On the thrust stand the Quad is held still, so its `speed` and `rotation` must be zero, while its motors, ESCs and battery work as in flight. |
+| `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`: see [The four kinds](#the-four-kinds) below. |
 | `quad` | `"test/whoop-65-no-drag"` | The Quad, by id. Its numbers come from its Quad definition, never from the Scenario. |
 | `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. |
 | `position` | `"0 m east, 0 m north, 0 m up"` | From the Map's origin. |
@@ -42,6 +42,24 @@ It spells out every item that affects the Simulation, every time, with no hidden
 | `[start.rates]` | `type = "Actual"`, `roll = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"`, … | Every field of a Betaflight 2026.6 rate profile, written as the Betaflight App shows it: see [The Rates](#the-rates) below. |
 
 In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `armed`, `flight_controller`, the Flight Mode, the Assists, the Radio Link and the Rates change nothing. They are written down all the same, so the format never needs them added later.
+
+### The four kinds
+
+| `kind` | What runs | Its inputs |
+|---|---|---|
+| `"flight"` | Our Flight Controller and the physics fly the Quad together. | The pilot's sticks and Arm switch. |
+| `"flight controller"` | The Flight Controller alone. | The pilot's sticks and Arm switch, and the sensor readings: a Timeline, or a table of cases. |
+| `"physics"` | The physics alone, with scripted motors in place of the Flight Controller. | Motor commands. |
+| `"thrust stand"` | The physics, with the Quad held still: its `speed` and `rotation` must be zero, while its motors, ESCs and battery work as in flight. | Motor commands. |
+
+Where our Flight Controller runs:
+
+- **The Quad's Tune must spell out every setting the Flight Controller reads** ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). The Freestyle 5″'s does. The Whoop 65's gets its settings from the `diff all` importer (#53); until then a Scenario that flies it is refused, naming what its Tune lacks.
+- **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and every Assist must be `"off"` until its ticket: Input smoothing #56, Auto-arm #52, Endless Battery #57.
+- **A Flight Scenario starts mid-air** with `motors = "settled"`. A landed start is Reset, whose ESCs power up first; the arming and power-up ticket (#52) names how it is written.
+- **`armed = true`** starts the Flight Controller armed, as a mid-air start needs; the Timeline's Arm switch then holds it armed, or disarms it.
+
+A Flight Controller Scenario runs the Flight Controller alone, so its `[start]` leaves out `map`, `position`, `speed`, `motors` and `battery`: it has no Map, place, motors or battery. Its `attitude` and `rotation` are the sensor readings it starts with: the attitude, and the gyro.
 
 ### How the motors start
 
@@ -116,6 +134,50 @@ timeline = [
 
 A Timeline: what happens when. Each value holds until it changes. A Physics or Thrust Stand Scenario scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
 
+A Flight or Flight Controller Scenario scripts the pilot's sticks and the Arm switch instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
+
+```toml
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "1 s",   roll = "100%" },
+  { at = "1.5 s", roll = "0%" },
+]
+```
+
+- **The sticks are in percent:** `roll`, `pitch` and `yaw` from -100% to 100% (right, forward and right are positive, so pitch forward asks for nose down), `throttle` from 0% to 100%.
+- **`arm`** is the Arm switch on AUX1: `"on"` (high, 2012 µs) or `"off"` (988 µs). Flight Mode on AUX2 comes from `flight_mode` in `[start]`, as the pilot's setting drives it when no switch is bound; Crash Flip on AUX3 is off.
+- **The first moment, at 0 s, sets every stick and the Arm switch,** so the run starts from values the file states.
+- **`"ramp to 60%"`** moves a stick in a straight line, step by step, from the value and moment an earlier entry set it to this value at this moment. A ramp needs an earlier value to ramp from.
+- **A Flight Controller Scenario's Timeline** may also change the sensor readings from a moment on: `rotation` (the gyro, written as in `[start]`) and `attitude`.
+
+How the sticks reach the Flight Controller, as on a real quad on ExpressLRS:
+
+1. **Each stick becomes a whole-number Channel:** the step an ELRS receiver hands over CRSF, from 172 (-100%, 988 µs) through 992 (centre, 1500 µs) to 1811 (+100%, 2012 µs). The runner rounds each percent to the nearest step: 50% is 1500 + 512 × 0.5 = 1756 µs, step 1401. Whenever a Channel changes, it enters the Simulation as a Flight Input, stamped with Simulation Time.
+2. **The Radio Link** sends a frame with the newest Channels at the Packet Rate (`radio_link`), the first at 0 s: every 4 ms at 250 Hz. A frame due between two physics steps leaves on the later one.
+3. **The Flight Controller** reads each step as Betaflight 2026.6 reads CRSF: 0.62477 × step + 881 µs. So a centred stick reads 1500.77 µs, not 1500 µs, and asks for a little rotation (0.11 °/s on Actual 70/670), and 50% stick reads 1756.30 µs, a deflection of 0.5126. Full stick reads 2012.46 µs, beyond 500 µs from centre, so it is exactly full. [`actual-rates.toml`](../../scenarios/flight-controller/actual-rates.toml) has the table.
+4. **One Flight Controller loop runs per physics step,** reading the gyro (the Quad's true rotation) and the true attitude at the step's start.
+
+### A table of cases, `[[case]]`
+
+A Flight Controller Scenario may be fed a table of cases instead of a Timeline, as in [`mixer-and-airmode.toml`](../../scenarios/flight-controller/mixer-and-airmode.toml). Each case is a fresh Flight Controller (armed or not, as `[start]` says), one Radio Link frame with the case's sticks and Arm switch, and one loop with its sensor readings; each `[[case.expect]]` is measured after that loop:
+
+```toml
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+
+[[case.expect]]
+what  = "roll PID sum"
+value = "144.53 ± 0.01"
+basis = "source: ..."
+```
+
+A case sets every stick and the Arm switch; `rotation` and `attitude` are optional, and otherwise `[start]`'s. A case is one loop, so nothing in it ramps. Its Expectations say only `what`, `value` and `basis`.
+
 ### The Expectations, `[[expect]]`
 
 Each `[[expect]]` is one check, either at a moment or over a stretch of time:
@@ -138,6 +200,7 @@ basis  = "rule: ..."
   - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, roll rate, pitch rate, yaw rate, roll, pitch, heading. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length.
   - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %). **Total thrust** is all four motors' thrust.
   - **the battery:** **battery voltage** (at its terminals, past the connector), **battery current** (drawn from it; negative while braking motors give some back), **battery charge used** (since the start, in mAh) and **battery sag** (how far the voltage sits below the pack's resting voltage at its charge).
+  - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll P term**, **roll I term**, **roll D term** and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; and **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these.
 - **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`**. A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.
@@ -147,6 +210,7 @@ basis  = "rule: ..."
   - "Straight up or down" means within about 0.00000006° of vertical. Turned back into an attitude, the three angles point every part of the Quad the same way to within 1e-12, exactly vertical included. The one exception is a nose inside that band but not exactly vertical: roll still reads 0° there, so the angles are off by up to twice the nose's distance from vertical, at most about 2e-9 (0.0000001°). No tolerance can tell the difference.
   - A stretch in which the nose is inside that band for some steps and outside it for others mixes the two ways of reading roll and heading, for example a Quad that starts there and leaves very slowly. Then roll's and heading's lowest, highest and mean have no single answer either, and the Expectation fails saying so; their `final` value still works. A stretch wholly inside the band, such as a spin about the nose pointing straight up, keeps all four.
 - **Compared with another run:** an Expectation may compare this run with the same Scenario run again with one or two starting-state items changed, written in `against` as in `[start]`: `physics_rate`, `battery`, or both. `compare` says how: `"difference"` (this run's value minus the other's, in the measure's unit) or `"ratio"` (this run's value as a share of the other's, in %). The moment or stretch is the same in both runs, so it must be a whole number of steps at both physics rates. Angles can't be compared yet, because they wrap round.
+  - A Flight Scenario may also compare with the same flight on mirrored sticks: `against = { sticks = "mirrored" }` turns roll and yaw the other way. The start must be its own mirror image (no roll, no roll or yaw rotation, no speed sideways to the heading), as in [`mirrored-sticks.toml`](../../scenarios/flight-controller/mirrored-sticks.toml).
 
   ```toml
   [[expect]]
@@ -177,9 +241,9 @@ measured = "-4.91 m"
 - Each Expectation's **measured** value, to 3 significant figures, in the unit its expected value uses. The check itself uses the full number: -4.9056 m passes "-4.905 m ± 0.001 m", and the Results show it as -4.91 m.
 - The Results are the same on every computer, so a pull request's diff shows every value that moved, even inside its tolerance.
 - `[fingerprints]`: short codes that change if anything changes by even one bit.
-  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition changed; if `map` moved, the Map's world values or its solid shapes did.
-  - `run`: the whole state after every step, in order. Any change to the flight changes it.
-  - `[fingerprints.checkpoints]`: the whole state after each tenth of the run, so you can see how far into the run nothing changed.
+  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition or its Tune changed; if `map` moved, the Map's world values or its solid shapes did. A Flight Controller Scenario has no Map: `map = "none"`.
+  - `run`: the whole state after every step, in order, the Radio Link and the Flight Controller's memory included. Any change to the flight changes it.
+  - `[fingerprints.checkpoints]`: the whole state after each tenth of the run, so you can see how far into the run nothing changed. For a table of cases, the Flight Controller's whole state after each case.
 
 ## Running them
 

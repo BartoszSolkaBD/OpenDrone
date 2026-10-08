@@ -1,0 +1,144 @@
+# The Flight Controller alone, fed one stick at a time: KISS rates (RC rate,
+# rate and RC curve) give each axis's setpoint as Betaflight 2026.6.2 does.
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop.
+# Pitch's steep rate shows KISS's own hold at 1998 °/s.
+#
+# Each stick reaches the Flight Controller as an ExpressLRS receiver hands it
+# over CRSF (ELRS puts -100%, centre and +100% at steps 172, 992 and 1811),
+# and Betaflight 2026.6.2 reads step s as 0.62477120 × s + 881 µs
+# (`crsfReadRawRC`, src/main/rx/crsf.c). The stick's deflection is then
+# (µs - 1500) ÷ 500, held within -1 to 1, and turned round for yaw
+# (`updateRcCommands`, src/main/fc/rc.c), so it sits a little off the
+# percent, as on a real quad on ELRS:
+#
+# | Stick | CRSF step | µs       | Deflection |
+# |-------|-----------|----------|------------|
+# |    0% |       992 | 1500.773 |    0.00155 |
+# |   25% |      1196 | 1628.226 |    0.25645 |
+# |   50% |      1401 | 1756.304 |    0.51261 |
+# |   75% |      1606 | 1884.383 |    0.76877 |
+# |  100% |      1811 | 2012.461 |    1.00000 |
+# |  -50% |       582 | 1244.617 |   -0.51077 |
+#
+# Full stick reads 2012.46 µs, more than 500 µs from centre, so its deflection
+# is held at exactly 1.
+format = 1
+name   = "KISS rates turn each stick into the rotation speed Betaflight gives"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "KISS"
+roll               = "rc rate 1.00, rate 0.70, rc curve 0.20"
+pitch              = "rc rate 2.55, rate 0.99, rc curve 0.00"
+yaw                = "rc rate 1.00, rate 0.70, rc curve 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "0.25 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = 0.00155 for 0% roll"
+
+[[case]]
+roll     = "25%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "50.83 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = 0.25645 for 25% roll"
+
+[[case]]
+roll     = "50%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "136.32 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = 0.51261 for 50% roll"
+
+[[case]]
+roll     = "75%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "305.67 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = 0.76877 for 75% roll"
+
+[[case]]
+roll     = "100%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "666.67 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = 1.00000 for 100% roll"
+
+[[case]]
+roll     = "-50%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "roll setpoint"
+value = "-135.50 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (100 ÷ 1000) × (0.20 x³ + 0.80 x) ÷ (1 - 0.70 |x|), with RC rate 1.00 stored as 100 and x = -0.51077 for -50% roll"
+
+[[case]]
+roll     = "0%"
+pitch    = "50%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-530.80 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): 2000 °/s × (255 ÷ 1000) × x ÷ (1 - 0.99 |x|) at x = 0.51261 gives 530.80 °/s, nose down for pitch forward"
+
+[[case]]
+roll     = "0%"
+pitch    = "100%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "off"
+
+[[case.expect]]
+what  = "pitch setpoint"
+value = "-1998.00 °/s ± 0.01 °/s"
+basis = "source: applyKissRates (Betaflight 2026.6.2, src/main/fc/rc.c): full pitch asks for 2000 °/s × 0.255 ÷ (1 - 0.99) = 51000 °/s, which KISS rates hold at 1998 °/s, nose down"
