@@ -2,6 +2,7 @@
 [package]
 name = "opendrone-pack"
 version.workspace = true
+edition.workspace = true
 
 [lints]
 workspace = true

@@ -1,8 +1,8 @@
 # Fixtures for the Review Report's readable checks
 
 `repo/` is a small copy of the repo as it stands before a pull request: three
-Scenarios (two with their Results), an ADR, a deep dive, a few crates and a
-`Cargo.lock`. The checks in `crates/xtask/tests/review_report.rs` copy it,
+Scenarios (two with their Results), the Test Quad one of them flies, an ADR, a
+deep dive, a few crates and a `Cargo.lock`. The checks in `crates/xtask/tests/review_report.rs` copy it,
 swap in files from `changes/` the way a pull request would, and run
 `cargo xtask review-report` on the two copies. The real `.github/CODEOWNERS`
 is copied in too, so the Areas are the real ones.

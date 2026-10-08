@@ -1,0 +1,27 @@
+# A fixture: the second half of free-fall.toml split in two. "height at 1 s"
+# is unchanged, but the flight starts 100 m up at 1 kHz (the Reviewer's case
+# on #92).
+format = 1
+name   = "Free fall drops ½ g t²"
+
+[start]
+kind              = "physics"
+quad              = "test/whoop-65-no-drag"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 100 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+random_seed       = 1
+physics_rate      = "1 kHz"
+
+[inputs]
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what  = "height"
+at    = "1 s"
+value = "-4.905 m ± 0.001 m"
+basis = "rule: distance fallen = ½ × g × t² = 4.905 m"

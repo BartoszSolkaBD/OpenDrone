@@ -1,0 +1,18 @@
+#!/usr/bin/env -S cargo run --manifest-path unsafe.toml
+//! A fixture crate. Nothing here is unsafe code: the first line is one Rust
+//! skips (a shebang), and the rest are words in C strings, raw C strings and
+//! a raw byte string, some with a suffix.
+
+macro_rules! ignore {
+    ($($t:tt)*) => {};
+}
+
+/// Words, never code.
+pub fn words() -> usize {
+    let c = c"an unsafe word";
+    let raw_c = cr#"unsafe "quoted" and #[allow(clippy::disallowed_methods)]"#;
+    let raw_c_plain = cr"unsafe\";
+    let raw_byte = br##"unsafe "# still inside"##;
+    ignore!("a"x "unsafe" c"b"y r"c"z 'd'w);
+    c.count_bytes() + raw_c.count_bytes() + raw_c_plain.count_bytes() + raw_byte.len()
+}

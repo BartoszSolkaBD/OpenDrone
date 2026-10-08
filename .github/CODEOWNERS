@@ -58,6 +58,7 @@
 /.rustfmt.toml                  @BartoszSolkaBD
 /deny.toml                      @BartoszSolkaBD
 /crates/*/clippy.toml           @BartoszSolkaBD
+/crates/*/.clippy.toml          @BartoszSolkaBD
 /crates/xtask/                  @BartoszSolkaBD
 /AGENTS.md                      @BartoszSolkaBD
 /.gitattributes                 @BartoszSolkaBD

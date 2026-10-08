@@ -1,8 +1,9 @@
 //! What a pull request changes: every file that differs between the base and
 //! the head, with a way to read either version of any file.
 //!
-//! In CI the two sides are git commits, read as data with `git show`: nothing
-//! from the pull request is run. The readable checks use two folders instead.
+//! In CI the two sides are git commits, read as data with `git show`, `git
+//! diff` and `git ls-tree`: nothing from the pull request is run. The readable
+//! checks use two folders, and git commits too.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -37,6 +38,44 @@ impl Side {
     /// The file at `path` as text, if it exists and is text.
     pub fn text(&self, path: &str) -> Option<String> {
         String::from_utf8(self.read(path)?).ok()
+    }
+
+    /// Every file under `folder` (such as `scenarios/`) on this side, changed
+    /// or not, in order. A commit's files are listed with `git ls-tree`, which
+    /// reads git objects only.
+    pub fn files_under(&self, folder: &str) -> Vec<String> {
+        let mut files = BTreeSet::new();
+        match self {
+            Side::Commit(rev) => {
+                let listed = Command::new("git")
+                    .args([
+                        "ls-tree",
+                        "-r",
+                        "-z",
+                        "--name-only",
+                        "--full-tree",
+                        rev,
+                        "--",
+                    ])
+                    .arg(folder)
+                    .output();
+                if let Ok(output) = listed
+                    && output.status.success()
+                {
+                    files.extend(
+                        output
+                            .stdout
+                            .split(|byte| *byte == 0)
+                            .filter(|path| !path.is_empty())
+                            .map(|path| String::from_utf8_lossy(path).into_owned()),
+                    );
+                }
+            }
+            Side::Folder(root) => {
+                let _ = walk(root, folder.trim_end_matches('/'), &mut files);
+            }
+        }
+        files.into_iter().collect()
     }
 }
 
