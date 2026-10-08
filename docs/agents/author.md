@@ -65,14 +65,17 @@ Two kinds of reference sit outside the repo:
   - `cargo nextest run --workspace --status-level fail --final-status-level fail`
   - `<command> 2>&1 | tail -n 40`
   - Never print a whole build log or a whole Results folder.
-- **Wait for CI with one command.** It waits until no check except the Review check is pending, because that check waits for a Verdict, and then lists the failed checks. It prints nothing when CI is green. Don't use `gh pr checks --watch`: it never ends while the Review check waits.
+- **Wait for CI with one command,** and run it with `run_in_background`. Claude Code blocks a `sleep` in the foreground, and it tells you when a background command ends.
+  - It waits until no check except the Review check is pending, because that check waits for a Verdict. It keeps waiting while `gh` prints nothing, for example before any check has started.
+  - Then it lists every check, except the Review check, that didn't pass or skip, so a cancelled check shows up as well as a failed one. It prints nothing when CI is green.
+  - Don't use `gh pr checks --watch`: it never ends while the Review check waits.
 
   ```sh
   sleep 60
-  while [ "$(gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket \
-    --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length')" != 0 ]; do sleep 60; done
+  until gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket \
+    --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length' | grep -qx 0; do sleep 60; done
   gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
-    --jq '.[] | select(.name != "Review check" and .bucket == "fail") | "\(.name)\t\(.link)"'
+    --jq '.[] | select(.name != "Review check" and .bucket != "pass" and .bucket != "skipping") | "\(.bucket)\t\(.name)\t\(.link)"'
   ```
 
 ## Before you push
@@ -98,15 +101,15 @@ When a Verdict says changes needed:
 
 - Fix each blocking problem, and nothing else. Items under "Follow-ups (not blocking)" aren't yours to fix in this PR.
 - If you think a blocking problem is wrong, say so in your report, with evidence. Don't work around it.
-- Push, and wait for CI.
+- Push, and wait for CI with the background command under [Save tokens](#save-tokens).
 
 ## Bringing main in
 
 When you're asked to bring main in, merge it: `git fetch origin && git merge origin/main`. Once a PR has a Verdict, never rebase it. A merge lets the next check see exactly what changed since the reviewed commit.
 
-1. Resolve the conflicts.
-2. If the Results files are out of date, run `cargo scenarios run`.
-3. Commit, push, and wait for CI.
+1. Resolve the conflicts, and commit the merge.
+2. If the Results files are out of date, run `cargo scenarios run`, and commit the rewritten Results in their own commit, after the merge, as [PR #116](https://github.com/BartoszSolkaBD/OpenDrone/pull/116) did. Never put them in the merge commit: the [merge-only update check](merge-update.md) then stops on each rewritten Results file that didn't conflict, and the PR needs a full review round.
+3. Push, and wait for CI with the background command under [Save tokens](#save-tokens).
 
 In your report, say:
 

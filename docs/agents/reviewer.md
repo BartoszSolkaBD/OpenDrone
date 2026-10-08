@@ -66,7 +66,16 @@ Review tooling, the checkers and xtask, during the alpha: block only if a wrong 
 In round 2 and later, start from the earlier Verdicts:
 
 1. **Check that each blocking problem is fixed.**
-2. **Review what changed since the last reviewed commit:** `git diff <last reviewed commit> <latest commit>`. Authors merge main rather than rebase, so that commit stays in the branch's history.
+2. **Review what changed since the last reviewed commit.** Authors merge main rather than rebase, so that commit stays in the branch's history. First list the branch's own commits since then. A merge shows two parents after its own SHA:
+
+   ```sh
+   git log --first-parent --format='%H %P %s' <last reviewed commit>..<latest commit>
+   ```
+
+   - **No merge listed:** review `git diff <last reviewed commit> <latest commit>`.
+   - **Main was merged in since:** that diff also shows all of main's merged changes, so don't review it whole. Instead:
+     - Review each listed commit that isn't a merge, with `git show <commit>`.
+     - Check each merge's resolutions, and only those. Redo the merge and compare it with the author's, with the `git merge-tree` and `git diff --no-renames --name-only T M` commands in step 3 of the [merge-only update check](merge-update.md#the-check). Whatever differs is what the author changed by hand. Or read `git show --cc <merge>`. That's shorter, but it hides a resolution that keeps one side's whole file and so drops the other side's change.
 3. **Don't reopen what an earlier round accepted,** unless the new change touches it. A new blocking problem in code an earlier round already read needs to be a real bug. Say why it was missed.
 
 ## Working efficiently

@@ -29,13 +29,16 @@ Your job is small and mechanical: confirm the update brought in main's changes a
      git merge-base --is-ancestor <second parent> origin/main && echo "on main" || echo "NOT on main"
      ```
    - **A fingerprint commit.** It changes only `*.results.toml` files, and only inside their `[fingerprints]` tables (step 4).
-3. **For each merge commit M, redo the merge and compare.** Git can merge M's two parents by itself. Whatever differs from M is what the author changed by hand.
+3. **For each merge commit M, redo the merge and compare.** Git can merge M's two parents by itself. Whatever differs from M is what the author changed by hand. First redo the merge:
 
    ```sh
-   out=$(git merge-tree --write-tree --name-only --no-messages M^1 M^2)   # it exits 1 when files conflict
-   T=$(echo "$out" | head -n 1)                                           # the tree git made by itself
-   echo "$out" | tail -n +2                                               # the files that conflicted
-   git diff --no-renames --name-only T M                                  # the files M changed by hand
+   git merge-tree --write-tree --name-only --no-messages M^1 M^2
+   ```
+
+   It exits 1 when files conflict. The first line of its output is **T**, the tree git made by itself. The lines after it are the files that conflicted. Then run these two, with T copied from that first line. The first lists the files M changed by hand. The second checks that no value line in a Results file changed:
+
+   ```sh
+   git diff --no-renames --name-only T M
    git diff --no-renames T M -- '*.results.toml' | grep -E '^[-+](format|scenario|what|basis|expected|measured|\[\[)'
    ```
 
@@ -44,6 +47,7 @@ Your job is small and mechanical: confirm the update brought in main's changes a
      - Each must be a file that conflicted and is in that allowed set. Otherwise the author changed something else, or dropped part of main's change. Stop.
      - Results files may differ only in fingerprints. The last command must print nothing.
    - **Read `git diff T M -- <file>`** for each file that conflicted. The conflict markers are gone, both sides are kept, and nothing is added.
+   - **Rewritten Results belong in their own commit,** a fingerprint commit after the merge, as [PR #116](https://github.com/BartoszSolkaBD/OpenDrone/pull/116) did ([Bringing main in](author.md#bringing-main-in)). If the merge commit itself rewrote Results files that didn't conflict, they differ from T, and this step stops.
 4. **For each fingerprint commit C,** check that no other kind of file changed, and that no value line changed:
 
    ```sh
@@ -52,14 +56,20 @@ Your job is small and mechanical: confirm the update brought in main's changes a
    ```
 
    Both must print nothing.
-5. **Cross-check:** with N the second parent of the newest merge, `git diff R H` may list only files that main changed, plus Results files. This catches a stray file. Step 3 is what catches a dropped change of main's.
+5. **Cross-check:** with N the second parent of the newest merge, `git diff R H` may list only files that main changed, plus Results files. This catches a stray file. Step 3 is what catches a dropped change of main's. First find where R and main split:
 
    ```sh
-   git diff --no-renames --name-only $(git merge-base R N) N | sort > /tmp/main-files.txt
-   git diff --no-renames --name-only R H | sort | comm -13 /tmp/main-files.txt - | grep -v '\.results\.toml$'
+   git merge-base R N
    ```
 
-   It must print nothing.
+   Call its output **B**. Then run these two, with B copied in. The first writes the files main changed to a scratch file named after the PR. The second lists any other file the branch changed:
+
+   ```sh
+   git diff --no-renames --name-only B N | sort > /tmp/main-files-<PR>.txt
+   git diff --no-renames --name-only R H | sort | comm -13 /tmp/main-files-<PR>.txt - | grep -v '\.results\.toml$'
+   ```
+
+   The second must print nothing.
 6. **Check CI:** `gh pr checks <PR> -R BartoszSolkaBD/OpenDrone`. Every check passes, except that the Review check may wait.
 
 ## The result

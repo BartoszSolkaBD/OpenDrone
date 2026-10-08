@@ -155,6 +155,13 @@ Merge when all of these hold:
 - CI is green on the PR's latest commit.
 - The Review check and the Red Flag gate both pass.
 - The PR has no `needs-maintainer` label.
+- The PR changes no file under `.github/workflows/` or `.github/actions/`. This command lists the PR's changed files there, including a file's old name when it was moved. It must print nothing:
+
+  ```sh
+  gh api --paginate repos/BartoszSolkaBD/OpenDrone/pulls/<P>/files --jq '.[] | .filename, (.previous_filename // empty)' | grep -E '^\.github/(workflows|actions)/'
+  ```
+
+  If it lists any file, don't merge. Such a PR can set the Review check and the Red Flag gate itself, so the maintainer merges it by hand, as [the Reviewer page](reviewer.md) and [the Review Report's limits](../review-report.md#limits) say. Leave it to them: label it `needs-maintainer`, tell the maintainer, and carry on in the other Lanes.
 
 How you merge depends on what main has done since the PR's base:
 
@@ -177,8 +184,6 @@ How you merge depends on what main has done since the PR's base:
   - If the only changes are clashes in the shared files and moved fingerprints, the Light merge-only update check is enough.
   - If any measured value or any code moved, start a fresh Reviewer. That counts as a review round.
 
-A PR that changes CI's workflows follows [the Reviewer page](reviewer.md) and [the Review Report's limits](../review-report.md#limits): the maintainer merges it by hand.
-
 **After a merge:**
 
 1. Post the author's notes for later tickets. Use one comment on each later ticket, starting "Notes from #N (PR #P):".
@@ -197,14 +202,17 @@ A Verdict may list "Follow-ups (not blocking)". After the PR merges:
 ## Saving tokens
 
 - **Do one-line jobs yourself:** merging, updating a branch, labels, comments and filing issues. Start an agent only for work that needs reading code or running a build.
-- **Never start an agent to wait.** Watch CI with one background command (`run_in_background`). You're told when it ends. It waits until no check except the Review check is pending, because that check waits for a Verdict. Then it lists the failed checks, and prints nothing when CI is green. Don't use `gh pr checks --watch`: it never ends while the Review check waits.
+- **Never start an agent to wait.** Watch CI with one background command (`run_in_background`). You're told when it ends. Authors and fixers use the same command ([Building a ticket](author.md#save-tokens)).
+  - It waits until no check except the Review check is pending, because that check waits for a Verdict. It keeps waiting while `gh` prints nothing, for example before any check has started.
+  - Then it lists every check, except the Review check, that didn't pass or skip, so a cancelled check shows up as well as a failed one. It prints nothing when CI is green.
+  - Don't use `gh pr checks --watch`: it never ends while the Review check waits.
 
   ```sh
   sleep 60
-  while [ "$(gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket \
-    --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length')" != 0 ]; do sleep 60; done
-  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
-    --jq '.[] | select(.name != "Review check" and .bucket == "fail") | "\(.name)\t\(.link)"'
+  until gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket \
+    --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length' | grep -qx 0; do sleep 60; done
+  gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
+    --jq '.[] | select(.name != "Review check" and .bucket != "pass" and .bucket != "skipping") | "\(.bucket)\t\(.name)\t\(.link)"'
   ```
 - **Read agents' final reports and nothing more.**
   - Never read their transcripts.
