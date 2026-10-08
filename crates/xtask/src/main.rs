@@ -55,7 +55,8 @@ Commands:
       as the book shows it.
   migrate [<step>]
       Run a named format migration step over every Scenario, or every Pack
-      file and Test Quad, keeping comments and layout. Alone, list the steps.
+      file, Test Quad and Test Map, keeping comments and layout. Alone, list
+      the steps.
   packs
       Check every Pack in packs/ and every Test Quad in scenarios/test-quads/
       with the Pack checker, listing every problem with its file and line.

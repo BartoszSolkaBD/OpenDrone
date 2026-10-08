@@ -1,0 +1,10 @@
+# The built-in Test Map test/empty-air. Built into the code for Scenarios
+# only (crates/pack/src/map.rs); `cargo xtask migrate` rewrites it like any
+# Pack file.
+format      = 1
+name        = "Empty air"
+description = "Nothing but air: no floor, no walls and no wind. For Physics Scenarios."
+
+[world]
+gravity     = "9.81 m/s²"     # standard gravity, as the alpha Maps write it
+air_density = "1.225 kg/m³"   # sea level

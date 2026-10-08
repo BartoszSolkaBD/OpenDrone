@@ -52,7 +52,10 @@ use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
 pub use manifest::{LicenceOverride, Manifest, is_an_id, read_manifest};
-pub use map::{MapDefinition, read_map_file, test_map, test_map_ids};
+pub use map::{
+    MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps, test_map,
+    test_map_ids,
+};
 pub use quad::{
     Battery, Board, Camera, Chemistry, Collision, Confidence, Ducts, Feel, Frame, Motors,
     PropDirection, Props, QuadDefinition, QuadFile, Setting, Sound, Value, check_quad, label,

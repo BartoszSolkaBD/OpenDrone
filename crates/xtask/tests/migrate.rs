@@ -26,7 +26,7 @@ fn on_its_own_the_command_says_each_format_and_lists_the_steps() {
     let first = text.lines().next().unwrap_or_default();
     assert!(
         first.starts_with("Scenarios are format ")
-            && first.contains(", and Pack files and Test Quads are format "),
+            && first.contains(", and Pack files, Test Quads and Test Maps are format "),
         "{text}"
     );
     assert!(

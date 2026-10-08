@@ -9,7 +9,9 @@ Scenarios and Pack files are numbered apart, so a new starting-state item never 
 | Files | Format today | Its steps live in |
 |---|---|---|
 | Every Scenario in `scenarios/` | 1 | `SCENARIO_STEPS`, in [`crates/scenario/src/format.rs`](../crates/scenario/src/format.rs) |
-| Every Pack file (`pack.toml`, `quad.toml`, `map.toml`, Input Device profiles) and every Test Quad in `scenarios/test-quads/` | 1 | `PACK_STEPS`, in [`crates/pack/src/migration.rs`](../crates/pack/src/migration.rs) |
+| Every Pack file (`pack.toml`, `quad.toml`, `map.toml`, Input Device profiles), every Test Quad in `scenarios/test-quads/` and every built-in Test Map in [`crates/pack/test-maps/`](../crates/pack/test-maps/empty-air.toml) | 1 | `PACK_STEPS`, in [`crates/pack/src/migration.rs`](../crates/pack/src/migration.rs) |
+
+The built-in Test Maps, such as `test/empty-air`, are built into the code, but each one's `map.toml` is a file of its own in `crates/pack/test-maps/`, so the tool rewrites them like any Pack file. A new Test Map goes there too, never as text inside the Rust code, and a readable check makes sure of it.
 
 Results files are never migrated: the Scenario runner writes them, with a `format` line of their own. `tune.txt` stays Betaflight CLI text with no `format` line ([ADR-0015](adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)), and a Feel Test log is Markdown.
 
@@ -45,7 +47,7 @@ In the pull request that brings the item:
    }
    ```
 
-   A Pack step is told which kind of file it's rewriting, so it can add a Quad definition's item to `quad.toml` and leave `pack.toml` and the Test Quads alone, apart from their `format` line. The newest format follows the steps by itself: format 1 plus one per step.
+   A Pack step is told which kind of file it's rewriting, so it can add a Quad definition's item to `quad.toml` and leave `pack.toml`, the Maps and the Test Quads alone, apart from their `format` line. The newest format follows the steps by itself: format 1 plus one per step.
 3. **Run it:** `cargo xtask migrate add-auto-arm`. It lists every file it rewrote.
 4. **Check nothing moved:** `cargo scenarios check` must find every Results file up to date, and after a Pack step `cargo xtask packs` must pass. Then run the rest of the checks in [Setup and CI](book/contributing.md).
 5. **Update the docs that show the format,** such as the starting-state table in [Reading a Scenario](verification/reading-a-scenario.md) or a section in [Checking a Pack](verification/checking-a-pack.md).
@@ -54,16 +56,17 @@ In the pull request that brings the item:
 ## What the tool does
 
 - It rewrites each file of the step's family that is in the format the step upgrades: it writes the step's item and bumps the `format` line by one.
-- It keeps every comment, blank line and space as it was. A new item is lined up with the item before it, with the same indent and its `=` in the same column, and a comment above the next item stays with that item.
+- It keeps every comment, blank line and space as it was. A new item is lined up with the item before it, with the same indent and its `=` in the same column. A comment above the next item stays with that item, and a comment beside the last item of an inline table stays beside it.
 - A file already in the newer format is left alone, so running a step twice changes nothing.
 - If any file can't take the step, such as one that needs an earlier step first, it lists every such file and writes nothing.
+- It writes every file or none: each new text goes first to a hidden file beside its file (`.<name>.migrating`), and only when all of them are written do they replace the files. Only a failure while replacing them, which is rare, could leave some files rewritten; the tool then names each one.
 
 ## Older files
 
-- **A pilot's older Pack** is upgraded in memory every time it's read, one format at a time, by the very same steps. The pilot's files on disk aren't changed. A Pack in a newer format than the game knows is refused: it "needs a newer OpenDrone" ([Checking a Pack](verification/checking-a-pack.md#file-formats)).
+- **A pilot's older Pack** is upgraded in memory every time it's read, one format at a time, by the very same steps: every Pack reader does this, for manifests, Quad definitions, Test Quads and Maps (the built-in Test Maps too). The pilot's files on disk aren't changed. A Pack in a newer format than the game knows is refused: it "needs a newer OpenDrone" ([Checking a Pack](verification/checking-a-pack.md#file-formats)).
 - **An older Scenario** is refused, naming the step that brings it up to date, for example on a branch started before the step arrived. Scenarios are never upgraded in memory, because a Scenario's file must show everything it depends on.
 - **The Feel Test log rules** read the version before a change through the same upgrade, so a Pack step's new item doesn't count as a moved number.
 
 ## How it's proved
 
-No real step exists yet. The readable checks use synthetic ones: each pretends an item the files hold today, such as the Auto-arm Assist or the Quads' `restart_tries`, arrived in a step from a "format 0" written before it. On a scratch copy of the repo, the step must give back every committed Scenario and Pack file byte for byte, so the item is there with today's value, every comment and line is in place and `format` reads 1; and every Scenario must still match its committed Results. The Pack reader's in-memory upgrade must give the same text as the tool, and read as the same Quad with the same fingerprint. The checks are in `crates/pack/tests/migration.rs` and `crates/scenario/tests/migration.rs`; one more checks that every Scenario and Pack file in the repo is in the newest format, so a step that was written but never run fails CI.
+No real step exists yet. The readable checks use synthetic ones: each pretends an item the files hold today, such as the Auto-arm Assist or the Quads' `restart_tries`, arrived in a step from the format before the newest (a pretend format 0 while format 1 is the first). On a scratch copy of the repo, the step must give back every committed Scenario and Pack file byte for byte, so the item is there with today's value, every comment and line is in place and `format` is the newest; and every Scenario must still match its committed Results. The Pack reader's in-memory upgrade must give the same text as the tool, and read as the same Quad with the same fingerprint, and the Map reader must read an older `map.toml` through the same upgrade. The checks are in `crates/pack/tests/migration.rs` and `crates/scenario/tests/migration.rs`. One more checks that every Scenario and Pack file in the repo, the Test Maps' included, is in the newest format, so a step that was written but never run fails CI.

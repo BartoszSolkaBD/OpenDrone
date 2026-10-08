@@ -1,36 +1,43 @@
 //! Readable checks for format migration (#60): a named step rewrites a file,
 //! adding its item with the value that keeps today's behaviour, keeping
 //! every comment and the layout, and bumping `format`; `cargo xtask migrate`
-//! runs it over every Pack file at once or not at all; and the Pack reader
-//! upgrades an older file in memory with the same step.
+//! runs it over every Pack file at once or not at all; and the Pack readers
+//! upgrade an older file in memory with the same step.
 //!
-//! No real step exists yet: format 1 is the first. So the steps here are
-//! synthetic: each pretends an item the files hold today arrived in a step
-//! from a "format 0" written before it, so the step's output can be compared
-//! with the committed file, byte for byte. Basis: Rule, from ADR-0002 and
-//! ADR-0011. The end-to-end checks over the repo's Scenarios and Packs, with
-//! their Results, are in the Scenario runner's `tests/migration.rs`.
+//! The steps here are synthetic: each pretends an item the files hold today
+//! arrived in a step from the format before the newest ([`PREVIOUS`], which
+//! is 0 while format 1 is the first). So the step's output can be compared
+//! with the committed file, byte for byte, and the checks keep working once
+//! real steps exist. Basis: Rule, from ADR-0002 and ADR-0011. The end-to-end
+//! checks over the repo's Scenarios and Packs, with their Results, are in the
+//! Scenario runner's `tests/migration.rs`.
 
 mod common;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use common::{Fixture, repo};
 use opendrone_pack::document::{Document, FORMAT};
 use opendrone_pack::migration::toml_edit::DocumentMut;
 use opendrone_pack::migration::{
-    Family, FileKind, PACK_STEPS, Step, add_after, add_to_inline_table, apply, migrate, pack_files,
-    upgrade, upgraded_with,
+    Family, FileKind, MigrationFile, PACK_STEPS, Step, add_after, add_to_inline_table, apply,
+    migrate, pack_files, toml_files, upgrade, upgraded_with,
 };
-use opendrone_pack::{Problems, check_quad, read_quad_file, read_tune};
+use opendrone_pack::{
+    Problems, TEST_MAPS_FOLDER, check_quad, read_map_file, read_map_file_with_steps,
+    read_quad_file, read_tune, test_map, test_map_ids,
+};
+
+/// The format before the newest: the one the synthetic steps upgrade.
+const PREVIOUS: i64 = FORMAT - 1;
 
 /// A synthetic Pack step: Quad definitions gain `[motors] restart_tries`,
 /// written after `start_wait`.
 const RESTART_TRIES: Step = Step {
     name: "add-restart-tries",
     family: Family::Packs,
-    from: 0,
+    from: PREVIOUS,
     says: "Quad definitions gain `[motors] restart_tries = 3`: Bluejay tries three times to restart a stalled motor, as every Quad did before the item existed",
     rewrite: add_restart_tries,
 };
@@ -42,13 +49,37 @@ fn add_restart_tries(kind: FileKind, doc: &mut DocumentMut) -> Result<(), String
     }
 }
 
+/// The same step, from format 0 to 1, for the checks on small files written
+/// out in full.
+const RESTART_TRIES_FROM_0: Step = Step {
+    from: 0,
+    ..RESTART_TRIES
+};
+
 const RESTART_TRIES_LINE: &str = "restart_tries       = 3\n";
 
-/// A committed file as it was in the pretend format 0: `format = 0`, and
+/// A synthetic Pack step for Maps: `[world] air_density` arrives, at sea
+/// level.
+const ADD_AIR_DENSITY: Step = Step {
+    name: "add-air-density",
+    family: Family::Packs,
+    from: PREVIOUS,
+    says: "Maps gain `[world] air_density = \"1.225 kg/m³\"`: every Map had sea-level air before the item existed",
+    rewrite: add_air_density,
+};
+
+fn add_air_density(kind: FileKind, doc: &mut DocumentMut) -> Result<(), String> {
+    match kind {
+        FileKind::Map => add_after(doc, "world", "gravity", "air_density", "1.225 kg/m³"),
+        _ => Ok(()),
+    }
+}
+
+/// A committed file as it was in the format before: `format` one lower, and
 /// without `line` when it is given.
 fn before(text: &str, line: Option<&str>) -> String {
-    assert_eq!(format_of(text), 1);
-    let text = with_format(text, 0);
+    assert_eq!(format_of(text), FORMAT);
+    let text = with_format(text, PREVIOUS);
     match line {
         Some(line) => {
             assert_eq!(text.matches(line).count(), 1, "{line:?}");
@@ -121,7 +152,7 @@ startup_power_limit = \"1.96%\"
 cells = 1
 ";
     assert_eq!(
-        apply(&RESTART_TRIES, FileKind::Quad, before).unwrap(),
+        apply(&RESTART_TRIES_FROM_0, FileKind::Quad, before).unwrap(),
         "\
 # A comment at the top of the file.
 format = 1   # the format line keeps its comment
@@ -161,6 +192,7 @@ fn a_kind_of_file_the_step_doesnt_change_gets_only_its_format_bumped() {
             "scenarios/test-quads/whoop-65-no-drag.toml",
             FileKind::TestQuad,
         ),
+        ("crates/pack/test-maps/empty-air.toml", FileKind::Map),
     ] {
         let committed = fs::read_to_string(repo().join(file)).unwrap();
         assert_eq!(
@@ -173,23 +205,13 @@ fn a_kind_of_file_the_step_doesnt_change_gets_only_its_format_bumped() {
 
 #[test]
 fn an_item_added_to_an_inline_table_goes_before_its_closing_brace() {
-    fn add_wind(_: FileKind, doc: &mut DocumentMut) -> Result<(), String> {
-        add_to_inline_table(doc, "start", "assists", "wind", "off")
-    }
-    let step = Step {
-        name: "add-wind-assist",
-        family: Family::Scenarios,
-        from: 1,
-        says: "a pretend Assist",
-        rewrite: add_wind,
-    };
     let one_line = "\
 format = 1
 [start]
 assists = { input_smoothing = \"off\", auto_arm = \"off\" }   # every Assist
 ";
     assert_eq!(
-        apply(&step, FileKind::Scenario, one_line).unwrap(),
+        apply(&WIND, FileKind::Scenario, one_line).unwrap(),
         "\
 format = 2
 [start]
@@ -207,7 +229,7 @@ assists = {
 }
 ";
     assert_eq!(
-        apply(&step, FileKind::Scenario, several_lines).unwrap(),
+        apply(&WIND, FileKind::Scenario, several_lines).unwrap(),
         "\
 format = 2
 [start]
@@ -218,6 +240,67 @@ assists = {
 }
 "
     );
+}
+
+#[test]
+fn a_comment_beside_the_last_item_of_an_inline_table_stays_with_that_item() {
+    let with_a_comma = "\
+format = 1
+[start]
+assists = {
+  input_smoothing = \"off\",
+  # Auto-arm arms on the first throttle.
+  auto_arm = \"off\",   # the last one
+  # The end of the list.
+}
+";
+    assert_eq!(
+        apply(&WIND, FileKind::Scenario, with_a_comma).unwrap(),
+        "\
+format = 2
+[start]
+assists = {
+  input_smoothing = \"off\",
+  # Auto-arm arms on the first throttle.
+  auto_arm = \"off\",   # the last one
+  wind = \"off\",
+  # The end of the list.
+}
+"
+    );
+    let without_a_comma = "\
+format = 1
+[start]
+assists = {
+  input_smoothing = \"off\",
+  auto_arm = \"off\"   # the last one
+}
+";
+    assert_eq!(
+        apply(&WIND, FileKind::Scenario, without_a_comma).unwrap(),
+        "\
+format = 2
+[start]
+assists = {
+  input_smoothing = \"off\",
+  auto_arm = \"off\",   # the last one
+  wind = \"off\"
+}
+"
+    );
+}
+
+/// A pretend Scenario step for the inline-table checks: a new Assist, off.
+const WIND: Step = Step {
+    name: "add-wind-assist",
+    family: Family::Scenarios,
+    from: 1,
+    says: "a pretend Assist",
+    rewrite: add_wind,
+};
+
+fn add_wind(_: FileKind, doc: &mut DocumentMut) -> Result<(), String> {
+    add_to_inline_table(doc, "start", "assists", "wind", "off")
 }
 
 #[test]
@@ -247,17 +330,18 @@ fn a_new_key_longer_than_its_neighbours_gets_one_space_before_its_equals_sign() 
 fn a_file_with_windows_line_endings_keeps_them() {
     let before = "format = 0\r\n[motors]\r\nstart_wait = \"0.1 s\"\r\n";
     assert_eq!(
-        apply(&RESTART_TRIES, FileKind::Quad, before).unwrap(),
+        apply(&RESTART_TRIES_FROM_0, FileKind::Quad, before).unwrap(),
         "format = 1\r\n[motors]\r\nstart_wait = \"0.1 s\"\r\nrestart_tries = 3\r\n"
     );
 }
 
 #[test]
 fn a_step_refuses_another_format_another_family_and_an_item_already_there() {
+    let step = RESTART_TRIES_FROM_0;
     let quad = "format = 0\n[motors]\nstart_wait = \"0.1 s\"\n";
     assert_eq!(
         apply(
-            &RESTART_TRIES,
+            &step,
             FileKind::Quad,
             &quad.replace("format = 0", "format = 1")
         )
@@ -265,21 +349,16 @@ fn a_step_refuses_another_format_another_family_and_an_item_already_there() {
         "this file is format 1, and `add-restart-tries` upgrades format 0 to 1"
     );
     assert_eq!(
-        apply(&RESTART_TRIES, FileKind::Scenario, quad).unwrap_err(),
-        "`add-restart-tries` rewrites every Pack file and Test Quad, and this is a Scenario"
+        apply(&step, FileKind::Scenario, quad).unwrap_err(),
+        "`add-restart-tries` rewrites every Pack file, Test Quad and Test Map, and this is a Scenario"
     );
     assert_eq!(
-        apply(
-            &RESTART_TRIES,
-            FileKind::Quad,
-            &format!("{quad}restart_tries = 3\n")
-        )
-        .unwrap_err(),
+        apply(&step, FileKind::Quad, &format!("{quad}restart_tries = 3\n")).unwrap_err(),
         "[motors] already has `restart_tries`"
     );
     assert_eq!(
         apply(
-            &RESTART_TRIES,
+            &step,
             FileKind::Quad,
             "format = 0\n[motors]\nspin_up = \"35 ms\"\n"
         )
@@ -287,18 +366,19 @@ fn a_step_refuses_another_format_another_family_and_an_item_already_there() {
         "[motors] has no `start_wait` to add `restart_tries` after"
     );
     assert_eq!(
-        apply(&RESTART_TRIES, FileKind::Quad, "format = 0\n").unwrap_err(),
+        apply(&step, FileKind::Quad, "format = 0\n").unwrap_err(),
         "there's no [motors]"
     );
 }
 
-// The Pack reader
+// The Pack readers
 
 #[test]
 fn the_pack_reader_upgrades_an_older_quad_in_memory_with_the_same_step_as_the_tool() {
     for (label, committed) in built_in_quads() {
         let old = before(&committed, Some(RESTART_TRIES_LINE));
-        let in_memory = upgraded_with(&label, &old, FileKind::Quad, 1, &[RESTART_TRIES]).unwrap();
+        let in_memory =
+            upgraded_with(&label, &old, FileKind::Quad, FORMAT, &[RESTART_TRIES]).unwrap();
         let written = apply(&RESTART_TRIES, FileKind::Quad, &old).unwrap();
         assert_eq!(in_memory, written, "{label}");
         assert_eq!(
@@ -325,10 +405,60 @@ fn the_pack_reader_upgrades_an_older_quad_in_memory_with_the_same_step_as_the_to
 }
 
 #[test]
-fn a_file_in_the_newest_format_is_read_as_it_is() {
-    let text = "format = 1\n[motors]\nstart_wait = \"0.1 s\"\n";
+fn the_map_reader_upgrades_an_older_map_in_memory_too() {
+    let committed =
+        fs::read_to_string(repo().join(TEST_MAPS_FOLDER).join("empty-air.toml")).unwrap();
+    let line = committed
+        .lines()
+        .find(|line| line.starts_with("air_density"))
+        .unwrap();
+    let old = before(&committed, Some(&format!("{line}\n")));
+    assert!(!old.contains("air_density"));
+    let label = "packs/example/maps/empty-air/map.toml";
     assert_eq!(
-        upgraded_with("quad.toml", text, FileKind::Quad, 1, &[RESTART_TRIES]).unwrap(),
+        read_map_file_with_steps("test/empty-air", label, &old, &[ADD_AIR_DENSITY]).unwrap(),
+        read_map_file("test/empty-air", label, &committed).unwrap(),
+        "the older map.toml, upgraded in memory, reads as the very same Map"
+    );
+    // Without the step, the same older file can't be read.
+    assert!(read_map_file("test/empty-air", label, &old).is_err());
+}
+
+#[test]
+fn every_built_in_test_map_is_a_file_the_tool_rewrites() {
+    let files: Vec<MigrationFile> = toml_files(
+        &repo().join(TEST_MAPS_FOLDER),
+        TEST_MAPS_FOLDER,
+        FileKind::Map,
+    )
+    .unwrap();
+    let mut ids = test_map_ids();
+    ids.sort();
+    assert_eq!(
+        files.iter().map(|f| f.label.clone()).collect::<Vec<_>>(),
+        ids.iter()
+            .map(|id| format!("{TEST_MAPS_FOLDER}/{}.toml", id.trim_start_matches("test/")))
+            .collect::<Vec<_>>(),
+        "each built-in Test Map's map.toml is a file in {TEST_MAPS_FOLDER}, so `cargo xtask migrate` reaches it"
+    );
+    for (id, file) in ids.iter().zip(&files) {
+        let built_in = test_map(id.trim_start_matches("test/")).unwrap().unwrap();
+        let from_file =
+            read_map_file(id, &file.label, &fs::read_to_string(&file.path).unwrap()).unwrap();
+        assert_eq!(
+            (built_in.name, built_in.world),
+            (from_file.name, from_file.world),
+            "{id} is built from {}",
+            file.label
+        );
+    }
+}
+
+#[test]
+fn a_file_in_the_newest_format_is_read_as_it_is() {
+    let text = format!("format = {FORMAT}\n[motors]\nstart_wait = \"0.1 s\"\n");
+    assert_eq!(
+        upgraded_with("quad.toml", &text, FileKind::Quad, FORMAT, &[RESTART_TRIES]).unwrap(),
         text
     );
 }
@@ -383,7 +513,7 @@ fn a_pack_file_whose_step_is_missing_is_refused_at_its_format_line() {
         "# The Quad.\nformat = 0\n[motors]\nstart_wait = \"0.1 s\"\n",
         FileKind::Quad,
         2,
-        &[RESTART_TRIES],
+        &[RESTART_TRIES_FROM_0],
     )
     .unwrap_err();
     assert_eq!(
@@ -395,16 +525,9 @@ fn a_pack_file_whose_step_is_missing_is_refused_at_its_format_line() {
 #[test]
 fn a_file_in_an_older_format_that_isnt_upgraded_in_memory_names_the_step_that_brings_it_up_to_date()
 {
-    let step = Step {
-        name: "add-wind-assist",
-        family: Family::Scenarios,
-        from: 1,
-        says: "a pretend Assist",
-        rewrite: |_, _| Ok(()),
-    };
     let doc = Document::parse("scenario.toml", "format = 1\nname = \"A\"\n").unwrap();
     let mut problems = Problems::new();
-    doc.check_format_against(2, &[step], &mut problems);
+    doc.check_format_against(2, &[WIND], &mut problems);
     assert_eq!(
         problems.to_string(),
         "scenario.toml line 1: this file is format 1, older than the format 2 this OpenDrone reads: bring it up to date with `cargo xtask migrate add-wind-assist`"
@@ -423,9 +546,32 @@ fn the_pack_steps_lead_one_format_at_a_time_from_format_1_to_the_newest() {
 
 // Every Pack file at once
 
-/// A scratch copy of the built-in Pack and the Test Quads, every file in the
-/// pretend format 0, and the Quads without `restart_tries`.
-fn format_0_repo(case: &str) -> std::path::PathBuf {
+/// Every Pack file the tool rewrites in a repo at `root`: its Packs, Test
+/// Quads and built-in Test Maps.
+fn files_of(root: &Path) -> Vec<MigrationFile> {
+    let mut files = pack_files(&root.join("packs"), "packs").unwrap();
+    files.extend(
+        toml_files(
+            &root.join("scenarios/test-quads"),
+            "scenarios/test-quads",
+            FileKind::TestQuad,
+        )
+        .unwrap(),
+    );
+    files.extend(
+        toml_files(
+            &root.join(TEST_MAPS_FOLDER),
+            TEST_MAPS_FOLDER,
+            FileKind::Map,
+        )
+        .unwrap(),
+    );
+    files
+}
+
+/// A scratch copy of the repo's Pack files, every one in the format before
+/// the newest, and the Quads without `restart_tries`.
+fn older_repo(case: &str) -> PathBuf {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR"))
         .join("pack-migration")
         .join(case);
@@ -440,34 +586,17 @@ fn format_0_repo(case: &str) -> std::path::PathBuf {
     root
 }
 
-fn files_of(root: &Path) -> Vec<opendrone_pack::migration::MigrationFile> {
-    pack_files(
-        &root.join("packs"),
-        "packs",
-        &root.join("scenarios/test-quads"),
-        "scenarios/test-quads",
-    )
-    .unwrap()
-}
-
 #[test]
-fn the_tool_finds_every_pack_file_and_every_test_quad() {
+fn the_tool_finds_every_pack_file() {
     let fixture = Fixture::new("migration-finds-every-file");
     fixture.write("packs/fixture/maps/skate-park/map.toml", "format = 1\n");
     fixture.write("packs/fixture/input-devices/pocket.toml", "format = 1\n");
     fixture.write("packs/fixture/input-devices/notes.txt", "not a Pack file\n");
-    let files: Vec<(String, FileKind)> = pack_files(
-        &fixture.root.join("packs"),
-        "packs",
-        &fixture.root.join("test-quads"),
-        "test-quads",
-    )
-    .unwrap()
-    .into_iter()
-    .map(|file| (file.label, file.kind))
-    .collect();
+    let found = |files: Vec<MigrationFile>| -> Vec<(String, FileKind)> {
+        files.into_iter().map(|f| (f.label, f.kind)).collect()
+    };
     assert_eq!(
-        files,
+        found(pack_files(&fixture.root.join("packs"), "packs").unwrap()),
         [
             ("packs/fixture/pack.toml".to_string(), FileKind::Manifest),
             (
@@ -482,17 +611,27 @@ fn the_tool_finds_every_pack_file_and_every_test_quad() {
                 "packs/fixture/input-devices/pocket.toml".to_string(),
                 FileKind::InputDevice
             ),
-            (
-                "test-quads/ducted-no-drag.toml".to_string(),
-                FileKind::TestQuad
-            ),
         ]
+    );
+    assert_eq!(
+        found(
+            toml_files(
+                &fixture.root.join("test-quads"),
+                "test-quads",
+                FileKind::TestQuad
+            )
+            .unwrap()
+        ),
+        [(
+            "test-quads/ducted-no-drag.toml".to_string(),
+            FileKind::TestQuad
+        )]
     );
 }
 
 #[test]
 fn the_tool_brings_every_pack_file_back_exactly_as_committed() {
-    let root = format_0_repo("every-pack-file");
+    let root = older_repo("every-pack-file");
     let files = files_of(&root);
     let migration = migrate(&RESTART_TRIES, &files).unwrap();
     assert_eq!(migration.rewritten.len(), files.len());
@@ -514,23 +653,62 @@ fn the_tool_brings_every_pack_file_back_exactly_as_committed() {
 
 #[test]
 fn the_tool_writes_nothing_when_any_file_cant_take_the_step() {
-    let root = format_0_repo("one-file-cant");
+    let root = older_repo("one-file-cant");
     let files = files_of(&root);
     let manifest = root.join("packs/opendrone/pack.toml");
     let text = fs::read_to_string(&manifest).unwrap();
-    fs::write(&manifest, with_format(&text, -1)).unwrap();
+    fs::write(&manifest, with_format(&text, PREVIOUS - 1)).unwrap();
     let problems = migrate(&RESTART_TRIES, &files).unwrap_err();
     assert_eq!(
         problems.to_string(),
         format!(
-            "packs/opendrone/pack.toml line {}: this file is format -1: it needs the steps before `add-restart-tries` first, which upgrades format 0 to 1",
-            common::line_of(&text, "format ")
+            "packs/opendrone/pack.toml line {}: this file is format {}: it needs the steps before `add-restart-tries` first, which upgrades format {PREVIOUS} to {FORMAT}",
+            common::line_of(&text, "format "),
+            PREVIOUS - 1
         )
     );
-    // `migrate` writes nothing itself, and with a problem there is no
-    // migration to write: every other file is still format 0.
+    // With a problem there is no migration to write: every other file is
+    // still as it was.
     for file in files.iter().filter(|f| f.kind != FileKind::Manifest) {
         let text = fs::read_to_string(&file.path).unwrap();
-        assert_eq!(format_of(&text), 0, "{}", file.label);
+        assert_eq!(format_of(&text), PREVIOUS, "{}", file.label);
+    }
+}
+
+#[test]
+fn the_tool_writes_every_file_or_none() {
+    let root = older_repo("every-file-or-none");
+    let files = files_of(&root);
+    let migration = migrate(&RESTART_TRIES, &files).unwrap();
+    // A folder stands where the manifest's new text would be written first
+    // (`.pack.toml.migrating`, beside it), so that one can't be written.
+    let manifest = root.join("packs/opendrone/pack.toml");
+    fs::create_dir_all(manifest.with_file_name(".pack.toml.migrating")).unwrap();
+    let problems = migration.write().unwrap_err().to_string();
+    assert!(
+        problems.starts_with("packs/opendrone/pack.toml: can't be written (")
+            && problems.ends_with("), so no file was changed"),
+        "{problems}"
+    );
+    for file in &files {
+        let text = fs::read_to_string(&file.path).unwrap();
+        assert_eq!(
+            format_of(&text),
+            PREVIOUS,
+            "{} was left as it was",
+            file.label
+        );
+    }
+    // No other hidden file is left behind.
+    for file in files.iter().filter(|f| f.path != manifest) {
+        let name = file.path.file_name().unwrap().to_string_lossy();
+        assert!(
+            !file
+                .path
+                .with_file_name(format!(".{name}.migrating"))
+                .exists(),
+            "{}",
+            file.label
+        );
     }
 }

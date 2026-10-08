@@ -3,7 +3,7 @@
 //!
 //! - `migrate` lists every step, newest last, with the files it rewrites.
 //! - `migrate <step>` runs one named step over every Scenario, or over every
-//!   Pack file and Test Quad: each file in the format the step upgrades gets
+//!   Pack file, Test Quad and Test Map: each file in the format the step upgrades gets
 //!   the step's item, with the value that keeps today's behaviour, and its
 //!   `format` line bumped, keeping every comment and the layout. A file
 //!   already in the newer format is left alone, so running it twice changes
@@ -46,7 +46,7 @@ pub fn run(args: &[String]) -> ExitCode {
 
 fn list(steps: &[&Step]) {
     println!(
-        "Scenarios are format {SCENARIO_FORMAT}, and Pack files and Test Quads are format {FORMAT}."
+        "Scenarios are format {SCENARIO_FORMAT}, and Pack files, Test Quads and Test Maps are format {FORMAT}."
     );
     if steps.is_empty() {
         println!(

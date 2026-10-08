@@ -7,7 +7,7 @@
 //! item arrives, the pull request that brings it adds one [`Step`]:
 //!
 //! - **The repo's own files.** `cargo xtask migrate <step>` runs the step over
-//!   every Scenario, or over every Pack file and Test Quad, writing the new
+//!   every Scenario, or over every Pack file, Test Quad and Test Map, writing the new
 //!   item with the value that keeps today's behaviour and bumping the
 //!   `format` line, and keeps every comment and the layout ([`migrate`]).
 //! - **A pilot's older Pack.** The Pack reader runs the same steps in memory,
@@ -25,7 +25,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use toml_edit;
-use toml_edit::{Decor, DocumentMut, InlineTable, Item, Key, Table, Value};
+use toml_edit::{Decor, DocumentMut, Item, Key, Table, Value};
 
 use crate::document::{Document, FORMAT, Problem, Problems};
 
@@ -84,7 +84,7 @@ pub enum Family {
     /// Every Scenario.
     Scenarios,
     /// Every Pack file: manifests, Quad definitions, Maps' files, Input
-    /// Device profiles, and the Test Quads.
+    /// Device profiles, and the Test Quads and built-in Test Maps.
     Packs,
 }
 
@@ -93,7 +93,7 @@ impl Family {
     pub fn words(self) -> &'static str {
         match self {
             Family::Scenarios => "every Scenario",
-            Family::Packs => "every Pack file and Test Quad",
+            Family::Packs => "every Pack file, Test Quad and Test Map",
         }
     }
 }
@@ -276,7 +276,9 @@ pub fn add_after(
 
 /// Adds `key = value` at the end of the inline table `inline` in the table
 /// `table`, such as `assists = { … }` in `[start]`, spaced like the item
-/// before it. A table written over several lines keeps its trailing comma.
+/// before it. A table written over several lines puts it on a line of its
+/// own and keeps its trailing comma; a comment on the last item's line stays
+/// on that line.
 pub fn add_to_inline_table(
     doc: &mut DocumentMut,
     table: &str,
@@ -293,33 +295,52 @@ pub fn add_to_inline_table(
         return Err(format!("`{inline}` in {name} already has `{key}`"));
     }
     let mut value = value.into();
-    let new_key = match last_entry(target) {
-        Some((last, last_value)) => {
-            let key_decor = Decor::new(
-                raw(last.leaf_decor().prefix(), " "),
-                raw(last.leaf_decor().suffix(), " "),
-            );
-            // The space before the closing brace moves to the new last item.
-            let before_brace = raw(last_value.decor().suffix(), " ");
-            *value.decor_mut() = Decor::new(raw(last_value.decor().prefix(), " "), before_brace);
-            last_value.decor_mut().set_suffix("");
-            Key::new(key).with_leaf_decor(key_decor)
-        }
-        None => {
-            *value.decor_mut() = Decor::new(" ", " ");
-            Key::new(key).with_leaf_decor(Decor::new(" ", " "))
-        }
+    let Some(last) = target.iter().last().map(|(key, _)| key.to_string()) else {
+        *value.decor_mut() = Decor::new(" ", " ");
+        target.insert_formatted(&Key::new(key).with_leaf_decor(Decor::new(" ", " ")), value);
+        return Ok(());
     };
+    let trailing_comma = target.trailing_comma();
+    let trailing = raw(Some(target.trailing()), "");
+    let (last_key, last_item) = target
+        .get_key_value_mut(&last)
+        .ok_or_else(|| format!("`{inline}` in {name} can't be read"))?;
+    let last_value = last_item
+        .as_value_mut()
+        .ok_or_else(|| format!("`{inline}` in {name} can't be read"))?;
+    // The new item starts as the last one does: on a new line with its
+    // indent (leaving out any comment above the last item), or after a space.
+    let last_prefix = raw(last_key.leaf_decor().prefix(), " ");
+    let start = match last_prefix.rfind('\n') {
+        Some(i) => last_prefix[i..].to_string(),
+        None => last_prefix,
+    };
+    let key_suffix = raw(last_key.leaf_decor().suffix(), " ");
+    let value_prefix = raw(last_value.decor().prefix(), " ");
+    // What follows the last item, up to the closing brace: after its comma
+    // when it has one. Whatever is on the last item's own line, such as a
+    // comment, stays there, after the comma that now follows it; the rest
+    // moves after the new item.
+    let after = if trailing_comma {
+        trailing
+    } else {
+        raw(last_value.decor().suffix(), " ")
+    };
+    let (same_line, rest) = match after.find('\n') {
+        Some(i) => after.split_at(i),
+        None => ("", after.as_str()),
+    };
+    let new_key =
+        Key::new(key).with_leaf_decor(Decor::new(format!("{same_line}{start}"), key_suffix));
+    if trailing_comma {
+        *value.decor_mut() = Decor::new(value_prefix, "");
+        target.set_trailing(rest);
+    } else {
+        last_value.decor_mut().set_suffix("");
+        *value.decor_mut() = Decor::new(value_prefix, rest);
+    }
     target.insert_formatted(&new_key, value);
     Ok(())
-}
-
-/// The last item of an inline table, as written.
-fn last_entry(table: &mut InlineTable) -> Option<(Key, &mut Value)> {
-    let last = table.iter().last().map(|(key, _)| key.to_string())?;
-    let (key, item) = table.get_key_value_mut(&last)?;
-    let key = Key::new(key.get()).with_leaf_decor(key.leaf_decor().clone());
-    item.as_value_mut().map(|value| (key, value))
 }
 
 fn table_mut<'d>(doc: &'d mut DocumentMut, path: &str) -> Result<&'d mut Table, String> {
@@ -373,20 +394,67 @@ pub struct Migration {
 }
 
 impl Migration {
-    /// Writes every rewritten file.
+    /// Writes every rewritten file, all or nothing as far as the computer
+    /// allows: each new text goes first to a hidden file beside its file,
+    /// and only when every one is written do they replace the files. So a
+    /// file that can't be written leaves every file as it was. Only a
+    /// failure while replacing them, which is rare, can leave some files
+    /// rewritten and others not; the problems then name each one.
     pub fn write(&self) -> Result<(), Problems> {
         let mut problems = Problems::new();
+        let mut ready = Vec::new();
         for (file, text) in &self.rewritten {
-            if let Err(error) = fs::write(&file.path, text) {
+            let hidden = hidden_beside(&file.path);
+            match fs::write(&hidden, text) {
+                Ok(()) => ready.push((file, hidden)),
+                Err(error) => problems.push(Problem::of(
+                    &file.label,
+                    0,
+                    format!("can't be written ({error}), so no file was changed"),
+                )),
+            }
+        }
+        if !problems.is_empty() {
+            for (_, hidden) in &ready {
+                let _ = fs::remove_file(hidden);
+            }
+            return Err(problems);
+        }
+        let mut replaced = Vec::new();
+        for (file, hidden) in &ready {
+            match fs::rename(hidden, &file.path) {
+                Ok(()) => replaced.push(*file),
+                Err(error) => {
+                    let _ = fs::remove_file(hidden);
+                    problems.push(Problem::of(
+                        &file.label,
+                        0,
+                        format!("can't be replaced, so it was left as it was: {error}"),
+                    ));
+                }
+            }
+        }
+        if !problems.is_empty() {
+            for file in replaced {
                 problems.push(Problem::of(
                     &file.label,
                     0,
-                    format!("can't be written: {error}"),
+                    "was rewritten before another file failed",
                 ));
             }
         }
         problems.or(())
     }
+}
+
+/// The hidden file a new text is written to before it replaces `path`:
+/// `.<name>.migrating`, beside it.
+fn hidden_beside(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    path.with_file_name(format!(".{name}.migrating"))
 }
 
 /// Works out what `step` does to each of `files`, writing nothing: a file in
@@ -449,17 +517,11 @@ pub fn migrate(step: &Step, files: &[MigrationFile]) -> Result<Migration, Proble
     problems.or(migration)
 }
 
-/// Every Pack file a Pack step rewrites, in folder order: in each Pack in
-/// `packs`, its `pack.toml`, every `quads/<id>/quad.toml`,
-/// `maps/<id>/map.toml` and `input-devices/<id>.toml`; then every Test Quad
-/// in `test_quads`. Problems name files starting with the labels, such as
-/// `packs` and `scenarios/test-quads`.
-pub fn pack_files(
-    packs: &Path,
-    packs_label: &str,
-    test_quads: &Path,
-    test_quads_label: &str,
-) -> Result<Vec<MigrationFile>, Problems> {
+/// Every Pack file in the Packs in `packs`, in folder order: each Pack's
+/// `pack.toml`, every `quads/<id>/quad.toml`, `maps/<id>/map.toml` and
+/// `input-devices/<id>.toml`. Problems name files starting with
+/// `packs_label`, such as `packs`.
+pub fn pack_files(packs: &Path, packs_label: &str) -> Result<Vec<MigrationFile>, Problems> {
     let mut files = Vec::new();
     let file = |path: PathBuf, label: String, kind| MigrationFile { path, label, kind };
     for pack in names(packs, packs_label)? {
@@ -507,18 +569,28 @@ pub fn pack_files(
             }
         }
     }
-    if test_quads.is_dir() {
-        for name in names(test_quads, test_quads_label)? {
-            if name.ends_with(".toml") {
-                files.push(file(
-                    test_quads.join(&name),
-                    format!("{test_quads_label}/{name}"),
-                    FileKind::TestQuad,
-                ));
-            }
-        }
-    }
     Ok(files)
+}
+
+/// Every `<id>.toml` in `folder`, in order, each a `kind` file, such as the
+/// Test Quads in `scenarios/test-quads/`. A folder that isn't there has none.
+pub fn toml_files(
+    folder: &Path,
+    label: &str,
+    kind: FileKind,
+) -> Result<Vec<MigrationFile>, Problems> {
+    if !folder.is_dir() {
+        return Ok(Vec::new());
+    }
+    Ok(names(folder, label)?
+        .into_iter()
+        .filter(|name| name.ends_with(".toml"))
+        .map(|name| MigrationFile {
+            path: folder.join(&name),
+            label: format!("{label}/{name}"),
+            kind,
+        })
+        .collect())
 }
 
 /// The names in a folder, in order, leaving out hidden ones.
