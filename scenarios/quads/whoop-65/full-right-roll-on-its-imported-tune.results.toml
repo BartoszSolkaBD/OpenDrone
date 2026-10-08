@@ -1,0 +1,88 @@
+# Results of full-right-roll-on-its-imported-tune.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
+
+[[expect]]
+what     = "roll setpoint at 1.25 s"
+basis    = "Source"
+expected = "670 °/s ± 0.01 °/s"
+measured = "670 °/s"
+
+[[expect]]
+what     = "roll rate, mean over 1.3 s to 1.5 s"
+basis    = "Source"
+expected = "670 °/s ± 3%"
+measured = "671 °/s"
+
+[[expect]]
+what     = "roll rate at 1.25 s"
+basis    = "Source"
+expected = "670 °/s ± 3%"
+measured = "677 °/s"
+
+[[expect]]
+what     = "roll rate at 0.9 s"
+basis    = "Observed"
+expected = "0 °/s ± 0.5 °/s"
+measured = "0.133 °/s"
+
+[[expect]]
+what     = "pitch rate, lowest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "0 °/s ± 1 °/s"
+measured = "-0.129 °/s"
+
+[[expect]]
+what     = "pitch rate, highest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "0 °/s ± 1 °/s"
+measured = "-0.0634 °/s"
+
+[[expect]]
+what     = "yaw rate, lowest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "0 °/s ± 1 °/s"
+measured = "0.0824 °/s"
+
+[[expect]]
+what     = "yaw rate, highest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "0 °/s ± 1 °/s"
+measured = "0.138 °/s"
+
+[[expect]]
+what     = "roll rate, highest over 1 s to 1.5 s"
+basis    = "Observed"
+expected = "803 °/s ± 2%"
+measured = "803 °/s"
+
+[[expect]]
+what     = "roll rate at 1.8 s"
+basis    = "Observed"
+expected = "-2.6 °/s ± 1 °/s"
+measured = "-2.57 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "bea23e59b56b9562"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "b2f21ba61949e0c0"   # the whole state after each of 14400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.18 s" = "db982823bf2a0b64"
+"0.36 s" = "fe98acc4e0c51c30"
+"0.54 s" = "ec2452b68e2e9607"
+"0.72 s" = "73ba776f6fa1d04a"
+"0.9 s" = "10cee98269878c9b"
+"1.08 s" = "1bd7d65a22be6e50"
+"1.26 s" = "84d240c156514f0e"
+"1.44 s" = "db75d5da8cefa592"
+"1.62 s" = "2066d328eabd29eb"
+"1.8 s" = "a35e22dd760654f3"

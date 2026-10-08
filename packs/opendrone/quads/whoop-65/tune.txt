@@ -1,17 +1,77 @@
 # Whoop 65 Tune: Betaflight 2026.6 names and units.
-# Imported from the Meteor65 Pro's diff all: Betaflight 4.3.0, dated 2023-01-16
-#   (docs/research/quad-settings/meteor65-pro.diff-all.txt)
+# Imported from the diff all of the quad named "Meteor65 pro": Betaflight 4.3.0,
+# configured 2023-01-16 (docs/research/quad-settings/meteor65-pro.diff-all.txt),
+# by `cargo xtask import-tune`.
 # Each line's mark says where its value came from:
 #   diff         set on the real quad
 #   4.3 default  not in the diff, so Betaflight 4.3.0's default
-#   ADR-0008     4.3 had no such setting; set to behave like 4.3
+#   ADR-0008     4.3 had no such setting (or it meant something else); set to behave like 4.3
 #   (was …)      the setting's 4.3 name
 #   hand-set: …  changed by hand, with the reason
 #
-# So far this holds only the settings the Pack checker compares with the Quad
-# definition. The Flight Controller tickets spell out every other setting
-# (ADR-0015).
+# It spells out every setting the Flight Controller reads so far, grouped by
+# the Betaflight App's tabs in their order, with each tab's CLI-only settings
+# after the ones the tab shows (ADR-0015). The settings the diff sets that
+# OpenDrone doesn't simulate yet come last, under their own heading. As the
+# Flight Controller reads more settings, run the importer again.
+
+# Configuration
+set small_angle = 180                  # diff; degrees: the most it may tilt and still arm
+
+# PID Tuning
+set p_roll = 40                        # diff
+set i_roll = 64                        # diff
+set d_roll = 45                        # diff (was d_min_roll)
+set p_pitch = 39                       # diff
+set i_pitch = 64                       # diff
+set d_pitch = 49                       # diff (was d_min_pitch)
+set p_yaw = 35                         # diff
+set i_yaw = 50                         # diff
+set d_yaw = 0                          # 4.3 default
+set motor_output_limit = 100           # 4.3 default; percent
+# PID Tuning, CLI only
+set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
+set pidsum_limit_yaw = 400             # 4.3 default
+set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500; the I limit, in percent of the PID-sum limit
+set pid_at_min_throttle = ON           # 4.3 default
+
+# Receiver
+set min_check = 1050                   # 4.3 default; µs
+set mid_rc = 1500                      # 4.3 default; µs
+set deadband = 0                       # 4.3 default; µs
+set yaw_deadband = 0                   # 4.3 default; µs
+# Receiver, CLI only
+set yaw_control_reversed = OFF         # 4.3 default
+set airmode_start_throttle_percent = 25 # 4.3 default
 
 # Motors
+set motor_pwm_protocol = DSHOT300      # diff
+set motor_idle = 600                   # diff (was dshot_idle_value); hundredths of a percent
 set motor_poles = 12                   # diff; must match [motors] poles
-set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction, props-in
+set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
+# Motors, CLI only
+set mixer_type = LEGACY                # 4.3 default
+
+# Not simulated yet
+set d_max_roll = 48                    # diff (was d_roll)
+set f_roll = 125                       # diff
+set d_max_pitch = 52                   # diff (was d_pitch)
+set f_pitch = 124                      # diff
+set f_yaw = 100                        # diff
+set feedforward_averaging = 2_POINT    # diff
+set feedforward_jitter_factor = 9      # diff
+set tpa_rate = 70                      # diff; percent
+set gyro_lpf1_static_hz = 0            # diff; Hz; 0 is off
+set gyro_lpf1_dyn_min_hz = 287         # diff; Hz; 0 is off
+set gyro_lpf1_dyn_max_hz = 575         # diff; Hz
+set gyro_lpf2_static_hz = 575          # diff; Hz; 0 is off
+set dterm_lpf1_static_hz = 82          # diff; Hz; 0 is off
+set dterm_lpf1_dyn_min_hz = 82         # diff; Hz; 0 is off
+set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
+set dterm_lpf2_static_hz = 165         # diff; Hz; 0 is off
+set blackbox_sample_rate = 1/2         # diff
+set dyn_notch_count = 2                # diff
+set dyn_notch_q = 350                  # diff
+set dyn_notch_min_hz = 130             # diff
+set dshot_bidir = ON                   # diff
+set vbat_max_cell_voltage = 435        # diff

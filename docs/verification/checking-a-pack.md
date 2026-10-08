@@ -111,8 +111,10 @@ At the top: `format`, the on-screen `name`, `description` and `spec_line`, and t
 Betaflight CLI text, with 2026.6 names and Betaflight's own units ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). It stays pasteable into a real quad, so it has no `format` line; its opening comments say which Betaflight it follows, the quad and the date.
 
 ```text
+set d_roll = 45                        # diff (was d_min_roll)
+set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500; the I limit, in percent of the PID-sum limit
 set motor_poles = 12                   # diff; must match [motors] poles
-set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction, props-in
+set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
 ```
 
 - Only `set` lines and comments. `aux` lines and rate profiles belong to the pilot.
@@ -121,7 +123,12 @@ set yaw_motors_reversed = OFF          # 4.3 default; must match [props] directi
 - `motor_poles` must equal `[motors] poles`, and `yaw_motors_reversed` must be `OFF` for props-in and `ON` for props-out. Both lines are required.
 - Every setting the Flight Controller reads must hold a value it can read, written as Betaflight's CLI writes it: a whole number within Betaflight 2026.6.2's range for that setting, `OFF` or `ON`, or one of its words. A word Betaflight knows but OpenDrone doesn't simulate is refused with the reason, such as `mixer_type = LINEAR` (only the Legacy mixer is simulated) or a motor protocol other than DShot.
 
-A Quad flies only once its Tune spells out every setting the Flight Controller reads (ADR-0015). The Freestyle 5″'s Tune does: Betaflight 2026.6.2's firmware defaults, each line marked `2026.6.2 default`, grouped by the Betaflight App's tabs (Configuration, PID Tuning, Receiver, Motors), each tab's CLI-only settings after the ones it shows. The Whoop 65's still holds only `motor_poles` and `yaw_motors_reversed`: it gets the rest from the Meteor65 Pro's `diff all` through the importer (#53). Until then the Pack checker loads it, and the Scenario runner refuses to fly it, naming the settings its Tune lacks. Each later Flight Controller ticket adds the settings it reads.
+A Quad flies only once its Tune spells out every setting the Flight Controller reads (ADR-0015); the Pack checker loads one that doesn't, and the Scenario runner refuses to fly it, naming the settings its Tune lacks. Both built-in Quads' Tunes do, grouped by the Betaflight App's tabs (Configuration, PID Tuning, Receiver, Motors), each tab's CLI-only settings after the ones it shows:
+
+- The Freestyle 5″'s holds Betaflight 2026.6.2's firmware defaults, each line marked `2026.6.2 default`.
+- The Whoop 65's is the Meteor65 Pro's `diff all` (Betaflight 4.3.0), imported by `cargo xtask import-tune`, which also keeps the settings the diff sets that OpenDrone doesn't simulate yet under their own heading. A readable check holds it to exactly what the importer writes, so it's imported again, never edited: [Importing a Tune from Betaflight](importing-a-tune.md).
+
+Each later Flight Controller ticket adds the settings it reads: by hand to the 5″'s, and by importing the whoop's again.
 
 Some settings the Flight Controller knows but doesn't simulate yet: the gyro and D-term low-passes, the dynamic notch, the yaw P low-pass, RC smoothing and feedforward (#49), and Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50). A Tune may set them, under a "Not simulated yet" heading, and their values are checked like the others, but the Flight Controller flies as if each were off until its ticket lands. The Freestyle 5″'s Tune holds them at 2026.6.2's defaults, each marked `2026.6.2 default; not simulated yet (#49)` or `(#50)`, so a Test Quad can switch them off.
 

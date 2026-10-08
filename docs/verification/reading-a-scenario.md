@@ -54,7 +54,7 @@ In Physics and Thrust Stand Scenarios the Flight Controller doesn't run, so `arm
 
 Where our Flight Controller runs:
 
-- **The Quad's Tune must spell out every setting the Flight Controller reads** ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). The Freestyle 5″'s does. The Whoop 65's gets its settings from the `diff all` importer (#53); until then a Scenario that flies it is refused, naming what its Tune lacks.
+- **The Quad's Tune must spell out every setting the Flight Controller reads** ([ADR-0015](../adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md)). Both built-in Quads' do: the Freestyle 5″'s holds Betaflight 2026.6.2's defaults, and the Whoop 65's is imported from the Meteor65 Pro's `diff all` ([Importing a Tune from Betaflight](importing-a-tune.md)). A Scenario that flies a Quad whose Tune lacks one is refused, naming what it lacks.
 - **It flies Acro so far.** `flight_mode = "Angle"` or `"Horizon"` waits for #51, and every Assist must be `"off"` until its ticket: Input smoothing #56, Auto-arm #52, Endless Battery #57.
 - **A Flight Scenario starts mid-air** with `motors = "settled"`. A landed start is Reset, whose ESCs power up first; the arming and power-up ticket (#52) names how it is written.
 - **`armed = true`** starts the Flight Controller armed, as a mid-air start needs; the Timeline's Arm switch then holds it armed, or disarms it.
