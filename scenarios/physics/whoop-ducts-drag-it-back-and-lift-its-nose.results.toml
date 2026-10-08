@@ -41,18 +41,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "120bd36b3f1b0349"   # test/whoop-65-ducts-only: what the Simulation receives from it
+quad = "6a81f77bbaf63880"   # test/whoop-65-ducts-only: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "b7c979d8442e20a1"   # the whole state after each of 400 steps at 8000 Hz, in order
+run  = "219939cc2d23407c"   # the whole state after each of 400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.005 s" = "35c5bb9af8fffe53"
-"0.01 s" = "fedbc79085b5b8b8"
-"0.015 s" = "7080a169818c5c22"
-"0.02 s" = "c164029606a78e39"
-"0.025 s" = "dd794198f2a8bc25"
-"0.03 s" = "45b29f6032a9cbf4"
-"0.035 s" = "b44712b68e4cc85b"
-"0.04 s" = "62f320a9553fb087"
-"0.045 s" = "b23ce65fcb6fdfe4"
-"0.05 s" = "e0415deb9a02a2d8"
+"0.005 s" = "6f3eb5a93a81c96e"
+"0.01 s" = "52cd23f023012c15"
+"0.015 s" = "84212f0184a97433"
+"0.02 s" = "8f98bd1780f9a667"
+"0.025 s" = "75c2524ed37361cc"
+"0.03 s" = "69c0c4441aaef4af"
+"0.035 s" = "b55ef1b8f1c9a3ad"
+"0.04 s" = "a08d4a3d94336bdd"
+"0.045 s" = "dd9e4d0dcc48d688"
+"0.05 s" = "1818d0565aae3c0a"
