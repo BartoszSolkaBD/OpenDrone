@@ -259,6 +259,71 @@ fn deleting_a_scenario_with_rule_and_source_expectations_waits_for_the_maintaine
     review.reviewer_decides("A Scenario deleted", "`scenarios/physics/free-fall.toml`");
 }
 
+#[test]
+fn a_scenario_split_into_two_files_has_each_new_file_s_setup_compared() {
+    // The Reviewer's case on #92: the first new file keeps the setup; the
+    // second starts 100 m up at 1 kHz and holds "height at 1 s", unchanged.
+    let review = PullRequest::new("scenario-split")
+        .delete(FREE_FALL)
+        .change(
+            "scenarios/physics/free-fall-speed.toml",
+            "free-fall-split-speed.toml",
+        )
+        .change(
+            "scenarios/physics/free-fall-height.toml",
+            "free-fall-split-height.toml",
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A Scenario's setup changed under its Source or Rule Expectations",
+        "`scenarios/physics/free-fall-height.toml`, moved from \
+         `scenarios/physics/free-fall.toml`: `start.position`, `start.physics_rate` changed, so \
+         its Source and Rule Expectations now check a different flight.",
+    );
+    assert!(
+        !review
+            .report
+            .contains("`scenarios/physics/free-fall-speed.toml`, moved from"),
+        "the first new file keeps the setup:\n{}",
+        review.report
+    );
+    assert!(
+        !review.report.contains("A Scenario deleted"),
+        "every Expectation was found again:\n{}",
+        review.report
+    );
+}
+
+#[test]
+fn a_changed_test_quad_under_a_scenario_with_rule_expectations_is_for_the_reviewer_to_decide() {
+    // free-fall.toml doesn't change, but the Test Quad it flies does. A
+    // Scenario with only Observed Expectations flying it raises nothing.
+    let pull_request = PullRequest::new("test-quad-changed")
+        .on_main(
+            "scenarios/physics/drift-with-no-drag.toml",
+            "format = 1\nname = \"No drift with no drag\"\n\n[start]\n\
+             quad = \"test/whoop-65-no-drag\"\n\n[[expect]]\nwhat = \"east speed\"\n\
+             at = \"1 s\"\nvalue = \"0 m/s ± 0.01 m/s\"\n\
+             basis = \"observed: what the Simulation did when this was written\"\n",
+        )
+        .change(TEST_QUAD, "whoop-65-no-drag-with-rotor-drag.toml");
+    // Read from two folders, and from two git commits, as CI reads them.
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(review.gate_passed, "{}", review.output);
+        review.reviewer_decides(
+            "A Scenario's setup changed under its Source or Rule Expectations",
+            "`scenarios/physics/free-fall.toml`: the Test Quad `test/whoop-65-no-drag` changed, \
+             so its Source and Rule Expectations now check a different flight.",
+        );
+        assert!(
+            !review.report.contains("drift-with-no-drag"),
+            "an Observed-only Scenario raises nothing:\n{}",
+            review.report
+        );
+    }
+}
+
 // ADRs, Bevy and wgpu.
 
 #[test]
@@ -395,6 +460,109 @@ fn raw_strings_byte_strings_block_comments_and_lifetimes_are_not_code() {
 }
 
 #[test]
+fn a_raw_c_string_cannot_hide_a_house_rule_exception() {
+    // The Reviewer's case on #92: in `cr#"\"#` the backslash is text, so the
+    // string ends right after it.
+    let review = PullRequest::new("raw-c-string-hides-allow")
+        .change(
+            "crates/physics/src/lib.rs",
+            "physics-raw-c-string-hides-allow.rs.txt",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn no_string_prefix_or_suffix_rust_accepts_can_hide_unsafe_code_later_on_its_line() {
+    // Each line compiles with Rust 1.99, and each literal ends before
+    // `unsafe`, whatever its prefix, or a suffix before it, does to a
+    // backslash.
+    let lines = [
+        // C strings and raw C strings.
+        r#"let _p = c"\""; let first = unsafe { *x.as_ptr() };"#,
+        r##"let _p = cr#"\"#; let first = unsafe { *x.as_ptr() }; let _q = "";"##,
+        r#"let _p = cr"\"; let first = unsafe { *x.as_ptr() }; let _q = "";"#,
+        // Byte strings, raw byte strings and byte chars.
+        r#"let _p = b"\""; let first = unsafe { *x.as_ptr() };"#,
+        r##"let _p = br#"\"#; let first = unsafe { *x.as_ptr() }; let _q = "";"##,
+        r#"let _p = b'"'; let first = unsafe { *x.as_ptr() };"#,
+        // A suffix right after a literal, which a macro's input allows: this
+        // `r` is a suffix, not a raw string's prefix, so `\"` is an escape.
+        r#"ignore!("a"r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!('a'r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!(r"a"r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+        r#"ignore!(c"a"r"\" "); let first = unsafe { *x.as_ptr() }; ignore!("");"#,
+    ];
+    for (i, line) in lines.iter().enumerate() {
+        let review = PullRequest::new(&format!("literal-hides-unsafe-{i}"))
+            .write(
+                "crates/sim/src/lib.rs",
+                &format!("{SIM_START}    {line}\n    first\n}}\n"),
+            )
+            .review();
+        review.reviewer_decides(
+            "New `unsafe` code",
+            &format!("`crates/sim/src/lib.rs` adds `{line}`."),
+        );
+    }
+}
+
+#[test]
+fn a_first_line_rust_skips_cannot_hide_unsafe_code_on_the_lines_after_it() {
+    // Rust skips a first line that starts with `#!` (a shebang), quote and
+    // all, so the next line is code.
+    let review = PullRequest::new("shebang-hides-unsafe")
+        .write(
+            "crates/sim/src/lib.rs",
+            "#!/usr/bin/env run \"\n\
+             pub fn first(x: &[u8]) -> u8 { unsafe { *x.as_ptr() } }\n\
+             // \"\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "New `unsafe` code",
+        "`crates/sim/src/lib.rs` adds `pub fn first(x: &[u8]) -> u8 { unsafe { *x.as_ptr() } }`.",
+    );
+}
+
+#[test]
+fn an_inner_attribute_after_an_invisible_mark_is_code_not_a_skipped_first_line() {
+    // Rust reads U+200E, the left-to-right mark, as a space, so `#!` and the
+    // mark before `[allow(…)]` make an inner attribute, not a shebang.
+    let review = PullRequest::new("inner-attribute-after-a-mark")
+        .write(
+            "crates/physics/src/lib.rs",
+            "#!\u{200E}[allow(clippy::disallowed_methods)]\n//! A fixture core crate.\n\n\
+             pub fn sine(x: f64) -> f64 {\n    x.sin()\n}\n",
+        )
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/src/lib.rs` now allows `clippy::disallowed_methods`.",
+    );
+}
+
+#[test]
+fn c_strings_raw_c_strings_literal_suffixes_and_a_skipped_first_line_are_not_code() {
+    let review = PullRequest::new("c-strings-not-code")
+        .change("crates/sim/src/lib.rs", "sim-unsafe-in-c-strings.rs.txt")
+        .review();
+    assert!(
+        !review.report.contains("New `unsafe` code"),
+        "{}",
+        review.report
+    );
+    assert!(
+        !review.report.contains("A house-rule exception"),
+        "{}",
+        review.report
+    );
+}
+
+#[test]
 fn a_house_rule_lint_allowed_over_several_lines_is_for_the_reviewer_to_decide() {
     let review = PullRequest::new("house-rule-split")
         .change(
@@ -439,6 +607,38 @@ fn changing_a_core_crate_s_lint_settings_is_for_the_reviewer_to_decide() {
         "New `unsafe` code",
         "`crates/physics/Cargo.toml` adds no `[lints] workspace = true` any more, so `unsafe` \
          isn't forbidden there.",
+    );
+}
+
+#[test]
+fn a_dotted_clippy_toml_in_a_core_crate_is_a_house_rule_exception_and_a_repo_rules_change() {
+    // Clippy reads `.clippy.toml` instead of the `clippy.toml` beside it, so
+    // even an empty one turns the house rules off (the Reviewer's case on #92).
+    let review = PullRequest::new("core-dotted-clippy-toml")
+        .write("crates/physics/.clippy.toml", "")
+        .review();
+    review.reviewer_decides(
+        "A house-rule exception in a core crate",
+        "`crates/physics/.clippy.toml`. Clippy reads a `.clippy.toml` instead of the \
+         `clippy.toml` beside it, which holds the house rules, so even an empty one turns them \
+         off.",
+    );
+    review.reviewer_decides(
+        "A change to the Repo rules",
+        "`crates/physics/.clippy.toml`",
+    );
+}
+
+#[test]
+fn a_dotted_clippy_toml_in_an_edge_crate_is_a_repo_rules_change() {
+    let review = PullRequest::new("edge-dotted-clippy-toml")
+        .write("crates/input/.clippy.toml", "msrv = \"1.99\"\n")
+        .review();
+    review.reviewer_decides("A change to the Repo rules", "`crates/input/.clippy.toml`");
+    assert!(
+        !review.report.contains("A house-rule exception"),
+        "input isn't a core crate:\n{}",
+        review.report
     );
 }
 
@@ -731,6 +931,11 @@ const FREE_FALL: &str = "scenarios/physics/free-fall.toml";
 const FREE_FALL_RESULTS: &str = "scenarios/physics/free-fall.results.toml";
 const FREE_TUMBLE_RESULTS: &str = "scenarios/physics/free-tumble.results.toml";
 const ADR: &str = "docs/adr/0001-bit-exact-determinism.md";
+const TEST_QUAD: &str = "scenarios/test-quads/whoop-65-no-drag.toml";
+/// The start of a crate's `lib.rs`, up to a line inside a function that
+/// reads the first byte of `x` into `first`.
+const SIM_START: &str = "//! A fixture crate.\n\nmacro_rules! ignore {\n    ($($t:tt)*) => {};\n}\n\n\
+                         /// The first byte.\npub fn first_byte(x: &[u8]) -> u8 {\n";
 
 fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/review")
@@ -782,6 +987,14 @@ impl PullRequest {
         self
     }
 
+    /// A file already on main: the same in the base and the head.
+    fn on_main(self, path: &str, text: &str) -> PullRequest {
+        let target = self.root.join("base").join(path);
+        fs::create_dir_all(target.parent().expect("a folder")).expect("can make the folder");
+        fs::write(target, text).expect("can write the file");
+        self.write(path, text)
+    }
+
     fn copy(self, from: &str, to: &str) -> PullRequest {
         let text = fs::read_to_string(self.head(from)).expect("the file exists");
         self.write(to, &text)
@@ -810,16 +1023,51 @@ impl PullRequest {
 
     /// Runs `cargo xtask review-report` on the base and the head.
     fn review(&self) -> Review {
-        let out = self.root.join("out");
         let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
         command
             .arg("review-report")
             .arg("--before")
             .arg(self.root.join("base"))
             .arg("--after")
-            .arg(self.root.join("head"))
-            .arg("--out")
-            .arg(&out);
+            .arg(self.root.join("head"));
+        self.run(command, "out")
+    }
+
+    /// Runs `cargo xtask review-report` the way CI does: on two git commits,
+    /// the base and the head, which it reads with git alone.
+    fn review_as_commits(&self) -> Review {
+        let repo = self.root.join("git");
+        let _ = fs::remove_dir_all(&repo);
+        copy_exactly(&self.root.join("base"), &repo);
+        git(&repo, &["init", "--quiet"]);
+        git(&repo, &["add", "--all"]);
+        git(&repo, &["commit", "--quiet", "--message", "base"]);
+        for entry in fs::read_dir(&repo).expect("can read the repository") {
+            let entry = entry.expect("can read the entry");
+            if entry.file_name() == ".git" {
+                continue;
+            }
+            if entry.file_type().expect("has a type").is_dir() {
+                fs::remove_dir_all(entry.path()).expect("can remove the folder");
+            } else {
+                fs::remove_file(entry.path()).expect("can remove the file");
+            }
+        }
+        copy_exactly(&self.root.join("head"), &repo);
+        git(&repo, &["add", "--all"]);
+        git(&repo, &["commit", "--quiet", "--message", "head"]);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
+        command
+            .args(["review-report", "--base", "HEAD^", "--head", "HEAD"])
+            .current_dir(&repo);
+        isolate_git(&mut command, &repo);
+        self.run(command, "out-commits")
+    }
+
+    /// Runs a `review-report` command, with `--out` in the folder `out`.
+    fn run(&self, mut command: Command, out: &str) -> Review {
+        let out = self.root.join(out);
+        command.arg("--out").arg(&out);
         if let Some(metadata) = &self.metadata {
             command.arg("--metadata").arg(metadata);
         }
@@ -923,6 +1171,53 @@ impl Review {
             .map(str::to_string)
             .collect()
     }
+}
+
+/// Copies a folder as it is.
+fn copy_exactly(from: &Path, to: &Path) {
+    fs::create_dir_all(to).expect("can make the folder");
+    for entry in fs::read_dir(from).expect("can read the folder") {
+        let entry = entry.expect("can read the entry");
+        let target = to.join(entry.file_name());
+        if entry.file_type().expect("has a type").is_dir() {
+            copy_exactly(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).expect("can copy the file");
+        }
+    }
+}
+
+/// Git's own settings, as on a fresh CI runner, and no repository but `repo`.
+fn isolate_git(command: &mut Command, repo: &Path) {
+    command
+        .env("GIT_CONFIG_GLOBAL", repo.join("no-global-gitconfig"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .env_remove("GIT_INDEX_FILE");
+}
+
+/// Runs git in `repo`.
+fn git(repo: &Path, args: &[&str]) {
+    let mut command = Command::new("git");
+    command
+        .args([
+            "-c",
+            "user.name=Scratch",
+            "-c",
+            "user.email=scratch@example.com",
+            "-c",
+            "commit.gpgsign=false",
+        ])
+        .args(args)
+        .current_dir(repo);
+    isolate_git(&mut command, repo);
+    let output = command.output().expect("git runs");
+    assert!(
+        output.status.success(),
+        "git {args:?} failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 /// Copies a folder; a fixture's `.txt` ending comes off, so `lib.rs.txt`

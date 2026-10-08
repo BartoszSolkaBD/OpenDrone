@@ -32,7 +32,7 @@ Read only these. Never read the author's notes or conversation.
   - **A house-rule exception in a core crate:** it's needed, and it can't break determinism.
   - **New `unsafe` code:** it's in `opendrone-input` or the game, and it's needed.
   - **A change to the Repo rules:** the ticket asks for it, and no check gets weaker.
-  - **A change to CI workflows:** no workflow can set a commit status (below).
+  - **A change to CI workflows:** no workflow can set a commit status, whether through `statuses: write` or `permissions: write-all` (below).
   - **A Scenario's setup changed under Source or Rule Expectations:** the listed fields still let those Expectations check what their Basis says, for example the physics rate a Rule's working assumes.
 - **The listed Red Flags look right:**
   - each updated Observed Expectation has a one-line reason that holds;
@@ -69,7 +69,7 @@ CI works out the Review check again whenever the maintainer's account comments o
 
 The Report is worked out by main's code, so a PR that changes the review workflow, its script or xtask isn't judged by its own change. Judge such a change from the diff: it is a change to the Repo rules.
 
-**A PR that changes CI's workflows** (`.github/workflows/` or `.github/actions/`) can set the Red Flag gate and the Review check itself. Any workflow with `statuses: write` can set any commit status. So for such a PR, neither status can be trusted, and the Report says so. Read every workflow it changes or adds: none may ask for `statuses: write` or set a status. Say in your review that the maintainer should merge it by hand. See [Limits](../review-report.md#limits).
+**A PR that changes CI's workflows** (`.github/workflows/` or `.github/actions/`) can set the Red Flag gate and the Review check itself. Any workflow with `statuses: write` can set any commit status, and so can one with `permissions: write-all`, which grants every permission. So for such a PR, neither status can be trusted, and the Report says so. Read every workflow it changes or adds: none may ask for `statuses: write` or `permissions: write-all`, or set a status. Say in your review that the maintainer should merge it by hand. See [Limits](../review-report.md#limits).
 
 | The Review check | When |
 |---|---|

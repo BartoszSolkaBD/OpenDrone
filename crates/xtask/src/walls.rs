@@ -11,12 +11,15 @@
 //!   library on the never-in-core list, or any outside library missing from
 //!   the core-libraries list;
 //! - no library the core reaches has a feature on the never-in-core-features
-//!   list turned on.
+//!   list turned on;
+//! - no core crate has a `.clippy.toml`, which Clippy would read instead of
+//!   the `clippy.toml` that holds the house rules ([ADR-0001]).
 //!
+//! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
 use std::collections::{BTreeMap, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use serde_json::Value;
@@ -76,6 +79,18 @@ fn check(workspace: &Workspace, rules: &Rules) -> Vec<String> {
         if !rules.crates.contains_key(name) {
             problems.push(format!(
                 "{RULES_FILE} names `{name}` as a core crate but gives no rule for it."
+            ));
+        }
+        if let Some(dotted) = workspace
+            .member_named(name)
+            .map(|id| workspace.folder(id).join(".clippy.toml"))
+            .filter(|path| path.exists())
+        {
+            problems.push(format!(
+                "`{name}` has a `.clippy.toml` ({}). Clippy reads it instead of the crate's \
+                 `clippy.toml`, which holds the house rules (ADR-0001), so it turns them off. \
+                 Keep the house rules in `clippy.toml` only, and remove the `.clippy.toml`.",
+                workspace.relative(&dotted)
             ));
         }
     }
@@ -457,9 +472,26 @@ impl Workspace {
 
     fn relative_manifest(&self, id: &str) -> String {
         let manifest = self.manifests.get(id).map_or(id, String::as_str);
-        Path::new(manifest)
-            .strip_prefix(&self.root)
-            .map_or_else(|_| manifest.to_owned(), |path| path.display().to_string())
+        self.relative(Path::new(manifest))
+    }
+
+    /// The folder that holds a package's `Cargo.toml`.
+    fn folder(&self, id: &str) -> PathBuf {
+        let manifest = Path::new(self.manifests.get(id).map_or(id, String::as_str));
+        manifest.parent().unwrap_or(manifest).to_path_buf()
+    }
+
+    /// A path from the workspace's root, with `/` between folders.
+    fn relative(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root).map_or_else(
+            |_| path.display().to_string(),
+            |path| {
+                path.components()
+                    .map(|part| part.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            },
+        )
     }
 }
 

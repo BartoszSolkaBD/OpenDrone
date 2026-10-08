@@ -3,7 +3,8 @@
 //!
 //! CI runs these commands in one workflow, `.github/workflows/review.yml`,
 //! built from main's code. They read a pull request only as data: its commits
-//! through `git show` and `git diff`, and its comments through GitHub's API.
+//! through `git show`, `git diff` and `git ls-tree`, and its comments through
+//! GitHub's API.
 //! Nothing from the pull request is ever run, built or checked out.
 //!
 //! - `review-report` compares a pull request's base and head and writes the

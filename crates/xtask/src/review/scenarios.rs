@@ -11,8 +11,13 @@
 //! every Scenario the pull request adds, whatever its file or name: one found
 //! unchanged has only moved, and a Source or Rule one found nowhere unchanged
 //! waits for the maintainer.
+//!
+//! A Scenario's setup, the flight its Expectations check, is compared too:
+//! every field but its Expectations, and the Test Quad it flies. When a
+//! deleted Scenario's Expectations went to several new files, each new file's
+//! setup is compared with the old one.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use opendrone_pack::units::{Dimension, Expected, Tolerance, parse_expected, parse_quantity};
 
@@ -26,6 +31,9 @@ pub const FOLDER: &str = "scenarios/";
 pub const RESULTS_ENDING: &str = ".results.toml";
 /// The folder of Test Quads, which aren't Scenarios.
 const TEST_QUADS: &str = "scenarios/test-quads/";
+/// The setup field naming the Quad a Scenario flies, such as
+/// `test/whoop-65-no-drag`.
+const QUAD_FIELD: &str = "start.quad";
 
 /// The keys that hold an Expectation's expected value, one per kind: at a
 /// moment, or a statistic over a stretch.
@@ -260,9 +268,20 @@ fn width(text: &str) -> Option<(f64, Dimension)> {
     Some((width, kind))
 }
 
+/// The Test Quads a pull request adds, changes or deletes, by id, such as
+/// `test/whoop-65-no-drag` for `scenarios/test-quads/whoop-65-no-drag.toml`.
+fn changed_test_quads(changes: &Changes) -> BTreeSet<String> {
+    changes
+        .under(TEST_QUADS)
+        .filter_map(|path| path.strip_prefix(TEST_QUADS)?.strip_suffix(".toml"))
+        .map(|name| format!("test/{name}"))
+        .collect()
+}
+
 /// Every Red Flag about Scenarios and their Expectations.
 pub fn flags(changes: &Changes) -> Vec<RedFlag> {
     let mut flags = Vec::new();
+    let test_quads = changed_test_quads(changes);
     let changed: Vec<&str> = changes
         .paths
         .iter()
@@ -285,15 +304,17 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                 let candidates: Vec<(&str, &ScenarioFile)> =
                     added.iter().map(|(p, f)| (*p, f)).collect();
                 let all_found = compare(path, &base, &candidates, &mut flags);
-                // Where the Scenario went, if it moved: the added file with its
-                // first Expectation.
-                let moved_to = base.expectations.first().and_then(|first| {
-                    candidates
-                        .iter()
-                        .find(|(_, file)| file.expectations.iter().any(|e| e.same_check(first)))
-                });
-                if let Some((now, head)) = moved_to {
-                    setup_changed(path, now, &base, head, &mut flags);
+                // Where its Source and Rule Expectations went, if it moved or
+                // was split: every added file that holds one of them, each
+                // with its own setup.
+                for (now, head) in &candidates {
+                    let holds_a_locked_one = base.expectations.iter().any(|before| {
+                        before.basis().locked()
+                            && head.expectations.iter().any(|e| e.same_check(before))
+                    });
+                    if holds_a_locked_one {
+                        setup_changed(path, now, &base, head, &test_quads, &mut flags);
+                    }
                 }
                 if !all_found {
                     let name = base
@@ -314,7 +335,7 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
             Some(text) => match ScenarioFile::read(&text) {
                 Some(head) => {
                     compare(path, &base, &[(path, &head)], &mut flags);
-                    setup_changed(path, path, &base, &head, &mut flags);
+                    setup_changed(path, path, &base, &head, &test_quads, &mut flags);
                 }
                 None => {
                     let locked = base
@@ -337,25 +358,43 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
             },
         }
     }
+    // A changed Test Quad changes the flight of every Scenario that flies it,
+    // even one the pull request leaves alone.
+    if !test_quads.is_empty() {
+        for path in changes.base.files_under(FOLDER) {
+            if !is_scenario(&path) || changes.touches(&path) {
+                continue;
+            }
+            if let Some(file) = changes
+                .base
+                .text(&path)
+                .and_then(|t| ScenarioFile::read(&t))
+            {
+                setup_changed(&path, &path, &file, &file, &test_quads, &mut flags);
+            }
+        }
+    }
     flags
 }
 
 /// A change to how a Scenario holding Source or Rule Expectations sets up its
-/// flight: its starting state, its inputs, or any other field but its
-/// Expectations. Those Expectations then check a different flight, so the
-/// Reviewer decides. It doesn't wait for the maintainer, because the format
-/// migration tool (#60) writes new starting-state items into every Scenario.
+/// flight: its starting state, its inputs, any other field but its
+/// Expectations, or the Test Quad it flies (`test_quads` are the changed
+/// ones). Those Expectations then check a different flight, so the Reviewer
+/// decides. It doesn't wait for the maintainer, because the format migration
+/// tool (#60) writes new starting-state items into every Scenario.
 fn setup_changed(
     path: &str,
     now: &str,
     base: &ScenarioFile,
     head: &ScenarioFile,
+    test_quads: &BTreeSet<String>,
     flags: &mut Vec<RedFlag>,
 ) {
     if !base.expectations.iter().any(|e| e.basis().locked()) {
         return;
     }
-    let changed: Vec<String> = base
+    let mut changed: Vec<String> = base
         .setup
         .keys()
         .chain(
@@ -366,6 +405,18 @@ fn setup_changed(
         .filter(|key| base.setup.get(*key) != head.setup.get(*key))
         .map(|key| code(key))
         .collect();
+    // The same Test Quad by name, but its file changed.
+    let quad = |file: &ScenarioFile| {
+        file.setup
+            .get(QUAD_FIELD)
+            .and_then(toml::Value::as_str)
+            .map(str::to_string)
+    };
+    if let Some(id) = quad(head).filter(|id| quad(base).as_ref() == Some(id))
+        && test_quads.contains(&id)
+    {
+        changed.push(format!("the Test Quad {}", code(&id)));
+    }
     if changed.is_empty() {
         return;
     }

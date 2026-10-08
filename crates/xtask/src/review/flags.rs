@@ -203,12 +203,16 @@ fn allowed_lints(text: &str) -> Vec<String> {
 
 /// A house-rule exception in a core crate: newly allowing a lint that carries
 /// a house rule, a change to a core crate's lint settings in its `Cargo.toml`,
-/// or a change to its `clippy.toml`, which holds the house rules.
+/// a change to its `clippy.toml`, which holds the house rules, or a
+/// `.clippy.toml`, which Clippy reads instead of the `clippy.toml` beside it.
 fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
     let mut settings = Vec::new();
+    let mut dotted = Vec::new();
     for folder in core_folders() {
         for path in changes.under(&folder) {
-            if path.ends_with("/clippy.toml") {
+            if path.ends_with("/.clippy.toml") {
+                dotted.push(code(path));
+            } else if path.ends_with("/clippy.toml") {
                 settings.push(code(path));
             } else if path == format!("{folder}Cargo.toml") {
                 if lints_of(changes.base.text(path)) != lints_of(changes.head.text(path)) {
@@ -256,6 +260,18 @@ fn house_rules(changes: &Changes, flags: &mut Vec<RedFlag>) {
             format!(
                 "the house rules themselves changed, in {}.",
                 settings.join(", ")
+            ),
+        ));
+    }
+    if !dotted.is_empty() {
+        flags.push(RedFlag::new(
+            Level::ReviewerDecides,
+            "A house-rule exception in a core crate",
+            format!(
+                "{}. Clippy reads a `.clippy.toml` instead of the `clippy.toml` beside it, which \
+                 holds the house rules, so even an empty one turns them off. The walls check \
+                 refuses one in a core crate.",
+                dotted.join(", ")
             ),
         ));
     }
@@ -389,8 +405,8 @@ fn workflows(changes: &Changes, flags: &mut Vec<RedFlag>) {
             format!(
                 "{}. A workflow can set any commit status, so for this PR the Red Flag gate's and \
                  the Review check's own results can't be trusted. Check that no workflow it \
-                 changes or adds asks for `statuses: write` or sets a status, and the maintainer \
-                 should merge it by hand.",
+                 changes or adds asks for `statuses: write` or `permissions: write-all`, or sets \
+                 a status, and the maintainer should merge it by hand.",
                 listed(&files, 10, "files")
             ),
         ));
