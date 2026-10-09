@@ -86,9 +86,10 @@ const DISARM_FRAMES: u8 = 3;
 /// Why arming is refused right now: Betaflight's arming-disabled flags
 /// (`armingDisableFlags`) that OpenDrone's Flight Controller can raise, each
 /// named as Betaflight names it. `RXLOSS` and `FAILSAFE` are raised and
-/// cleared by the Radio Link and Failsafe whether armed or not; the others
-/// are checked only while disarmed, so an armed Quad's stay as they were when
-/// it armed (all clear).
+/// cleared by the Radio Link and Failsafe whether armed or not; `RUNAWAY` and
+/// `FLIP_SWITCH` are raised by the disarm they name; the others are checked
+/// only while disarmed, so an armed Quad's stay as they were when it armed
+/// (all clear).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ArmingBlocks {
     /// `FAILSAFE`: Failsafe dropped the Quad and hasn't ended.
