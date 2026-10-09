@@ -7,7 +7,8 @@
 #   review.sh update   For one PR: fetch its commits as git objects (never
 #                      checked out, never built, never run), work out the
 #                      Review Report and its Red Flags, and the Review check
-#                      from the PR's comments; then post the Review Report
+#                      from the PR's comments (and the issues its triage
+#                      comments name, #120); then post the Review Report
 #                      comment, the labels, and the Red Flag gate's and the
 #                      Review check's commit statuses.
 #                      Needs REPO, XTASK and PR_NUMBER; RUN_URL is optional,
@@ -176,6 +177,27 @@ update() {
   api "search/issues?q=repo:$REPO+is:pr+is:merged+label:skipped-a-check&per_page=20" \
     > "$work/skipped.json" || echo '{"items": []}' > "$work/skipped.json"
 
+  # Once the PR's review rounds have run out, the issues its "Triaged to #N"
+  # comments name (xtask lists them, and decides which count). A missing one
+  # is left out, so it counts for nothing; any other error fails the run, so
+  # it shows instead of failing the Review check quietly.
+  "$XTASK" triage-issues --comments "$work/comments.json" > "$work/triage-issues.txt"
+  : > "$work/issues.json"
+  local issue
+  while read -r issue; do
+    [[ "$issue" =~ ^[1-9][0-9]{0,9}$ ]] || continue
+    if api "repos/$REPO/issues/$issue" > "$work/issue.json" 2> "$work/issue.err"; then
+      cat "$work/issue.json" >> "$work/issues.json"
+      echo >> "$work/issues.json"
+    elif grep -qE '\(HTTP (404|410)\)' "$work/issue.err"; then
+      echo "GitHub has no issue #$issue, so a triage comment naming it counts for nothing."
+    else
+      cat "$work/issue.err" >&2
+      echo "GitHub couldn't say whether issue #$issue is open." >&2
+      return 1
+    fi
+  done < "$work/triage-issues.txt"
+
   licences "$base" "$head" > "$work/metadata.json"
 
   # Exit code 1 means a Red Flag waits for the maintainer; the gate status
@@ -197,6 +219,7 @@ update() {
     --comments "$work/comments.json" \
     --skipped-merges "$work/skipped.json" \
     --head-pulls "$work/head-pulls.json" \
+    --issues "$work/issues.json" \
     --codeowners .github/CODEOWNERS \
     --out "$work/out" \
     ${report[@]+"${report[@]}"}

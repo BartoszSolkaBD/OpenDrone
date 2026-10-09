@@ -41,7 +41,7 @@ At the start of a session, check what each `model` value runs in this Claude Cod
 | **Author** of a ticket that asks to choose or derive a physics model | Strongest. |
 | **Author** of anything else | Standard. That covers physics whose model and numbers the research gives, the Simulation, the game, screens, Input, Sound, Packs, docs, xtask tools outside the review path, the Blackbox, and follow-ups with a concrete fix list. |
 | **Fix round** | Resume the author if it finished less than an hour ago, since its context is still cached. Otherwise use a fresh Standard author. |
-| **The fix after the second failed round,** when the failures were about correctness. It is the last fix before the three-round cap. | Strongest. |
+| **The fix after the fourth failed round,** when the failures were about correctness. It is the last fix before the five-round cap. | Strongest. |
 | **Reviewer** of a Flight lane or Repo rules lane PR, or of any tracer | Strongest. In Phase 1 the Reviewer is the only one who reads the code. |
 | **Reviewer** of anything else | Standard. |
 | **Merge-only update check** | Light. |
@@ -156,9 +156,18 @@ Everything else the author needs is on the ticket and in the brief. That way a f
   1. Start a fix round, at the tier the table gives.
   2. The fixer pushes. Then start a **new** Reviewer. Never reuse one.
   3. Sometimes every blocking item is an edge case beyond the ticket, or a hardening idea for tooling. Fix those too, since they're usually small. Note them for your end-of-batch report, so the Reviewer page's calibration can be tuned.
-- **Three failed rounds:** the Review check fails and the PR gets `needs-maintainer`. Leave it, tell the maintainer, and carry on in the other Lanes.
-  - The maintainer decided on 8 October 2026 that a PR shouldn't wait for them because its rounds ran out.
-  - [#120](https://github.com/BartoszSolkaBD/OpenDrone/issues/120) changes the Review check to allow five rounds, then move what's left into its own issue. Until #120 merges, the three-round rule stands.
+- **Five failed rounds:** the Review check fails and the PR gets `needs-triage`. The maintainer decided on 8 October 2026 that a PR shouldn't wait for them because its rounds ran out ([#120](https://github.com/BartoszSolkaBD/OpenDrone/issues/120)). So don't start a sixth round. Triage it instead:
+  1. **File what still blocks** as one issue, to be fixed in a later run. List the fifth Verdict's blocking problems, each with its concrete fix, and link the PR and that Verdict. Title it "Left from PR #P", and label it `ready-for-agent`.
+  2. **Post the triage comment** on the PR. Its first line is exactly `Triaged to #<issue>`, naming that issue:
+
+     ```sh
+     gh pr comment <P> -R BartoszSolkaBD/OpenDrone --body "Triaged to #<issue>"
+     ```
+
+     CI then passes the Review check on the commit the fifth Verdict reviewed, takes `needs-triage` off, and links the issue in the Review Report.
+  3. **Merge** when every merge condition below holds. A later commit, such as main merged in, needs a fresh Verdict as usual. A failed round after the triage needs a triage of its own.
+
+  The Red Flag gate is separate: what it holds still waits for the maintainer.
 
 ## Merging
 
@@ -258,7 +267,7 @@ Report to the maintainer:
 
 - what merged, as ticket and PR;
 - what waits for them, and why;
-- the follow-up issues you filed;
+- the follow-up issues you filed, and each issue you triaged a PR to;
 - for each PR, the author's model and its number of review rounds.
 
 ## Reference sources

@@ -16,7 +16,7 @@ use std::path::Path;
 use serde_json::{Value, json};
 
 use super::markdown::code;
-use super::verdict::{self, Comment, PullRequest, State};
+use super::verdict::{self, Comment, Issue, PullRequest, State};
 
 /// The hidden first line that marks the Review Report comment.
 pub const MARKER: &str = "<!-- opendrone-review-report -->";
@@ -24,6 +24,9 @@ pub const MARKER: &str = "<!-- opendrone-review-report -->";
 pub const CI_ACCOUNT: &str = "github-actions[bot]";
 /// The label for a PR that waits for the maintainer.
 pub const NEEDS_MAINTAINER: &str = "needs-maintainer";
+/// The label for a PR whose review rounds ran out, until a triage comment
+/// moves what still blocks into its own issue.
+pub const NEEDS_TRIAGE: &str = "needs-triage";
 /// The label for a merged PR that skipped a check.
 pub const SKIPPED_A_CHECK: &str = "skipped-a-check";
 /// Area labels start with this, such as `area: Physics`.
@@ -44,7 +47,16 @@ impl Label {
         Label {
             name: NEEDS_MAINTAINER.to_string(),
             colour: "B60205",
-            description: "Waits for the maintainer: a Red Flag, or three failed review rounds"
+            description: "Waits for the maintainer, such as for a Red Flag".to_string(),
+        }
+    }
+
+    pub fn needs_triage() -> Label {
+        Label {
+            name: NEEDS_TRIAGE.to_string(),
+            colour: "FBCA04",
+            description: "Needs sorting; on a PR, five review rounds failed and what still blocks \
+                          needs its own issue"
                 .to_string(),
         }
     }
@@ -263,7 +275,8 @@ pub struct Update {
 
 /// Works out the update. `known_areas` are the Areas in main's CODEOWNERS:
 /// only those become labels. `sharing` are the PRs GitHub lists for the head
-/// commit, this one included or not.
+/// commit, this one included or not. `issues` are GitHub's records of the
+/// issues its triage comments name.
 ///
 /// A commit status belongs to a commit, not to a PR, so:
 /// - only a PR into the default branch gets the two statuses; one into any
@@ -279,8 +292,9 @@ pub fn update(
     skipped: &[SkippedMerge],
     known_areas: &[String],
     sharing: &[SharingPr],
+    issues: &[Issue],
 ) -> Update {
-    let check = verdict::review_check(pr, comments);
+    let check = verdict::review_check(pr, comments, issues);
     let gate = match report {
         Report::Ready {
             waits_for_maintainer: true,
@@ -421,15 +435,24 @@ pub fn update(
 
     let mut add = Vec::new();
     let mut remove = Vec::new();
+    let has = |name: &str| pr.labels.iter().any(|l| l == name);
     let waits = matches!(
         report,
         Report::Ready {
             waits_for_maintainer: true,
             ..
         }
-    ) || check.failed_rounds >= verdict::ROUNDS;
-    if waits && !pr.labels.iter().any(|l| l == NEEDS_MAINTAINER) {
+    );
+    if waits && !has(NEEDS_MAINTAINER) {
         add.push(Label::needs_maintainer());
+    }
+    // Five failed rounds wait for triage, not for the maintainer; the label
+    // comes off once a triage comment counts.
+    if check.waits_for_triage() && !has(NEEDS_TRIAGE) {
+        add.push(Label::needs_triage());
+    }
+    if check.triaged_to.is_some() && has(NEEDS_TRIAGE) {
+        remove.push(NEEDS_TRIAGE.to_string());
     }
     if let Report::Ready { areas, .. } = report {
         let wanted: Vec<&String> = areas.iter().filter(|a| known_areas.contains(a)).collect();
