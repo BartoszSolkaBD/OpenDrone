@@ -56,7 +56,7 @@ fn changes_needed_on_the_latest_commit_fails_the_review_check() {
         .update();
     update.check_is(
         "failure",
-        "The Reviewer asked for changes on 1111111 (round 1 of 3)",
+        "The Reviewer asked for changes on 1111111 (round 1 of 5)",
     );
 }
 
@@ -68,41 +68,282 @@ fn only_the_newest_verdict_counts() {
         .update();
     failed_after_a_pass.check_is(
         "failure",
-        "The Reviewer asked for changes on 1111111 (round 1 of 3)",
+        "The Reviewer asked for changes on 1111111 (round 1 of 5)",
     );
     let passed_after_a_fail = Pr::new("changes-then-pass")
         .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
         .comment(MAINTAINER, &verdict(HEAD, "pass"))
         .update();
     passed_after_a_fail.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
-    passed_after_a_fail.says("Failed review rounds: 1 of 3.");
+    passed_after_a_fail.says("Failed review rounds: 1 of 5.");
+}
+
+// Review rounds, and triage after the fifth failed one (#120).
+
+#[test]
+fn a_pass_in_the_fourth_or_the_fifth_review_round_passes_the_review_check() {
+    for failed in [3, 4] {
+        let update = Pr::new(&format!("pass-in-round-{}", failed + 1))
+            .failed_rounds(failed, OLDER)
+            .comment(MAINTAINER, &verdict(HEAD, "pass"))
+            .update();
+        update.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+        update.says(&format!("Failed review rounds: {failed} of 5."));
+        assert!(update.add.is_empty(), "{:?}", update.add);
+    }
 }
 
 #[test]
-fn after_three_failed_review_rounds_the_pr_waits_for_the_maintainer_even_with_a_pass() {
-    let update = Pr::new("three-rounds")
-        .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
-        .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
-        .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
+fn a_fifth_failed_review_round_fails_the_review_check_and_labels_the_pr_needs_triage() {
+    let update = Pr::new("five-rounds")
+        .failed_rounds(4, OLDER)
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .update();
+    update.check_is("failure", &out_of_rounds(5));
+    update.says("Failed review rounds: 5 of 5.");
+    update.says("this PR gets the `needs-triage` label");
+    update.says("first line is `Triaged to #<issue>`");
+    update.adds_label("needs-triage");
+    update.does_not_add_label("needs-maintainer");
+    let already = Pr::new("five-rounds-labelled")
+        .label("needs-triage")
+        .failed_rounds(5, HEAD)
+        .update();
+    assert!(already.add.is_empty(), "{:?}", already.add);
+    assert!(already.remove.is_empty(), "{:?}", already.remove);
+}
+
+#[test]
+fn after_five_failed_review_rounds_a_pass_alone_still_fails_the_review_check() {
+    let update = Pr::new("five-rounds-then-pass")
+        .failed_rounds(5, OLDER)
         .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .update();
+    update.check_is("failure", &out_of_rounds(5));
+    update.adds_label("needs-triage");
+}
+
+#[test]
+fn a_triaged_to_comment_from_the_maintainer_s_account_after_five_failed_rounds_passes_the_review_check()
+ {
+    let update = Pr::new("triaged")
+        .label("needs-triage")
+        .failed_rounds(4, OLDER)
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .comment(
+            MAINTAINER,
+            "Triaged to #200\n\nThe two blocking problems left are in #200.",
+        )
+        .issue(200, "open")
         .update();
     update.check_is(
-        "failure",
-        "3 review rounds failed, so this PR waits for the maintainer",
+        "success",
+        "Triaged to #200 after 5 failed review rounds: passes on 1111111",
     );
-    update.adds_label("needs-maintainer");
+    update.says("**Review check: passes.**");
+    update.says(
+        "Failed review rounds: 5 of 5. What still blocked is triaged to \
+         [#200](https://github.com/BartoszSolkaBD/OpenDrone/issues/200).",
+    );
+    assert_eq!(update.remove, ["needs-triage"]);
+    assert!(update.add.is_empty(), "{:?}", update.add);
 }
 
 #[test]
-fn two_failed_review_rounds_and_a_pass_on_the_latest_commit_pass_the_review_check() {
-    let update = Pr::new("two-rounds")
-        .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
-        .comment(MAINTAINER, &verdict(OLDER, "changes needed"))
-        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+fn a_triage_passes_only_the_commit_the_fifth_verdict_reviewed_and_a_later_commit_needs_a_fresh_verdict()
+ {
+    let later_commit = Pr::new("triaged-older")
+        .failed_rounds(5, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .issue(200, "open")
         .update();
-    update.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
-    update.says("Failed review rounds: 2 of 3.");
+    later_commit.check_is(
+        "pending",
+        "Waiting for a fresh Verdict on 1111111; the triage covers 2222222",
+    );
+    later_commit.says("every new commit needs a fresh Verdict");
+    later_commit.says("What still blocked is triaged to [#200]");
+    later_commit.does_not_add_label("needs-triage");
+
+    let fresh_pass = Pr::new("triaged-then-pass")
+        .failed_rounds(5, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, &verdict(HEAD, "pass"))
+        .issue(200, "open")
+        .update();
+    fresh_pass.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+    fresh_pass.says("What still blocked is triaged to [#200]");
 }
+
+#[test]
+fn a_failed_round_after_the_triage_needs_a_triage_of_its_own() {
+    let failed_again = Pr::new("failed-after-triage")
+        .failed_rounds(5, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .issue(200, "open")
+        .update();
+    failed_again.check_is("failure", &out_of_rounds(6));
+    failed_again.says("Failed review rounds: 6 of 5.");
+    failed_again.adds_label("needs-triage");
+
+    let triaged_again = Pr::new("triaged-again")
+        .failed_rounds(5, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .comment(MAINTAINER, "Triaged to #201")
+        .issue(200, "open")
+        .issue(201, "open")
+        .update();
+    triaged_again.check_is(
+        "success",
+        "Triaged to #201 after 6 failed review rounds: passes on 1111111",
+    );
+}
+
+#[test]
+fn a_triaged_to_comment_before_the_fifth_failed_round_changes_nothing() {
+    let in_round_four = Pr::new("triage-too-early")
+        .failed_rounds(3, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .issue(200, "open")
+        .update();
+    in_round_four.check_is(
+        "failure",
+        "The Reviewer asked for changes on 1111111 (round 4 of 5)",
+    );
+    in_round_four.says("Failed review rounds: 4 of 5.");
+    assert!(
+        !in_round_four.comment.contains("triaged to"),
+        "{}",
+        in_round_four.comment
+    );
+    in_round_four.does_not_add_label("needs-triage");
+
+    let then_a_fifth = Pr::new("triage-before-the-fifth")
+        .failed_rounds(4, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, &verdict(HEAD, "changes needed"))
+        .issue(200, "open")
+        .update();
+    then_a_fifth.check_is("failure", &out_of_rounds(5));
+    then_a_fifth.adds_label("needs-triage");
+}
+
+#[test]
+fn a_triaged_to_comment_from_any_other_account_changes_nothing() {
+    for (i, author) in ["someone-else", "github-actions[bot]"].iter().enumerate() {
+        let update = Pr::new(&format!("triage-from-stranger-{i}"))
+            .failed_rounds(5, HEAD)
+            .comment(author, "Triaged to #200")
+            .issue(200, "open")
+            .update();
+        update.check_is("failure", &out_of_rounds(5));
+        update.adds_label("needs-triage");
+    }
+}
+
+#[test]
+fn a_triaged_to_comment_naming_a_closed_or_missing_issue_changes_nothing() {
+    let closed = Pr::new("triage-closed-issue")
+        .failed_rounds(5, HEAD)
+        .comment(MAINTAINER, "Triaged to #200")
+        .issue(200, "closed")
+        .update();
+    closed.check_is("failure", &out_of_rounds(5));
+    closed.says("`Triaged to #200` doesn't count: #200 isn't an open issue in this repo.");
+    closed.adds_label("needs-triage");
+
+    let missing = Pr::new("triage-missing-issue")
+        .failed_rounds(5, HEAD)
+        .comment(MAINTAINER, "Triaged to #200")
+        .update();
+    missing.check_is("failure", &out_of_rounds(5));
+    missing.says("`Triaged to #200` doesn't count: #200 isn't an open issue in this repo.");
+
+    // GitHub's issue records hold pull requests too, and an issue moved to
+    // another repo answers with that repo's record.
+    let a_pull_request = Pr::new("triage-names-a-pr")
+        .failed_rounds(5, HEAD)
+        .comment(MAINTAINER, "Triaged to #201")
+        .issue_record(json!({
+            "number": 201,
+            "state": "open",
+            "html_url": "https://github.com/BartoszSolkaBD/OpenDrone/pull/201",
+            "pull_request": {
+                "url": "https://api.github.com/repos/BartoszSolkaBD/OpenDrone/pulls/201",
+            },
+        }))
+        .update();
+    a_pull_request.check_is("failure", &out_of_rounds(5));
+    let moved = Pr::new("triage-names-a-moved-issue")
+        .failed_rounds(5, HEAD)
+        .comment(MAINTAINER, "Triaged to #202")
+        .issue_record(json!({
+            "number": 7,
+            "state": "open",
+            "html_url": "https://github.com/someone/elsewhere/issues/7",
+        }))
+        .update();
+    moved.check_is("failure", &out_of_rounds(5));
+}
+
+#[test]
+fn a_comment_is_a_triage_only_in_the_exact_format() {
+    let not_triages = [
+        "Triaged to #200, mostly",
+        "triaged to #200",
+        "Triaged to 200",
+        "Triaged to #",
+        "Triaged to #0200",
+        "Triaged to #200 #201",
+        " Triaged to #200",
+        "Some words first.\nTriaged to #200",
+    ];
+    for (i, body) in not_triages.iter().enumerate() {
+        let update = Pr::new(&format!("not-a-triage-{i}"))
+            .failed_rounds(5, HEAD)
+            .comment(MAINTAINER, body)
+            .issue(200, "open")
+            .update();
+        update.check_is("failure", &out_of_rounds(5));
+    }
+    let with_trailing_space_and_windows_lines = Pr::new("triage-crlf")
+        .failed_rounds(5, HEAD)
+        .comment(
+            MAINTAINER,
+            "\r\nTriaged to #200  \r\n\r\nWhat still blocks: the tolerance.\r\n",
+        )
+        .issue(200, "open")
+        .update();
+    with_trailing_space_and_windows_lines.check_is(
+        "success",
+        "Triaged to #200 after 5 failed review rounds: passes on 1111111",
+    );
+}
+
+#[test]
+fn the_workflow_looks_up_only_the_issues_a_triage_comment_could_pass_with() {
+    let too_few_rounds = Pr::new("lookups-too-few")
+        .failed_rounds(4, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .triage_issues();
+    assert_eq!(too_few_rounds, Vec::<String>::new());
+
+    let lookups = Pr::new("lookups")
+        .failed_rounds(4, OLDER)
+        .comment(MAINTAINER, "Triaged to #100")
+        .failed_rounds(1, OLDER)
+        .comment("someone-else", "Triaged to #101")
+        .comment(MAINTAINER, "Triaged to #200")
+        .comment(MAINTAINER, "Triaged to #201")
+        .comment(MAINTAINER, "Triaged to #200")
+        .triage_issues();
+    assert_eq!(lookups, ["200", "201"], "newest first, each once");
+}
+
+// Who can pass, and what counts as a Verdict.
 
 #[test]
 fn a_verdict_from_any_other_account_is_not_a_verdict() {
@@ -489,6 +730,12 @@ fn verdict(commit: &str, says: &str) -> String {
     )
 }
 
+/// The Review check's description once `failed` rounds have failed and no
+/// triage counts.
+fn out_of_rounds(failed: usize) -> String {
+    format!("{failed} review rounds failed: waiting for a triage comment naming an open issue")
+}
+
 fn scratch(kind: &str, name: &str) -> PathBuf {
     let root = Path::new(env!("CARGO_TARGET_TMPDIR")).join(kind).join(name);
     let _ = fs::remove_dir_all(&root);
@@ -509,6 +756,8 @@ struct Pr {
     skipped: Vec<Value>,
     /// The PRs that hold the same head commit, as GitHub lists them.
     sharing: Vec<Value>,
+    /// GitHub's records of the issues triage comments name.
+    issues: Vec<Value>,
 }
 
 impl Pr {
@@ -538,6 +787,7 @@ impl Pr {
                 "base": { "ref": "main" },
                 "head": { "sha": HEAD },
             })],
+            issues: Vec::new(),
         }
     }
 
@@ -582,6 +832,28 @@ impl Pr {
         self.comment_with_id(id, author, body)
     }
 
+    /// `count` Verdicts of changes needed on `commit`, one after another.
+    fn failed_rounds(self, count: usize, commit: &str) -> Pr {
+        (0..count).fold(self, |pr, _| {
+            pr.comment(MAINTAINER, &verdict(commit, "changes needed"))
+        })
+    }
+
+    /// GitHub's record of an issue in this repo, `open` or `closed`.
+    fn issue(self, number: u64, state: &str) -> Pr {
+        self.issue_record(json!({
+            "number": number,
+            "state": state,
+            "html_url": format!("https://github.com/BartoszSolkaBD/OpenDrone/issues/{number}"),
+        }))
+    }
+
+    /// GitHub's answer when the workflow looks up an issue.
+    fn issue_record(mut self, record: Value) -> Pr {
+        self.issues.push(record);
+        self
+    }
+
     fn comment_with_id(mut self, id: u64, author: &str, body: &str) -> Pr {
         self.comments.push(json!({
             "id": id,
@@ -618,16 +890,42 @@ impl Pr {
         self
     }
 
+    /// Writes the comments as two pages, as `gh api --paginate` prints them.
+    fn write_comments(&self) -> PathBuf {
+        let (first, second) = self.comments.split_at(self.comments.len() / 2);
+        let path = self.root.join("comments.json");
+        fs::write(&path, format!("{}\n{}", json!(first), json!(second)))
+            .expect("can write the comments");
+        path
+    }
+
+    /// Runs `cargo xtask triage-issues`, as the privileged workflow does, and
+    /// returns each issue it would look up.
+    fn triage_issues(&self) -> Vec<String> {
+        let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
+            .arg("triage-issues")
+            .arg("--comments")
+            .arg(self.write_comments())
+            .output()
+            .expect("xtask runs");
+        assert!(
+            output.status.success(),
+            "triage-issues failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(str::to_string)
+            .collect()
+    }
+
     /// Runs `cargo xtask review-update`, as the privileged workflow does.
     fn update(&self) -> Update {
         write_json(&self.root.join("pr.json"), &self.pr);
-        // Two pages, as `gh api --paginate` prints them.
-        let (first, second) = self.comments.split_at(self.comments.len() / 2);
-        fs::write(
-            self.root.join("comments.json"),
-            format!("{}\n{}", json!(first), json!(second)),
-        )
-        .expect("can write the comments");
+        self.write_comments();
+        // One record after another, as the workflow saves them.
+        let issues: Vec<String> = self.issues.iter().map(Value::to_string).collect();
+        fs::write(self.root.join("issues.json"), issues.join("\n")).expect("can write the issues");
         write_json(&self.root.join("head-pulls.json"), &json!(self.sharing));
         write_json(
             &self.root.join("skipped.json"),
@@ -646,6 +944,8 @@ impl Pr {
             .arg(self.root.join("skipped.json"))
             .arg("--head-pulls")
             .arg(self.root.join("head-pulls.json"))
+            .arg("--issues")
+            .arg(self.root.join("issues.json"))
             .arg("--codeowners")
             .arg(codeowners)
             .arg("--out")
@@ -725,6 +1025,14 @@ impl Update {
         assert!(
             self.add.iter().any(|l| l["name"] == name),
             "expected the label {name} to be added: {:?}",
+            self.add
+        );
+    }
+
+    fn does_not_add_label(&self, name: &str) {
+        assert!(
+            !self.add.iter().any(|l| l["name"] == name),
+            "expected no label {name} to be added: {:?}",
             self.add
         );
     }

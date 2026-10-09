@@ -10,7 +10,14 @@ When a [Delegator](delegator.md) runs the batch, it starts the Reviewers and pic
 2. Start a new agent with none of your conversation. Give it only the PR number and this page.
 3. If the Verdict is changes needed, fix the problems, push, and start a **new** Reviewer. Never reuse one.
 
-Every new commit needs a fresh Verdict, even a merge of main into the branch. Say main was merged into a PR after a pass, and the only changes since are main's own, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. That is a merge-only update, and a fresh agent can run the shorter [merge-only update check](merge-update.md) instead of a full review. After 3 failed review rounds, the PR waits for the maintainer.
+Every new commit needs a fresh Verdict, even a merge of main into the branch. Say main was merged into a PR after a pass, and the only changes since are main's own, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. That is a merge-only update, and a fresh agent can run the shorter [merge-only update check](merge-update.md) instead of a full review.
+
+A PR gets up to 5 review rounds. A pass in round 4 or 5 passes the Review check as usual. When the fifth round fails, the PR doesn't wait for the maintainer. It gets the `needs-triage` label, and what still blocks moves into its own issue, to be fixed in a later run:
+
+1. File the remaining blocking problems as one issue, with a link to the fifth Verdict. The [Delegator](delegator.md#when-a-verdict-arrives) does this when it runs the batch.
+2. Post a comment on the PR from the maintainer's account whose first line is exactly `Triaged to #<issue>`, naming that open issue.
+
+That comment counts as a pass Verdict on the commit the fifth Verdict reviewed. CI then takes the `needs-triage` label off. A later commit still needs a fresh Verdict, and a sixth failed round needs a triage comment of its own, posted after it.
 
 ## For the Reviewer: what to read
 
@@ -116,8 +123,17 @@ The Report is worked out by main's code, so a PR that changes the review workflo
 
 | The Review check | When |
 |---|---|
-| **passes** | The newest Verdict covers the PR's latest commit and says pass. The PR was opened by the maintainer's account or by Dependabot, from a branch in this repo. Fewer than 3 review rounds have failed. |
+| **passes** | The newest Verdict covers the PR's latest commit and says pass, or a triage comment turned it into a pass. The PR was opened by the maintainer's account or by Dependabot, from a branch in this repo. Fewer than 5 review rounds have failed, or a triage comment covers the newest failed one. |
 | **waits** | No Verdict covers the latest commit yet. |
-| **fails** | The newest Verdict on the latest commit says changes needed. Or the PR was opened by someone else, or from a fork. Or 3 rounds have failed: the PR then waits for the maintainer and gets the `needs-maintainer` label. |
+| **fails** | The newest Verdict on the latest commit says changes needed. Or the PR was opened by someone else, or from a fork. Or 5 rounds have failed and no triage comment covers the newest: the PR then gets the `needs-triage` label until one does. |
 
-Each `Verdict: changes needed` counts as one failed round.
+Each `Verdict: changes needed` counts as one failed round. A triage comment turns the newest failed Verdict into a pass on the commit that Verdict reviewed. It counts only when all of these hold:
+
+- it comes from the maintainer's account;
+- its first line is exactly `Triaged to #<issue>`;
+- it comes after the newest failed Verdict, once 5 have failed;
+- the issue it names is open, and is an issue in this repo, not a pull request.
+
+Otherwise it changes nothing. CI looks the issue up each time it works out the Review check. The Review Report shows the failed rounds out of 5, and links the triage issue when there is one.
+
+Running out of rounds never adds `needs-maintainer`. The Red Flag gate is separate: whatever it holds for the maintainer still waits for them.

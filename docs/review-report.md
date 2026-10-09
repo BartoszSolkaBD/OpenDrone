@@ -4,7 +4,7 @@ Every pull request gets one **Review Report**: a comment from CI (`github-action
 
 | Section | What it shows |
 |---|---|
-| **Verdict** | The Review check: whether the newest Verdict covers the latest commit and says pass. It also gives a warning naming any earlier merge that skipped a check. |
+| **Verdict** | The Review check: whether the newest Verdict covers the latest commit and says pass, the failed review rounds out of 5, and the triage issue when there is one. It also gives a warning naming any earlier merge that skipped a check. |
 | **Red Flags** | Changes that could weaken a check or a decision. Some wait for you, some the Reviewer decides, and some are only listed. |
 | **What moved** | Every Expectation whose measured value moved, biggest move first, before and after, from the Scenarios' Results files. |
 | **Speed** | Work Counts against main. Not measured yet: they arrive with #78 and #79. |
@@ -49,11 +49,19 @@ The Areas come from the comment above each block in main's `.github/CODEOWNERS`,
 
 The Review check is a commit status on the PR's latest commit, set only for PRs into main (see below). It **passes** only when all three hold:
 
-- the newest Verdict covers that commit and says pass;
+- the newest Verdict covers that commit and says pass, or a triage comment turned it into a pass (below);
 - the PR was opened by the maintainer's account or by Dependabot, from a branch in this repo;
-- fewer than 3 review rounds have failed.
+- fewer than 5 review rounds have failed, or a triage comment covers the newest failed one.
 
-It **waits** while no Verdict covers the latest commit. It **fails** otherwise. After 3 failed rounds the PR also gets the `needs-maintainer` label. Only comments from the maintainer's account count as Verdicts.
+It **waits** while no Verdict covers the latest commit. It **fails** otherwise. Only comments from the maintainer's account count as Verdicts. Each Verdict of changes needed is one failed review round, and the Report shows them out of 5, such as "Failed review rounds: 2 of 5."
+
+**After 5 failed rounds,** the PR doesn't wait for you. The Review check fails, and the PR gets the `needs-triage` label. The Delegator files what still blocks as its own issue, to be fixed in a later run. Then it posts a triage comment from your account: one whose first line is exactly `Triaged to #<issue>`, naming that issue.
+
+- **It counts** only when it comes from your account, after the newest failed Verdict, once 5 have failed, and names an open issue in this repo. CI looks the issue up each time it works out the Review check. A closed issue, a missing one or a pull request's number counts for nothing, and the Report says so.
+- **It turns the newest failed Verdict into a pass** on the commit that Verdict reviewed. On that commit the Review check passes, the `needs-triage` label comes off, and the Report links the issue.
+- **A later commit needs a fresh Verdict,** as usual. A later failed round needs a triage comment of its own, after it.
+
+Running out of rounds never adds `needs-maintainer`. The Red Flag gate is separate: what it holds still waits for you.
 
 ## Merges that skipped a check
 
@@ -82,6 +90,7 @@ For all three, GitHub runs the workflow file as it is on main, even when the PR 
 
 - **The PR's latest commit.** It is fetched by its SHA as git objects and read only with `git show`, `git diff` and `git ls-tree`, against the commit where the PR branched off main. No `cargo`, `rustup` or other tool ever runs on the PR's files, so its `rust-toolchain`, `.cargo/config.toml` and build scripts have no effect on this workflow.
 - **The PR's comments and details,** from GitHub's API. Only the maintainer's account's comments count as Verdicts.
+- **The issues triage comments name,** from GitHub's API, once 5 review rounds have failed. xtask lists them from the comments, as numbers, at most 10, and the script checks each is only digits before it goes into a web address. The workflow's existing `issues: write` permission reads them; it asks for no new one.
 - **The new libraries' licences,** from crates.io's API. The names and versions come from the PR's `Cargo.lock`, so they are checked before they go into a web address: a name of letters, digits, `-` and `_`, and a version that starts with a digit and holds no `..`.
 
 **Every piece of text from the PR or crates.io is escaped before it reaches the Report.** That covers file names, Scenario text and reasons, lines of code, library names and licences. So it can't start a heading, open HTML, forge the Report's hidden marker, fake a Verdict section or mention anyone. Invisible formatting characters, such as U+202E, which shows the text after it right to left, appear as their codes.
@@ -128,6 +137,7 @@ You can work out the Report locally: `cargo xtask review-report --base origin/ma
 
 - A change to the review workflow, its script or xtask takes effect only once it is on main. Until then the PR is judged by main's copy. That is why such a change is a Repo rules change: the Reviewer judges it from the diff, not from the Report.
 - CI (`ci.yml`) runs the PR's code, as it must. Unchanged, it has a read-only token, and nothing it produces reaches the Red Flag gate or the Report.
+- A triage comment's issue is checked only when the Review check is worked out. Closing that issue later doesn't run the workflow, so the Review check keeps its result until the next push or comment.
 - If a run stops early, for example if GitHub doesn't have the PR's latest commit yet, that commit keeps its pending or error statuses until the next push or comment. That fails closed: the PR waits. A comment's run that can't read the PR's record at all changes nothing; its failed run is the trace.
 - Dependabot's own runs get a read-only token. So on a Dependabot PR, the Report and both statuses appear once the maintainer's account comments.
 - Code examples in doc comments are doctests. rustc reads them as comments, and they build as crates of their own that ship nowhere and that neither the house rules nor `unsafe_code = "forbid"` reach (a doctest with `unsafe` runs in `cargo test --doc` even so). The Red Flags don't read them; the Reviewer does.

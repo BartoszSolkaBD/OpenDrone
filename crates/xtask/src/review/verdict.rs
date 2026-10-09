@@ -1,14 +1,23 @@
-//! Verdicts and the Review check (#15 §3, ADR-0010).
+//! Verdicts, triage and the Review check (#15 §3, #120, ADR-0010).
 //!
 //! A Verdict is a PR comment from the maintainer's account (agents work under
 //! it) whose first line is `Reviewed commit <full SHA>` and whose last line is
-//! exactly `Verdict: pass` or `Verdict: changes needed`. The Review check
-//! passes only when:
+//! exactly `Verdict: pass` or `Verdict: changes needed`. Each Verdict of
+//! changes needed is one failed review round. The Review check passes only
+//! when:
 //!
 //! - the PR was opened by the maintainer's account or by Dependabot, from a
 //!   branch in this repo;
-//! - fewer than 3 review rounds (Verdicts of changes needed) have failed;
+//! - fewer than 5 review rounds have failed, or a triage comment covers the
+//!   newest failed one (below);
 //! - the newest Verdict covers the PR's latest commit, and says pass.
+//!
+//! After 5 failed rounds, what still blocks is filed as its own issue, and a
+//! **triage comment** from the maintainer's account says so: its first line is
+//! exactly `Triaged to #<issue>`, naming an open issue in this repo. One that
+//! comes after the newest failed Verdict, once 5 have failed, counts as a pass
+//! Verdict on the commit that failed Verdict reviewed. A later commit needs a
+//! fresh Verdict as usual, and a later failed round needs a triage of its own.
 
 use serde_json::Value;
 
@@ -17,8 +26,11 @@ use serde_json::Value;
 pub const MAINTAINER: &str = "BartoszSolkaBD";
 /// Dependabot's account, whose PRs may pass the Review check too.
 pub const DEPENDABOT: &str = "dependabot[bot]";
-/// After this many failed review rounds, the PR waits for the maintainer.
-pub const ROUNDS: usize = 3;
+/// A PR gets this many review rounds. Once this many have failed, the Review
+/// check fails until a triage comment covers the newest failed one.
+pub const ROUNDS: usize = 5;
+/// The most issues the workflow looks up for triage comments.
+const MOST_TRIAGE_LOOKUPS: usize = 10;
 
 /// What the PR's API record says, as far as the Review check needs it.
 #[derive(Clone, Debug)]
@@ -136,6 +148,8 @@ pub struct Verdict {
     pub commit: String,
     pub pass: bool,
     pub url: String,
+    /// Its comment's place among the PR's comments, oldest first.
+    pub place: usize,
 }
 
 /// The Verdict in a comment's text, if it is one: the first line names the
@@ -163,16 +177,121 @@ pub fn read_verdict(body: &str) -> Option<(String, bool)> {
 pub fn verdicts(comments: &[Comment]) -> Vec<Verdict> {
     comments
         .iter()
-        .filter(|comment| comment.author == MAINTAINER)
-        .filter_map(|comment| {
+        .enumerate()
+        .filter(|(_, comment)| comment.author == MAINTAINER)
+        .filter_map(|(place, comment)| {
             let (commit, pass) = read_verdict(&comment.body)?;
             Some(Verdict {
                 commit,
                 pass,
                 url: comment.url.clone(),
+                place,
             })
         })
         .collect()
+}
+
+/// The issue a triage comment names, if the comment is one: its first line
+/// is exactly `Triaged to #<issue>`, with the issue's number as GitHub writes
+/// it. Anything may follow on later lines.
+pub fn read_triage(body: &str) -> Option<u64> {
+    let first = body
+        .lines()
+        .map(str::trim_end)
+        .find(|line| !line.is_empty())?;
+    let number = first.strip_prefix("Triaged to #")?;
+    let digits =
+        !number.is_empty() && number.len() <= 10 && number.bytes().all(|b| b.is_ascii_digit());
+    if !digits || number.starts_with('0') {
+        return None;
+    }
+    number.parse().ok()
+}
+
+/// A triage comment that could cover the newest failed Verdict.
+#[derive(Clone, Debug)]
+struct Triage {
+    issue: u64,
+    url: String,
+}
+
+/// The triage comments that could pass the Review check, oldest first: from
+/// the maintainer's account, after the newest failed Verdict, once
+/// [`ROUNDS`] review rounds have failed. Whether each names an open issue is
+/// for GitHub to say.
+fn triage_comments(comments: &[Comment]) -> Vec<Triage> {
+    let verdicts = verdicts(comments);
+    let failed: Vec<&Verdict> = verdicts.iter().filter(|v| !v.pass).collect();
+    let Some(newest_failed) = failed.last().filter(|_| failed.len() >= ROUNDS) else {
+        return Vec::new();
+    };
+    comments
+        .iter()
+        .skip(newest_failed.place + 1)
+        .filter(|comment| comment.author == MAINTAINER)
+        .filter_map(|comment| {
+            Some(Triage {
+                issue: read_triage(&comment.body)?,
+                url: comment.url.clone(),
+            })
+        })
+        .collect()
+}
+
+/// The issues the workflow looks up for the triage comments that could pass
+/// the Review check: newest first, each once, at most 10.
+pub fn triage_issues(comments: &[Comment]) -> Vec<u64> {
+    let mut issues: Vec<u64> = Vec::new();
+    for triage in triage_comments(comments).iter().rev() {
+        if !issues.contains(&triage.issue) && issues.len() < MOST_TRIAGE_LOOKUPS {
+            issues.push(triage.issue);
+        }
+    }
+    issues
+}
+
+/// GitHub's record of an issue a triage comment names.
+#[derive(Clone, Debug)]
+pub struct Issue {
+    pub number: u64,
+    pub state: String,
+    /// Its web address, such as `https://github.com/owner/repo/issues/120`.
+    pub url: String,
+}
+
+impl Issue {
+    /// Reads GitHub's issue records (`GET /repos/{owner}/{repo}/issues/{n}`),
+    /// one after another. A record without a number is left out.
+    pub fn list_from_api(text: &str) -> Result<Vec<Issue>, String> {
+        let mut issues = Vec::new();
+        for record in serde_json::Deserializer::from_str(text).into_iter::<Value>() {
+            let record = record.map_err(|error| format!("the issues aren't JSON: {error}"))?;
+            let text = |key: &str| {
+                record
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string()
+            };
+            if let Some(number) = record.get("number").and_then(Value::as_u64) {
+                issues.push(Issue {
+                    number,
+                    state: text("state"),
+                    url: text("html_url"),
+                });
+            }
+        }
+        Ok(issues)
+    }
+
+    /// Whether it is an open issue in the PR's repo. GitHub's issue records
+    /// hold pull requests too, whose address has `/pull/`, and an issue moved
+    /// to another repo answers with that repo's record and address.
+    fn is_open_in(&self, pr: &PullRequest) -> bool {
+        self.state == "open"
+            && !pr.repo_url.is_empty()
+            && self.url == format!("{}/issues/{}", pr.repo_url, self.number)
+    }
 }
 
 /// A commit status, as GitHub shows the Review check and the Red Flag gate.
@@ -208,19 +327,51 @@ pub struct ReviewCheck {
     pub report: String,
     /// How many review rounds have failed.
     pub failed_rounds: usize,
+    /// The issue a triage comment moved what still blocked into, once
+    /// [`ROUNDS`] review rounds have failed.
+    pub triaged_to: Option<u64>,
 }
 
-/// Works out the Review check from the PR and its comments.
-pub fn review_check(pr: &PullRequest, comments: &[Comment]) -> ReviewCheck {
+impl ReviewCheck {
+    /// Whether [`ROUNDS`] review rounds have failed and no triage comment
+    /// covers the newest one: the PR then gets the `needs-triage` label.
+    pub fn waits_for_triage(&self) -> bool {
+        self.failed_rounds >= ROUNDS && self.triaged_to.is_none()
+    }
+}
+
+/// Works out the Review check from the PR, its comments, and GitHub's records
+/// of the issues its triage comments name ([`triage_issues`]).
+pub fn review_check(pr: &PullRequest, comments: &[Comment], issues: &[Issue]) -> ReviewCheck {
     let verdicts = verdicts(comments);
     let failed_rounds = verdicts.iter().filter(|v| !v.pass).count();
     let head = short(&pr.head_sha);
-    let rounds = format!("Failed review rounds: {failed_rounds} of {ROUNDS}.");
+    let open = |issue: u64| issues.iter().any(|i| i.number == issue && i.is_open_in(pr));
+    // The newest triage comment that names an open issue.
+    let triage = triage_comments(comments)
+        .into_iter()
+        .rev()
+        .find(|t| open(t.issue));
+    let link = |issue: u64| {
+        if pr.repo_url.is_empty() {
+            format!("#{issue}")
+        } else {
+            format!("[#{issue}]({}/issues/{issue})", pr.repo_url)
+        }
+    };
+    let mut rounds = format!("Failed review rounds: {failed_rounds} of {ROUNDS}.");
+    if let Some(triage) = &triage {
+        rounds.push_str(&format!(
+            " What still blocked is triaged to {}.",
+            link(triage.issue)
+        ));
+    }
     let check = |state, description: String, report: String| ReviewCheck {
         state,
         description,
         report,
         failed_rounds,
+        triaged_to: triage.as_ref().map(|t| t.issue),
     };
 
     let trusted_author = pr.author == MAINTAINER || pr.author == DEPENDABOT;
@@ -242,14 +393,31 @@ pub fn review_check(pr: &PullRequest, comments: &[Comment]) -> ReviewCheck {
             ),
         );
     }
-    if failed_rounds >= ROUNDS {
+    if failed_rounds >= ROUNDS && triage.is_none() {
+        let reviewed = verdicts
+            .iter()
+            .rev()
+            .find(|v| !v.pass)
+            .map_or("", |v| short(&v.commit));
+        let mut report = format!(
+            "**Review check: fails.** {failed_rounds} review rounds have failed, so this PR gets \
+             the `needs-triage` label. What still blocks goes into its own issue. Then a comment \
+             from the maintainer's account whose first line is `Triaged to #<issue>`, naming that \
+             open issue, counts as a pass Verdict on `{reviewed}`, the commit the last failed \
+             Verdict reviewed. {rounds}"
+        );
+        for issue in triage_issues(comments) {
+            report.push_str(&format!(
+                " `Triaged to #{issue}` doesn't count: #{issue} isn't an open issue in this repo."
+            ));
+        }
         return check(
             State::Failure,
-            format!("{failed_rounds} review rounds failed, so this PR waits for the maintainer"),
             format!(
-                "**Review check: fails.** {failed_rounds} review rounds have failed, so this PR \
-                 waits for the maintainer, and it gets the `needs-maintainer` label."
+                "{failed_rounds} review rounds failed: waiting for a triage comment naming an open \
+                 issue"
             ),
+            report,
         );
     }
     let Some(newest) = verdicts.last() else {
@@ -262,24 +430,52 @@ pub fn review_check(pr: &PullRequest, comments: &[Comment]) -> ReviewCheck {
             ),
         );
     };
+    let reviewed = short(&newest.commit);
+    let on_head = newest.commit == pr.head_sha.to_ascii_lowercase();
+    // A triage comment comes after the newest failed Verdict, so when the
+    // newest Verdict fails, the triage counts as a pass on its commit.
+    if let Some(triage) = triage.as_ref().filter(|_| !newest.pass) {
+        return if on_head {
+            check(
+                State::Success,
+                format!(
+                    "Triaged to #{} after {failed_rounds} failed review rounds: passes on {head}",
+                    triage.issue
+                ),
+                format!(
+                    "**Review check: passes.** The [triage comment]({}) counts as a pass Verdict \
+                     on the latest commit, `{head}`, which the last failed Verdict reviewed. A \
+                     later commit needs a fresh Verdict. {rounds}",
+                    triage.url
+                ),
+            )
+        } else {
+            check(
+                State::Pending,
+                format!("Waiting for a fresh Verdict on {head}; the triage covers {reviewed}"),
+                format!(
+                    "**Review check: waiting.** The [triage comment]({}) counts as a pass Verdict \
+                     on `{reviewed}`, the commit the last failed Verdict reviewed, but the latest \
+                     commit is `{head}`, and every new commit needs a fresh Verdict. {rounds}",
+                    triage.url
+                ),
+            )
+        };
+    }
     let said = if newest.pass {
         "pass"
     } else {
         "changes needed"
     };
-    if newest.commit != pr.head_sha.to_ascii_lowercase() {
+    if !on_head {
         return check(
             State::Pending,
+            format!("Waiting for a fresh Verdict on {head}; the newest covers {reviewed}"),
             format!(
-                "Waiting for a fresh Verdict on {head}; the newest covers {}",
-                short(&newest.commit)
-            ),
-            format!(
-                "**Review check: waiting.** The [newest Verdict]({}) says {said} on `{}`, but \
-                 the latest commit is `{head}`, and every new commit needs a fresh Verdict. \
+                "**Review check: waiting.** The [newest Verdict]({}) says {said} on `{reviewed}`, \
+                 but the latest commit is `{head}`, and every new commit needs a fresh Verdict. \
                  {rounds}",
-                newest.url,
-                short(&newest.commit)
+                newest.url
             ),
         );
     }
@@ -299,8 +495,8 @@ pub fn review_check(pr: &PullRequest, comments: &[Comment]) -> ReviewCheck {
             format!("The Reviewer asked for changes on {head} (round {failed_rounds} of {ROUNDS})"),
             format!(
                 "**Review check: fails.** The Reviewer's [Verdict]({}) on the latest commit, \
-                 `{head}`, is changes needed. {rounds} After {ROUNDS}, each with a new Reviewer, \
-                 the PR waits for the maintainer.",
+                 `{head}`, is changes needed. {rounds} After {ROUNDS} failed rounds, each with a \
+                 new Reviewer, what still blocks moves to its own issue.",
                 newest.url
             ),
         )
