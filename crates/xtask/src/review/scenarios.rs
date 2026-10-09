@@ -6,16 +6,19 @@
 //! be updated with a one-line reason; a loosened tolerance on one, or removing
 //! one, is for the Reviewer to decide. A deleted Scenario is for the Reviewer
 //! too. An Expectation is matched by what it measures and when (with its
-//! moment read as a time, so "1 s" and "1.0 s" match), so moving it within the
-//! file changes nothing. A deleted Scenario's Expectations are looked for in
-//! every Scenario the pull request adds, whatever its file or name: one found
-//! unchanged has only moved, and a Source or Rule one found nowhere unchanged
-//! waits for the maintainer.
+//! moment read as a time, so "1 s" and "1.0 s" match), and, inside a Flight
+//! Controller Scenario's `[[case]]`, by its case: the case's sticks, Arm
+//! switch and sensor readings (with each number read as a value, so "0%" and
+//! "0.0 %" match). So moving it within the file changes nothing. Expectations
+//! are read wherever the Scenario format lets them sit. A deleted Scenario's
+//! Expectations are looked for in every Scenario the pull request adds,
+//! whatever its file or name: one found unchanged has only moved, and a
+//! Source or Rule one found nowhere unchanged waits for the maintainer.
 //!
 //! A Scenario's setup, the flight its Expectations check, is compared too:
-//! every field but its Expectations, and the Test Quad it flies. When a
-//! deleted Scenario's Expectations went to several new files, each new file's
-//! setup is compared with the old one.
+//! every field but its Expectations and the cases they sit in, and the Test
+//! Quad it flies. When a deleted Scenario's Expectations went to several new
+//! files, each new file's setup is compared with the old one.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -52,8 +55,9 @@ pub fn is_scenario(path: &str) -> bool {
 struct ScenarioFile {
     name: Option<String>,
     expectations: Vec<Expectation>,
-    /// Everything that sets up the flight: every field but the Expectations,
-    /// the name and the format, by dotted name, such as `start.physics_rate`.
+    /// Everything that sets up the flight: every field but the Expectations
+    /// (with the cases they sit in), the name and the format, by dotted
+    /// name, such as `start.physics_rate`.
     setup: BTreeMap<String, toml::Value>,
 }
 
@@ -61,9 +65,11 @@ impl ScenarioFile {
     fn read(text: &str) -> Option<ScenarioFile> {
         let table: toml::Table = text.parse().ok()?;
         let mut expectations = Vec::new();
-        collect(&table, "", &mut expectations);
+        collect(&table, &Place::default(), &mut expectations);
         let mut setup = BTreeMap::new();
         flatten(&table, "", &mut setup);
+        setup.remove("name");
+        setup.remove("format");
         Some(ScenarioFile {
             name: table
                 .get("name")
@@ -75,11 +81,12 @@ impl ScenarioFile {
     }
 }
 
-/// Every setup field, by dotted name: every value but the Expectations, and,
-/// at the top, the name and the format.
+/// Every field of a table, by dotted name, but its Expectations and the
+/// tables they sit in, such as a Flight Controller Scenario's `[[case]]`s: a
+/// case's sticks are part of what its Expectations measure, as a moment is.
 fn flatten(table: &toml::Table, prefix: &str, into: &mut BTreeMap<String, toml::Value>) {
     for (key, value) in table {
-        if key == "expect" || (prefix.is_empty() && (key == "name" || key == "format")) {
+        if key == "expect" {
             continue;
         }
         let name = if prefix.is_empty() {
@@ -87,43 +94,155 @@ fn flatten(table: &toml::Table, prefix: &str, into: &mut BTreeMap<String, toml::
         } else {
             format!("{prefix}.{key}")
         };
-        match value.as_table() {
-            Some(inner) => flatten(inner, &name, into),
-            None => {
+        match value {
+            toml::Value::Table(inner) => flatten(inner, &name, into),
+            toml::Value::Array(items) if items.iter().any(holds_expectations) => {}
+            _ => {
                 into.insert(name, value.clone());
             }
         }
     }
 }
 
-/// Every `[[expect]]` in the file, including ones inside a section such as
-/// `[osd]`.
-fn collect(table: &toml::Table, section: &str, into: &mut Vec<Expectation>) {
+/// Whether a value is a table that holds Expectations, at any depth.
+fn holds_expectations(value: &toml::Value) -> bool {
+    match value {
+        toml::Value::Table(table) => {
+            table.contains_key("expect") || table.values().any(holds_expectations)
+        }
+        toml::Value::Array(items) => items.iter().any(holds_expectations),
+        _ => false,
+    }
+}
+
+/// Every Expectation in the file, wherever it sits: `[[expect]]` at the top,
+/// inside a section such as `[osd]`, or inside each table of an array of
+/// tables, such as `[[case.expect]]` in a Flight Controller Scenario's
+/// `[[case]]`s. Every `expect` list is read, in whatever table it sits; the
+/// check at the end of this file fails if the Scenario runner ever measures
+/// an Expectation this doesn't read.
+fn collect(table: &toml::Table, place: &Place, into: &mut Vec<Expectation>) {
     for (key, value) in table {
-        if key == "expect" {
-            for entry in value.as_array().into_iter().flatten() {
-                if let Some(entry) = entry.as_table() {
-                    into.push(Expectation {
-                        section: section.to_string(),
-                        table: entry.clone(),
-                    });
+        match value {
+            toml::Value::Array(items) if key == "expect" => {
+                for entry in items {
+                    if let Some(entry) = entry.as_table() {
+                        into.push(Expectation {
+                            place: place.clone(),
+                            table: entry.clone(),
+                        });
+                    }
                 }
             }
-        } else if let Some(inner) = value.as_table() {
-            let section = if section.is_empty() {
-                key.clone()
-            } else {
-                format!("{section}.{key}")
-            };
-            collect(inner, &section, into);
+            toml::Value::Table(inner) => collect(inner, &place.section(key), into),
+            toml::Value::Array(items) => {
+                for item in items {
+                    if let Some(inner) = item.as_table() {
+                        collect(inner, &place.case(key, inner), into);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
 
+/// Where in its file an Expectation sits.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Place {
+    /// The section, such as `osd`, or nothing for the top.
+    section: String,
+    /// The tables of an array of tables it sits in, such as one `[[case]]`,
+    /// each as the Report shows it: its key and its own fields, such as
+    /// `case with arm on; pitch 0%; …`.
+    cases: Vec<String>,
+    /// What it's matched by: the same, with each case's fields read as
+    /// values where they're numbers, so `0%` and `0.0 %` are the same stick.
+    read: String,
+}
+
+impl Place {
+    /// A section inside this place, such as `[osd]`.
+    fn section(&self, key: &str) -> Place {
+        let join = |outer: &str| {
+            if outer.is_empty() {
+                key.to_string()
+            } else {
+                format!("{outer}.{key}")
+            }
+        };
+        Place {
+            section: join(&self.section),
+            cases: self.cases.clone(),
+            read: format!("{}/{key}", self.read),
+        }
+    }
+
+    /// One table of an array of tables in this place, such as one
+    /// `[[case]]`, known by its own fields: a case's sticks, Arm switch and
+    /// sensor readings, but not its Expectations.
+    fn case(&self, key: &str, table: &toml::Table) -> Place {
+        let mut fields = BTreeMap::new();
+        flatten(table, "", &mut fields);
+        let shown: Vec<String> = fields
+            .iter()
+            .map(|(name, value)| {
+                format!(
+                    "{name} {}",
+                    value
+                        .as_str()
+                        .map_or_else(|| value.to_string(), str::to_string)
+                )
+            })
+            .collect();
+        let read: Vec<String> = fields
+            .iter()
+            .map(|(name, value)| match value.as_str() {
+                Some(text) => format!("{name} {}", read_values(text)),
+                None => format!("{name} {value}"),
+            })
+            .collect();
+        let mut cases = self.cases.clone();
+        cases.push(format!(
+            "{} with {}",
+            self.section(key).section,
+            shown.join("; ")
+        ));
+        Place {
+            section: self.section.clone(),
+            cases,
+            read: format!("{}/{key}[{}]", self.read, read.join("; ")),
+        }
+    }
+}
+
+/// Text with each of its comma-separated parts that is a number with its
+/// unit, alone or after a word ("0%" or "roll -100 °/s"), read as a value in
+/// SI units, so "0%" and "0.0 %", or "roll -100 °/s" and "roll -100.0°/s",
+/// read the same. Anything else stays as written.
+fn read_values(text: &str) -> String {
+    let value = |part: &str| {
+        parse_quantity(part)
+            .ok()
+            .map(|q| format!("{:e} {:?}", q.value, q.dimension()))
+    };
+    text.split(',')
+        .map(|part| {
+            let part = part.trim();
+            value(part)
+                .or_else(|| {
+                    let (word, rest) = part.split_once(' ')?;
+                    Some(format!("{word} {}", value(rest)?))
+                })
+                .unwrap_or_else(|| part.to_string())
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct Expectation {
-    /// The section it sits in, such as `osd`, or nothing for the top.
-    section: String,
+    place: Place,
     table: toml::Table,
 }
 
@@ -164,22 +283,30 @@ impl Expectation {
     }
 
     /// What it measures and when, as the Results file words it: "height at
-    /// 1 s" or "roll rate, lowest over 0 s to 1 s".
+    /// 1 s", "roll rate, lowest over 0 s to 1 s", or, in a case, "motor 1
+    /// DShot, in the case with arm on; pitch 0%; …".
     fn description(&self) -> String {
         let what = self.text("what").unwrap_or("(no what)");
-        let section = if self.section.is_empty() {
+        let section = if self.place.section.is_empty() {
             String::new()
         } else {
-            format!("[{}] ", self.section)
+            format!("[{}] ", self.place.section)
         };
-        match (self.text("at"), self.text("over"), self.statistic()) {
+        let checks = match (self.text("at"), self.text("over"), self.statistic()) {
             (Some(at), _, _) => format!("{section}{what} at {at}"),
             (None, Some(over), Some((statistic, _))) => {
                 format!("{section}{what}, {statistic} over {over}")
             }
             (None, Some(over), None) => format!("{section}{what} over {over}"),
             (None, None, _) => format!("{section}{what}"),
-        }
+        };
+        let cases: String = self
+            .place
+            .cases
+            .iter()
+            .map(|case| format!(", in the {case}"))
+            .collect();
+        format!("{checks}{cases}")
     }
 
     /// The expected value with its tolerance, as written.
@@ -221,9 +348,10 @@ impl Expectation {
     }
 
     /// Two Expectations are the same check if they measure the same thing at
-    /// the same moment or with the same statistic over the same stretch.
+    /// the same moment or with the same statistic over the same stretch, in
+    /// the same section and the same case.
     fn same_check(&self, other: &Expectation) -> bool {
-        self.section == other.section
+        self.place.read == other.place.read
             && self.text("what") == other.text("what")
             && self.when("at") == other.when("at")
             && self.when("over") == other.when("over")
@@ -579,4 +707,62 @@ fn differences(before: &Expectation, after: &Expectation) -> Vec<String> {
         differences.push("changed".to_string());
     }
     differences
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use opendrone_scenario::Repo;
+
+    use super::ScenarioFile;
+
+    /// The check the Scenario runner adds to the end of every Results file,
+    /// which no Scenario file writes.
+    const NO_BROKEN_NUMBERS: &str =
+        "no broken numbers: every number in the state is a real number after every step";
+
+    /// The Scenario runner writes every Expectation it reads into the Results
+    /// file beside its Scenario, wherever the Scenario format lets it sit. So
+    /// if the runner ever reads an Expectation somewhere the review tool
+    /// doesn't look, the first Scenario that puts one there fails this.
+    #[test]
+    fn the_review_tool_reads_every_expectation_the_scenario_runner_measures() {
+        let repo = Repo {
+            root: Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."),
+        };
+        let files = repo.scenario_files().expect("can list the Scenarios");
+        assert!(!files.is_empty(), "the repo has Scenarios");
+        for file in files {
+            let label = file.label();
+            let text = fs::read_to_string(&file.path).expect("can read the Scenario");
+            let read = ScenarioFile::read(&text)
+                .unwrap_or_else(|| panic!("the review tool can read {label}"));
+            let results: toml::Table = fs::read_to_string(file.results_path())
+                .expect("every Scenario has its Results")
+                .parse()
+                .expect("a Results file is TOML");
+            let mut measured: Vec<&str> = results
+                .get("expect")
+                .and_then(toml::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|e| e.get("what").and_then(toml::Value::as_str) != Some(NO_BROKEN_NUMBERS))
+                .map(|e| {
+                    e.get("basis")
+                        .and_then(toml::Value::as_str)
+                        .unwrap_or("none")
+                })
+                .collect();
+            let mut seen: Vec<&str> = read.expectations.iter().map(|e| e.basis().word()).collect();
+            measured.sort_unstable();
+            seen.sort_unstable();
+            assert_eq!(
+                seen, measured,
+                "{label}: the review tool reads these Expectations' Bases (left), but the \
+                 Scenario runner measured these (right)"
+            );
+        }
+    }
 }
