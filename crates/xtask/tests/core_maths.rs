@@ -289,6 +289,105 @@ fn a_table_pointing_at_acos_outside_any_function_fails_even_beside_an_allowed_ca
 }
 
 #[test]
+fn a_table_written_as_std_acos_fails_even_beside_an_allowed_call_at_every_opt_level() {
+    // `[f64::acos]` points at std's `f64::acos`, copied into the crate: a
+    // function, not the operating system's `acos` itself. The data still
+    // counts as a reference from outside any function, whether the copy is
+    // also called (unoptimised) or only kept for the table (optimised).
+    let parry = "pub static ANGLES: [fn(f64) -> f64; 1] = [f64::acos];\n\
+                 pub struct TriMesh;\n\
+                 impl TriMesh {\n\
+                     #[inline(never)] pub fn compute_pseudo_normals(&self, x: f64) -> f64 { x.acos() }\n\
+                 }";
+    for (case, optimised) in [
+        ("table-of-std-acos-at-0", false),
+        ("table-of-std-acos-at-3", true),
+    ] {
+        let fixture = Fixture::new(case)
+            .outside_module("parry3d-f64", "shape::trimesh", parry)
+            .member("opendrone-maths", &[], "")
+            .member("opendrone-physics", &["opendrone-maths", "parry3d-f64"], "");
+        let outcome = if optimised {
+            fixture.optimise("parry3d-f64").check()
+        } else {
+            fixture.check()
+        };
+        assert!(!outcome.passed, "{case}: {}", outcome.output);
+        outcome
+            .says("- `parry3d-f64` calls the operating system's `acos` (Rust's `f64::acos`) from ");
+        outcome
+            .says("`parry3d_f64::shape::trimesh::ANGLES`, data outside any function (in section `");
+        outcome.says(
+            "No allowance can cover a reference from outside any function, such as a table of \
+             function pointers",
+        );
+    }
+}
+
+#[test]
+fn running_the_check_again_with_other_programs_never_reads_a_program_built_with_other_features() {
+    // The Scenario runner turns glamx's `std` on, so the game's compiled code
+    // calls `acos` only when both are built together. Running the full
+    // command, then the game alone, then the full command again: cargo finds
+    // the first build still fresh, but the second one's kept compiled code
+    // has replaced its object file. The third run must read the right one.
+    let glamx = "#[cfg(feature = \"std\")]\npub fn eigen<T: Into<f64>>(x: T) -> f64 { x.into().acos() }\n\
+                 #[cfg(not(feature = \"std\"))]\npub fn eigen<T: Into<f64>>(x: T) -> f64 { x.into() * 0.5 }";
+    let fixture = Fixture::new("alternate-commands")
+        .outside("glamx", &[], glamx)
+        .features("glamx", &["std"])
+        .member("opendrone-maths", &[], "")
+        .member(
+            "opendrone-physics",
+            &["opendrone-maths", "glamx"],
+            "pub fn hull<T: Into<f64>>(x: T) -> f64 { glamx::eigen(x) }",
+        )
+        .member(
+            "opendrone-scenario",
+            &["opendrone-physics", "glamx/std"],
+            "",
+        )
+        .optimise("opendrone-physics")
+        .program(
+            "opendrone",
+            &["opendrone-physics"],
+            "fn main() { println!(\"{}\", opendrone_physics::hull(0.5_f32)); }",
+        );
+    let both = ["opendrone", "opendrone-scenario"];
+    let first = fixture.check_with(&both);
+    assert!(!first.passed, "{}", first.output);
+    let game_alone = fixture.check_again_with(&["opendrone"]);
+    assert!(game_alone.passed, "{}", game_alone.output);
+    let again = fixture.check_again_with(&both);
+    assert!(!again.passed, "{}", again.output);
+    again.says("calls the operating system's `acos` (Rust's `f64::acos`) from ");
+    again.says("(compiled into the program `opendrone`).");
+}
+
+#[test]
+fn the_acos_allowance_names_every_clippy_ban_that_keeps_it_unreachable() {
+    let walls = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("walls.toml"))
+        .expect("can read walls.toml");
+    let reason = walls
+        .lines()
+        .find(|line| line.starts_with("\"parry3d-f64/acos\""))
+        .expect("walls.toml allows parry3d-f64's acos");
+    for ban in [
+        "TriMesh::set_flags",
+        "TriMesh::with_flags",
+        "TriMesh::update_vertices",
+        "TriMesh::set_vertices",
+        "TriMesh::append",
+        "TriMesh::connected_component_meshes",
+        "TriMeshConnectedComponents::to_meshes",
+        "SharedShape::trimesh_with_flags",
+        "transformation::volume_mesh",
+    ] {
+        assert!(reason.contains(ban), "the reason doesn't name {ban}");
+    }
+}
+
+#[test]
 fn a_generic_core_function_calling_acos_compiled_into_the_games_program_fails() {
     // A generic function is compiled into the crate that uses it: here the
     // physics' and glamx's, into the game's program. The core's own compiled
@@ -620,6 +719,11 @@ impl Fixture {
             }
             _ => {}
         }
+        self.write_workspace();
+        self.check_again_with(with)
+    }
+
+    fn write_workspace(&self) {
         let workspace = self.root.join("workspace");
         let members: Vec<String> = self
             .members
@@ -642,6 +746,13 @@ impl Fixture {
         for library in &self.outside {
             self.write_package(&self.root.join("outside").join(&library.name), library);
         }
+    }
+
+    /// Runs the check on the workspace as written, with the builds of earlier
+    /// runs kept, as running the command again on one's own computer does.
+    /// The files aren't written again: that would make cargo build all.
+    fn check_again_with(&self, with: &[&str]) -> Outcome {
+        let workspace = self.root.join("workspace");
         let mut command = Command::new(env!("CARGO_BIN_EXE_xtask"));
         command.arg("core-maths");
         for package in with {

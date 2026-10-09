@@ -4,7 +4,7 @@ Every pull request gets a **Reviewer** before it merges: a fresh agent with none
 
 ## Starting a Reviewer
 
-When a [delegator](delegator.md) runs the batch, it starts the Reviewers and picks each one's model. Otherwise the author does:
+When a [Delegator](delegator.md) runs the batch, it starts the Reviewers and picks each one's model. Otherwise the author does:
 
 1. Push the PR, and let CI post its [Review Report](../review-report.md).
 2. Start a new agent with none of your conversation. Give it only the PR number and this page.
@@ -57,7 +57,7 @@ Block only when one of these is true:
 - the docs or the PR's text mislead;
 - a Red Flag left to you doesn't hold up.
 
-Everything else goes under a heading **Follow-ups (not blocking)**. The delegator files those for the maintainer to sort. That covers edge cases beyond the ticket, hardening ideas, wording and taste.
+Everything else goes under a heading **Follow-ups (not blocking)**. The Delegator files those for the maintainer to sort. That covers edge cases beyond the ticket, hardening ideas, wording and taste.
 
 Review tooling, the checkers and xtask, during the alpha: block only if a wrong change could get through unnoticed, or if CI breaks. Hardening against unlikely inputs is a follow-up.
 
@@ -75,7 +75,7 @@ In round 2 and later, start from the earlier Verdicts:
    - **No merge listed:** review `git diff <last reviewed commit> <latest commit>`.
    - **Main was merged in since:** that diff also shows all of main's merged changes, so don't review it whole. Instead:
      - Review each listed commit that isn't a merge, with `git show <commit>`.
-     - Check each merge's resolutions, and only those. Redo the merge and compare it with the author's, with the `git merge-tree` and `git diff --no-renames --name-only T M` commands in step 3 of the [merge-only update check](merge-update.md#the-check). Whatever differs is what the author changed by hand. Or read `git show --cc <merge>`. That's shorter, but it hides a resolution that keeps one side's whole file and so drops the other side's change.
+     - Check each merge's resolutions, and only those. Redo the merge and compare it with the author's, with the `git merge-tree` and `git diff --no-renames --name-only T M` commands in step 3 of the [merge-only update check](merge-update.md#the-check). Whatever differs is what the author changed by hand. Don't use `git show --cc <merge>`: it hides a resolution that keeps one side's whole file and so drops the other side's change.
 3. **Don't reopen what an earlier round accepted,** unless the new change touches it. A new blocking problem in code an earlier round already read needs to be a real bug. Say why it was missed.
 
 ## Working efficiently

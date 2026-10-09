@@ -1,0 +1,54 @@
+# A fixture: a Flight Controller Scenario fed a table of cases, so its Source,
+# Rule and Observed Expectations all sit inside its [[case]]s. Two cases
+# measure "motor 1 DShot", so only the case tells them apart.
+format = 1
+name   = "The mixer spreads corrections over the motors with Airmode"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-filters-off"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+# Zero throttle, nothing to correct: every motor idles.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "158 ± 1"
+basis = "source: dshotInitEndpoints: idle is 48 + 5.5% × 1999 = 157.9, sent as 158"
+
+# Airmode: at zero throttle a roll correction still drives the motors apart.
+[[case]]
+roll     = "0%"
+pitch    = "0%"
+yaw      = "0%"
+throttle = "0%"
+arm      = "on"
+rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
+
+[[case.expect]]
+what  = "roll PID sum"
+value = "144.53 ± 0.01"
+basis = "rule: P = 0.032029 × 45 × 100.11 = 144.29, plus one loop's I, 0.244381 × 80 × 100.11 ÷ 8000 = 0.24"
+
+[[case.expect]]
+what  = "motor 1 DShot"
+value = "158 ± 1"
+basis = "source: mixTable and applyMixerAdjustment: Airmode leaves the right motors at idle, 158"
+
+[[case.expect]]
+what  = "motor 3 DShot"
+value = "704 ± 1"
+basis = "observed: what the Flight Controller did when this was written"

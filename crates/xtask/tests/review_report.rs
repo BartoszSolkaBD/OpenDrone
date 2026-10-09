@@ -324,6 +324,161 @@ fn a_changed_test_quad_under_a_scenario_with_rule_expectations_is_for_the_review
     }
 }
 
+// Expectations inside a Flight Controller Scenario's table of cases.
+
+#[test]
+fn an_edited_source_expectation_inside_a_case_waits_for_the_maintainer() {
+    // Two cases measure "motor 1 DShot"; only the second one's changes.
+    let review = PullRequest::new("case-source-changed")
+        .edit(
+            MIXER,
+            "value = \"158 ± 1\"\nbasis = \"source: mixTable",
+            "value = \"160 ± 1\"\nbasis = \"source: mixTable",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+         pitch 0%; roll 0%; rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw \
+         0%\" went from `158 ± 1` to `160 ± 1`.",
+    );
+    assert_eq!(
+        review.json["red_flags"]
+            .as_array()
+            .expect("red_flags is a list")
+            .len(),
+        1,
+        "only that one Expectation changed, and an Expectation is no part of the setup:\n{}",
+        review.report
+    );
+}
+
+#[test]
+fn a_loosened_observed_tolerance_inside_a_case_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("case-observed-loosened")
+        .edit(
+            MIXER,
+            "value = \"704 ± 1\"\nbasis = \"observed: what the Flight Controller did when this \
+             was written\"",
+            "value = \"704 ± 5\"\nbasis = \"observed: the motors now settle a few steps apart\"",
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A tolerance loosened on an Observed Expectation",
+        "\"motor 3 DShot, in the case with arm on; pitch 0%; roll 0%; rotation roll -100 °/s, \
+         pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw 0%\" went from `704 ± 1` to `704 ± 5`, a \
+         loosened tolerance, and has a new basis line. Reason given: \"the motors now settle a few steps \
+         apart\".",
+    );
+}
+
+#[test]
+fn a_changed_test_quad_flags_a_flight_controller_scenario_that_flies_it_only_through_cases() {
+    // mixer.toml doesn't change, and its Source and Rule Expectations all sit
+    // inside its [[case]]s.
+    let pull_request = PullRequest::new("case-test-quad-changed").change(
+        FILTERS_OFF,
+        "freestyle-5-filters-off-with-a-gyro-low-pass.toml",
+    );
+    // Read from two folders, and from two git commits, as CI reads them.
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(review.gate_passed, "{}", review.output);
+        review.reviewer_decides(
+            "A Scenario's setup changed under its Source or Rule Expectations",
+            "`scenarios/flight-controller/mixer.toml`: the Test Quad \
+             `test/freestyle-5-filters-off` changed, so its Source and Rule Expectations now \
+             check a different flight.",
+        );
+    }
+}
+
+#[test]
+fn a_new_stick_in_the_case_under_a_source_expectation_waits_for_the_maintainer() {
+    // The first case's throttle moves, so its Expectation checks something
+    // else: as with a moment, the case is part of what it measures.
+    let review = PullRequest::new("case-input-changed")
+        .edit(
+            MIXER,
+            "throttle = \"0%\"\narm      = \"on\"\n\n[[case.expect]]",
+            "throttle = \"10%\"\narm      = \"on\"\n\n[[case.expect]]",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+         pitch 0%; roll 0%; throttle 0%; yaw 0%\" (`158 ± 1`) was removed, or now measures \
+         something else.",
+    );
+}
+
+#[test]
+fn a_new_setup_under_rule_and_source_expectations_in_cases_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("case-setup-changed")
+        .edit(
+            MIXER,
+            "radio_link        = \"250 Hz\"",
+            "radio_link        = \"500 Hz\"",
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A Scenario's setup changed under its Source or Rule Expectations",
+        "`scenarios/flight-controller/mixer.toml`: `start.radio_link` changed, so its Source and \
+         Rule Expectations now check a different flight.",
+    );
+}
+
+#[test]
+fn deleting_a_scenario_with_source_expectations_in_cases_waits_for_the_maintainer() {
+    let review = PullRequest::new("case-scenario-deleted")
+        .delete(MIXER)
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+         pitch 0%; roll 0%; throttle 0%; yaw 0%\" (`158 ± 1`) was removed",
+    );
+    review.reviewer_decides(
+        "A Scenario deleted",
+        "`scenarios/flight-controller/mixer.toml`",
+    );
+}
+
+#[test]
+fn reordering_cases_and_spelling_their_inputs_another_way_raises_no_red_flag() {
+    let review = PullRequest::new("cases-reordered")
+        .change(MIXER, "mixer-cases-reordered.toml")
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.has_no_red_flags();
+}
+
+#[test]
+fn renaming_a_scenario_of_cases_and_loosening_a_rule_expectation_in_a_case_waits() {
+    let renamed = "scenarios/flight-controller/mixer-and-airmode.toml";
+    let review = PullRequest::new("cases-renamed-and-loosened")
+        .rename(MIXER, renamed)
+        .edit(renamed, "144.53 ± 0.01", "144.53 ± 0.1")
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Rule Expectation changed",
+        "`scenarios/flight-controller/mixer-and-airmode.toml`, moved from \
+         `scenarios/flight-controller/mixer.toml`: \"roll PID sum, in the case with arm on; \
+         pitch 0%; roll 0%; rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw \
+         0%\" went from `144.53 ± 0.01` to `144.53 ± 0.1`, a loosened tolerance.",
+    );
+    assert!(
+        !review.report.contains("A Scenario deleted"),
+        "every Expectation was found again, so the Scenario only moved:\n{}",
+        review.report
+    );
+}
+
 // ADRs, Bevy and wgpu.
 
 #[test]
@@ -1214,6 +1369,10 @@ const FREE_FALL_RESULTS: &str = "scenarios/physics/free-fall.results.toml";
 const FREE_TUMBLE_RESULTS: &str = "scenarios/physics/free-tumble.results.toml";
 const ADR: &str = "docs/adr/0001-bit-exact-determinism.md";
 const TEST_QUAD: &str = "scenarios/test-quads/whoop-65-no-drag.toml";
+/// A Flight Controller Scenario fed a table of cases, and the Test Quad it
+/// flies.
+const MIXER: &str = "scenarios/flight-controller/mixer.toml";
+const FILTERS_OFF: &str = "scenarios/test-quads/freestyle-5-filters-off.toml";
 /// The start of a crate's `lib.rs`, up to a line inside a function that
 /// reads the first byte of `x` into `first`.
 const SIM_START: &str = "//! A fixture crate.\n\nmacro_rules! ignore {\n    ($($t:tt)*) => {};\n}\n\n\
@@ -1278,6 +1437,18 @@ impl PullRequest {
         fs::create_dir_all(target.parent().expect("a folder")).expect("can make the folder");
         fs::write(target, text).expect("can write the file");
         self
+    }
+
+    /// The head's `path` with its one `from` replaced by `to`.
+    fn edit(self, path: &str, from: &str, to: &str) -> PullRequest {
+        let text = fs::read_to_string(self.head(path)).expect("the file exists");
+        assert_eq!(
+            text.matches(from).count(),
+            1,
+            "{path} holds {from:?} exactly once"
+        );
+        let edited = text.replace(from, to);
+        self.write(path, &edited)
     }
 
     /// A file already on main: the same in the base and the head.

@@ -1,0 +1,7 @@
+# A fixture: the Test Quad mixer.toml flies, named only in its [start].
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "The filters off, so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own"
+
+[tune]
+gyro_lpf1_static_hz = 0
