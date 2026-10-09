@@ -29,6 +29,10 @@ pub(crate) struct Code {
     pub maths: BTreeMap<String, BTreeSet<Place>>,
     /// The functions that call (or otherwise refer to) each symbol, by name.
     pub callers: BTreeMap<String, BTreeSet<String>>,
+    /// Where data (not a function), such as a table of function pointers,
+    /// points at each function, by the function's symbol name: the data's
+    /// symbol name when it has one, and its section.
+    pub data_refs: BTreeMap<String, BTreeSet<(Option<String>, String)>>,
     /// Every function the code holds, by symbol name.
     pub functions: BTreeSet<String>,
     /// Whether some of it is LLVM bitcode instead of machine code. This check
@@ -167,6 +171,16 @@ impl Code {
                     continue;
                 }
                 if functions.is_empty() {
+                    if is_unwind_information(&section) {
+                        continue;
+                    }
+                    let data = holding.first().map(|(_, name, _)| name.clone());
+                    for callee in targets(file, target, &defined) {
+                        self.data_refs
+                            .entry(callee)
+                            .or_default()
+                            .insert((data.clone(), section_name(&section)));
+                    }
                     continue;
                 }
                 for callee in targets(file, target, &defined) {
@@ -178,6 +192,15 @@ impl Code {
             }
         }
     }
+}
+
+/// Whether a section holds the information that unwinds the stack when a
+/// function panics. It points at every function, but calls nothing.
+fn is_unwind_information(section: &object::Section<'_, '_>) -> bool {
+    let name = section.name().unwrap_or_default();
+    ["unwind", "eh_frame", "pdata", "xdata", "gcc_except_table"]
+        .iter()
+        .any(|part| name.contains(part))
 }
 
 /// The symbols a reference points at, by name. ELF points at a function only
