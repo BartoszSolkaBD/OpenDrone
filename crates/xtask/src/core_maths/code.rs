@@ -171,7 +171,7 @@ impl Code {
                     continue;
                 }
                 if functions.is_empty() {
-                    if is_unwind_information(&section) {
+                    if is_information_about_code(&section) {
                         continue;
                     }
                     let data = holding.first().map(|(_, name, _)| name.clone());
@@ -194,13 +194,21 @@ impl Code {
     }
 }
 
-/// Whether a section holds the information that unwinds the stack when a
-/// function panics. It points at every function, but calls nothing.
-fn is_unwind_information(section: &object::Section<'_, '_>) -> bool {
+/// Whether a section holds debug information or the information that unwinds
+/// the stack when a function panics. It points at every function, but nothing
+/// in it runs or calls anything.
+fn is_information_about_code(section: &object::Section<'_, '_>) -> bool {
     let name = section.name().unwrap_or_default();
-    ["unwind", "eh_frame", "pdata", "xdata", "gcc_except_table"]
-        .iter()
-        .any(|part| name.contains(part))
+    [
+        "debug",
+        "unwind",
+        "eh_frame",
+        "pdata",
+        "xdata",
+        "gcc_except_table",
+    ]
+    .iter()
+    .any(|part| name.contains(part))
 }
 
 /// The symbols a reference points at, by name. ELF points at a function only
