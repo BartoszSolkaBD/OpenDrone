@@ -1,6 +1,6 @@
-# The delegator
+# The Delegator
 
-The **delegator** is the agent session that works through the ready tickets. It picks the next ticket, starts an author to build it, starts a Reviewer for the author's PR, and merges what passes. It never writes or reviews code itself. To run a batch of tickets, start a session, point it at this page, and say which tickets or how many.
+The **Delegator** is the agent session that works through the ready tickets. It picks the next ticket, starts an author to build it, starts a Reviewer for the author's PR, and merges what passes. It never writes or reviews code itself. To run a batch of tickets, start a session, point it at this page, and say which tickets or how many.
 
 The other pages it hands out:
 
@@ -34,7 +34,7 @@ At the start of a session, check what each `model` value runs in this Claude Cod
 
 | Job | Tier |
 |---|---|
-| **The delegator** itself | Standard. Following this page is its whole job. Planning work, such as a spec, tickets or a grilling, runs on Strongest in its own session. |
+| **The Delegator** itself | Standard. Following this page is its whole job. Planning work, such as a spec, tickets or a grilling, runs on Strongest in its own session. |
 | **Author** of a tracer (the title starts "Tracer:") | Strongest. A tracer sets the interfaces that later tickets build on. |
 | **Author** of a ticket that copies Betaflight or Bluejay behaviour from their source | Strongest. A misreading of the C code still passes tests written from the same misreading. |
 | **Author** of a change to the review path: `.github/`, the review scripts, the Review Report, the Red Flag gate or the Review check | Strongest. In Phase 1 that path is the only guard. |
@@ -61,8 +61,10 @@ A **Lane** is a group of Areas whose PRs collide when they run side by side. Eac
 | **Sound** | `crates/sound` | |
 | **Blackbox** | `crates/blackbox` | |
 | **Content** | `assets-src/`, `packs/` and `crates/pack`. Quad numbers belong to the Flight lane. | |
-| **Repo rules** | `.github/`, `crates/xtask`, the root Cargo files, `deny.toml`, the lint settings and `AGENTS.md` | Every PR runs through them. |
+| **Repo rules** | `.github/`, `crates/xtask`, the root Cargo files (`Cargo.toml`, `Cargo.lock`), `.cargo/`, `.config/`, `rust-toolchain.toml`, `deny.toml`, the lint settings and `AGENTS.md` | Every PR runs through them. |
 | **Docs** | `docs/`, `CONTEXT.md` and `book.toml`, for a PR that changes nothing else | |
+
+The Lanes and the Areas in CODEOWNERS group the same files, with two differences. CODEOWNERS files `crates/blackbox` under Scenarios, but the Blackbox has its own Lane here, because its PRs rarely collide with flight changes. And `Cargo.lock` is a Repo rules file, yet every Lane's PR touches it (see below), so it never holds a PR back.
 
 Place a ticket by the files its "What to build" will change. A ticket that spans two Lanes takes both.
 
@@ -71,6 +73,7 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
   - While a Lane's PR is in review, one more ticket may build in that Lane. Its code must be in a different crate, for example a Flight Controller ticket beside a physics one.
   - It doesn't open its PR for review until the PR ahead has merged. Before then, it merges main and runs its Scenarios again.
 - **A ticket starts only when all its blockers are closed,** which means merged. Never build on top of an unmerged branch.
+- **A workflow-changing PR** (it changes `.github/workflows/` or `.github/actions/`) holds the Repo rules Lane like any other PR: it counts as in review from its first Reviewer until the maintainer merges it, so no other Repo rules PR starts review meanwhile.
 - **Some files every Lane touches:** `Cargo.lock`, `CONTEXT.md`, `docs/SUMMARY.md` and the deep dives.
   - Authors add to these files rather than rewrite them.
   - Clashes there are small, and the merge-only update check handles them.
@@ -89,19 +92,28 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
    For each PR, read its checks and its newest Verdict's first and last lines. Only comments from the maintainer's account count. The second command prints nothing when there's no Verdict yet:
 
    ```sh
-   gh pr checks <PR> -R BartoszSolkaBD/OpenDrone
-   gh pr view <PR> -R BartoszSolkaBD/OpenDrone --json comments --jq '[.comments[] | select(.author.login == "BartoszSolkaBD" and (.body | startswith("Reviewed commit")))] | last // empty | [.body | splits("\r?\n") | select(length > 0)] | "\(first) / \(last)"'
+   gh pr checks <P> -R BartoszSolkaBD/OpenDrone
+   gh pr view <P> -R BartoszSolkaBD/OpenDrone --json comments --jq '[.comments[] | select(.author.login == "BartoszSolkaBD" and (.body | startswith("Reviewed commit")))] | last // empty | [.body | splits("\r?\n") | select(length > 0)] | "\(first) / \(last)"'
    ```
-4. Find the ready tickets. A ticket is ready when it's open and labelled `ready-for-agent`, has no assignee, and has no open blocker:
+4. Find the ready tickets. A ticket is ready when it's open and labelled `ready-for-agent`, has no assignee, and has no open blocker. The spec, #37, isn't a ticket: skip any issue whose title starts "Spec".
 
    ```sh
    gh issue list -R BartoszSolkaBD/OpenDrone --label ready-for-agent --state open --limit 300 \
-     --json number,title,assignees --jq '.[] | select(.assignees | length == 0) | "\(.number)\t\(.title)"' |
+     --json number,title,assignees --jq '.[] | select((.assignees | length == 0) and (.title | startswith("Spec") | not)) | "\(.number)\t\(.title)"' |
    while IFS=$'\t' read -r n t; do
      gh api repos/BartoszSolkaBD/OpenDrone/issues/$n \
        --jq "select(.issue_dependencies_summary.blocked_by == 0) | \"$n\tblocks \(.issue_dependencies_summary.blocking)\t$t\""
    done
    ```
+
+   A ticket claimed by a session that has ended is an **abandoned claim**. It stays assigned and drops out of this list. To release one, look for an open PR or a pushed branch:
+
+   ```sh
+   gh pr list -R BartoszSolkaBD/OpenDrone --state open --search "head:ticket/<N>-"
+   git ls-remote --heads origin 'ticket/<N>-*'
+   ```
+
+   If either shows something, the work is alive: carry on from that PR or branch. If both are empty, unassign the ticket with `gh issue edit <N> -R BartoszSolkaBD/OpenDrone --remove-assignee <login>`, and it's ready again.
 5. Keep a short **session note** in your scratchpad: one row per ticket with its Lane, stage, PR, agent and model. You need it to resume agents after a usage limit, or after your conversation is summarised.
 
 ## Order of work
@@ -209,9 +221,9 @@ A Verdict may list "Follow-ups (not blocking)". After the PR merges:
 
   ```sh
   sleep 60
-  until gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket \
+  until gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket \
     --jq '[.[] | select(.name != "Review check" and .bucket == "pending")] | length' | grep -qx 0; do sleep 60; done
-  gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
+  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
     --jq '.[] | select(.name != "Review check" and .bucket != "pass" and .bucket != "skipping") | "\(.bucket)\t\(.name)\t\(.link)"'
   ```
 - **Read agents' final reports and nothing more.**

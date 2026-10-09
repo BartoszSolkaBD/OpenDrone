@@ -1,6 +1,6 @@
 # Building a ticket
 
-You are the **author** of one ticket. You build it as one PR. The [delegator](delegator.md) started you. A fresh Reviewer will check your work against the ticket and the repo's rules ([The Reviewer and the Verdict](reviewer.md)). The terms are in the [map](../../CONTEXT.md).
+You are the **author** of one ticket. You build it as one PR. The [Delegator](delegator.md) started you. A fresh Reviewer will check your work against the ticket and the repo's rules ([The Reviewer and the Verdict](reviewer.md)). The terms are in the [map](../../CONTEXT.md).
 
 ## What to read
 
@@ -93,7 +93,7 @@ If your change moves a flight, run `cargo scenarios run` and commit the Results 
   - The body follows the PR template, with `Closes #<N>`.
   - End the body with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - **CI:** wait for it, and fix it until it's green on all three operating systems.
-- **The Reviewer:** don't start one. The delegator does.
+- **The Reviewer:** don't start one. The Delegator does.
 
 ## Fix rounds
 
@@ -108,8 +108,9 @@ When a Verdict says changes needed:
 When you're asked to bring main in, merge it: `git fetch origin && git merge origin/main`. Once a PR has a Verdict, never rebase it. A merge lets the next check see exactly what changed since the reviewed commit.
 
 1. Resolve the conflicts, and commit the merge.
-2. If the Results files are out of date, run `cargo scenarios run`, and commit the rewritten Results in their own commit, after the merge, as [PR #116](https://github.com/BartoszSolkaBD/OpenDrone/pull/116) did. Never put them in the merge commit: the [merge-only update check](merge-update.md) then stops on each rewritten Results file that didn't conflict, and the PR needs a full review round.
-3. Push, and wait for CI with the background command under [Save tokens](#save-tokens).
+2. If a Results file conflicted, it has to be resolved in the merge: take either side's whole file (for example `git checkout --ours <file>`), without editing it by hand. The fingerprint commit in the next step rewrites it. Say so in your report: the [merge-only update check](merge-update.md) stops on a conflicted Results file, because the merge commit then differs from git's own merge in value lines, so the PR needs a full Reviewer.
+3. If the Results files are out of date, run `cargo scenarios run`, and commit the rewritten Results in their own commit, after the merge, as [PR #116](https://github.com/BartoszSolkaBD/OpenDrone/pull/116) did. Never put them in the merge commit: the [merge-only update check](merge-update.md) then stops on each rewritten Results file that didn't conflict, and the PR needs a full review round.
+4. Push, and wait for CI with the background command under [Save tokens](#save-tokens).
 
 In your report, say:
 
