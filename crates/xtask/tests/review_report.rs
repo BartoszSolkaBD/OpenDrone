@@ -339,7 +339,7 @@ fn an_edited_source_expectation_inside_a_case_waits_for_the_maintainer() {
     assert!(!review.gate_passed, "{}", review.output);
     review.waits_for_the_maintainer(
         "A Source Expectation changed",
-        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; crash\\_flip off; \
          pitch 0%; roll 0%; rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw \
          0%\" went from `158 ± 1` to `160 ± 1`.",
     );
@@ -367,7 +367,7 @@ fn a_loosened_observed_tolerance_inside_a_case_is_for_the_reviewer_to_decide() {
     assert!(review.gate_passed, "{}", review.output);
     review.reviewer_decides(
         "A tolerance loosened on an Observed Expectation",
-        "\"motor 3 DShot, in the case with arm on; pitch 0%; roll 0%; rotation roll -100 °/s, \
+        "\"motor 3 DShot, in the case with arm on; crash\\_flip off; pitch 0%; roll 0%; rotation roll -100 °/s, \
          pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw 0%\" went from `704 ± 1` to `704 ± 5`, a \
          loosened tolerance, and has a new basis line. Reason given: \"the motors now settle a few steps \
          apart\".",
@@ -401,14 +401,14 @@ fn a_new_stick_in_the_case_under_a_source_expectation_waits_for_the_maintainer()
     let review = PullRequest::new("case-input-changed")
         .edit(
             MIXER,
-            "throttle = \"0%\"\narm      = \"on\"\n\n[[case.expect]]",
-            "throttle = \"10%\"\narm      = \"on\"\n\n[[case.expect]]",
+            "throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\n\n[[case.expect]]",
+            "throttle = \"10%\"\narm      = \"on\"\ncrash_flip = \"off\"\n\n[[case.expect]]",
         )
         .review();
     assert!(!review.gate_passed, "{}", review.output);
     review.waits_for_the_maintainer(
         "A Source Expectation changed",
-        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; crash\\_flip off; \
          pitch 0%; roll 0%; throttle 0%; yaw 0%\" (`158 ± 1`) was removed, or now measures \
          something else.",
     );
@@ -439,7 +439,7 @@ fn deleting_a_scenario_with_source_expectations_in_cases_waits_for_the_maintaine
     assert!(!review.gate_passed, "{}", review.output);
     review.waits_for_the_maintainer(
         "A Source Expectation changed",
-        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; \
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; crash\\_flip off; \
          pitch 0%; roll 0%; throttle 0%; yaw 0%\" (`158 ± 1`) was removed",
     );
     review.reviewer_decides(
@@ -468,7 +468,7 @@ fn renaming_a_scenario_of_cases_and_loosening_a_rule_expectation_in_a_case_waits
     review.waits_for_the_maintainer(
         "A Rule Expectation changed",
         "`scenarios/flight-controller/mixer-and-airmode.toml`, moved from \
-         `scenarios/flight-controller/mixer.toml`: \"roll PID sum, in the case with arm on; \
+         `scenarios/flight-controller/mixer.toml`: \"roll PID sum, in the case with arm on; crash\\_flip off; \
          pitch 0%; roll 0%; rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw \
          0%\" went from `144.53 ± 0.01` to `144.53 ± 0.1`, a loosened tolerance.",
     );
