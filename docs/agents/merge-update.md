@@ -42,7 +42,7 @@ Your job is small and mechanical: confirm the update brought in main's changes a
    git diff --no-renames T M -- '*.results.toml' | grep -E '^[-+](format|scenario|what|basis|expected|measured|\[\[)'
    ```
 
-   - **Files that conflicted:** they may be only `Cargo.lock`, files under `docs/`, `CONTEXT.md`, and Results files. Anything else conflicting means stop.
+   - **Files that conflicted:** they may be only `Cargo.lock`, files under `docs/`, `CONTEXT.md`. Anything else conflicting means stop. A conflicted Results file also means stop: the author had to take one side whole, so the last command below would print the other side's value lines, and the PR needs a full Reviewer.
    - **Files that differ between T and M:**
      - Each must be a file that conflicted and is in that allowed set. Otherwise the author changed something else, or dropped part of main's change. Stop.
      - Results files may differ only in fingerprints. The last command must print nothing.
