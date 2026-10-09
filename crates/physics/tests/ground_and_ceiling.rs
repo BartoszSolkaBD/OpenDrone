@@ -9,7 +9,7 @@ use common::{STEP, WORLD, whoop};
 use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotAngles, Vec3};
 use opendrone_physics::{
     MapCollision, MapShape, MotorCommands, Mount, QuadBody, QuadParameters, QuadStart, QuadState,
-    SetUpProblem, StartingMotors,
+    SetUpProblem, StartingMotors, World,
 };
 
 /// The Whoop 65's props: 17.5 mm across the radius.
@@ -42,9 +42,18 @@ fn at(props: f64, attitude: Attitude) -> QuadState {
 
 /// A whoop whose motors settle as in open air, wherever it starts.
 fn settled_in_open_air(parameters: QuadParameters, state: QuadState, mount: Mount) -> QuadBody {
+    in_open_air_with(parameters, state, mount, StartingMotors::Settled)
+}
+
+fn in_open_air_with(
+    parameters: QuadParameters,
+    state: QuadState,
+    mount: Mount,
+    motors: StartingMotors,
+) -> QuadBody {
     let start = QuadStart {
         state,
-        motors: StartingMotors::Settled,
+        motors,
         battery: 1.0,
         mount,
     };
@@ -161,15 +170,38 @@ fn on_its_back_over_a_floor_a_rotor_draws_its_air_from_the_floor_and_is_pulled_t
         position: Vec3::new(0.0, 0.0, 1.0 + R + ROTOR_HEIGHT),
         ..at(0.0, attitude)
     };
-    let mut on_its_back = settled_in_open_air(whoop(), state, Mount::Free);
+    // Upside down no motor can hold a hover, so the motors start stopped, not
+    // settled: a running motor with no speed has stalled, and its ESC would
+    // restart it.
+    let mut on_its_back = in_open_air_with(whoop(), state, Mount::Free, StartingMotors::Stopped);
     let mut in_open_air = on_its_back.clone();
     let commands = MotorCommands::all(0.373);
-    on_its_back.step(&WORLD, &map(&[floor_at(1.0)]), &commands, STEP);
-    in_open_air.step(&WORLD, &MapCollision::default(), &commands, STEP);
+    let floor = map(&[floor_at(1.0)]);
+    // Both start their motors from standstill, with no gravity so the Quad
+    // doesn't fall onto the floor while its ESCs wait. Stop at the first step
+    // in which every rotor gives any thrust: the Quad has hardly moved, so the
+    // floor's gain is still the one at the start.
+    let weightless = World {
+        gravity: 0.0,
+        ..WORLD
+    };
+    for _ in 0..40_000 {
+        on_its_back.step(&weightless, &floor, &commands, STEP);
+        in_open_air.step(&weightless, &MapCollision::default(), &commands, STEP);
+        if in_open_air.motors().iter().all(|motor| motor.thrust > 0.0) {
+            break;
+        }
+    }
     let gamma: f64 = 0.5 + 0.5 * (1.0_f64 + 1.0 / 8.0).sqrt();
     let expected = opendrone_maths::functions::cbrt(gamma * gamma);
     for (near, far) in on_its_back.motors().iter().zip(in_open_air.motors()) {
-        assert!((near.thrust / far.thrust - expected).abs() < 1e-9);
+        assert!(
+            (near.thrust / far.thrust - expected).abs() < 1e-9,
+            "{} {} {}",
+            near.thrust,
+            far.thrust,
+            expected
+        );
     }
 }
 

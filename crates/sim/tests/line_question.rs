@@ -4,7 +4,7 @@
 //! the pilot and the Quad (#12, #14). Basis: Rule (the geometry of the shapes
 //! given).
 
-use opendrone_maths::{Attitude, Mat3, Vec3};
+use opendrone_maths::{Attitude, DEGREE, Mat3, Vec3};
 use opendrone_sim::{
     BatteryParameters, Drag, EscParameters, GroundAndCeiling, LineCrossing, MapShape,
     MapShapeProblem, MotorParameters, Mount, PacketRate, PhysicsRate, PropDirection,
@@ -89,6 +89,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 rotor_inertia: 0.25e-7,
                 reverse_thrust: 0.5,
                 reverse_torque: 1.0,
+                grip: 0.5,
             },
             motors: MotorParameters {
                 kv,
@@ -124,6 +125,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 bounce: 0.3,
                 friction: 0.5,
             },
+            gyro_range: 2000.0 * DEGREE,
             ground_and_ceiling: GroundAndCeiling {
                 ground_effect_body: 2.0,
                 ceiling_effect_asymmetry: 1.0,

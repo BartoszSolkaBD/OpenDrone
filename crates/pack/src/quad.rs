@@ -736,8 +736,8 @@ pub struct QuadDefinition {
     pub based_on: Option<String>,
     /// What the physics receives: the mass (dry mass plus the battery, stored
     /// apart and added here), the inertia, the drag, the rotors' layout, the
-    /// props, motors and ESCs, the battery, and the collision shape with its
-    /// bounce and friction.
+    /// props (with their grip), motors and ESCs, the battery, the collision
+    /// shape with its bounce and friction, and the gyro's range.
     pub parameters: QuadParameters,
     pub frame: Frame,
     pub collision: Collision,
@@ -1326,6 +1326,7 @@ fn definition(
             rotor_inertia: props.rotor_inertia,
             reverse_thrust: props.reverse_thrust,
             reverse_torque: props.reverse_torque,
+            grip: props.grip,
         },
         motors: MotorParameters {
             kv: motors.kv,
@@ -1367,6 +1368,7 @@ fn definition(
             bounce: collision.bounce,
             friction: collision.friction,
         },
+        gyro_range: r.one("board.gyro_range"),
         ground_and_ceiling: GroundAndCeiling {
             ground_effect_body: r.one("feel.ground_effect_body"),
             ceiling_effect_asymmetry: r.one("feel.ceiling_effect_asymmetry"),

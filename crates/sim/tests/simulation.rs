@@ -2,7 +2,7 @@
 //! the scripted-motors stand-in. What the Quads do in flight is proved by the
 //! Scenarios in `scenarios/`.
 
-use opendrone_maths::{Attitude, Mat3, Vec3};
+use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, PilotRates, Vec3};
 use opendrone_maths::{Fingerprinter, functions};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
@@ -45,6 +45,7 @@ fn parameters() -> QuadParameters {
             rotor_inertia: 0.25e-7,
             reverse_thrust: 0.5,
             reverse_torque: 1.0,
+            grip: 0.5,
         },
         motors: MotorParameters {
             kv,
@@ -70,6 +71,7 @@ fn parameters() -> QuadParameters {
             slow_sag: 0.0,
         },
         shape: whoop_shape(),
+        gyro_range: 2000.0 * DEGREE,
         ground_and_ceiling: GroundAndCeiling {
             ground_effect_body: 2.0,
             ceiling_effect_asymmetry: 1.0,
@@ -482,6 +484,7 @@ fn reset_puts_the_quad_on_its_launch_spot_still_disarmed_with_a_full_battery_and
         true,
         false,
         &quad.start,
+        quad.parameters.gyro_range,
     ));
     let mut set_up = set_up(8000, 1, vec![quad]);
     set_up.map = vec![floor];
@@ -563,6 +566,108 @@ impl FlightControllerSeam for EscListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+}
+
+#[test]
+fn each_ticks_contacts_and_output_say_how_hard_each_prop_rubs() {
+    // The whoop without its duct rings, level and nose to the north-east,
+    // its motors settled: only prop 2 reaches east of the rest, 50.5 mm from
+    // the centre of mass. A wall 1 mm beyond it; the Quad drifts into it.
+    let mut quad = quad_at(1.0);
+    quad.parameters.shape.duct_rings = None;
+    quad.motors = StartingMotors::Settled;
+    quad.start.velocity = Vec3::new(0.05, 0.0, 0.0);
+    quad.start.attitude = Attitude::from_pilot_angles(PilotAngles {
+        roll: 0.0,
+        pitch: 0.0,
+        heading: 45.0 * DEGREE,
+    });
+    quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+        SimulationTime::START,
+        MotorCommands::all(0.373),
+    )]));
+    let mut wall = set_up(8000, 1, vec![quad]);
+    wall.map = vec![MapShape::Box {
+        centre: Vec3::new(0.0505 + 0.001 + 0.1, 0.0, 1.0),
+        size: Vec3::new(0.2, 20.0, 20.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    }];
+    let mut sim = Simulation::new(wall).unwrap();
+    assert_eq!(sim.quad_output(0).prop_rubs, [0.0; 4]);
+    while sim.contacts(0).is_empty() {
+        sim.step();
+        assert!(sim.time().ticks() < 8000, "prop 2 never reached the wall");
+    }
+    let contacts = sim.contacts(0);
+    assert!(contacts.iter().all(|c| c.part == QuadPart::PropDisc(2)));
+    assert!(contacts.iter().all(|c| c.rub > 0.0));
+    let rubbed: f64 = contacts.iter().map(|c| c.rub).sum();
+    assert_eq!(sim.quad_output(0).prop_rubs, [0.0, rubbed, 0.0, 0.0]);
+}
+
+#[test]
+fn each_ticks_output_says_what_the_gyro_reads() {
+    // Spinning nose right at 3,000 °/s, past the gyro's ±2,000 °/s, and
+    // rolling right at 500 °/s, within it.
+    let mut quad = quad_at(10.0);
+    quad.start.rotation = PilotRates {
+        roll: 500.0 * DEGREE,
+        pitch: 0.0,
+        yaw: 3000.0 * DEGREE,
+    }
+    .to_body();
+    let sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    let gyro = PilotRates::from_body(sim.quad_output(0).gyro);
+    assert_eq!(gyro.roll, 500.0 * DEGREE);
+    assert_eq!(gyro.pitch, 0.0);
+    assert_eq!(gyro.yaw, 2000.0 * DEGREE);
+}
+
+#[test]
+fn the_flight_controller_reads_the_gyro_clipped_at_its_range() {
+    // Basis: Rule (#26 §4): the Flight Controller sees only what a real
+    // board sees, so its gyro reads 2,000 °/s of a 3,000 °/s spin. Spinning
+    // nose right at 3,000 °/s and rolling right at 500 °/s, 10 m up, our
+    // Flight Controller disarmed: nothing slows the spin.
+    let mut quad = quad_at(10.0);
+    quad.start.rotation = PilotRates {
+        roll: 500.0 * DEGREE,
+        pitch: 0.0,
+        yaw: 3000.0 * DEGREE,
+    }
+    .to_body();
+    quad.flight_controller = Box::new(OurFlightController::new(
+        tune(),
+        Rates::BETAFLIGHT_DEFAULT,
+        PhysicsRate::from_hz(8000).unwrap(),
+        false,
+        false,
+        &quad.start,
+        quad.parameters.gyro_range,
+    ));
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    for _ in 0..80 {
+        // The Flight Controller reads the sensors at the start of each tick.
+        // Spinning about two axes at once, the true rates drift a little
+        // (Euler's equations), but the yaw stays far past the gyro's range.
+        let rates = PilotRates::from_body(sim.quad_output(0).state.rotation);
+        assert!(rates.yaw > 2900.0 * DEGREE && rates.roll < 1000.0 * DEGREE);
+        sim.step();
+        // Betaflight's axes, in °/s: roll right, pitch nose down and yaw
+        // nose left are positive.
+        let read = sim.quad_output(0).flight_controller.unwrap().gyro;
+        assert!(
+            (read[0] - rates.roll / DEGREE).abs() < 1e-9,
+            "roll {}",
+            read[0]
+        );
+        assert!(
+            (read[1] - -rates.pitch / DEGREE).abs() < 1e-9,
+            "pitch {}",
+            read[1]
+        );
+        assert!((read[2] - -2000.0).abs() < 1e-9, "yaw {}", read[2]);
+    }
 }
 
 /// A whoop with the Whoop 65's Prop Wash numbers, level and sinking straight

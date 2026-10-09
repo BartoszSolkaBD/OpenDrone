@@ -268,6 +268,7 @@ fn simulate(
             start.armed,
             start.assists.auto_arm,
             &state,
+            quad.parameters.gyro_range,
         )),
         (Inputs::Pilot(_) | Inputs::Track(_), None) => {
             unreachable!("a pilot's inputs fly our Flight Controller")
@@ -315,7 +316,7 @@ fn simulate(
                         "its Prop Wash strength must be from 0% to 100% and its flicker 0 Hz or more".to_string()
                     }
                     SetUpProblem::ShapeCantBeBuilt => {
-                        "its collision shape needs every size above zero, a bounce from 0 to 1 and a friction of 0 or more".to_string()
+                        "its collision shape needs every size above zero, a bounce from 0 to 1, and a friction and a prop grip of 0 or more".to_string()
                     }
                     SetUpProblem::GroundOrCeilingEffectCantWork => {
                         "its ground_effect_body and ceiling_effect_asymmetry must be 0 or more, and ground_effect_body small enough for its rotors' layout that close to a floor its rotors still push air down".to_string()

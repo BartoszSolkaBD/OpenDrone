@@ -11,11 +11,14 @@
 //!   each motor's speed, from a motor model driven by the battery's voltage,
 //!   with separate spin-up and slow-down times (E4–E6, E9; [`motor`] and
 //!   ADR-0006);
-//! - each motor's ESC, copying Bluejay's power-up, start wait and start-up
-//!   power limit ([`esc`]);
+//! - each motor's ESC, copying Bluejay's power-up, start wait, start-up
+//!   power limit and restarts of a stalled motor ([`esc`]);
 //! - the battery: its voltage curve, sag, recovery and charge counting, with
 //!   no cutoff (E13, E14; [`battery`]);
-//! - collisions with the Map (E29, #43; see "Collisions" below);
+//! - collisions with the Map (E29, #43; see "Collisions" below), with Prop
+//!   Strikes (#45; see "Prop Strikes" below);
+//! - the gyro: the true rotation, clipped at the board's range
+//!   ([`QuadBody::gyro`], #26 §4);
 //! - the thrust stand: a Quad held still, its motors, ESCs and battery working
 //!   as in flight ([`Mount::ThrustStand`]);
 //! - the air: thrust falling in a climb and rising in a descent and at speed,
@@ -32,9 +35,6 @@
 //! - Prop Wash: a rotor sinking into its own air loses some thrust and its
 //!   thrust flickers, each rotor its own way, from a seeded random generator
 //!   kept in the Quad's state (E19, ADR-0005; [`prop_wash`]).
-//!
-//! The other effects arrive with their own tickets and Scenarios: Prop
-//! Strikes and stalled motors' restarts (#45), and so on.
 //!
 //! # How one step moves the Quad
 //!
@@ -77,10 +77,12 @@
 //!    exponential map, which is exact for a steady rotation and never drifts
 //!    (flight-dynamics research §2.3).
 //! 8. The collision stage (below): if that move would touch the Map, the Map
-//!    pushes back, friction holds or drags, the Quad bounces and the move is
-//!    redone, so no part ever passes through a surface between steps. It
-//!    starts from the speed and rotation steps 5 and 6 gave, so the motors'
-//!    thrust and torques are already in them.
+//!    pushes back, friction holds or drags, a spinning prop rubs, the Quad
+//!    bounces and the move is redone, so no part ever passes through a
+//!    surface between steps. It starts from the speed and rotation steps 5
+//!    and 6 gave, so the motors' thrust and torques are already in them, and
+//!    from the motors' speeds step 2 gave; a prop's rub slows its motor
+//!    there, and the next step's ESC and motor start from that.
 //!
 //! On the thrust stand, steps 4 to 8 are skipped: the Quad doesn't move.
 //!
@@ -106,7 +108,9 @@
 //!    gap away may only be closed to, never crossed: that is the continuous
 //!    check that stops a Quad passing through a thin rail between steps. The
 //!    pushes are worked out together, point by point, [`PASSES`] times, with
-//!    the Quad's mass and inertia, so a hit off its centre also spins it.
+//!    the Quad's mass and inertia, so a hit off its centre also spins it. On
+//!    a prop disc the friction is the prop's rub, with the prop grip in place
+//!    of the Quad's friction (see "Prop Strikes").
 //! 3. **Bounce.** A point that hit at more than [`BOUNCE_SPEED`] comes back
 //!    out at the Quad's bounce times the speed it came in at
 //!    ([`BOUNCE_PASSES`] times through). A hit found a gap away bounces from
@@ -116,7 +120,12 @@
 //!    also bounces it. So on a slanting hit, friction takes at most friction
 //!    × the speed into the surface off the speed along it, not friction ×
 //!    (1 + bounce) × that. Many physics engines simplify the same way, and
-//!    bounce and friction are Estimates that Feel Tests tune.
+//!    bounce and friction are Estimates that Feel Tests tune. A prop's rub is
+//!    the exception: its blade slides over the surface through the whole
+//!    hit, so after the bounce its rub is worked out again
+//!    ([`BOUNCE_PASSES`] times through), capped by the whole push. That
+//!    matters most for a hit found a gap away, whose push in step 2 only
+//!    closes the gap and can be almost nothing.
 //! 4. **Rest.** When the Map holds the Quad (it pushes and nothing bounced)
 //!    and what is left of its motion is below [`REST_SPEED`] and
 //!    [`REST_TURN`], the Quad stays exactly still. Step 2 works the pushes out
@@ -142,7 +151,45 @@
 //!
 //! The collision stage remembers nothing from one step to the next, so it
 //! adds nothing to the Simulation's state. Each step's [`Contact`]s say where
-//! the Map pushed.
+//! the Map pushed, and how hard each prop rubbed.
+//!
+//! # Prop Strikes
+//!
+//! A Prop Strike is a spinning prop touching the Map (#26 §1, ADR-0012). Each
+//! prop is a thin disc in the Quad's shape, so it bounces and slides like the
+//! frame, and while it touches something it rubs:
+//!
+//! - **The rub is the prop disc's friction,** worked out in step 2 of the
+//!   collision stage like any other, with the Quad definition's prop grip in
+//!   place of its friction: at most the grip times the push. The point that
+//!   rubs moves with the Quad and with the prop's spin, so friction works
+//!   against both, and it can change both. A spinning prop's blade moves far
+//!   faster than any push can stop it, so its rub is the grip times the push,
+//!   against the blade: the harder it's pressed, the harder it rubs. In a
+//!   hit it is worked out again after the bounce, with the whole push.
+//! - **The rub brakes the motor.** Its turn about the prop's own axis (the
+//!   rub times the point's lever from the hub) slows the prop and its
+//!   motor's spinning parts (`rotor_inertia`). When the most it can do in
+//!   one step outweighs the prop's spin, as in a hard hit, it stops the prop
+//!   within the step, and from then on holds it as the frame's friction
+//!   would: a hard hit stops the motor at once, and a graze only slows it.
+//!   The ESC then finds its motor stalled and restarts it ([`esc`]). The
+//!   motor's speed after the collision stage is where the next step starts.
+//! - **The same rub pushes and twists the Quad.** It acts on the Quad at the
+//!   point that rubs, as any push does, except for its turn about the prop's
+//!   own axis, which went into the prop. The blade moves one way or the other
+//!   with the prop's spin, so the push and the twist do too.
+//! - **A motor fighting the rub** twists the frame back through its stator:
+//!   that is the rotors' spin reaction (`dh/dt`, E7) in step 6 of "How one
+//!   step moves the Quad", which counts only the motor's own change of speed
+//!   in step 2, before the rub slows it again here. Together they twist the
+//!   frame as hard as the motor fights, and a prop simply stopped by a hard
+//!   hit gives the frame none of its spin.
+//! - **A jammed prop** pressed hard enough is held still by the rub, as the
+//!   frame's friction holds the frame, against whatever its motor gives.
+//!
+//! A whoop's duct rings sit round its props, so a wall meets a ring first and
+//! the props rarely strike.
 //!
 //! # House rules
 //!
@@ -192,7 +239,7 @@ pub use collide::{
     BOUNCE_PASSES, BOUNCE_SPEED, Contact, PASSES, REST_SPEED, REST_TURN, SINK_ALLOWANCE, SKIN,
 };
 pub use commands::{MotorCommand, MotorCommands, SpinDirection};
-pub use esc::{EscParameters, EscState, StartUpStep};
+pub use esc::{EscParameters, EscState, StartUpStep, StoppedStep};
 pub use map::{LineCrossing, MapCollision, MapShape, MapShapeError, MapShapeProblem};
 pub use motor::{MotorParameters, PropParameters};
 pub use prop_wash::{Flicker, PropWash};
@@ -236,6 +283,9 @@ pub struct QuadParameters {
     pub battery: BatteryParameters,
     /// The Quad's collision shape, and how it bounces and slides.
     pub shape: QuadShape,
+    /// The fastest rotation the board's gyro reads on each axis, in rad/s:
+    /// it reads ± this beyond it (#26 §4).
+    pub gyro_range: f64,
     /// How strong ground and ceiling effect are.
     pub ground_and_ceiling: GroundAndCeiling,
 }
@@ -378,12 +428,22 @@ pub enum SetUpProblem {
     /// more, both real numbers.
     PropWashOutOfRange,
     /// Every size in the collision shape must be above zero, its bounce from
-    /// 0 to 1 and its friction 0 or more.
+    /// 0 to 1, and its friction and the props' grip 0 or more.
     ShapeCantBeBuilt,
     /// The ground effect's body term and the ceiling effect's asymmetry must
     /// be 0 or more, and the body term small enough for the rotors' layout
     /// that close to a floor the rotors still push air down.
     GroundOrCeilingEffectCantWork,
+}
+
+/// What a clean gyro whose range is `range` (rad/s) reads of `rotation`
+/// (body axes, rad/s): the true rotation, each axis clipped at ± `range`, as
+/// a real gyro saturates (#26 §4).
+pub fn gyro_reading(rotation: Vec3, range: f64) -> Vec3 {
+    let clip = |rate: f64| {
+        opendrone_maths::functions::min(opendrone_maths::functions::max(rate, -range), range)
+    };
+    Vec3::new(clip(rotation.x), clip(rotation.y), clip(rotation.z))
 }
 
 /// What one motor reports after a step.
@@ -404,6 +464,10 @@ pub struct MotorOutput {
     /// The share of the battery's voltage its ESC puts across it.
     pub drive: f64,
     pub esc: EscState,
+    /// How many times its ESC has restarted it since it last ran properly or
+    /// stopped at zero throttle: after a stall, the ESC restarts it until
+    /// the Quad definition's `restart_tries` starts in a row have failed.
+    pub restarts: u32,
 }
 
 /// One Quad as a rigid body, with its motors, their ESCs and its battery.
@@ -473,6 +537,7 @@ impl QuadBody {
             ("the props' rotor inertia", parameters.props.rotor_inertia),
             ("the battery's capacity", parameters.battery.capacity),
             ("the battery's recovery time", parameters.battery.recovery),
+            ("the gyro's range", parameters.gyro_range),
         ] {
             if !above_zero(value) {
                 return Err(SetUpProblem::NotAboveZero(name));
@@ -484,7 +549,8 @@ impl QuadBody {
         if !parameters.prop_wash.is_usable() {
             return Err(SetUpProblem::PropWashOutOfRange);
         }
-        if !parameters.shape.is_buildable() {
+        let grip = parameters.props.grip;
+        if !parameters.shape.is_buildable() || !(grip >= 0.0 && grip.is_finite()) {
             return Err(SetUpProblem::ShapeCantBeBuilt);
         }
         let positions = parameters.rotors.positions();
@@ -609,8 +675,33 @@ impl QuadBody {
                 },
                 drive: motor.drive,
                 esc: self.escs[k].state(),
+                restarts: self.escs[k].restarts(),
             }
         })
+    }
+
+    /// What the board's gyro reads after the last step: the true rotation in
+    /// body axes (forward, left, up), in rad/s, with no noise, each axis
+    /// clipped at the Quad definition's gyro range, as a real gyro saturates
+    /// (#26 §4).
+    pub fn gyro(&self) -> Vec3 {
+        gyro_reading(self.state.rotation, self.parameters.gyro_range)
+    }
+
+    /// How hard each prop rubbed the Map during the last step, in newtons, in
+    /// Betaflight's motor order: each prop disc's [`Contact::rub`], added up.
+    pub fn prop_rubs(&self) -> [f64; 4] {
+        let mut rubs = [0.0; 4];
+        for contact in &self.contacts {
+            if let QuadPart::PropDisc(motor) = contact.part
+                && let Some(rub) = usize::from(motor)
+                    .checked_sub(1)
+                    .and_then(|index| rubs.get_mut(index))
+            {
+                *rub += contact.rub;
+            }
+        }
+        rubs
     }
 
     /// What the battery reports after the last step.
@@ -691,9 +782,13 @@ impl QuadBody {
             inertia_inverse: self.inertia_inverse,
             bounce: self.parameters.shape.bounce,
             friction: self.parameters.shape.friction,
+            grip: self.parameters.props.grip,
+            rotor_inertia: self.parameters.props.rotor_inertia,
             parts: &self.parts,
             reach: self.reach,
         };
+        // Each prop's spin about the body's up axis; a prop's rub changes it.
+        let mut spins: [f64; 4] = core::array::from_fn(|k| self.turning[k] * self.motors[k].speed);
         collide(
             &collider,
             map,
@@ -701,7 +796,11 @@ impl QuadBody {
             &mut self.state,
             dt,
             &mut self.contacts,
+            &mut spins,
         );
+        for ((motor, turning), spin) in self.motors.iter_mut().zip(self.turning).zip(spins) {
+            motor.speed = turning * spin;
+        }
     }
 
     /// Steps 4 to 7: the move as if nothing were in the way, under gravity,

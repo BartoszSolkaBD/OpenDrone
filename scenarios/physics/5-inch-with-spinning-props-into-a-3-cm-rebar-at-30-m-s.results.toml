@@ -1,0 +1,76 @@
+# Results of 5-inch-with-spinning-props-into-a-3-cm-rebar-at-30-m-s.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch with spinning props at 30 m/s never passes through a 3 cm rebar stub"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.04 s"
+basis    = "Rule"
+expected = "between 2 m and 2.985 m"
+measured = "2.94 m"
+
+[[expect]]
+what     = "prop 2 rub, highest over 0.03 s to 0.04 s"
+basis    = "Rule"
+expected = "between 1 N and 100000 N"
+measured = "3190 N"
+
+[[expect]]
+what     = "prop 4 rub, highest over 0.03 s to 0.04 s"
+basis    = "Rule"
+expected = "between 1 N and 100000 N"
+measured = "2210 N"
+
+[[expect]]
+what     = "prop 1 rub, highest over 0 s to 0.04 s"
+basis    = "Rule"
+expected = "0 N ± 0 N"
+measured = "0 N"
+
+[[expect]]
+what     = "motor 2 speed at 0.031 s"
+basis    = "Observed"
+expected = "2060 RPM ± 10%"
+measured = "2060 RPM"
+
+[[expect]]
+what     = "motor 2 drive, highest over 0.05 s to 0.1 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 4 drive, highest over 0.05 s to 0.1 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "speed east at 0.1 s"
+basis    = "Observed"
+expected = "-1.74 m/s ± 0.3 m/s"
+measured = "-1.57 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "cc6c57ca9cb14bc5"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "61249da54cc5d1fa"   # test/thin-rail
+run  = "40971285c999035a"   # the whole state after each of 800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.01 s" = "9b6f232f7b1f140e"
+"0.02 s" = "b110f218c4729ec1"
+"0.03 s" = "fd6d6a88e3626b6b"
+"0.04 s" = "2e2d41e7f17548cd"
+"0.05 s" = "07541681ef55bb67"
+"0.06 s" = "bd0a415295e2fe81"
+"0.07 s" = "7e9ac6ac457edc88"
+"0.08 s" = "f7d38abba50e594d"
+"0.09 s" = "946e01ae9369eea0"
+"0.1 s" = "838bea526d047882"

@@ -19,8 +19,9 @@ use crate::geometry::{from_parry, to_parry, turn};
 /// - **the body**: a box centred on the centre of mass;
 /// - **the pack**: a box straight above or below the centre of mass, where
 ///   the pack really sits;
-/// - **a prop disc** per motor, solid for now (Prop Strikes come with #45),
-///   [`PROP_DISC_THICKNESS`] thick, in the props' plane;
+/// - **a prop disc** per motor, [`PROP_DISC_THICKNESS`] thick, in the props'
+///   plane: it bounces and slides like the frame, and while it touches the
+///   Map its prop rubs (a Prop Strike: see the crate's "Prop Strikes");
 /// - on a whoop, **a duct ring** round each prop disc, centred on it: a
 ///   ring open at the top and bottom, made of [`DUCT_RING_SEGMENTS`] flat
 ///   segments.
@@ -64,8 +65,7 @@ pub struct DuctRings {
 }
 
 /// How thick each prop disc is, in metres. A Quad definition doesn't give a
-/// prop's thickness; 2 mm keeps the disc thin, as ADR-0012 asks, until Prop
-/// Strikes (#45) decide more.
+/// prop's thickness; 2 mm keeps the disc thin, as ADR-0012 asks.
 pub const PROP_DISC_THICKNESS: f64 = 0.002;
 
 /// How many flat segments make up each duct ring. On the alpha whoop's 37 mm
@@ -169,11 +169,13 @@ impl QuadShape {
         let flat = turn(Vec3::new(1.0, 0.0, 0.0), FRAC_PI_2);
         let disc = SharedShape::cylinder(PROP_DISC_THICKNESS / 2.0, self.prop_diameter / 2.0);
         for (motor, centre) in (1u8..).zip(self.motor_positions()) {
-            parts.push(Part::new(
+            let mut part = Part::new(
                 QuadPart::PropDisc(motor),
                 disc.clone(),
                 Pose::from_parts(to_parry(centre), flat),
-            ));
+            );
+            part.prop = Some((usize::from(motor - 1), centre));
+            parts.push(part);
             if let Some(rings) = self.duct_rings {
                 ring_segments(rings, centre, motor, &mut parts);
             }
@@ -221,6 +223,9 @@ pub(crate) struct Part {
     pub local: Pose,
     /// How far its farthest point is from the centre of mass.
     pub reach: f64,
+    /// On a prop disc: its motor, counting from 0 in Betaflight's order, and
+    /// its hub, in body axes from the centre of mass.
+    pub prop: Option<(usize, Vec3)>,
 }
 
 impl Part {
@@ -232,6 +237,7 @@ impl Part {
             reach: centre.length() + sphere.radius(),
             shape,
             local,
+            prop: None,
         }
     }
 }

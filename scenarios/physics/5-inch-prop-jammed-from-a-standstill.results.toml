@@ -1,0 +1,76 @@
+# Results of 5-inch-prop-jammed-from-a-standstill.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch prop jammed against a block from a standstill gets 2 restarts: its first start counts as a failed one"
+
+[[expect]]
+what     = "motor 2 drive at 0.600125 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 restarts at 0.600125 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 drive, lowest over 0.600125 s to 1.59 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 drive, lowest over 0.600125 s to 2.42 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "motor 2 restarts at 2.5 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "motor 2 restarts at 4.3 s"
+basis    = "Source"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "motor 2 restarts, highest over 0 s to 7 s"
+basis    = "Source"
+expected = "2 ± 0"
+measured = "2.00"
+
+[[expect]]
+what     = "motor 2 drive, highest over 6 s to 7 s"
+basis    = "Source"
+expected = "0% ± 0%"
+measured = "0%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "cc6c57ca9cb14bc5"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "1cf123df8fcb25b6"   # test/block
+run  = "18c7c9b514cdd8e8"   # the whole state after each of 56000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.7 s" = "1ba3c262168dea9d"
+"1.4 s" = "bcc95b465e841b34"
+"2.1 s" = "5b29a9259ef0e10e"
+"2.8 s" = "07fe12e08dc40423"
+"3.5 s" = "e277aed597743c7a"
+"4.2 s" = "3da71c3b39fc9339"
+"4.9 s" = "5403087eb1733087"
+"5.6 s" = "f1481a0ebfa9c281"
+"6.3 s" = "f48d9fac94fe9f06"
+"7 s" = "faae35764fb9c108"

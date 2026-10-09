@@ -1,0 +1,22 @@
+# The Freestyle 5″ with runaway takeoff prevention off.    id: test/freestyle-5-no-runaway-takeoff-prevention
+#
+# Betaflight 2026.6.2 switches `runaway_takeoff_prevention` on by default: it
+# disarms a Quad whose PID sum on any axis stays at 600 or more with the gyro
+# moving for 75 ms (src/main/fc/core.c). The Flight Controller doesn't
+# simulate that guard yet (#54). A Scenario that flies a hit hard enough to
+# hold a PID sum that high, like a wall strike, would disarm on real
+# Betaflight, so this Test Quad switches the guard off as Betaflight reads
+# "off", and its numbers hold until #54 simulates the guard. Nothing else
+# changes: unlike the other Test Quads, it keeps the Freestyle 5″'s filters
+# and loop shaping, so a flight on it is the real Quad's flight.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "Runaway takeoff prevention off, not simulated yet (#54), so a Scenario that holds a PID sum high after a hit shows what the Quad does without the guard disarming it"
+
+# Tune changes keep Betaflight's own units, as `tune.txt` does.
+[tune]
+runaway_takeoff_prevention = "OFF" # no disarm on a PID sum held at 60% for 75 ms (core.c)

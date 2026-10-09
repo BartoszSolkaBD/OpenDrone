@@ -1,0 +1,70 @@
+# Results of gyro-reads-2000-at-3000.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Spun at 3,000 °/s, the gyro reads 2,000 °/s"
+
+[[expect]]
+what     = "yaw rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "3000 °/s ± 0.001 °/s"
+measured = "3000 °/s"
+
+[[expect]]
+what     = "gyro yaw rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "gyro yaw rate, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "2000 °/s ± 0 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "gyro roll rate, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "gyro roll rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "gyro pitch rate, highest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "gyro pitch rate, lowest over 0 s to 0.5 s"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "9f1ad58d056c8465"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "62cc0d67ff9a65a6"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "275af9167a09d60c"
+"0.1 s" = "f3a84a61af163c8b"
+"0.15 s" = "623f9e7e556d02ef"
+"0.2 s" = "80f730c68abc0520"
+"0.25 s" = "43e6ad384508070a"
+"0.3 s" = "80ab5e91c2182040"
+"0.35 s" = "2a72928c4f43baaa"
+"0.4 s" = "6dfa51a7abfc7c50"
+"0.45 s" = "b810c4d26f63603e"
+"0.5 s" = "935a72d92ced29e0"

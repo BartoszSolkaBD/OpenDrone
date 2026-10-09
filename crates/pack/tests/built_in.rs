@@ -52,6 +52,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/freestyle-5-filters-and-shaping-off",
             "test/freestyle-5-no-drag",
             "test/freestyle-5-no-prop-wash",
+            "test/freestyle-5-no-runaway-takeoff-prevention",
             "test/freestyle-5-output-limit-80",
             "test/whoop-65-bench-supply",
             "test/whoop-65-body-drag-only",
@@ -531,7 +532,7 @@ fn a_map_that_isnt_built_in_yet_is_refused() {
     let problems = built_in().map("opendrone/skate-park").unwrap_err();
     assert_eq!(
         problems.to_string(),
-        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge"
+        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge, test/block"
     );
 }
 

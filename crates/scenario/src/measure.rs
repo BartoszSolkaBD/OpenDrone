@@ -74,6 +74,13 @@ pub enum Measure {
     PitchRate,
     /// Nose right is positive.
     YawRate,
+    /// What the gyro reads about the roll axis: the roll rate, clipped at the
+    /// board's gyro range. Rolling right is positive.
+    GyroRollRate,
+    /// What the gyro reads about the pitch axis. Nose up is positive.
+    GyroPitchRate,
+    /// What the gyro reads about the yaw axis. Nose right is positive.
+    GyroYawRate,
     /// Right side down is positive, from -180° to 180°.
     Roll,
     /// Nose up is positive, from -90° to 90°.
@@ -93,6 +100,12 @@ pub enum Measure {
     MotorCurrent(usize),
     /// The share of the battery's voltage a motor's ESC puts across it.
     MotorDrive(usize),
+    /// How many times a motor's ESC has restarted it since it last ran
+    /// properly or stopped at zero throttle.
+    MotorRestarts(usize),
+    /// How hard a prop rubbed the Map during the last step: the friction at
+    /// its prop disc.
+    PropRub(usize),
     /// All four motors' thrust.
     TotalThrust,
     /// At the battery's terminals, past its connector.
@@ -331,7 +344,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 68] = [
+const ALL: [(&str, Measure); 79] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -346,6 +359,9 @@ const ALL: [(&str, Measure); 68] = [
     ("roll rate", Measure::RollRate),
     ("pitch rate", Measure::PitchRate),
     ("yaw rate", Measure::YawRate),
+    ("gyro roll rate", Measure::GyroRollRate),
+    ("gyro pitch rate", Measure::GyroPitchRate),
+    ("gyro yaw rate", Measure::GyroYawRate),
     ("roll", Measure::Roll),
     ("pitch", Measure::Pitch),
     ("heading", Measure::Heading),
@@ -369,6 +385,14 @@ const ALL: [(&str, Measure); 68] = [
     ("motor 2 drive", Measure::MotorDrive(1)),
     ("motor 3 drive", Measure::MotorDrive(2)),
     ("motor 4 drive", Measure::MotorDrive(3)),
+    ("motor 1 restarts", Measure::MotorRestarts(0)),
+    ("motor 2 restarts", Measure::MotorRestarts(1)),
+    ("motor 3 restarts", Measure::MotorRestarts(2)),
+    ("motor 4 restarts", Measure::MotorRestarts(3)),
+    ("prop 1 rub", Measure::PropRub(0)),
+    ("prop 2 rub", Measure::PropRub(1)),
+    ("prop 3 rub", Measure::PropRub(2)),
+    ("prop 4 rub", Measure::PropRub(3)),
     ("total thrust", Measure::TotalThrust),
     ("battery voltage", Measure::BatteryVoltage),
     ("battery current", Measure::BatteryCurrent),
@@ -430,12 +454,12 @@ impl Measure {
         }
     }
 
-    /// Every name the runner can measure, with the four motors' measures
-    /// written once each, as "motor N speed".
+    /// Every name the runner can measure, with the four motors' and props'
+    /// measures written once each, as "motor N speed".
     pub fn names() -> Vec<&'static str> {
         let mut names: Vec<&'static str> = ALL
             .iter()
-            .filter(|(name, _)| !name.starts_with("motor "))
+            .filter(|(name, _)| !name.starts_with("motor ") && !name.starts_with("prop "))
             .map(|(name, _)| *name)
             .collect();
         let at = names.iter().position(|n| *n == "total thrust").unwrap_or(0);
@@ -445,6 +469,8 @@ impl Measure {
             "motor N torque",
             "motor N current",
             "motor N drive",
+            "motor N restarts",
+            "prop N rub",
         ]
         .into_iter()
         .enumerate()
@@ -479,13 +505,21 @@ impl Measure {
             Measure::VerticalAcceleration
             | Measure::AccelerationEast
             | Measure::AccelerationNorth => Dimension::ACCELERATION,
-            Measure::RollRate | Measure::PitchRate | Measure::YawRate => Dimension::ROTATION_SPEED,
+            Measure::RollRate
+            | Measure::PitchRate
+            | Measure::YawRate
+            | Measure::GyroRollRate
+            | Measure::GyroPitchRate
+            | Measure::GyroYawRate => Dimension::ROTATION_SPEED,
             Measure::Roll | Measure::Pitch | Measure::Heading => Dimension::ANGLE,
             Measure::MotorSpeed(_) => Dimension::ROTATION_SPEED,
-            Measure::MotorThrust(_) | Measure::TotalThrust => Dimension::FORCE,
+            Measure::MotorThrust(_) | Measure::TotalThrust | Measure::PropRub(_) => {
+                Dimension::FORCE
+            }
             Measure::MotorTorque(_) => Dimension::TORQUE,
             Measure::MotorCurrent(_) | Measure::BatteryCurrent => Dimension::CURRENT,
             Measure::MotorDrive(_) => Dimension::PERCENT,
+            Measure::MotorRestarts(_) => Dimension::NONE,
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
             Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
@@ -585,6 +619,7 @@ impl Measure {
         let state = &now.state;
         let v = state.velocity;
         let rates = || PilotRates::from_body(state.rotation);
+        let gyro = || PilotRates::from_body(now.gyro);
         let angles = || state.attitude.pilot_angles();
         Some(match self {
             Measure::Height => state.position.z,
@@ -601,6 +636,9 @@ impl Measure {
             Measure::RollRate => rates().roll,
             Measure::PitchRate => rates().pitch,
             Measure::YawRate => rates().yaw,
+            Measure::GyroRollRate => gyro().roll,
+            Measure::GyroPitchRate => gyro().pitch,
+            Measure::GyroYawRate => gyro().yaw,
             Measure::Roll => angles().roll,
             Measure::Pitch => angles().pitch,
             Measure::Heading => angles().heading,
@@ -609,6 +647,8 @@ impl Measure {
             Measure::MotorTorque(k) => now.motors[k].torque,
             Measure::MotorCurrent(k) => now.motors[k].current,
             Measure::MotorDrive(k) => now.motors[k].drive,
+            Measure::MotorRestarts(k) => f64::from(now.motors[k].restarts),
+            Measure::PropRub(k) => now.prop_rubs[k],
             Measure::TotalThrust => now.motors.iter().map(|m| m.thrust).sum(),
             Measure::BatteryVoltage => now.battery.voltage,
             Measure::BatteryCurrent => now.battery.current,

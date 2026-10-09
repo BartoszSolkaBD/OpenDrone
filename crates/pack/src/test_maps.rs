@@ -101,6 +101,16 @@ pub(crate) const TEST_MAPS: &[TestMap] = &[
             vec![ground(), MapShape::Convex { corners }]
         },
     },
+    TestMap {
+        name: "block",
+        text: include_str!("../test-maps/block.toml"),
+        shapes: || {
+            vec![
+                ground(),
+                level_box(Vec3::new(0.11, 0.11, 0.0125), Vec3::new(0.02, 0.02, 0.025)),
+            ]
+        },
+    },
 ];
 
 /// The rail on `test/thin-rail`, across: 6 cm, the alpha Maps' handrails

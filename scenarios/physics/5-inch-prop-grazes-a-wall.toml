@@ -1,0 +1,119 @@
+# The Freestyle 5″, level and nose to the north-east, flies north at 3 m/s
+# along the Wall Test Map's wall and drifts into it at 5 cm/s. Turned that
+# way, only its front right prop (motor 2) reaches east of the rest, so its
+# disc alone touches the wall, 0.25 mm away at the start: a graze, too soft to
+# bounce. Its motors are "settled", turning at the speed that holds its
+# weight, at the drive that holds them there.
+#
+# Prop 2 turns anticlockwise seen from above (Betaflight's props-in), so
+# where it touches the wall, its east edge, its blades sweep north. The
+# rub works against them: it brakes the prop, and pushes the Quad south at
+# a point east of its centre of mass, which twists it clockwise seen from
+# above, nose right. Proves a Prop Strike's rub (#26 §1, #26 §6).
+format = 1
+name   = "A 5-inch's spinning prop grazes a wall: that motor slows, and the Quad is pushed and twisted the way the rub says"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "test/wall"
+position          = "4.8225 m east, 0 m north, 2.5 m up"
+attitude          = "level, heading 45°"
+speed             = "0.05 m/s east, 3 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+# 24.4%: about the drive that holds settled motors at their hover speed in
+# still air on this pack.
+timeline = [
+  { at = "0 s", motors = "24.4%" },
+]
+
+[[expect]]
+what    = "prop 2 rub"
+over    = "0 s to 0.05 s"
+highest = "129 N ± 10%"
+basis   = "observed: prop 2's disc closes the 0.25 mm in 5 ms and rubs during the step that ends at 0.005125 s, as hard as its grip, 0.5, times the wall's push that stops it drifting in: about 0.016 N·s in one step"
+
+[[expect]]
+what    = "prop 1 rub"
+over    = "0 s to 0.05 s"
+highest = "0 N ± 0 N"
+basis   = "rule: nose to the north-east, prop 1 sits south of the centre of mass and reaches 65 mm east of it, 11 cm short of the wall; only prop 2 reaches it"
+
+[[expect]]
+what    = "prop 4 rub"
+over    = "0 s to 0.05 s"
+highest = "0 N ± 0 N"
+basis   = "rule: prop 4 sits north of the centre of mass and reaches 65 mm east of it, 11 cm short of the wall"
+
+[[expect]]
+what    = "prop 3 rub"
+over    = "0 s to 0.05 s"
+highest = "0 N ± 0 N"
+basis   = "rule: prop 3 sits west of the centre of mass, the farthest from the wall"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.0055 s"
+value = "between 190 RPM and 9250 RPM"
+basis = "rule: the rub brakes prop 2, so it reads below 9,250 RPM, under the 9,273 RPM (0.5% below 9,320) that an untouched motor can drift to, which an unbraked prop 2 would read; and a graze only slows it: it doesn't stop, or fall below Bluejay's minimum speed, 1,330 electrical RPM (190 RPM on this 14-pole motor), where its ESC would find it stalled"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.0055 s"
+value = "7530 RPM ± 5%"
+basis = "observed: the graze takes about a fifth of its speed"
+
+[[expect]]
+what  = "motor 4 speed"
+at    = "0.0055 s"
+value = "9320 RPM ± 0.5%"
+basis = "rule: prop 4 touches nothing, so nothing brakes it: it stays within 0.5% of 9,320 RPM, the speed it holds at the start of the flight (9,310 RPM a moment earlier), drifting only as its drive and the air it flies through set it"
+
+[[expect]]
+what  = "speed north"
+at    = "0.0055 s"
+value = "between 2.9 m/s and 2.999 m/s"
+basis = "rule: the rub pushes the Quad south, against prop 2's blades, which sweep north where they touch; nothing else acts along the wall (no drag, and the thrust points straight up), so its 3 m/s north falls"
+
+[[expect]]
+what  = "speed north"
+at    = "0.0055 s"
+value = "2.975 m/s ± 0.005 m/s"
+basis = "observed: the rub's push south, about 0.016 N·s on 0.652 kg"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.0055 s"
+value = "between 1 °/s and 1000 °/s"
+basis = "rule: the rub pushes south at prop 2's hub's line, 11 cm east of the centre of mass, which turns the Quad clockwise seen from above: its nose yaws right"
+
+[[expect]]
+what  = "yaw rate"
+at    = "0.0055 s"
+value = "41.9 °/s ± 5%"
+basis = "observed: about 0.016 N·s at 11 cm on a yaw inertia of 25 kg·cm²"

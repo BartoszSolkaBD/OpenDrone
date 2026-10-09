@@ -1,0 +1,96 @@
+# The Freestyle 5″ flies level at 30 m/s straight at the 3 cm rebar stub on
+# the Thin rail Test Map, which stands 2 m tall at 3 m east, 10 m north, as in
+# "A 5-inch at 30 m/s never passes through a 3 cm rebar stub", but with its
+# props spinning: its motors are "settled", turning at the speed that holds
+# its weight, and stay at the drive that holds them there. Its front prop
+# discs meet the stub first, and rub as they strike it. Proves the thin-rail
+# half of E29 in #10 with spinning props, now that prop discs rub (#26 §6).
+format = 1
+name   = "A 5-inch with spinning props at 30 m/s never passes through a 3 cm rebar stub"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "test/thin-rail"
+position          = "2 m east, 10 m north, 1 m up"
+attitude          = "level, heading 90°"
+speed             = "30 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+# 24.4%: about the drive that holds settled motors at their hover speed in
+# still air on this pack.
+timeline = [
+  { at = "0 s", motors = "24.4%" },
+]
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 0.04 s"
+highest = "between 2 m and 2.985 m"
+basis   = "rule: the stub's near side is 3 m - 1.5 cm = 2.985 m east. Flying free, the 5-inch's front prop discs would meet it at about 0.031 s, and its centre would pass it at 0.033 s and be 3.2 m east by 0.04 s. Its centre is inside its shape, so by 0.04 s only passing through the stub could take its centre to 2.985 m: the stub stands from the ground to 2 m, so it can't go under it, nor over it (a 1 m climb; its thrust only holds its weight); going round it needs its prop discs about 16 cm sideways in the 9 ms after they meet it"
+
+[[expect]]
+what    = "prop 2 rub"
+over    = "0.03 s to 0.04 s"
+highest = "between 1 N and 100000 N"
+basis   = "rule: its front right prop disc strikes the stub while it spins, so it rubs: its rub is its grip times how hard the stub pushes it, and a stub that stops 30 m/s pushes far harder than 2 N"
+
+[[expect]]
+what    = "prop 4 rub"
+over    = "0.03 s to 0.04 s"
+highest = "between 1 N and 100000 N"
+basis   = "rule: its front left prop disc strikes the stub too, on the stub's other side"
+
+[[expect]]
+what    = "prop 1 rub"
+over    = "0 s to 0.04 s"
+highest = "0 N ± 0 N"
+basis   = "rule: the rear props are 16 cm behind the front ones, and the stub never reaches them before 0.04 s"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "0.031 s"
+value = "2060 RPM ± 10%"
+basis = "observed: the strike takes three quarters of prop 2's 7,920 RPM in one step (settled at 30 m/s, its props need less speed than in a hover in still air)"
+
+[[expect]]
+what    = "motor 2 drive"
+over    = "0.05 s to 0.1 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, src/Bluejay.asm L983–987, L1037–1041 and L1084: the stub's rub leaves prop 2 turning backwards, about 380 RPM (observed), slower than the minimum speed the way it's told to turn, so its ESC finds the motor stalled, switches it off and waits 0.1 s before restarting it"
+
+[[expect]]
+what    = "motor 4 drive"
+over    = "0.05 s to 0.1 s"
+highest = "0% ± 0%"
+basis   = "source: Bluejay v0.21.0, as for motor 2: prop 4 is left turning backwards too, so its ESC switches it off for its restart wait"
+
+[[expect]]
+what  = "speed east"
+at    = "0.1 s"
+value = "-1.74 m/s ± 0.3 m/s"
+basis = "observed: its rubbing props slow and the stub squeezes between them, then the stub reaches its frame at about 11.5 m/s, and it bounces back, tipping nose up"

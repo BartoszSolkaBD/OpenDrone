@@ -6,27 +6,38 @@
 # idle or above.
 #
 # One default could: runaway takeoff prevention (`runaway_takeoff_prevention`
-# ON, a guard against wiring and orientation mistakes, not simulated yet,
-# #21's "later") disarms a Quad whose PID sum on any axis stays at 600 or more
-# (60% of the motor range) with the gyro moving for 75 ms, until half a
-# second of normal flight switches it off (src/main/fc/core.c). A mid-air
-# start skips that half second, so the Expectations below also check that the
-# hit holds the PID sums there for less than 75 ms.
+# ON, a guard against wiring and orientation mistakes, not simulated yet, #54)
+# disarms a Quad whose PID sum on any axis stays at 600 or more (60% of the
+# motor range) with the gyro moving for 75 ms, until half a second of normal
+# flight switches it off (src/main/fc/core.c). Flown with the sticks centred
+# below 40% throttle, as here, a Quad never counts as in that normal flight
+# (core.c L885–895), so it would still be on. Since Prop Strikes (#45) the hit
+# holds the pitch sum above 600 for about 300 ms (see below), long enough for
+# it to disarm a real Quad on Betaflight's defaults. Ours doesn't simulate it
+# yet, so this Scenario flies test/freestyle-5-no-runaway-takeoff-prevention,
+# the Freestyle 5″ with that one setting off in its Tune, as other Scenarios
+# do for settings not simulated yet; #54 can turn it back on.
 #
-# What the hit does (since the air, #42): rotor and body drag slow the Quad
-# from 10 m/s to 7.8 m/s before it reaches the wall at about 0.555 s. The
-# pitch sum is above 600 from then to about 0.587 s, about 32 ms. The hit
-# tips its nose 47° into the wall, and Acro holds it there, so its thrust
-# drives it up the wall's face, and from about 1.04 s to 1.33 s it scrapes
-# over the wall's top, 5 m up, in many short knocks: the pitch sum keeps
-# reaching past 600 and falling back below within 30 ms, the roll sum's
-# spikes last 20 ms at most and the yaw sum's 15 ms. After that it flies on
-# east, clear of the wall.
+# What the hit does (since the air, #42, and Prop Strikes, #45): rotor and
+# body drag slow the Quad from 10 m/s to 7.8 m/s before it reaches the wall
+# at about 0.555 s. Its front props strike the wall first and stop, and it
+# bounces back at about 2 m/s. Their ESCs find them stalled and restart them,
+# 0.1 s later and capped at the start-up power limit at first, so they run
+# again by about 0.86 s; until then the Flight Controller asks for all the
+# nose-up pitch it can, the pitch sum above 600 from about 0.556 s to 0.86 s,
+# and the Quad tumbles. Running again, it settles in Acro about 51° nose down,
+# so its thrust carries it back east into the wall at about 1.42 s, and it
+# ends up pressed against the wall's face, nose in, still armed and flying.
+# The first hit's first step kicks the PID sums to their limits (the gyro
+# jumps in one step); the second is a series of knocks from about 1.41 s to
+# 1.55 s, and the PID sums spike past ±20,000 at each. The Expectations leave
+# those out.
 #
-# Since ground and ceiling effect (#44): tipped into the wall, its rotors
-# blow at the wall's face and over its top, which cushions them, so the PID
-# sums during and after the scrape moved (the pitch sum's lowest from -536 to
-# -591); the flight up to the wall is the same.
+# Since ground and ceiling effect (#44): nose down and pressed against the
+# wall's face, its rotors blow close to the wall, which cushions them, so the PID
+# sums moved a little (the roll sum's lowest from 1.6 s to 3 s from 5.64 to
+# 2.08, the speed east at 1 s from -0.0915 to -0.0858 m/s). The hit, the
+# restarts, the second hit at about 1.41 s and where it ends up are the same.
 #
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with
@@ -36,7 +47,7 @@ name   = "A Quad that hits a wall stays armed"
 
 [start]
 kind              = "flight"
-quad              = "opendrone/freestyle-5"
+quad              = "test/freestyle-5-no-runaway-takeoff-prevention"
 map               = "test/wall"
 position          = "0 m east, 0 m north, 2 m up"
 attitude          = "level, heading 90°"
@@ -75,14 +86,14 @@ basis   = "rule: the wall's face is at 5 m east and the Quad never passes throug
 [[expect]]
 what  = "speed east"
 at    = "1 s"
-value = "1.36 m/s ± 0.5 m/s"
-basis = "observed: the wall stopped the Quad, from the 7.8 m/s the air had slowed it to; at 1 s it is sliding up the wall's face, nose into it, about to scrape over the top (it was 0.374 m/s with no air, #42)"
+value = "-0.09 m/s ± 0.5 m/s"
+basis = "observed: its front props strike the wall and it bounces back at about 2 m/s; running again, its props carry it back toward the wall, and at 1 s it is turning back (it was 1.36 m/s before Prop Strikes, #45, and 0.374 m/s with no air, #42)"
 
 [[expect]]
 what  = "the Quad disarms"
 over  = "0 s to 3 s"
 first = "never"
-basis = "source: Betaflight 2026.6.2's defaults (crash_recovery OFF, landing_disarm_threshold 0, pid.c): nothing disarms on a hit, and the Arm switch stays on; runaway takeoff prevention would not act either (see the PID sums below)"
+basis = "source: Betaflight 2026.6.2's defaults (crash_recovery OFF, landing_disarm_threshold 0, pid.c): nothing disarms on a hit, and the Arm switch stays on; runaway takeoff prevention, which on its defaults would disarm this Quad (see the PID sums below), is off in this Scenario's Tune, because the Flight Controller doesn't simulate that guard yet; #54 can turn it back on once it does"
 
 [[expect]]
 what   = "motor 1 DShot"
@@ -90,8 +101,9 @@ over   = "0.5 s to 3 s"
 lowest = "between 158 and 2047"
 basis  = "source: armed, Betaflight's mixer with Airmode never drops a motor below idle (48 + 5.5% × 1999 = 157.9, sent as 158)"
 
-# The hit holds no PID sum at 600 or more for 75 ms, so Betaflight's runaway
-# takeoff prevention wouldn't disarm it either.
+# While its struck front props restart, the pitch sum stays above 600 for
+# about 300 ms; roll and yaw stay well below it. Pressed against the wall
+# after the second hit, it asks next to nothing.
 
 [[expect]]
 what    = "pitch PID sum"
@@ -102,80 +114,86 @@ basis   = "observed: before the hit, level flight asks next to nothing"
 [[expect]]
 what    = "pitch PID sum"
 over    = "0.59 s to 1.04 s"
-highest = "between -600 and 600"
-basis   = "observed: the hit at about 0.555 s drives the pitch PID sum above 600 for about 32 ms; from 0.59 s it stays below until the Quad reaches the wall's top"
+highest = "between 2000 and 3000"
+basis   = "observed: with its front props struck and stopped, the Flight Controller asks for all the nose-up pitch it can until they run again"
 
 [[expect]]
 what   = "pitch PID sum"
-over   = "0.52 s to 3 s"
+over   = "0.556 s to 0.85 s"
+lowest = "between 600 and 3000"
+basis  = "observed: the pitch sum is above 600 from just after the hit until the struck props run again, about 0.86 s: about 300 ms, far longer than the 75 ms Betaflight's runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "0.52 s to 1.4 s"
 lowest = "between -600 and 600"
-basis  = "observed: it never goes below -600"
+basis  = "observed: until the second hit, it never goes below -600"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.04 s to 1.07 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.07 s to 1.10 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.10 s to 1.13 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.13 s to 1.16 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.16 s to 1.19 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.19 s to 1.22 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.22 s to 1.25 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.25 s to 1.28 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.28 s to 1.31 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what   = "pitch PID sum"
 over   = "1.31 s to 1.34 s"
 lowest = "between -600 and 600"
-basis  = "observed: scraping over the wall's top, the pitch sum falls back below 600 within every 30 ms, so it is never there for the 75 ms runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
 
 [[expect]]
 what    = "pitch PID sum"
-over    = "1.34 s to 3 s"
+over    = "1.6 s to 3 s"
 highest = "between -600 and 600"
-basis   = "observed: clear of the wall, it stays below 600"
+basis   = "observed: pressed against the wall after the second hit, it asks next to nothing in pitch"
 
 [[expect]]
 what    = "roll PID sum"
@@ -193,25 +211,25 @@ basis  = "observed: before the hit, level flight asks next to nothing"
 what    = "roll PID sum"
 over    = "0.59 s to 1.04 s"
 highest = "between -600 and 600"
-basis   = "observed: the hit is square on: after its first knock, roll asks next to nothing until the wall's top"
+basis   = "observed: the hit is square on, so roll asks little while its front props restart, and next to nothing once they run"
 
 [[expect]]
 what   = "roll PID sum"
 over   = "0.59 s to 1.04 s"
 lowest = "between -600 and 600"
-basis  = "observed: the hit is square on: after its first knock, roll asks next to nothing until the wall's top"
+basis  = "observed: the hit is square on, so roll asks little while its front props restart, and next to nothing once they run"
 
 [[expect]]
 what    = "roll PID sum"
-over    = "1.34 s to 3 s"
+over    = "1.6 s to 3 s"
 highest = "between -600 and 600"
-basis   = "observed: clear of the wall, roll asks next to nothing"
+basis   = "observed: pressed against the wall after the second hit, it asks next to nothing in roll"
 
 [[expect]]
 what   = "roll PID sum"
-over   = "1.34 s to 3 s"
+over   = "1.6 s to 3 s"
 lowest = "between -600 and 600"
-basis  = "observed: clear of the wall, roll asks next to nothing"
+basis  = "observed: pressed against the wall after the second hit, it asks next to nothing in roll"
 
 [[expect]]
 what    = "yaw PID sum"
@@ -229,22 +247,22 @@ basis  = "observed: before the hit, level flight asks next to nothing"
 what    = "yaw PID sum"
 over    = "0.59 s to 1.04 s"
 highest = "between -600 and 600"
-basis   = "observed: the hit is square on: after its first knock, yaw asks next to nothing until the wall's top"
+basis   = "observed: the hit is square on, so yaw asks little while its front props restart, and next to nothing once they run"
 
 [[expect]]
 what   = "yaw PID sum"
 over   = "0.59 s to 1.04 s"
 lowest = "between -600 and 600"
-basis  = "observed: the hit is square on: after its first knock, yaw asks next to nothing until the wall's top"
+basis  = "observed: the hit is square on, so yaw asks little while its front props restart, and next to nothing once they run"
 
 [[expect]]
 what    = "yaw PID sum"
-over    = "1.34 s to 3 s"
+over    = "1.6 s to 3 s"
 highest = "between -600 and 600"
-basis   = "observed: clear of the wall, yaw asks next to nothing"
+basis   = "observed: pressed against the wall after the second hit, it asks next to nothing in yaw"
 
 [[expect]]
 what   = "yaw PID sum"
-over   = "1.34 s to 3 s"
+over   = "1.6 s to 3 s"
 lowest = "between -600 and 600"
-basis  = "observed: clear of the wall, yaw asks next to nothing"
+basis  = "observed: pressed against the wall after the second hit, it asks next to nothing in yaw"
