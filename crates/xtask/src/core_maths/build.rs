@@ -187,6 +187,10 @@ pub(super) struct Built {
     /// The `--with` packages' programs: the package id, the program's name
     /// and the object file holding its compiled code.
     pub(super) programs: Vec<(String, String, PathBuf)>,
+    /// The programs' package ids that cargo didn't build this time, because
+    /// an earlier build was still fresh. Their kept object file is the last
+    /// build's, which may have had other features, so it can't be trusted.
+    pub(super) fresh: BTreeSet<String>,
 }
 
 /// While this is set, xtask runs as the compiler wrapper `build` gives
@@ -212,8 +216,10 @@ pub(super) fn build(
     let wrapper = std::env::current_exe()
         .map_err(|error| format!("can't find this program's own file: {error}"))?;
     // Cargo builds a program again only when something it's made from
-    // changed, so a program's object file is its last build's. If one is
-    // gone, its package is cleaned and built again, once.
+    // changed, so a program's object file is its last build's, and a build
+    // with other features (another `--with`) may have overwritten it since.
+    // If one is gone, or cargo reused an earlier build of its program, its
+    // package is cleaned and built again, once.
     for attempt in 0..2 {
         let built = build_once(
             packages,
@@ -227,7 +233,7 @@ pub(super) fn build(
         let missing: BTreeSet<&str> = built
             .programs
             .iter()
-            .filter(|(_, _, object)| !object.exists())
+            .filter(|(id, _, object)| !object.exists() || built.fresh.contains(id))
             .map(|(id, _, _)| packages.name(id))
             .collect();
         if missing.is_empty() {
@@ -235,7 +241,7 @@ pub(super) fn build(
         }
         if attempt > 0 {
             return Err(format!(
-                "cargo built {} without keeping its compiled code in {}",
+                "cargo built {} without keeping its fresh compiled code in {}",
                 missing.into_iter().collect::<Vec<_>>().join(", "),
                 objects.display()
             ));
@@ -295,6 +301,7 @@ fn build_once(
     let mut built = Built {
         rlibs: BTreeMap::new(),
         programs: Vec::new(),
+        fresh: BTreeSet::new(),
     };
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         let Ok(message) = serde_json::from_str::<Value>(line) else {
@@ -317,6 +324,9 @@ fn build_once(
                 built
                     .programs
                     .push((id.to_owned(), program.to_owned(), object));
+                if message["fresh"].as_bool() == Some(true) {
+                    built.fresh.insert(id.to_owned());
+                }
             }
             continue;
         }

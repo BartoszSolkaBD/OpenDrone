@@ -45,7 +45,8 @@
 //!
 //! - A reference to a maths function from outside any function, such as a
 //!   table of function pointers. No allowance covers one, because nothing
-//!   says what calls through it.
+//!   says what calls through it. That includes a table that points at a
+//!   copy of std's maths method (`[f64::acos]`), however the code is built.
 //! - Compiled code that is LLVM bitcode instead of machine code, which
 //!   link-time optimisation makes. This check can't read it.
 //!
@@ -531,10 +532,20 @@ fn core_calls(
         for place in places {
             match place {
                 Place::Function(name) => {
-                    let (core, uncalled) = owners.functions_leading_to(code, name);
+                    let Leading {
+                        core,
+                        uncalled,
+                        outside,
+                    } = owners.functions_leading_to(code, name);
                     let mut theirs: BTreeSet<&str> = uncalled;
                     if core.is_empty() && theirs.is_empty() {
                         theirs.insert(name);
+                    }
+                    if !outside.is_empty() {
+                        calls
+                            .entry((library.to_owned(), function.clone()))
+                            .or_default()
+                            .extend(outside);
                     }
                     for name in core {
                         let owner = owners.library(name).unwrap_or(library);
@@ -583,7 +594,7 @@ fn other_calls(
             let Place::Function(name) = place else {
                 continue;
             };
-            let (core, _) = owners.functions_leading_to(code, name);
+            let core = owners.functions_leading_to(code, name).core;
             for name in core {
                 let Some(library) = owners.library(name) else {
                     continue;
@@ -663,13 +674,10 @@ impl Owners {
     /// `function` itself when it's one of them, or else the core's functions
     /// that call it, through other crates' functions such as std's. Then the
     /// other crates' functions on those ways that nothing in this code calls.
-    fn functions_leading_to<'a>(
-        &self,
-        code: &'a Code,
-        function: &'a str,
-    ) -> (BTreeSet<&'a str>, BTreeSet<&'a str>) {
+    fn functions_leading_to<'a>(&self, code: &'a Code, function: &'a str) -> Leading<'a> {
         let mut core = BTreeSet::new();
         let mut uncalled = BTreeSet::new();
+        let mut outside = BTreeSet::new();
         let mut seen = BTreeSet::new();
         let mut waiting = vec![function];
         while let Some(name) = waiting.pop() {
@@ -680,6 +688,14 @@ impl Owners {
                 core.insert(name);
                 continue;
             }
+            // Data pointing at another crate's function, such as a table of
+            // function pointers, can call it from nowhere we can name.
+            for (data, section) in code.data_refs.get(name).into_iter().flatten() {
+                outside.insert(Caller::Outside {
+                    data: data.as_deref().map(demangle),
+                    section: section.clone(),
+                });
+            }
             match code.callers.get(name) {
                 Some(callers) if !callers.is_empty() => {
                     waiting.extend(callers.iter().map(String::as_str));
@@ -689,6 +705,21 @@ impl Owners {
                 }
             }
         }
-        (core, uncalled)
+        Leading {
+            core,
+            uncalled,
+            outside,
+        }
     }
+}
+
+/// What [`Owners::functions_leading_to`] found.
+struct Leading<'a> {
+    /// The core's functions that lead to the call.
+    core: BTreeSet<&'a str>,
+    /// Other crates' functions on the way that nothing in this code calls.
+    uncalled: BTreeSet<&'a str>,
+    /// Data outside any function that points at another crate's function on
+    /// the way.
+    outside: BTreeSet<Caller>,
 }
