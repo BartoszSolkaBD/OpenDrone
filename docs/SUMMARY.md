@@ -92,7 +92,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
   - [Issue tracker](agents/issue-tracker.md)
   - [Triage labels](agents/triage-labels.md)
   - [Domain docs](agents/domain.md)
-  - [The delegator](agents/delegator.md)
+  - [The Delegator](agents/delegator.md)
   - [Building a ticket](agents/author.md)
   - [The Reviewer and the Verdict](agents/reviewer.md)
   - [Checking a merge-only update](agents/merge-update.md)

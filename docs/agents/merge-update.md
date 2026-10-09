@@ -1,6 +1,6 @@
 # Checking a merge-only update
 
-A PR got `Verdict: pass` on a commit, R. Since then, main was merged into the PR's branch, so CI could run on the two together. A **merge-only update** is such a branch where the only changes since R are main's own changes, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. Every new commit needs a fresh Verdict ([The Reviewer and the Verdict](reviewer.md)). This page is the short check for that case. A fresh agent on the Light tier runs it ([the delegator](delegator.md#model-tiers)).
+A PR got `Verdict: pass` on a commit, R. Since then, main was merged into the PR's branch, so CI could run on the two together. A **merge-only update** is such a branch where the only changes since R are main's own changes, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. Every new commit needs a fresh Verdict ([The Reviewer and the Verdict](reviewer.md)). This page is the short check for that case. A fresh agent on the Light tier runs it ([the Delegator](delegator.md#model-tiers)).
 
 Your job is small and mechanical: confirm the update brought in main's changes and nothing else. Don't change code, push, merge or edit labels.
 
@@ -84,6 +84,6 @@ Merge-only update after the pass on <R>: main merged in, <no conflicts | conflic
 Verdict: pass
 ```
 
-**If any step fails,** post nothing. Never post `Verdict: changes needed` from this check: that would count as a failed review round for a problem you weren't asked to judge. Tell the delegator which step failed and why. The PR then needs a full Reviewer.
+**If any step fails,** post nothing. Never post `Verdict: changes needed` from this check: that would count as a failed review round for a problem you weren't asked to judge. Tell the Delegator which step failed and why. The PR then needs a full Reviewer.
 
-Then report to the delegator. Say what you posted, and the Review check's status a minute or two later.
+Then report to the Delegator. Say what you posted, and the Review check's status a minute or two later.
