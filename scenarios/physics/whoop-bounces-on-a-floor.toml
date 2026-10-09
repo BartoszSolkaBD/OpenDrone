@@ -2,7 +2,7 @@
 # floor Test Map. It lands flat on its body box's four bottom corners at about
 # √(2 × 9.81 m/s² × 1 m) = 4.43 m/s, bounces with its bounce of 0.3, and
 # settles. Shows the bounce half of E29 in #10.
-format = 1
+format = 2
 name   = "A dropped whoop bounces and settles"
 
 [start]

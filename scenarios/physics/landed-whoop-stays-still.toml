@@ -2,7 +2,7 @@
 # exactly where it is for two minutes: no creep, no jitter. It starts resting
 # on its body box, 20 mm tall round its centre of mass, so its centre is
 # 0.01 m up. Proves the landed half of E29 in #10.
-format = 1
+format = 2
 name   = "A landed whoop stays still for two minutes"
 
 [start]

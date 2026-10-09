@@ -25,7 +25,7 @@
 #
 # The Map is the flat floor Test Map, whose ground is a box. At rest the
 # Quad's drag does nothing. The run is one step long: it checks the start.
-format = 1
+format = 2
 name   = "Two rotor radii over the floor, a Freestyle 5″'s rotors give 10.6% more thrust, so it hovers on slower motors"
 
 [start]

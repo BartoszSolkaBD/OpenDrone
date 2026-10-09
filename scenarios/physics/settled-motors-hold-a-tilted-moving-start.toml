@@ -22,7 +22,7 @@
 # Its rotors see the air too (the climb along their tilted axes, and the air
 # across them), so the settled speed is not a hover's; but the thrust it
 # gives is what the working needs.
-format = 1
+format = 2
 name   = "Settled motors hold a tilted, moving Whoop 65's height and speed from the first step"
 
 [start]

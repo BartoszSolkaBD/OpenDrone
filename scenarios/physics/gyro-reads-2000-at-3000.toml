@@ -3,7 +3,7 @@
 # board's gyro reads only up to ±2,000 °/s (the Whoop 65's BMI270 and a
 # typical 5″'s ICM-42688-P both do), so it reads 2,000 °/s the whole time.
 # Proves the gyro limit (#26 §4, #26 §6).
-format = 1
+format = 2
 name   = "Spun at 3,000 °/s, the gyro reads 2,000 °/s"
 
 [start]

@@ -636,11 +636,12 @@ impl<'s> Feed<'s> {
 }
 
 /// The pilot's Timeline, ready to read at any step: each stick's values (with
-/// ramps between), the Arm switch and, for the Flight Controller alone, the
-/// sensor readings.
+/// ramps between), the Arm and Crash Flip switches and, for the Flight
+/// Controller alone, the sensor readings.
 struct PilotTrack {
     sticks: [Vec<(u64, Stick)>; 4],
     arm: Vec<(u64, bool)>,
+    crash_flip: Vec<(u64, bool)>,
     rotation: Vec<(u64, Vec3)>,
     attitude: Vec<(u64, Attitude)>,
     /// The Flight Inputs besides the Channels, each at its step, in order:
@@ -656,6 +657,7 @@ impl PilotTrack {
         let mut track = PilotTrack {
             sticks: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
             arm: Vec::new(),
+            crash_flip: Vec::new(),
             rotation: vec![(0, start.rotation)],
             attitude: vec![(0, start.attitude)],
             events: Vec::new(),
@@ -673,6 +675,7 @@ impl PilotTrack {
                 yaw,
                 throttle,
                 arm,
+                crash_flip,
                 rotation,
                 attitude,
                 input_device,
@@ -693,6 +696,9 @@ impl PilotTrack {
             }
             if let Some(arm) = arm {
                 track.arm.push((tick, arm));
+            }
+            if let Some(crash_flip) = crash_flip {
+                track.crash_flip.push((tick, crash_flip));
             }
             if let Some(rotation) = rotation {
                 track.rotation.push((tick, rotation));
@@ -715,7 +721,7 @@ impl PilotTrack {
             throttle: Channel::from_throttle(share(3)),
             arm: Channel::from_switch(held(&self.arm, tick).unwrap_or(false)),
             flight_mode: self.flight_mode,
-            crash_flip: Channel::LOW,
+            crash_flip: Channel::from_switch(held(&self.crash_flip, tick).unwrap_or(false)),
         }
     }
 

@@ -12,7 +12,7 @@
 # by about 30 m/s² each way, so the two runs' vertical speeds differ by at most
 # 30 m/s² × 0.125 ms ≈ 4 mm/s, and over the 1.5 s that follow their heights by
 # at most 4 mm/s × 1.5 s = 6 mm.
-format = 1
+format = 2
 name   = "The same flight at 4 kHz and 8 kHz gives nearly the same result"
 
 [start]

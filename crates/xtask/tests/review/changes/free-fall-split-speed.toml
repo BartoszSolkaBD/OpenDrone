@@ -1,6 +1,6 @@
 # A fixture: the first half of free-fall.toml split in two, with the same
 # setup.
-format = 1
+format = 2
 name   = "Free fall reaches g × t"
 
 [start]

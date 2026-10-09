@@ -26,7 +26,7 @@
 # throttle reaches the ESCs about 20 ms after the arming frame. The Flight
 # Controller doesn't send DShot commands yet (Crash Flip, #54), so the idle is
 # checked 26 ms after arming, where both agree.
-format = 1
+format = 2
 name   = "The Arm switch arms with the throttle low and the Quad level enough, as in Betaflight"
 
 [start]
@@ -53,7 +53,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   # Throttle low, level: arms.
   { at = "0.1 s", arm = "on" },
   { at = "0.5 s", arm = "off" },

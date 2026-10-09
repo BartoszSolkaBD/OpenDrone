@@ -42,7 +42,7 @@
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with
 # the sticks centred and the throttle at 30%.
-format = 1
+format = 2
 name   = "A Quad that hits a wall stays armed"
 
 [start]
@@ -74,7 +74,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
 ]
 
 [[expect]]

@@ -3,7 +3,7 @@
 # path at the height of its centre. At 8 kHz it moves 3.75 mm a step, more
 # than its 1.5 mm duct wall: only the continuous check stops a step carrying
 # a part through the rail. Proves the thin-rail half of E29 in #10.
-format = 1
+format = 2
 name   = "A whoop at 30 m/s never passes through a 6 cm rail"
 
 [start]

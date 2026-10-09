@@ -22,7 +22,7 @@
 #
 # Full stick reads 2012.46 µs, more than 500 µs from centre, so its deflection
 # is held at exactly 1.
-format = 1
+format = 2
 name   = "Quick rates with RC expo bend the stick itself, as Betaflight does"
 
 [start]
@@ -53,6 +53,7 @@ pitch    = "25%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "off"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "pitch setpoint"
@@ -65,6 +66,7 @@ pitch    = "50%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "off"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "pitch setpoint"
@@ -77,6 +79,7 @@ pitch    = "75%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "off"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "pitch setpoint"
@@ -89,6 +92,7 @@ pitch    = "100%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "off"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "pitch setpoint"
@@ -101,6 +105,7 @@ pitch    = "-50%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "off"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "pitch setpoint"

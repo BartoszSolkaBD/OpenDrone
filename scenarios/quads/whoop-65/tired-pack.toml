@@ -8,7 +8,7 @@
 #
 # The pack's resting voltage is 4.35 V full and 3.77 V at 20% (its voltage
 # curve), 86.7% of full.
-format = 1
+format = 2
 name   = "On a tired pack, the Whoop 65's thrust drops roughly with voltage squared and its idle speed falls"
 
 [start]

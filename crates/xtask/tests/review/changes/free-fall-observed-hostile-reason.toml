@@ -1,7 +1,7 @@
 # A fixture: an Observed Expectation updated with a "reason" that tries to
 # fake the Review Report's structure: its hidden marker, an HTML block, a
 # Verdict heading, a link and a mention.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

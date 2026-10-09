@@ -9,7 +9,7 @@
 # Falling, m·dv/dt = m·g − ½ρ·A·v², so the speed is v_t·tanh(g·t / v_t),
 # with the terminal speed v_t = √(2·m·g / (ρ·A)) =
 # √(2 × 0.0312 kg × 9.81 m/s² / (1.225 kg/m³ × 0.0017 m²)) = 17.145 m/s.
-format = 1
+format = 2
 name   = "A Whoop 65 falling belly first reaches its terminal speed, 17.1 m/s"
 
 [start]

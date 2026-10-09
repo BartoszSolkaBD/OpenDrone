@@ -6,7 +6,7 @@
 # against it and are spun up as it squeezes between them; its pack and then
 # its body meet it next. Proves the thin-rail half of E29
 # in #10 with the 5″'s prop discs (#26 §6).
-format = 1
+format = 2
 name   = "A 5-inch at 30 m/s never passes through a 3 cm rebar stub"
 
 [start]

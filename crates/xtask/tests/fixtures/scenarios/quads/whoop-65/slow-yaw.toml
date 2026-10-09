@@ -2,7 +2,7 @@
 # (crates/xtask/tests/scenario_catalogue.rs), in the format the Scenario
 # runner reads, with a Source and an Observed Expectation. Its numbers are
 # made up for the check: the catalogue only reads it, and nothing runs it.
-format = 1
+format = 2
 name   = "A slow yaw keeps its rate"
 
 [start]

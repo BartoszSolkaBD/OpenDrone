@@ -26,7 +26,7 @@
 # Terms are on Betaflight's scale (1000 is the whole motor range), signed the
 # pilot's way: a positive roll term pushes the Quad to roll right, a negative
 # yaw term pushes the nose left.
-format = 1
+format = 2
 name   = "The PID loop's terms follow Betaflight's scaling, and I stops at its limit"
 
 [start]
@@ -53,7 +53,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
   { at = "0.5 s", rotation = "roll -1 °/s, pitch 0 °/s, yaw 0 °/s" },
   { at = "0.6 s", rotation = "roll -100 °/s, pitch 0 °/s, yaw 100 °/s" },
 ]

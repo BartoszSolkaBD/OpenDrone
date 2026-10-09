@@ -2,7 +2,7 @@
 # (crates/xtask/tests/scenario_catalogue.rs), in the format the Scenario
 # runner reads: two Expectations from scenarios/physics/free-fall-is-exactly-g.toml.
 # The catalogue only reads it; nothing runs it.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

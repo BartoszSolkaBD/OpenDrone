@@ -14,7 +14,7 @@
 # at 1.14625 s. Betaflight checks Failsafe whenever more than 10 ms have
 # passed since the last check: every 11 ms from power-up, at 11 ms, 22 ms
 # and so on.
-format = 1
+format = 2
 name   = "Losing the Input Device runs Failsafe as Betaflight does, and flying again needs the link back and the Arm switch cycled"
 
 [start]
@@ -41,7 +41,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on" },
+  { at = "0 s",   roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
   { at = "1 s",   input_device = "lost" },
   { at = "4 s",   input_device = "back" },
   # Failsafe has ended by 5.2 s: the throttle down and the Arm switch off,

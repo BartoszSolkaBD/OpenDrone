@@ -10,7 +10,7 @@
 # on for 3 s of silence. During the circles every frame at 250 Hz, locked to
 # its 4 ms beat, carries at most one fresh report: a report that changed
 # nothing sends no Flight Input, so a few frames carry none.
-format = 1
+format = 2
 name   = "A DualSense without its heartbeat is never lost for silence"
 
 [start]

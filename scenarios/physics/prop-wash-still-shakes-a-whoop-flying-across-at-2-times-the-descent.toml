@@ -27,7 +27,7 @@
 #   × 0.222 = 1.93% of the thrust, against 20% at the band's middle.
 #
 # The motors are held at 21.77%, their settled drive, 14,708 RPM.
-format = 1
+format = 2
 name   = "Flying forward at only 2 times its descent, a Whoop 65 is still shaken by Prop Wash"
 
 [start]

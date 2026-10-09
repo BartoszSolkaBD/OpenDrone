@@ -8,7 +8,7 @@
 # Being opposite each other, each pair's thrust neither rolls nor pitches it.
 # The rotors' drag, as the Quad turns, slows the turn (crates/physics/src/
 # air.rs, "Rotor drag"), so the yaw rate settles rather than growing for ever.
-format = 1
+format = 2
 name   = "A Whoop 65 yaws against its rotors' net spin"
 
 [start]

@@ -8,7 +8,7 @@
 # motion sensors on (dualsense-at-rest.csv). Its last report is at 6 s;
 # after that it says nothing, as if it had hung. The Flight Controller runs
 # alone, disarmed.
-format = 1
+format = 2
 name   = "A DualSense that stops reporting is lost after 1 s of silence"
 
 [start]

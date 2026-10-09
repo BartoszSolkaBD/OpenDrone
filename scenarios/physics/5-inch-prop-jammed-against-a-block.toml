@@ -18,7 +18,7 @@
 # scripted commands disarm at 7 s (0% to every motor, as Betaflight sends a
 # disarmed Quad's ESCs) and arm again at 8 s. Proves stalls, restarts and
 # "stopped after failed restarts" (#26 §1, #26 §6).
-format = 1
+format = 2
 name   = "A 5-inch prop jammed against a block gets 3 restarts, then stays off until disarm, under the start-up power limit"
 
 [start]

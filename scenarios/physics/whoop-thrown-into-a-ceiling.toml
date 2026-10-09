@@ -5,7 +5,7 @@
 # corner first at about 7.9 m/s. That spins it up to about 1,300 °/s: it flips
 # and settles upside down on its duct rings, its centre 15 mm up. Shows E29 in
 # #10 against triangle meshes.
-format = 1
+format = 2
 name   = "A whoop thrown into a ceiling"
 
 [start]

@@ -8,7 +8,7 @@ Scenarios and Pack files are numbered apart, so a new starting-state item never 
 
 | Files | Format today | Its steps live in |
 |---|---|---|
-| Every Scenario in `scenarios/`, and every Scenario the checks keep as a fixture under `crates/` | 1 | `SCENARIO_STEPS`, in [`crates/scenario/src/format.rs`](../crates/scenario/src/format.rs) |
+| Every Scenario in `scenarios/`, and every Scenario the checks keep as a fixture under `crates/` | 2 | `SCENARIO_STEPS`, in [`crates/scenario/src/format.rs`](../crates/scenario/src/format.rs) |
 | Every Pack file (`pack.toml`, `quad.toml`, `map.toml`, Input Device profiles), every Test Quad in `scenarios/test-quads/` and every built-in Test Map in [`crates/pack/test-maps/`](../crates/pack/test-maps/empty-air.toml) | 1 | `PACK_STEPS`, in [`crates/pack/src/migration.rs`](../crates/pack/src/migration.rs) |
 
 The built-in Test Maps, such as `test/empty-air`, are built into the code, but each one's `map.toml` is a file of its own in `crates/pack/test-maps/`, so the tool rewrites them like any Pack file. A new Test Map goes there too, never as text inside the Rust code, and a readable check makes sure of it.
@@ -35,7 +35,7 @@ Before the 0.1.0 alpha ships, no Pack exists outside this repo, so a PR may add 
 In the pull request that brings the item:
 
 1. **Teach the reader the item.** For a Scenario, `crates/scenario/src/read.rs`; for a Pack file, its reader in `crates/pack/src/` (for a Quad definition, `schema.rs`).
-2. **Write the step** at the end of `SCENARIO_STEPS` or `PACK_STEPS`. A step has a name (lowercase words joined by dashes), the format it upgrades (the newest today), a plain sentence saying what it adds and why that keeps today's behaviour, and the change itself. Two helpers write an item lined up with its neighbours: `add_after` puts `key = value` on the line after another key of a table, and `add_to_inline_table` adds it to the end of an inline table such as `assists = { … }`. For example, if Auto-arm were a new Assist:
+2. **Write the step** at the end of `SCENARIO_STEPS` or `PACK_STEPS`. A step has a name (lowercase words joined by dashes), the format it upgrades (the newest today), a plain sentence saying what it adds and why that keeps today's behaviour, and the change itself. Two helpers write an item lined up with its neighbours: `add_after` puts `key = value` on the line after another key of a table (and `add_after_in` does the same in a table found another way, such as each `[[case]]`), and `add_to_inline_table` adds it to the end of an inline table such as `assists = { … }`. For example, if Auto-arm were a new Assist:
 
    ```rust
    pub const SCENARIO_STEPS: &[Step] = &[Step {

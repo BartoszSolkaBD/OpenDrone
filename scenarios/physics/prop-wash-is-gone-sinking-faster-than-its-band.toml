@@ -19,7 +19,7 @@
 #
 # The motors are held at 25.71%, their settled drive on the bench supply,
 # so the thrust and the descent hold.
-format = 1
+format = 2
 name   = "Sinking faster than its band, a Whoop 65 feels no Prop Wash"
 
 [start]

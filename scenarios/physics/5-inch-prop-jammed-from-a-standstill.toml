@@ -12,7 +12,7 @@
 # Quad definition's restart_tries. Compare "A 5-inch prop jammed against a
 # block gets 3 restarts", whose motor was running when it stalled. Proves
 # Bluejay's count of failed starts (#26 §1, #26 §5).
-format = 1
+format = 2
 name   = "A 5-inch prop jammed against a block from a standstill gets 2 restarts: its first start counts as a failed one"
 
 [start]

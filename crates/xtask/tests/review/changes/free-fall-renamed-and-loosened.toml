@@ -1,7 +1,7 @@
 # A fixture: the free fall Scenario under a new file name and a new name, with
 # the Rule Expectation on height loosened from ± 0.001 m to ± 0.5 m (the
 # Reviewer's case on #92).
-format = 1
+format = 2
 name   = "Free fall"
 
 [start]

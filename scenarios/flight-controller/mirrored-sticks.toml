@@ -24,7 +24,7 @@
 # Prop Wash's flicker is random, each rotor its own way, so it is no mirror
 # image of itself: with it on, the two runs part by about a thousandth of a
 # degree a second in pitch by 0.9 s.
-format = 1
+format = 2
 name   = "Mirrored sticks give a mirrored flight"
 
 [start]
@@ -56,7 +56,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "100%", throttle = "30%", arm = "on" },
+  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "100%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "0.3 s", roll = "-100%" },
   { at = "0.6 s", yaw = "-100%", throttle = "30%" },
   { at = "1 s",   throttle = "ramp to 60%" },

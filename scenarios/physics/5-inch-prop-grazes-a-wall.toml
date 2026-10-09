@@ -10,7 +10,7 @@
 # rub works against them: it brakes the prop, and pushes the Quad south at
 # a point east of its centre of mass, which twists it clockwise seen from
 # above, nose right. Proves a Prop Strike's rub (#26 §1, #26 §6).
-format = 1
+format = 2
 name   = "A 5-inch's spinning prop grazes a wall: that motor slows, and the Quad is pushed and twisted the way the rub says"
 
 [start]

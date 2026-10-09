@@ -10,7 +10,7 @@
 # - 2.5 s: back to 0%: ten counts (0.32 s) and the ready beep (67 ms) later,
 #   at about 2.9 s, the ESCs are ready.
 # - 3.2 s: 25% again: the motors start after the 0.1 s start wait.
-format = 1
+format = 2
 name   = "The Whoop 65's ESCs wait for zero throttle before their ready beep"
 
 [start]

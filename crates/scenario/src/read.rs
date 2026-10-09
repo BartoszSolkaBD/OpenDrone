@@ -120,6 +120,8 @@ pub struct PilotChanges {
     pub throttle: Option<Stick>,
     /// The Arm switch (AUX1): on is high.
     pub arm: Option<bool>,
+    /// The Crash Flip switch (AUX3): on is high.
+    pub crash_flip: Option<bool>,
     /// A Flight Controller Scenario's gyro reading from now on, in body axes
     /// (forward, left, up), in radians per second.
     pub rotation: Option<Vec3>,
@@ -1093,6 +1095,7 @@ impl Reader<'_> {
                 "yaw",
                 "throttle",
                 "arm",
+                "crash_flip",
                 "input_device",
                 "radio_link",
                 "reset",
@@ -1104,6 +1107,7 @@ impl Reader<'_> {
                 "yaw",
                 "throttle",
                 "arm",
+                "crash_flip",
                 "rotation",
                 "attitude",
                 "input_device",
@@ -1250,14 +1254,14 @@ impl Reader<'_> {
         })
     }
 
-    /// A pilot's Timeline must set every stick and the Arm switch at 0 s, so
+    /// A pilot's Timeline must set every stick and both switches at 0 s, so
     /// the run starts from values the file states (ADR-0002); a ramp needs a
     /// value to ramp from.
     fn check_pilot_timeline(&mut self, inputs: &Table<'_, '_>) {
         // Every moment at 0 s counts, in case the file splits them.
         let at_the_start = || self.moments.iter().filter(|m| m.seconds == 0.0);
         let first: Option<&Moment> = at_the_start().next();
-        let mut given = [false; 5];
+        let mut given = [false; 6];
         for moment in at_the_start() {
             if let Entry::Pilot(changes) = moment.entry {
                 let sets = [
@@ -1266,13 +1270,14 @@ impl Reader<'_> {
                     changes.yaw.is_some(),
                     changes.throttle.is_some(),
                     changes.arm.is_some(),
+                    changes.crash_flip.is_some(),
                 ];
                 for (given, sets) in given.iter_mut().zip(sets) {
                     *given |= sets;
                 }
             }
         }
-        let missing: Vec<&str> = ["roll", "pitch", "yaw", "throttle", "arm"]
+        let missing: Vec<&str> = ["roll", "pitch", "yaw", "throttle", "arm", "crash_flip"]
             .into_iter()
             .zip(given)
             .filter(|(_, given)| !given)
@@ -1284,7 +1289,7 @@ impl Reader<'_> {
         };
         if !missing.is_empty() {
             let found = problem(format!(
-                "the Timeline starts with a moment at 0 s that sets every stick and the Arm switch (ADR-0002); it doesn't set {}",
+                "the Timeline starts with a moment at 0 s that sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); it doesn't set {}",
                 missing
                     .iter()
                     .map(|m| format!("`{m}`"))
@@ -1358,8 +1363,9 @@ impl Reader<'_> {
         }
     }
 
-    /// The sticks, the Arm switch and, for a Flight Controller Scenario, the
-    /// sensor readings a Timeline moment or a case sets.
+    /// The sticks, the Arm and Crash Flip switches and, for a Flight
+    /// Controller Scenario, the sensor readings a Timeline moment or a case
+    /// sets.
     fn pilot_changes(&mut self, entry: &Table<'_, '_>) -> Option<PilotChanges> {
         let mut changes = PilotChanges::default();
         let mut fine = true;
@@ -1386,6 +1392,19 @@ impl Reader<'_> {
                 Some(other) => {
                     self.problems.push(item.problem(format!(
                         "`arm` is the Arm switch on AUX1: \"on\" (high, armed) or \"off\", not \"{other}\""
+                    )));
+                    fine = false;
+                }
+                None => fine = false,
+            }
+        }
+        if let Some(item) = entry.get("crash_flip") {
+            match item.text(self.problems) {
+                Some("on") => changes.crash_flip = Some(true),
+                Some("off") => changes.crash_flip = Some(false),
+                Some(other) => {
+                    self.problems.push(item.problem(format!(
+                        "`crash_flip` is the Crash Flip switch on AUX3: \"on\" (high) or \"off\", not \"{other}\""
                     )));
                     fine = false;
                 }
@@ -1593,27 +1612,37 @@ impl Reader<'_> {
             };
             table.refuse_unknown(
                 &[
-                    "roll", "pitch", "yaw", "throttle", "arm", "rotation", "attitude", "expect",
+                    "roll",
+                    "pitch",
+                    "yaw",
+                    "throttle",
+                    "arm",
+                    "crash_flip",
+                    "rotation",
+                    "attitude",
+                    "expect",
                 ],
                 self.problems,
             );
             let inputs = self.pilot_changes(&table);
             if let Some(inputs) = &inputs {
-                let missing: Vec<String> = ["roll", "pitch", "yaw", "throttle", "arm"]
-                    .into_iter()
-                    .zip([
-                        inputs.roll.is_some(),
-                        inputs.pitch.is_some(),
-                        inputs.yaw.is_some(),
-                        inputs.throttle.is_some(),
-                        inputs.arm.is_some(),
-                    ])
-                    .filter(|(_, given)| !given)
-                    .map(|(name, _)| format!("`{name}`"))
-                    .collect();
+                let missing: Vec<String> =
+                    ["roll", "pitch", "yaw", "throttle", "arm", "crash_flip"]
+                        .into_iter()
+                        .zip([
+                            inputs.roll.is_some(),
+                            inputs.pitch.is_some(),
+                            inputs.yaw.is_some(),
+                            inputs.throttle.is_some(),
+                            inputs.arm.is_some(),
+                            inputs.crash_flip.is_some(),
+                        ])
+                        .filter(|(_, given)| !given)
+                        .map(|(name, _)| format!("`{name}`"))
+                        .collect();
                 if !missing.is_empty() {
                     self.problems.push(table.problem(format!(
-                        "a case sets every stick and the Arm switch (ADR-0002); this one doesn't set {}",
+                        "a case sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); this one doesn't set {}",
                         missing.join(", ")
                     )));
                 }
@@ -2311,6 +2340,9 @@ fn case_words(changes: &PilotChanges) -> String {
     }
     if changes.arm == Some(true) {
         words.push("arm on".to_string());
+    }
+    if changes.crash_flip == Some(true) {
+        words.push("crash flip on".to_string());
     }
     if let Some(rotation) = changes.rotation {
         let r = PilotRates::from_body(rotation);

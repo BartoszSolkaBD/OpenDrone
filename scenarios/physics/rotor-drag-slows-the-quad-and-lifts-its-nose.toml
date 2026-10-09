@@ -16,7 +16,7 @@
 #   inertia of 90 g·cm², that is 57.564 rad/s², and after one step of
 #   0.125 ms a pitch rate of 0.0071955 rad/s, 0.41227 °/s.
 # - The nose lifts in step with the speed: twice as fast, twice the moment.
-format = 1
+format = 2
 name   = "Rotor drag slows a Whoop 65 at 8 m/s and lifts its nose"
 
 [start]

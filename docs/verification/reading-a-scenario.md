@@ -12,7 +12,7 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 ## The Scenario file
 
 ```toml
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 ```
 
@@ -137,19 +137,20 @@ timeline = [
 
 A Timeline: what happens when. Each value holds until it changes. A Physics or Thrust Stand Scenario scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
 
-A Flight or Flight Controller Scenario scripts the pilot's sticks and the Arm switch instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
+A Flight or Flight Controller Scenario scripts the pilot's sticks and switches instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
 
 ```toml
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "1 s",   roll = "100%" },
   { at = "1.5 s", roll = "0%" },
 ]
 ```
 
 - **The sticks are in percent:** `roll`, `pitch` and `yaw` from -100% to 100% (right, forward and right are positive, so pitch forward asks for nose down), `throttle` from 0% to 100%.
-- **`arm`** is the Arm switch on AUX1: `"on"` (high, 2012 µs) or `"off"` (988 µs). Flight Mode on AUX2 comes from `flight_mode` in `[start]`, as the pilot's setting drives it when no switch is bound; Crash Flip on AUX3 is off.
-- **The first moment, at 0 s, sets every stick and the Arm switch,** so the run starts from values the file states.
+- **`arm`** is the Arm switch on AUX1: `"on"` (high, 2012 µs) or `"off"` (988 µs). Flight Mode on AUX2 comes from `flight_mode` in `[start]`, as the pilot's setting drives it when no switch is bound.
+- **`crash_flip`** is the Crash Flip switch on AUX3: `"on"` (high) or `"off"`. The Flight Controller reads it at the moment of arming, as Betaflight does (see [Crash Flip](#crash-flip) below).
+- **The first moment, at 0 s, sets every stick and both switches,** so the run starts from values the file states.
 - **`"ramp to 60%"`** moves a stick in a straight line, step by step, from the value and moment an earlier entry set it to this value at this moment. A ramp needs an earlier value to ramp from.
 - **A Flight Controller Scenario's Timeline** may also change the sensor readings from a moment on: `rotation` (the gyro, written as in `[start]`) and `attitude`. Its ESCs count as ready: it has none to wait for.
 
@@ -157,7 +158,7 @@ Besides the Channels, a Timeline sends the other Flight Inputs, as in [`failsafe
 
 ```toml
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   { at = "1 s",   input_device = "lost" },
   { at = "4 s",   input_device = "back" },
   { at = "6 s",   radio_link = "drops out for 0.2 s" },
@@ -223,7 +224,7 @@ What the Radio Link does with an Input Track's device ([ADR-0020](../adr/0020-ra
 
 ### A table of cases, `[[case]]`
 
-A Flight Controller Scenario may be fed a table of cases instead of a Timeline, as in [`mixer-and-airmode.toml`](../../scenarios/flight-controller/mixer-and-airmode.toml). Each case is a fresh Flight Controller (armed or not, as `[start]` says), one Radio Link frame with the case's sticks and Arm switch, and one loop with its sensor readings; each `[[case.expect]]` is measured after that loop:
+A Flight Controller Scenario may be fed a table of cases instead of a Timeline, as in [`mixer-and-airmode.toml`](../../scenarios/flight-controller/mixer-and-airmode.toml). Each case is a fresh Flight Controller (armed or not, as `[start]` says), one Radio Link frame with the case's sticks and switches, and one loop with its sensor readings; each `[[case.expect]]` is measured after that loop:
 
 ```toml
 [[case]]
@@ -232,6 +233,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
 
 [[case.expect]]
@@ -240,7 +242,7 @@ value = "144.53 ± 0.01"
 basis = "source: ..."
 ```
 
-A case sets every stick and the Arm switch; `rotation` and `attitude` are optional, and otherwise `[start]`'s. A case is one loop, so nothing in it ramps. Its Expectations say only `what`, `value` and `basis`.
+A case sets every stick, the Arm switch and the Crash Flip switch; `rotation` and `attitude` are optional, and otherwise `[start]`'s. A case is one loop, so nothing in it ramps. Its Expectations say only `what`, `value` and `basis`.
 
 ### The Expectations, `[[expect]]`
 

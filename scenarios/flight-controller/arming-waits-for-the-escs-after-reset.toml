@@ -15,7 +15,7 @@
 # counts of zero throttle, and the ready beep: ready at 1.662 s. The Flight
 # Controller reads that at the start of each step, and BOOTGRACE clears with
 # the next Radio Link frame (every 4 ms).
-format = 1
+format = 2
 name   = "Arming waits for the ESCs' ready beep after power-up and after Reset, and Reset puts the Quad back landed and disarmed on a full battery"
 
 [start]
@@ -47,7 +47,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   # During the ESCs' start-up: refused.
   { at = "1 s",   arm = "on" },
   { at = "1.2 s", arm = "off" },
