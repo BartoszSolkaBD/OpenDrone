@@ -162,6 +162,94 @@ fn a_pr_into_another_branch_never_sets_a_status_not_even_pending() {
     );
 }
 
+// Triage after five failed review rounds (#120).
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn after_five_failed_rounds_the_issue_a_triage_comment_names_is_looked_up_and_an_open_one_passes() {
+    let scratch = Scratch::new("triage-open-issue");
+    let head = scratch.five_failed_rounds_and("Triaged to #200");
+    scratch.answer(
+        &format!("repos/{REPO}/issues/200"),
+        &json!({
+            "number": 200,
+            "state": "open",
+            "html_url": format!("https://github.com/{REPO}/issues/200"),
+        }),
+    );
+    let run = scratch.run("update", &[("PR_NUMBER", "77")]);
+    assert!(run.passed, "{}", run.output);
+    let short = &head[..7];
+    assert_eq!(
+        run.statuses().last(),
+        Some(&format!(
+            "Review check on {head}: success (Triaged to #200 after 5 failed review rounds: \
+             passes on {short})"
+        )),
+        "{}",
+        run.output
+    );
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_triage_comment_naming_an_issue_github_does_not_have_counts_for_nothing() {
+    let scratch = Scratch::new("triage-missing-issue");
+    let head = scratch.five_failed_rounds_and("Triaged to #200");
+    scratch.fails(
+        &format!("repos/{REPO}/issues/200"),
+        "gh: Not Found (HTTP 404)",
+    );
+    let run = scratch.run("update", &[("PR_NUMBER", "77")]);
+    assert!(run.passed, "{}", run.output);
+    assert_eq!(
+        run.statuses().last(),
+        Some(&format!(
+            "Review check on {head}: failure (5 review rounds failed: waiting for a triage \
+             comment naming an open issue)"
+        )),
+        "{}",
+        run.output
+    );
+    assert!(
+        run.stdout
+            .contains("Added the label `needs-triage` to #77."),
+        "{}",
+        run.output
+    );
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn when_github_cannot_say_whether_the_triage_issue_is_open_both_statuses_show_an_error() {
+    let scratch = Scratch::new("triage-issue-error");
+    let head = scratch.five_failed_rounds_and("Triaged to #200");
+    scratch.fails(
+        &format!("repos/{REPO}/issues/200"),
+        "gh: Server Error (HTTP 502)",
+    );
+    let run = scratch.run("update", &[("PR_NUMBER", "77")]);
+    assert!(!run.passed, "{}", run.output);
+    assert!(
+        run.output
+            .contains("GitHub couldn't say whether issue #200 is open."),
+        "{}",
+        run.output
+    );
+    let failed = "error (The review workflow failed: see its run)";
+    assert_eq!(
+        run.statuses(),
+        [
+            format!("Red Flag gate on {head}: pending (Working out the Red Flags)"),
+            format!("Review check on {head}: pending (Working out the Review check)"),
+            format!("Red Flag gate on {head}: {failed}"),
+            format!("Review check on {head}: {failed}"),
+        ],
+        "{}",
+        run.output
+    );
+}
+
 // Which other PRs are judged again.
 
 #[test]
@@ -297,6 +385,17 @@ fn pull_request(number: u64, head: &str, base: &str) -> Value {
     })
 }
 
+/// A comment from the maintainer's account, as GitHub lists it
+/// (`GET …/issues/{n}/comments`).
+fn maintainer_comment(id: u64, body: &str) -> Value {
+    json!({
+        "id": id,
+        "user": { "login": "BartoszSolkaBD" },
+        "body": body,
+        "html_url": format!("https://github.com/{REPO}/pull/77#issuecomment-{id}"),
+    })
+}
+
 /// A PR as GitHub lists it for a commit (`GET …/commits/{sha}/pulls`).
 fn listed(number: u64, state: &str, base: &str, head: &str) -> Value {
     json!({ "number": number, "state": state, "base": { "ref": base }, "head": { "sha": head } })
@@ -390,6 +489,34 @@ impl Scratch {
         let head = git(&origin, &["rev-parse", "HEAD"]);
         git(&origin, &["checkout", "--quiet", "main"]);
         git(&self.root, &["clone", "--quiet", "origin", "checkout"]);
+        head
+    }
+
+    /// PR #77 into main, with five Verdicts of changes needed on its latest
+    /// commit and then the maintainer's comment `last`. Returns that commit.
+    fn five_failed_rounds_and(&self, last: &str) -> String {
+        let head = self.pull_request_branch();
+        self.answer(
+            &format!("repos/{REPO}/pulls/77"),
+            &pull_request(77, &head, "main"),
+        );
+        let mut comments: Vec<Value> = (0..5)
+            .map(|i| {
+                maintainer_comment(
+                    100 + i,
+                    &format!("Reviewed commit {head}\n\nVerdict: changes needed"),
+                )
+            })
+            .collect();
+        comments.push(maintainer_comment(105, last));
+        self.answer(
+            &format!("repos/{REPO}/issues/77/comments?per_page=100"),
+            &json!(comments),
+        );
+        self.answer(
+            &format!("repos/{REPO}/commits/{head}/pulls?per_page=100"),
+            &json!([listed(77, "open", "main", &head)]),
+        );
         head
     }
 

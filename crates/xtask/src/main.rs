@@ -22,9 +22,9 @@
 //!   Quad in `scenarios/test-quads/`.
 //! - `feel-tests --base <revision>`: the Feel Test log rules, comparing every
 //!   Quad definition with the one at `<revision>`.
-//! - `review-report`, `new-libraries`, `review-update` and `merge-check`: the
-//!   Review Report, the Red Flag gate and the Review check, run by CI on every
-//!   pull request ([`review`]).
+//! - `review-report`, `new-libraries`, `review-update`, `triage-issues` and
+//!   `merge-check`: the Review Report, the Red Flag gate and the Review check,
+//!   run by CI on every pull request ([`review`]).
 //! - `input-monitor`: every connected Input Device live, with its Channels
 //!   and their stamps ([`input_monitor`]).
 //! - `import-tune`: imports a quad's Betaflight `diff all` as a Quad
@@ -118,6 +118,7 @@ fn main() -> ExitCode {
         "feel-tests" => packs::run_feel_tests(rest),
         "review-report" => review::run_report(rest),
         "review-update" => review::run_update(rest),
+        "triage-issues" => review::run_triage_issues(rest),
         "new-libraries" => review::run_new_libraries(rest),
         "merge-check" => review::run_merge_check(rest),
         "input-monitor" => input_monitor::run(rest),

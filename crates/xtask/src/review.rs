@@ -15,6 +15,8 @@
 //!   workflow can look up their licences.
 //! - `review-update` works out the Review check from the PR and its comments,
 //!   and the Review Report comment, labels and both commit statuses to post.
+//! - `triage-issues` lists the issues that triage comments name, once a PR's
+//!   review rounds have run out, so the workflow can look them up.
 //! - `merge-check` names every required check a just-merged PR hadn't passed,
 //!   so later Review Reports can name that merge.
 //!
@@ -48,7 +50,7 @@ use changes::Changes;
 use flags::Level;
 use report::Review;
 use update::{Report, SharingPr, SkippedMerge};
-use verdict::{Comment, PullRequest};
+use verdict::{Comment, Issue, PullRequest};
 
 pub const REPORT_USAGE: &str = "\
   review-report (--base <commit> --head <commit> | --before <folder> --after <folder>)
@@ -66,10 +68,16 @@ pub const NEW_LIBRARIES_USAGE: &str = "\
 pub const UPDATE_USAGE: &str = "\
   review-update --pr <pr.json> --comments <comments.json> --codeowners <file>
                 --out <folder> [--report <folder>] [--skipped-merges <search.json>]
-                [--head-pulls <commit-pulls.json>]
+                [--head-pulls <commit-pulls.json>] [--issues <issues.json>]
       Work out the Review check, the Review Report comment, the PR's labels
       and the commit statuses to set (statuses.json) from GitHub's records,
-      and write them to the --out folder.";
+      and write them to the --out folder. --issues holds GitHub's records of
+      the issues triage-issues listed, one after another.";
+
+pub const TRIAGE_USAGE: &str = "\
+  triage-issues --comments <comments.json>
+      Print each issue a \"Triaged to #<issue>\" comment could pass the Review
+      check with, one number per line, for the workflow to look up.";
 
 pub const MERGE_USAGE: &str = "\
   merge-check --branch <branch.json> --rules <rules.json>
@@ -190,7 +198,38 @@ pub fn run_new_libraries(args: &[String]) -> ExitCode {
 
 /// Every review command's usage, for `cargo xtask` with no command.
 pub fn usage() -> String {
-    [REPORT_USAGE, NEW_LIBRARIES_USAGE, UPDATE_USAGE, MERGE_USAGE].join("\n")
+    [
+        REPORT_USAGE,
+        NEW_LIBRARIES_USAGE,
+        UPDATE_USAGE,
+        TRIAGE_USAGE,
+        MERGE_USAGE,
+    ]
+    .join("\n")
+}
+
+/// `cargo xtask triage-issues`.
+pub fn run_triage_issues(args: &[String]) -> ExitCode {
+    let result = options(args, &["comments"]).and_then(|options| {
+        let comments = options
+            .get("comments")
+            .ok_or_else(|| "--comments is needed".to_string())?;
+        Ok(verdict::triage_issues(&Comment::list_from_api(
+            &read_text(comments)?,
+        )?))
+    });
+    match result {
+        Ok(issues) => {
+            for issue in issues {
+                println!("{issue}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("triage-issues: {error}\n\nUsage:\n{TRIAGE_USAGE}");
+            ExitCode::from(2)
+        }
+    }
 }
 
 /// `cargo xtask review-update`.
@@ -205,6 +244,7 @@ pub fn run_update(args: &[String]) -> ExitCode {
             "report",
             "skipped-merges",
             "head-pulls",
+            "issues",
         ],
     )
     .and_then(|options| {
@@ -225,8 +265,20 @@ pub fn run_update(args: &[String]) -> ExitCode {
             Some(path) => SharingPr::list_from_api(&read_json(path)?),
             None => Vec::new(),
         };
+        let issues = match options.get("issues") {
+            Some(path) => Issue::list_from_api(&read_text(path)?)?,
+            None => Vec::new(),
+        };
         let report = Report::read(options.get("report").map(Path::new), &pr);
-        let update = update::update(&pr, &comments, &report, &skipped, &known_areas, &sharing);
+        let update = update::update(
+            &pr,
+            &comments,
+            &report,
+            &skipped,
+            &known_areas,
+            &sharing,
+            &issues,
+        );
 
         let out = PathBuf::from(need("out")?);
         fs::create_dir_all(&out)
