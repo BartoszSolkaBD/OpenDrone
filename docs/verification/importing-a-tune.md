@@ -71,10 +71,10 @@ A setting the export doesn't set takes **its own version's** default, never 2026
 The "Not simulated yet" part of a Tune comes last, in three parts. Together with the settings under the tabs, they spell out every setting the translator knows, about 100 (ADR-0015):
 
 - **What the Flight Controller knows but flies as off** until its ticket lands ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): feedforward, the low-pass filters and RC smoothing (#49), Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch, which waits for gyro noise (#21). Each mark ends `not simulated yet (#49)` or the like, and they come in the order the Freestyle 5″'s Tune lists them.
-- **Every other setting the translator knows** that the Flight Controller doesn't read yet, by tab: what the next Flight Controller tickets read (Failsafe, the rest of feedforward and Dynamic D, Angle and Horizon, Crash Flip and yaw spin recovery), with ADR-0008's values where the old version lacked a setting, and the rest of the dynamic notch, RC smoothing and the Blackbox rate.
+- **Every other setting the translator knows** that the Flight Controller doesn't read yet, by tab: what the next Flight Controller tickets read (Failsafe, the rest of feedforward and Dynamic D, Angle and Horizon), with ADR-0008's values where the old version lacked a setting, and the rest of the dynamic notch, RC smoothing and the Blackbox rate.
 - **The settings the export sets that the translator doesn't know**, as the real quad had them: for the Meteor, `dshot_bidir` (the RPM filter's motor speed) and `vbat_max_cell_voltage`.
 
-Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab.
+Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab, as #54 did for Crash Flip's settings, yaw spin recovery and runaway takeoff prevention.
 
 ## What still differs from the real quad
 
