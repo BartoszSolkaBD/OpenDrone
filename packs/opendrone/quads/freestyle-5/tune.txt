@@ -12,6 +12,12 @@
 
 # Configuration
 set small_angle = 25                   # 2026.6.2 default; the most it may tilt and still arm, in degrees
+# Configuration, CLI only
+set yaw_spin_recovery = AUTO           # 2026.6.2 default; starts at the Rates' max yaw rate + 200 °/s
+set yaw_spin_threshold = 1950          # 2026.6.2 default; °/s, read only with yaw_spin_recovery = ON
+set runaway_takeoff_prevention = ON    # 2026.6.2 default
+set runaway_takeoff_deactivate_delay = 500 # 2026.6.2 default; ms of stable flight before it switches off
+set runaway_takeoff_deactivate_throttle_percent = 20 # 2026.6.2 default; percent
 
 # Failsafe
 set rx_min_usec = 885                  # 2026.6.2 default; µs: a Channel below this is invalid, and Failsafe's stage 1 throttle
@@ -55,12 +61,15 @@ set motor_poles = 14                   # 2026.6.2 default; must match [motors] p
 set yaw_motors_reversed = OFF          # 2026.6.2 default; must match [props] direction, props-in
 # Motors, CLI only
 set mixer_type = LEGACY                # 2026.6.2 default
+set crashflip_motor_percent = 0        # 2026.6.2 default; percent
+set crashflip_rate = 0                 # 2026.6.2 default; tens of °/s; 0 is off
+set crashflip_auto_rearm = OFF         # 2026.6.2 default
 
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands: the low-pass filters, RC smoothing
 # and feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA
-# and throttle boost with #50; runaway takeoff prevention later; the dynamic
-# notch waits for gyro noise (#21) (ADR-0015).
+# and throttle boost with #50; the dynamic notch waits for gyro noise (#21)
+# (ADR-0015).
 # PID Tuning
 set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
 set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
@@ -84,6 +93,3 @@ set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#4
 set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)
-# CLI only: runaway takeoff prevention guards against wiring and orientation
-# mistakes the sim can't have (#21)
-set runaway_takeoff_prevention = ON    # 2026.6.2 default; not simulated yet (later)

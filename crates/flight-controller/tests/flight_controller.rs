@@ -11,6 +11,11 @@ use opendrone_maths::{Attitude, Vec3};
 /// The Freestyle 5″'s Tune: Betaflight 2026.6.2's defaults.
 const DEFAULTS: &[(&str, &str)] = &[
     ("small_angle", "25"),
+    ("yaw_spin_recovery", "AUTO"),
+    ("yaw_spin_threshold", "1950"),
+    ("runaway_takeoff_prevention", "ON"),
+    ("runaway_takeoff_deactivate_delay", "500"),
+    ("runaway_takeoff_deactivate_throttle_percent", "20"),
     ("rx_min_usec", "885"),
     ("rx_max_usec", "2115"),
     ("failsafe_delay", "15"),
@@ -41,6 +46,9 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("motor_idle", "550"),
     ("yaw_motors_reversed", "OFF"),
     ("mixer_type", "LEGACY"),
+    ("crashflip_motor_percent", "0"),
+    ("crashflip_rate", "0"),
+    ("crashflip_auto_rearm", "OFF"),
 ];
 
 fn tune() -> Tune {
@@ -131,9 +139,9 @@ fn settings_the_flight_controller_doesnt_know_are_left_alone() {
     let lines = DEFAULTS
         .iter()
         .copied()
-        .chain([("motor_poles", "14"), ("crashflip_rate", "0")]);
+        .chain([("motor_poles", "14"), ("vbat_max_cell_voltage", "435")]);
     assert_eq!(Tune::read(lines).unwrap(), tune());
-    assert!(Tune::check("crashflip_rate", "anything").is_ok());
+    assert!(Tune::check("vbat_max_cell_voltage", "anything").is_ok());
 }
 
 #[test]
@@ -349,4 +357,59 @@ fn a_fresh_flight_controller_counts_the_link_as_settled_and_watches_it_at_once()
     // BOOTGRACE clears: the ESCs are ready.
     assert_eq!(silent.debug().arming_blocks.names(), ["RXLOSS"]);
     assert!(!silent.debug().failsafe.signal);
+}
+
+/// The Tune with one setting changed.
+fn tune_with(name: &str, value: &str) -> Tune {
+    let lines = DEFAULTS
+        .iter()
+        .map(|(n, v)| if *n == name { (*n, value) } else { (*n, *v) });
+    Tune::read(lines).unwrap()
+}
+
+#[test]
+fn yaw_spin_recovery_on_auto_starts_200_degrees_a_second_past_the_max_yaw_rate() {
+    // Basis: Source (Betaflight 2026.6.2's `initYawSpinRecovery`,
+    // src/main/sensors/gyro.c: AUTO adds a quarter of the max yaw rate, or
+    // 200 °/s if that's more). Betaflight's default Rates reach 670 °/s, a
+    // quarter of which is 167, so 870 °/s (#26 §4).
+    let fc = FlightController::new(tune(), Rates::BETAFLIGHT_DEFAULT, 8000, true, &STILL);
+    assert_eq!(fc.yaw_spin_threshold(), Some(870));
+}
+
+#[test]
+fn yaw_spin_recovery_on_auto_adds_a_quarter_of_a_fast_max_yaw_rate_up_to_1950() {
+    // Basis: Source (`initYawSpinRecovery`: the threshold is held within
+    // 500–1950 °/s, YAW_SPIN_RECOVERY_THRESHOLD_MIN and _MAX). Actual Rates
+    // of 1000 °/s on yaw add 250: 1250 °/s. 1800 °/s would give 2250, held at
+    // 1950.
+    let mut rates = Rates::BETAFLIGHT_DEFAULT;
+    rates.yaw.srate = 100;
+    let fc = FlightController::new(tune(), rates.clone(), 8000, true, &STILL);
+    assert_eq!(fc.yaw_spin_threshold(), Some(1250));
+    rates.yaw.srate = 180;
+    let fc = FlightController::new(tune(), rates, 8000, true, &STILL);
+    assert_eq!(fc.yaw_spin_threshold(), Some(1950));
+}
+
+#[test]
+fn yaw_spin_recovery_on_starts_at_the_tunes_threshold_and_off_never_starts() {
+    // Basis: Source (`initYawSpinRecovery`: ON takes yaw_spin_threshold; OFF
+    // turns it off).
+    let on = FlightController::new(
+        tune_with("yaw_spin_recovery", "ON"),
+        Rates::BETAFLIGHT_DEFAULT,
+        8000,
+        true,
+        &STILL,
+    );
+    assert_eq!(on.yaw_spin_threshold(), Some(1950));
+    let off = FlightController::new(
+        tune_with("yaw_spin_recovery", "OFF"),
+        Rates::BETAFLIGHT_DEFAULT,
+        8000,
+        true,
+        &STILL,
+    );
+    assert_eq!(off.yaw_spin_threshold(), None);
 }

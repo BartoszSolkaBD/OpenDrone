@@ -18,20 +18,27 @@
 //! - what Betaflight makes of each Radio Link frame: the [`Channels`] in µs,
 //!   the stick commands with the deadband, and the throttle through its
 //!   curve;
-//! - a built-in Modes table with Arm on AUX1, and Betaflight's arming checks
-//!   (throttle low, tilt within `small_angle`, the ESCs' ready beep in place
-//!   of Betaflight's boot grace, the Radio Link and Failsafe, and the Arm
-//!   switch going off before it can arm again) ([ADR-0017], [`arming`]);
+//! - a built-in Modes table with Arm on AUX1 and Crash Flip on AUX3, and
+//!   Betaflight's arming checks (throttle low, tilt within `small_angle`
+//!   unless the Crash Flip switch is on, the ESCs' ready beep in place of
+//!   Betaflight's boot grace, the Radio Link and Failsafe, and the Arm switch
+//!   going off before it can arm again) ([ADR-0017], [`arming`]);
 //! - the Radio Link's loss and Failsafe, flying DROP ([`failsafe`]);
 //! - the PID loop with Betaflight's scaling, I limit and PID-sum limits;
 //! - the Legacy mixer with Airmode always on, motor idle and the motor output
 //!   limit;
+//! - Crash Flip, which spins the motors backwards straight from the sticks
+//!   (#26 §3, [`arming`], `mixer::crash_flip`), and the DShot commands that
+//!   tell the ESCs which way to spin on every arm and disarm
+//!   ([`dshot_command`]);
+//! - yaw spin recovery (#26 §4, `yaw_spin`) and runaway takeoff prevention
+//!   (`runaway`);
 //! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
 //!   a 2026.6 Tune, and the pilot's pasted Rates and `aux` switches.
 //!
 //! The filters, RC smoothing and feedforward (#49), the rest of the loop
-//! shaping (#50), Angle and Horizon (#51), Crash Flip and yaw spin recovery
-//! (#54), the OSD paste and the OSD logic (#59) arrive with their tickets.
+//! shaping (#50), Angle and Horizon (#51), the OSD paste and the OSD logic
+//! (#59) arrive with their tickets.
 //!
 //! # Power-up
 //!
@@ -54,13 +61,19 @@
 //!    checked: past `failsafe_delay` without good Channels, DROP disarms.
 //! 3. If the Channels were worked out again, Betaflight's receiver work
 //!    runs: Airmode starts once the throttle first passes
-//!    `airmode_start_throttle_percent` after arming; the Arm switch arms or
-//!    (after more than three frames off) disarms; the sticks become
-//!    commands, and the Rates turn them into each axis's setpoint; the
-//!    arming checks run.
-//! 4. The PID loop compares each setpoint with the gyro.
-//! 5. The mixer turns the PID sums and the throttle into four motor
-//!    commands.
+//!    `airmode_start_throttle_percent` after arming; runaway takeoff
+//!    prevention adds up stable flight; the Arm switch arms or (after more
+//!    than three frames off) disarms, and the Crash Flip switch is read as
+//!    it arms; the sticks become commands, and the Rates turn them into each
+//!    axis's setpoint; the arming checks run, and the Crash Flip switch going
+//!    off disarms.
+//! 4. Yaw spin recovery watches the gyro's yaw rate.
+//! 5. The PID loop compares each setpoint with the gyro; then runaway
+//!    takeoff prevention checks the PID sums.
+//! 6. The mixer turns the PID sums and the throttle into four motor
+//!    commands, or in Crash Flip the sticks do; a spin direction command
+//!    queued by arming or disarming goes out in their place
+//!    ([`dshot_command`]).
 //!
 //! # Directions
 //!
@@ -97,19 +110,26 @@
 pub mod arming;
 mod channels;
 pub mod cli;
+pub mod dshot_command;
 pub mod failsafe;
 mod mixer;
 mod pid;
 pub mod rates;
 mod receiver;
+mod runaway;
 pub mod tune;
+mod yaw_spin;
 
 use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotRates, Vec3};
 
 use arming::Arming;
+use dshot_command::DshotCommands;
 use failsafe::{Failsafe, Receiver};
+use mixer::CrashFlipInputs;
 use pid::Pid;
 use receiver::RcCommand;
+use runaway::Runaway;
+use yaw_spin::YawSpin;
 
 pub use arming::ArmingBlocks;
 pub use channels::{Channel, Channels};
@@ -117,7 +137,9 @@ pub use failsafe::FailsafePhase;
 pub use mixer::{DSHOT_HIGHEST, DSHOT_LOWEST};
 pub use pid::Terms;
 pub use rates::{Axis, AxisRates, Rates, RatesType, ThrottleLimitType};
-pub use tune::{FailsafeProcedure, Gains, MixerType, MotorProtocol, Tune, TuneProblems};
+pub use tune::{
+    FailsafeProcedure, Gains, MixerType, MotorProtocol, Tune, TuneProblems, YawSpinRecovery,
+};
 
 /// What a real board's sensors read, which is all the Flight Controller
 /// knows of the Quad.
@@ -161,8 +183,10 @@ pub enum SpinDirection {
     Reversed,
 }
 
-/// What the Flight Controller sends one motor's ESC: a DShot throttle value
-/// (0 is "stop"; 48 to 2047 is the throttle) and the spin direction.
+/// What the Flight Controller sends one motor's ESC: a DShot value (0 is
+/// "stop", 1 to 47 are commands, which Bluejay takes as no throttle, and 48
+/// to 2047 is the throttle) and the spin direction the ESC has taken
+/// ([`dshot_command`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MotorCommand {
     pub dshot: u16,
@@ -189,6 +213,14 @@ pub struct DebugRecord {
     pub throttle: f64,
     /// The four motor commands, in Betaflight's motor order.
     pub motors: [MotorCommand; 4],
+    /// In Crash Flip: armed with the Crash Flip switch on
+    /// (`crashFlipModeActive`).
+    pub crash_flip: bool,
+    /// In yaw spin recovery (`yawSpinDetected`).
+    pub yaw_spin_recovery: bool,
+    /// The flight has counted as stable since power-up, so runaway takeoff
+    /// prevention has switched itself off (`runawayTakeoffCheckDisabled`).
+    pub flight_stable: bool,
 }
 
 impl DebugRecord {
@@ -228,6 +260,12 @@ pub struct FlightController {
     stabilising: bool,
     reset_iterm: bool,
     pid: Pid,
+    yaw_spin: YawSpin,
+    runaway: Runaway,
+    /// The tilt's cosine when Crash Flip first drove the motors, for
+    /// `crashflip_rate`'s fade; `None` outside Crash Flip.
+    tilt_at_start: Option<f64>,
+    dshot: DshotCommands,
     last: DebugRecord,
 }
 
@@ -251,6 +289,7 @@ impl FlightController {
         let arming = Arming::new(armed);
         let receiver = Receiver::at_power_up(&tune);
         let failsafe = Failsafe::at_power_up(&tune);
+        let yaw_spin = YawSpin::new(&tune, &rates);
         FlightController {
             last: DebugRecord {
                 armed,
@@ -261,6 +300,9 @@ impl FlightController {
                 terms: [Terms::default(); 3],
                 throttle: 0.0,
                 motors: [stopped(); 4],
+                crash_flip: false,
+                yaw_spin_recovery: false,
+                flight_stable: false,
             },
             tune,
             rates,
@@ -276,7 +318,17 @@ impl FlightController {
             stabilising: false,
             reset_iterm: true,
             pid,
+            yaw_spin,
+            runaway: Runaway::default(),
+            tilt_at_start: None,
+            dshot: DshotCommands::new(loop_hz),
         }
+    }
+
+    /// The yaw rate at which yaw spin recovery starts, in °/s, as the Tune
+    /// and the Rates set it; `None` with it off.
+    pub fn yaw_spin_threshold(&self) -> Option<i64> {
+        self.yaw_spin.threshold()
     }
 
     pub fn tune(&self) -> &Tune {
@@ -307,15 +359,42 @@ impl FlightController {
         // read it: whole µs and ms since power-up.
         let now_us = self.loops * 1_000_000 / u64::from(self.loop_hz);
         let now_ms = now_us / 1000;
+        let before = (self.arming.armed, self.arming.crash_flip);
         let changed = self.receiver.look(now_us, frame);
         self.failsafe.check(now_ms, &mut self.arming);
         if changed {
-            self.receive(now_ms, readings);
+            self.receive(now_us, readings);
         }
         let gyro = degrees(readings.gyro);
-        self.pid
-            .step(self.setpoint, gyro, self.stabilising, self.reset_iterm);
+        self.yaw_spin.check(gyro[2], now_us);
+        self.pid.step(
+            self.setpoint,
+            gyro,
+            self.stabilising,
+            self.reset_iterm,
+            self.yaw_spin.active,
+        );
         let sums = self.pid.terms.map(|terms| terms.sum);
+        if self
+            .runaway
+            .loop_check(&self.tune, self.runaway_moment(now_us), sums, gyro)
+        {
+            self.arming.blocks.runaway = true;
+            self.arming.disarm();
+        }
+        // Arming and disarming tell the ESCs which way to spin; so does Crash
+        // Flip ending while armed (`crashflip_auto_rearm`).
+        match (before, (self.arming.armed, self.arming.crash_flip)) {
+            ((false, _), (true, crash_flip)) => self.dshot.spin(if crash_flip {
+                SpinDirection::Reversed
+            } else {
+                SpinDirection::Normal
+            }),
+            ((true, _), (false, _)) | ((true, true), (true, false)) => {
+                self.dshot.spin(SpinDirection::Normal);
+            }
+            _ => {}
+        }
         let throttle_command = self.command.map_or(receiver::RANGE_MIN, |c| c.throttle);
         let mixed = mixer::mix(
             &self.tune,
@@ -323,11 +402,24 @@ impl FlightController {
             sums,
             throttle_command,
             self.arming.armed,
+            self.yaw_spin.active,
         );
-        let motors = mixed.dshot.map(|dshot| MotorCommand {
-            dshot,
-            direction: SpinDirection::Normal,
-        });
+        let dshot = if self.arming.crash_flip {
+            let deflection = self.command.map_or([0.0; 3], |command| {
+                Axis::ALL.map(|axis| command.deflection(&self.tune, axis))
+            });
+            let inputs = CrashFlipInputs {
+                deflection,
+                gyro,
+                cos_tilt: readings.attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0)).z,
+            };
+            mixer::crash_flip(&self.tune, inputs, &mut self.tilt_at_start)
+        } else {
+            self.tilt_at_start = None;
+            mixed.dshot
+        };
+        let (sent, direction) = self.dshot.output(dshot);
+        let motors = sent.map(|dshot| MotorCommand { dshot, direction });
         self.last = DebugRecord {
             armed: self.arming.armed,
             arming_blocks: self.arming.blocks,
@@ -337,6 +429,9 @@ impl FlightController {
             terms: self.pid.terms,
             throttle: mixed.throttle,
             motors,
+            crash_flip: self.arming.crash_flip,
+            yaw_spin_recovery: self.yaw_spin.active,
+            flight_stable: self.runaway.done,
         };
         self.loops += 1;
         motors
@@ -344,9 +439,12 @@ impl FlightController {
 
     /// Betaflight's work on the Channels, in its order: they are worked out
     /// again, and Failsafe told whether they were good; Airmode's start and
-    /// the PID loop's state read the arming as it stood; then the Arm switch;
-    /// then the stick commands and the setpoints; then the arming checks.
-    fn receive(&mut self, now_ms: u64, readings: &SensorReadings) {
+    /// the PID loop's state read the arming as it stood, and runaway takeoff
+    /// prevention adds up stable flight; then the Arm and Crash Flip
+    /// switches; then the stick commands and the setpoints; then the arming
+    /// checks.
+    fn receive(&mut self, now_us: u64, readings: &SensorReadings) {
+        let now_ms = now_us / 1000;
         let good = self
             .receiver
             .apply(now_ms, &self.tune, self.failsafe.active);
@@ -375,7 +473,20 @@ impl FlightController {
             self.reset_iterm = true;
             self.stabilising = self.tune.pid_at_min_throttle;
         }
+        // The sticks as the frame before left them, as Betaflight's
+        // `processRx` reads them.
+        let deflection = self
+            .command
+            .map(|command| Axis::ALL.map(|axis| command.deflection(&self.tune, axis)));
+        self.runaway.frame(
+            &self.tune,
+            self.runaway_moment(now_us),
+            rc.throttle_percent(&self.tune),
+            deflection,
+            self.pid.terms.map(|terms| terms.sum),
+        );
 
+        let was_armed = self.arming.armed;
         self.arming.frame(
             &rc,
             &self.tune,
@@ -386,6 +497,9 @@ impl FlightController {
                 link_up: self.failsafe.link_up,
             },
         );
+        if !was_armed && self.arming.armed {
+            self.runaway.arm();
+        }
 
         let command = RcCommand::new(&rc, &self.tune, &self.throttle_lookup);
         for axis in Axis::ALL {
@@ -393,6 +507,15 @@ impl FlightController {
             self.setpoint[axis.index()] = self.rates.setpoint(axis, deflection);
         }
         self.command = Some(command);
+    }
+
+    /// Where runaway takeoff prevention finds the Flight Controller now.
+    fn runaway_moment(&self, now_us: u64) -> runaway::Moment {
+        runaway::Moment {
+            armed: self.arming.armed,
+            crash_flip: self.arming.crash_flip,
+            now_us,
+        }
     }
 
     /// Feeds everything it remembers into a fingerprint, in a fixed order.
@@ -413,8 +536,22 @@ impl FlightController {
             f.write_u64(u64::from(flag));
         }
         self.pid.write_fingerprint(f);
+        self.yaw_spin.write_fingerprint(f);
+        self.runaway.write_fingerprint(f);
+        match self.tilt_at_start {
+            None => f.write_u64(0),
+            Some(tilt) => {
+                f.write_u64(1);
+                f.write_f64(tilt);
+            }
+        }
+        self.dshot.write_fingerprint(f);
         for motor in self.last.motors {
             f.write_u64(u64::from(motor.dshot));
+            f.write_u64(match motor.direction {
+                SpinDirection::Normal => 0,
+                SpinDirection::Reversed => 1,
+            });
         }
     }
 }
