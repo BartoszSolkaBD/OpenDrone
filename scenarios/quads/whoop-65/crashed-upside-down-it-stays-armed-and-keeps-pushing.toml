@@ -1,0 +1,118 @@
+# A Whoop 65 crashed upside down with Airmode on stays armed and keeps
+# pushing, as on Betaflight 2026.6.2's defaults (#26 §2 and §6, ADR-0012):
+# nothing disarms on a crash (`crash_recovery` OFF, `landing_disarm_threshold`
+# 0, src/main/flight/pid.c), and once the throttle has passed
+# `airmode_start_throttle_percent` (25%), Airmode keeps the PID loop working
+# at zero throttle, every motor at idle or above (src/main/fc/core.c,
+# `processRx`).
+#
+# The flight counts as stable first, so runaway takeoff prevention, which a
+# crash's PID sums could otherwise trip, is already off: it climbs at 45%
+# throttle (42% above `min_check`, at least 40%) with every PID sum below
+# 100, and after 500 ms of that the prevention switches itself off
+# (runaway-takeoff-prevention-switches-off-once-the-flight-counts-as-stable.toml).
+#
+# It starts 1 m up on test/flat-floor, level, armed, its motors "settled",
+# the sticks centred. At 0.7 s, about 1.7 m up, full roll right turns it
+# over; at 0.95 s the sticks centre and the throttle drops to 0, and it falls
+# onto the floor upside down at about 1.45 s. There it lies, armed, the Arm
+# switch on: the PID loop keeps fighting, its pitch I winds up to its limit
+# (80% of `pidsum_limit` 500 = 400) and holds there, and the front motors
+# push hard against the floor, until it settles flat on its duct rings by
+# about 6 s and lies there pushing.
+format = 2
+name   = "A Whoop 65 crashed upside down with Airmode stays armed and keeps pushing"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 1 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",    roll = "0%", pitch = "0%", yaw = "0%", throttle = "45%", arm = "on", crash_flip = "off" },
+  { at = "0.7 s",  roll = "100%" },
+  { at = "0.95 s", roll = "0%", throttle = "0%" },
+]
+
+[[expect]]
+what  = "runaway takeoff prevention switches off"
+over  = "0 s to 0.7 s"
+first = "0.504125 s ± 0.000001 s"
+basis = "source: processRx (Betaflight 2026.6.2's core.c): at 42% throttle, at least 40%, with every PID sum below 100, the flight is stable from the first frame; the first frame after 500 ms of it switches the prevention off"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 12 s"
+first = "never"
+basis = "source: Betaflight 2026.6.2's defaults: crash_recovery OFF and landing_disarm_threshold 0 (pid.c) disarm on no crash, runaway takeoff prevention is off by now, and the Arm switch stays on"
+
+[[expect]]
+what  = "tilt"
+at    = "6 s"
+value = "180° ± 1°"
+basis = "observed: it comes to rest upside down on the floor"
+
+[[expect]]
+what  = "the Quad turns right side up"
+over  = "1 s to 12 s"
+first = "never"
+basis = "observed: pushing as it does, it never rights itself"
+
+[[expect]]
+what    = "pitch I term"
+over    = "2 s to 12 s"
+highest = "400 ± 0.5"
+basis   = "source: pidController and the static I clamp (Betaflight research §4.1): lying armed, with Airmode on, the I term winds up to its limit, iterm_windup 80% of pidsum_limit 500 = 400"
+
+[[expect]]
+what   = "motor 1 DShot"
+over   = "2 s to 12 s"
+lowest = "between 168 and 2047"
+basis  = "source: mixTable: armed with Airmode on, no motor drops below idle, 48 + 6% (motor_idle 600) × 1999 = 167.9, sent as 168"
+
+[[expect]]
+what   = "motor 2 DShot"
+over   = "2 s to 12 s"
+lowest = "between 168 and 2047"
+basis  = "source: mixTable: armed with Airmode on, no motor drops below idle"
+
+[[expect]]
+what   = "motor 3 DShot"
+over   = "2 s to 12 s"
+lowest = "between 168 and 2047"
+basis  = "source: mixTable: armed with Airmode on, no motor drops below idle"
+
+[[expect]]
+what   = "motor 4 DShot"
+over   = "2 s to 12 s"
+lowest = "between 168 and 2047"
+basis  = "source: mixTable: armed with Airmode on, no motor drops below idle"
+
+[[expect]]
+what  = "motor 2 DShot"
+over  = "6 s to 12 s"
+mean  = "1950 ± 100"
+basis = "observed: lying still, the front right motor keeps pushing hard, near full power, for the whole 6 s, its pitch I held near its limit"

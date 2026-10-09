@@ -75,7 +75,7 @@ basis = "source: failsafeCheckDataFailurePeriod and failsafeUpdateState: more th
 what  = "motor 1 DShot"
 at    = "2.6 s"
 value = "0 ± 0"
-basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, about 21 ms (dshot_command.c; not sent yet, #54)"
+basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, 21.25 ms (dshot_command.c)"
 
 [[expect]]
 what  = "motor 1 speed"

@@ -121,9 +121,11 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             ),
         }]));
     }
-    let tune = match start.kind {
-        Kind::Physics | Kind::ThrustStand => None,
-        Kind::Flight | Kind::FlightController => match &quad.flight_controller {
+    // Scripted motors need no Flight Controller; a pilot's inputs fly ours,
+    // on the thrust stand too.
+    let tune = match (start.kind, &scenario.inputs) {
+        (Kind::Physics, _) | (Kind::ThrustStand, Inputs::Motors(_)) => None,
+        _ => match &quad.flight_controller {
             Ok(tune) => Some(tune.clone()),
             Err(missing) => {
                 return Err(Problems(vec![Problem {

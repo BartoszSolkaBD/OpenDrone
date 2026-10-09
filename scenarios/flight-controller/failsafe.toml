@@ -110,7 +110,7 @@ basis = "source: failsafeUpdateState: FAILSAFE_LANDED disarms and blocks arming 
 what  = "motor 1 DShot"
 at    = "2.6 s"
 value = "0 ± 0"
-basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, about 21 ms (dshot_command.c; not sent yet, #54)"
+basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, 21.25 ms (dshot_command.c)"
 
 # The link back at 4 s: RXLOSS clears 0.5 s later, Failsafe ends another
 # 0.5 s after that, and AUX1 holds its value until it does.

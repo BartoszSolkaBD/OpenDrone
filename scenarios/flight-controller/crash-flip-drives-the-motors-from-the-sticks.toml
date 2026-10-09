@@ -1,0 +1,346 @@
+# Crash Flip spins the motors backwards straight from the sticks, as
+# Betaflight 2026.6.2's `applyCrashFlipModeToMotors` does
+# (src/main/flight/mixer.c; the Betaflight research §4.1, #26 §3):
+#
+# - It's open loop: the PID sums and the throttle are ignored.
+# - Pitch forward drives the front pair, pitch back the rear pair, roll right
+#   the right pair, roll left the left pair. A stick within 30° of a diagonal
+#   drives only the motor at that corner. Yaw, moved further than roll and
+#   pitch, drives a diagonal pair.
+# - Power is how far the stick is moved (roll and pitch together, as one
+#   length), once that's past 15%: linear, with no expo.
+# - The Freestyle 5″'s Tune keeps Betaflight's defaults: a motor whose mix
+#   would push the wrong way gets nothing (`crashflip_motor_percent` 0), and
+#   power never fades (`crashflip_rate` 0).
+#
+# Motors in Betaflight's order: 1 rear right, 2 front right, 3 rear left,
+# 4 front left. The motors' range runs from idle, 48 + 5.5% × 1999 = 157.945,
+# to 2047; a motor driven at less than 2% of it gets 0, "stop". Each stick
+# reaches Betaflight as ELRS rounds it (see actual-rates.toml): a centred
+# stick reads 1500.77 µs, a deflection of 0.0015, which adds to the length.
+#
+# The Flight Controller alone, upside down, disarmed, with the Crash Flip
+# switch on from the start: the frame at 0.1 s turns Arm on, so it arms with
+# the next, at 0.104 s, in Crash Flip; the tilt check is skipped
+# (crash-flip-switch.toml). Arming sends the ESCs "spin direction reversed"
+# first, so the motors' commands reach them from 0.125 s
+# (a-reversed-motor-gives-the-quads-reverse-share.toml has the timing).
+format = 2
+name   = "Crash Flip drives the motors straight from the sticks, as Betaflight does"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "roll 180°, pitch 0°, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
+  { at = "0.1 s", arm = "on" },
+  # The mapping, at full stick.
+  { at = "0.2 s", pitch = "100%" },
+  { at = "0.3 s", pitch = "-100%" },
+  { at = "0.4 s", pitch = "0%", roll = "100%" },
+  { at = "0.5 s", roll = "-100%" },
+  { at = "0.6 s", roll = "100%", pitch = "100%" },
+  # 17.1° from the roll axis, within 30° of the diagonal; then 14.4°, not.
+  { at = "0.7 s", pitch = "30%" },
+  { at = "0.8 s", pitch = "25%" },
+  { at = "0.9 s", roll = "0%", pitch = "0%", yaw = "100%" },
+  { at = "1 s",   yaw = "-100%" },
+  # The deadband and linear power.
+  { at = "1.1 s", yaw = "0%", roll = "14%" },
+  { at = "1.2 s", roll = "16%" },
+  { at = "1.3 s", roll = "50%" },
+  # The throttle changes nothing.
+  { at = "1.4 s", roll = "100%", throttle = "100%" },
+]
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "0.1 s to 0.2 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm (src/main/fc/core.c): the frame at 0.104 s arms with the Crash Flip switch on, so Crash Flip starts"
+
+[[expect]]
+what  = "motor 1 direction"
+at    = "0.25 s"
+value = "-1 ± 0"
+basis = "source: tryArm and setMotorSpinDirection: arming in Crash Flip sends every ESC DShot command 21, spin direction reversed"
+
+[[expect]]
+what  = "motor 4 direction"
+at    = "0.25 s"
+value = "-1 ± 0"
+basis = "source: tryArm and setMotorSpinDirection: every ESC is told to spin backwards"
+
+# Pitch forward: the front pair, motors 2 and 4, at full power.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.25 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch forward gives the rear pair a mix of -1, so nothing (crashflip_motor_percent 0): DShot 0, stop"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.25 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch forward at full stick drives the front pair at power 1.0: 157.945 + 1 × 1889.055 = 2047"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.25 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the rear pair gets nothing"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.25 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the front pair at full power"
+
+# Pitch back: the rear pair, motors 1 and 3.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.35 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch back drives the rear pair"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.35 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch back gives the front pair nothing"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.35 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch back drives the rear pair"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.35 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch back gives the front pair nothing"
+
+# Roll right: the right pair, motors 1 and 2.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.45 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll right drives the right pair"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.45 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll right drives the right pair"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.45 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll right gives the left pair nothing"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.45 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll right gives the left pair nothing"
+
+# Roll left: the left pair, motors 3 and 4.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.55 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll left gives the right pair nothing"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.55 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll left drives the left pair"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.55 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll left drives the left pair"
+
+# Roll right and pitch forward together, on the diagonal: motor 2 alone.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.65 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: on the diagonal both signs count, and motor 1's roll and pitch cancel (-(-1) - (+1) = 0)"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.65 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: motor 2's roll and pitch add (mix 2), and power √2 × 2 is held at 1"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.65 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: motor 3's mix is -2, so nothing"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.65 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: motor 4's roll and pitch cancel"
+
+# Roll 100% and pitch 30%: 17.1° from the roll axis, within 30° of the
+# diagonal, so motor 2 alone. Pitch 25%: 14.4°, so roll alone.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.75 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch 30% reaches Betaflight as a deflection of 0.3077, and (0.3077 + 1) ÷ (√2 × 1.0463) = 0.884 is above cos 30° = 0.866, so the stick counts as diagonal"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.75 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: counted as diagonal, motor 2 alone"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.85 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch 25% reaches Betaflight as a deflection of 0.2565, and (0.2565 + 1) ÷ (√2 × 1.0324) = 0.861 is below cos 30°, so only roll, the larger, drives: the right pair"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.85 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: only roll drives: the right pair"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.85 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch is dropped, so motor 4 (front left) gets nothing"
+
+# Yaw: a diagonal pair. Props-in (yaw_motors_reversed OFF), yaw right drives
+# motors 1 and 4, yaw left motors 2 and 3.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.95 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw leads, so roll and pitch drop out; yaw right with yaw_motors_reversed OFF gives motor 1 a mix of -1 × -1 = 1"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.95 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw right gives motor 2 a mix of -1"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "0.95 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw right gives motor 3 a mix of -1"
+
+[[expect]]
+what  = "motor 4 DShot"
+at    = "0.95 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw right gives motor 4 a mix of 1"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.05 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw left gives motor 1 nothing"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "1.05 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw left drives motors 2 and 3"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "1.05 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: yaw left drives motors 2 and 3"
+
+# The deadband, then linear power.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.15 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll 14% reaches Betaflight as 1572.00 µs, a deflection of 0.1440, inside the 15% deadband (CRASHFLIP_STICK_DEADBAND): no power"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "1.15 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: inside the 15% deadband, no power"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.25 s"
+value = "470 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll 16% reaches Betaflight as 1582.62 µs, a deflection of 0.16524 (with the centred pitch's 0.0015, a length of 0.16524), past the deadband, so power 0.16524 with no expo: 157.945 + 0.16524 × 1889.055 = 470.10, sent as 470"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "1.25 s"
+value = "470 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the right pair at power 0.16524: 470"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.35 s"
+value = "1126 ± 0"
+basis = "source: applyCrashFlipModeToMotors: roll 50% reaches Betaflight as 1756.30 µs, a deflection of 0.51261: 157.945 + 0.51261 × 1889.055 = 1126.30, sent as 1126; linear, so half the stick gives about half the range"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "1.35 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the left pair gets nothing"
+
+# Full throttle changes nothing.
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "1.45 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors ignores the throttle: roll right still drives the right pair"
+
+[[expect]]
+what  = "motor 3 DShot"
+at    = "1.45 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors ignores the throttle: the left pair still gets nothing, where a normal mix at full throttle would run it"

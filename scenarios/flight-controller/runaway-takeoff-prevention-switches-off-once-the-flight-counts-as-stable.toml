@@ -1,0 +1,84 @@
+# Runaway takeoff prevention switches itself off once the flight counts as
+# stable, and then never disarms the Quad, however hard it's hit, until the
+# next power-up (Reset). It copies Betaflight 2026.6.2's `processRx`
+# (src/main/fc/core.c): on each Radio Link frame, the flight is stable when
+# every PID sum is below 100 and the throttle is at
+# `runaway_takeoff_deactivate_throttle_percent` (20%) with a stick moved at
+# least 15%, or at twice that (40%) with the sticks anywhere. It switches off
+# once the stable stretches since arming add up to more than
+# `runaway_takeoff_deactivate_delay` (500 ms; half that at 75% throttle, as
+# yaw-spin-recovery.toml shows). The Freestyle 5″'s Tune keeps Betaflight's
+# defaults for all three.
+#
+# Betaflight checks the sticks as the frame before left them, and the PID
+# sums as the last loop left them. The throttle is in whole percent above
+# `min_check`: 30% on the stick reads 25%, 50% reads 47%.
+#
+# The Flight Controller alone, armed, the sticks centred and the throttle at
+# 30%: not stable. Then roll 20%, with the gyro reading the 39.64 °/s it asks
+# for, so every PID sum stays near 0: stable. Back to centre, not stable;
+# then 50% throttle: stable again, until the two stretches add up to 500 ms.
+# Then a roll at 500 °/s against centred sticks holds the roll PID sum past
+# 600, which would disarm a Quad whose flight hadn't counted as stable
+# (runaway-takeoff-prevention-disarms-a-quad-that-runs-away.toml).
+format = 2
+name   = "Runaway takeoff prevention switches off once the flight counts as stable, and then never disarms"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+  # 25% with a stick moved 20%: stable from the frame at 0.104 s.
+  { at = "0.1 s", roll = "20%", rotation = "roll 39.64 °/s, pitch 0 °/s, yaw 0 °/s" },
+  # Centred: not stable from the frame at 0.304 s, after 200 ms.
+  { at = "0.3 s", roll = "0%", rotation = "0 °/s" },
+  # 47%: stable again from 0.4 s.
+  { at = "0.4 s", throttle = "50%" },
+  # A hard roll the sticks don't ask for.
+  { at = "0.9 s", throttle = "30%", rotation = "roll 500 °/s, pitch 0 °/s, yaw 0 °/s" },
+]
+
+[[expect]]
+what  = "runaway takeoff prevention switches off"
+over  = "0 s to 0.7 s"
+first = "never"
+basis = "source: processRx: the stable stretches add up to 200 ms (0.104 s to 0.304 s) and then 296 ms (0.4 s to 0.696 s): not yet more than 500 ms"
+
+[[expect]]
+what  = "runaway takeoff prevention switches off"
+over  = "0.7 s to 0.8 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRx: the frame at 0.704 s brings the stretches to 200 + 304 = 504 ms, more than 500 ms (runaway_takeoff_deactivate_delay), so the prevention switches off; without the first stretch it would wait until 0.904 s"
+
+[[expect]]
+what  = "roll PID sum"
+at    = "1 s"
+value = "-1120.49 ± 0.01"
+basis = "source: pidController: the centred stick asks 0.110 °/s against the gyro's 500 °/s, so P is 0.032029 × 45 × (0.110 - 500) = -720.49, and I has wound up to its limit, -400: past 600, with the gyro moving"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.9 s to 1.5 s"
+first = "never"
+basis = "source: subTaskPidController: runaway takeoff prevention is off once the flight has counted as stable (runawayTakeoffCheckDisabled), so the held PID sum disarms nothing"

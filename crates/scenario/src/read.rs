@@ -191,7 +191,8 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// True for the kinds whose motors are scripted.
+    /// True for the kinds whose motors are scripted. A Thrust Stand Scenario
+    /// scripts them too, unless its Timeline flies our Flight Controller.
     fn scripts_motors(self) -> bool {
         matches!(self, Kind::Physics | Kind::ThrustStand)
     }
@@ -455,6 +456,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         moments: Vec::new(),
         other_runs: Vec::new(),
         track: false,
+        scripted: kind.scripts_motors(),
     };
     let has_cases = root.get("case").is_some();
     let inputs = if kind == Kind::FlightController && has_cases {
@@ -1021,6 +1023,10 @@ struct Reader<'p> {
     other_runs: Vec<OtherRun>,
     /// True when the inputs are an Input Track.
     track: bool,
+    /// True when the Timeline scripts the motors: always in a Physics
+    /// Scenario, and in a Thrust Stand Scenario whose Timeline gives
+    /// `motors` rather than a pilot's sticks and switches.
+    scripted: bool,
 }
 
 impl Reader<'_> {
@@ -1086,8 +1092,29 @@ impl Reader<'_> {
                 .timeline_at(self.rate, false)
                 .unwrap_or(Inputs::Motors(Vec::new()));
         };
+        // A Thrust Stand Scenario scripts its motors, or flies our Flight
+        // Controller from a pilot's sticks and switches: its first moment
+        // says which.
+        if self.kind == Kind::ThrustStand {
+            self.scripted = timeline
+                .first()
+                .and_then(|first| first.table(&mut Problems::new()))
+                .is_none_or(|first| first.get("motors").is_some());
+        }
         let known: &[&str] = match self.kind {
-            Kind::Physics | Kind::ThrustStand => &["at", "motors"],
+            Kind::Physics => &["at", "motors"],
+            Kind::ThrustStand if self.scripted => &["at", "motors"],
+            Kind::ThrustStand => &[
+                "at",
+                "roll",
+                "pitch",
+                "yaw",
+                "throttle",
+                "arm",
+                "crash_flip",
+                "input_device",
+                "radio_link",
+            ],
             Kind::Flight => &[
                 "at",
                 "roll",
@@ -1123,7 +1150,7 @@ impl Reader<'_> {
             let at = entry
                 .text("at", self.problems)
                 .and_then(|(text, item)| self.moment(text, &item));
-            let read = if self.kind.scripts_motors() {
+            let read = if self.scripted {
                 entry
                     .text("motors", self.problems)
                     .and_then(|(text, item)| self.motor_commands(text, &item))
@@ -1172,7 +1199,7 @@ impl Reader<'_> {
                 }
             }
         }
-        if !self.kind.scripts_motors() {
+        if !self.scripted {
             self.check_pilot_timeline(&inputs);
             self.check_flight_inputs();
         }
@@ -1355,7 +1382,7 @@ impl Reader<'_> {
             return None;
         }
         // In time order; moments at the same time keep the file's order.
-        if self.kind.scripts_motors() {
+        if self.scripted {
             Some(Inputs::Motors(motors))
         } else {
             pilot.sort_by_key(|e| e.at);
@@ -1757,12 +1784,10 @@ impl Reader<'_> {
                     "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller and its Radio Link do, not {text}"
                 ))
             }
-            Kind::Physics | Kind::ThrustStand if measure.of_the_flight_controller() => {
-                Some(format!(
-                    "{text} is our Flight Controller's, but a {scripted} Scenario's motors are scripted"
-                ))
-            }
-            Kind::Physics | Kind::ThrustStand if measure.of_the_radio_link() => Some(format!(
+            _ if self.scripted && measure.of_the_flight_controller() => Some(format!(
+                "{text} is our Flight Controller's, but a {scripted} Scenario's motors are scripted"
+            )),
+            _ if self.scripted && measure.of_the_radio_link() => Some(format!(
                 "{text} is the Radio Link's, but a {scripted} Scenario's motors are scripted, so no sticks reach a Flight Controller"
             )),
             _ => None,

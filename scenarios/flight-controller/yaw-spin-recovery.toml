@@ -1,0 +1,152 @@
+# Yaw spin recovery copies Betaflight 2026.6.2 (`checkForYawSpin` and
+# `handleYawSpin`, src/main/sensors/gyro.c; `pidController`,
+# src/main/flight/pid.c; `mixTable`, src/main/flight/mixer.c; the Betaflight
+# research §4.1, #26 §4):
+#
+# - The Freestyle 5″'s Tune has `yaw_spin_recovery` AUTO, Betaflight's
+#   default: it starts when the gyro's yaw rate passes the Rates' max yaw rate
+#   plus 200 °/s (or a quarter of it, if that's more), so 670 + 200 = 870 °/s
+#   on these Rates.
+# - While it's on, the yaw setpoint is 0 and I is emptied on every axis;
+#   roll and pitch's P and D are 0, so only yaw's P works, braking the spin,
+#   and the yaw PID sum may use the whole motor range (1000, not
+#   pidsum_limit_yaw's 400).
+# - It ends once the yaw rate has stayed 100 °/s below the threshold, under
+#   770 °/s, for more than 20 ms.
+#
+# The Flight Controller alone, armed, the sticks centred. It first flies at
+# 80% throttle, so the flight counts as stable and runaway takeoff
+# prevention switches itself off, as after any takeoff: otherwise a
+# spin's PID sums, held at 600 or more for 75 ms, would disarm it
+# (runaway-takeoff-prevention-disarms-a-quad-that-runs-away.toml). Then the
+# throttle is at 30%, with Airmode on, and the gyro reading changes from
+# moment to moment, as a hit could spin a Quad. Betaflight's yaw is nose
+# left, so a spin nose right at 880 °/s is -880 °/s to it: its yaw P term is
+# then 0.032029 × 45 × 880 = 1268.35 to the left, which the pilot's
+# directions give as -1268.35.
+format = 2
+name   = "Yaw spin recovery starts past the max yaw rate plus 200 °/s, drops I and roll and pitch, brakes the yaw, and ends 20 ms below"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "80%", arm = "on", crash_flip = "off" },
+  { at = "0.6 s", throttle = "30%" },
+  # Just under the threshold, then past it, rolling too.
+  { at = "0.7 s", rotation = "roll 0 °/s, pitch 0 °/s, yaw 860 °/s" },
+  { at = "0.8 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 880 °/s" },
+  # Slowing, but not 100 °/s below; then below.
+  { at = "1 s",   rotation = "roll 100 °/s, pitch 0 °/s, yaw 780 °/s" },
+  { at = "1.1 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 760 °/s" },
+]
+
+[[expect]]
+what  = "runaway takeoff prevention switches off"
+over  = "0 s to 0.6 s"
+first = "0.252125 s ± 0.000001 s"
+basis = "source: processRx (src/main/fc/core.c): at 79% throttle, at least 40% (twice runaway_takeoff_deactivate_throttle_percent's 20), with every PID sum below 100, the flight is stable from the first frame; at 75% or more it needs only half of runaway_takeoff_deactivate_delay's 500 ms, so the first frame after 250 ms switches the prevention off"
+
+[[expect]]
+what  = "yaw spin recovery starts"
+over  = "0 s to 0.8 s"
+first = "never"
+basis = "source: checkForYawSpin: 860 °/s isn't past the AUTO threshold, 670 + max(670 ÷ 4, 200) = 870 °/s (initYawSpinRecovery)"
+
+[[expect]]
+what  = "yaw I term"
+at    = "0.75 s"
+value = "-320 ± 0.01"
+basis = "source: pidController: before recovery, yaw's I winds up against the spin to its limit, 80% (iterm_windup) of pidsum_limit_yaw 400 = 320"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.75 s"
+value = "between 1660 and 1700"
+basis = "source: mixTable: the yaw PID sum is held at pidsum_limit_yaw, 400, a mix of ±0.4; Airmode lifts the 30% throttle (0.257 through the throttle curve) to 0.4, so motor 1 gets 0.8 of the range, 157.945 + 0.8 × 1889.055 = 1669.19, and the roll and pitch I wound up by the centred sticks' 0.11 °/s since 0 s add a few steps"
+
+[[expect]]
+what  = "yaw spin recovery starts"
+over  = "0.8 s to 0.9 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: checkForYawSpin: 880 °/s is past 870 °/s, so it starts with the first loop that reads it"
+
+[[expect]]
+what  = "yaw P term"
+at    = "0.85 s"
+value = "-1268.35 ± 0.01"
+basis = "source: pidController: the yaw setpoint is 0, so yaw's P brakes the whole spin: 0.032029 × 45 × 880 = 1268.35, to the left"
+
+[[expect]]
+what  = "yaw I term"
+at    = "0.85 s"
+value = "0 ± 0"
+basis = "source: pidController: in yaw spin recovery I is 0 on every axis"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.85 s"
+value = "0 ± 0"
+basis = "source: pidController: in yaw spin recovery I is 0 on every axis"
+
+[[expect]]
+what  = "roll P term"
+at    = "0.85 s"
+value = "0 ± 0"
+basis = "source: pidController: in yaw spin recovery roll and pitch's P, D and F are 0, so the 100 °/s roll gets no correction"
+
+[[expect]]
+what  = "roll PID sum"
+at    = "0.85 s"
+value = "0 ± 0"
+basis = "source: pidController: roll's P, I, D and F are all 0, so its sum is"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.85 s"
+value = "2047 ± 0"
+basis = "source: mixTable: in yaw spin recovery the yaw PID sum may reach PIDSUM_LIMIT_MAX, 1000, a mix of ±1; Airmode halves a mix wider than the range, to ±0.5, and sets the throttle to 0.5, so motors 1 and 4 run at full power"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.85 s"
+value = "158 ± 0"
+basis = "source: mixTable: motors 2 and 3 at idle (157.945, sent as 158)"
+
+[[expect]]
+what  = "yaw spin recovery ends"
+over  = "0.8 s to 1.1 s"
+first = "never"
+basis = "source: handleYawSpin: 780 °/s isn't below 870 - 100 = 770 °/s, so recovery goes on"
+
+[[expect]]
+what  = "yaw spin recovery ends"
+over  = "1.1 s to 1.2 s"
+first = "0.020125 s ± 0.000001 s"
+basis = "source: handleYawSpin: from 1.1 s the yaw rate, 760 °/s, is below 770 °/s; it ends on the first loop more than 20 ms after the last one at or above it (1.099875 s), the loop at 1.12 s"
+
+[[expect]]
+what  = "roll P term"
+at    = "1.15 s"
+value = "-143.97 ± 0.01"
+basis = "source: pidController: out of recovery, roll's P corrects again: the centred stick asks 0.110 °/s, so 0.032029 × 45 × (0.110 - 100) = -143.97"
