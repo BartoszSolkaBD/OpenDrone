@@ -1,0 +1,128 @@
+# An upside-down Whoop 65 on a hard floor Crash Flips itself upright, at full
+# roll stick and at full pitch stick (#26 §3 and §6). The maintainer's own
+# Meteor65 Pro "works pretty good on the hard surfaces", so whatever the
+# details, it comes over; how long each flip takes is what the Simulation
+# does today.
+#
+# It lies upside down on test/flat-floor, on its duct rings, their tops 15 mm
+# above its centre of mass (8 mm up to the props' plane, plus half the rings'
+# 14 mm), and starts as Reset leaves it: disarmed, the ESCs powering up, ready
+# at 1.662 s. The Crash Flip switch is on; the Arm switch goes on at 2 s, so
+# it arms in Crash Flip at 2.004 s, and the motors' commands reach the ESCs
+# 21.25 ms later, after "spin direction reversed"; each ESC then waits its
+# 0.1 s start wait, so thrust starts at about 2.125 s.
+#
+# Full roll right spins the right pair backwards: upside down, their reverse
+# thrust (50% of forward, an Estimate) lifts its right side, and it rolls
+# over its left side. The motors take a while to get going: each ESC starts
+# its motor capped at the start-up power limit for 15 electrical turns, so
+# they run fast only from about 2.3 s. The pilot centres the stick at 2.45 s,
+# as it comes over, and it lands right side up; held on, the pair that lifted
+# it would keep pushing once it's over and flip it over again, as on a real
+# quad. The Crash Flip switch then goes off, which disarms it. Then Reset
+# puts it back upside down, and it does the same on full pitch forward: the
+# front pair lifts its nose, and it flips over its tail.
+format = 2
+name   = "An upside-down Whoop 65 on a hard floor Crash Flips upright on roll and on pitch"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.015 m up"
+attitude          = "roll 180°, pitch 0°, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
+  { at = "2 s",   arm = "on" },
+  { at = "2.45 s", roll = "0%" },
+  { at = "3.2 s", crash_flip = "off" },
+  { at = "3.5 s", arm = "off" },
+  # Back upside down, then on pitch.
+  { at = "4 s",   reset = true, pitch = "100%", crash_flip = "on" },
+  { at = "6 s",   arm = "on" },
+  { at = "6.45 s", pitch = "0%" },
+  { at = "7.2 s", crash_flip = "off" },
+  { at = "7.5 s", arm = "off" },
+]
+
+[[expect]]
+what  = "tilt"
+at    = "1.9 s"
+value = "180° ± 1°"
+basis = "rule: it starts upside down and lies still on its duct rings until it's armed"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "2 s to 2.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm (Betaflight 2026.6.2's core.c): upside down, the tilt check is skipped with the Crash Flip switch on, so the frame at 2.004 s arms in Crash Flip"
+
+[[expect]]
+what  = "tilt"
+at    = "3.1 s"
+value = "between 0° and 45°"
+basis = "source: the maintainer's memory of the Meteor65 Pro: Crash Flip \"works pretty good on the hard surfaces\" (#26 §6), so full roll stick brings it upright and it stays there; a wide tolerance, since nobody measured it"
+
+[[expect]]
+what  = "the Quad turns right side up"
+over  = "2 s to 3 s"
+first = "0.495 s ± 0.05 s"
+basis = "observed: the roll flip, from the Arm switch going on until it comes past its side"
+
+[[expect]]
+what  = "tilt"
+at    = "3 s"
+value = "0° ± 1°"
+basis = "observed: right side up and at rest on the floor by 2.8 s"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "3.2 s to 3.3 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the Crash Flip switch off while armed in Crash Flip disarms (crashflip_auto_rearm OFF)"
+
+[[expect]]
+what  = "tilt"
+at    = "5.9 s"
+value = "180° ± 1°"
+basis = "rule: Reset put it back upside down on its Launch Spot"
+
+[[expect]]
+what  = "tilt"
+at    = "7.1 s"
+value = "between 0° and 45°"
+basis = "source: the maintainer's memory of the Meteor65 Pro (#26 §6): full pitch stick brings it upright too, and it stays there; a wide tolerance"
+
+[[expect]]
+what  = "the Quad turns right side up"
+over  = "6 s to 7 s"
+first = "0.501 s ± 0.05 s"
+basis = "observed: the pitch flip, from the Arm switch going on until it comes past its side"
+
+[[expect]]
+what  = "tilt"
+at    = "7 s"
+value = "0° ± 1°"
+basis = "observed: right side up and at rest on the floor by 6.8 s"

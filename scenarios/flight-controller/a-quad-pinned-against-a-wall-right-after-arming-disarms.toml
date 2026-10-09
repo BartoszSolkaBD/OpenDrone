@@ -1,0 +1,91 @@
+# A Freestyle 5″ on its own Tune, flown into a wall right after arming,
+# disarms as Betaflight 2026.6.2's runaway takeoff prevention would disarm it
+# (`subTaskPidController`, src/main/fc/core.c): the guard half of the pair
+# whose other half is a-quad-that-hits-a-wall-stays-armed.toml.
+#
+# That Scenario flies the same flight on
+# test/freestyle-5-no-runaway-takeoff-prevention: the hit stops the front
+# props, and while they restart the Flight Controller asks for all the
+# nose-up pitch it can, the pitch PID sum above 600 for about 300 ms. With
+# the guard on, as on the Freestyle 5″'s Tune and Betaflight's defaults, the
+# flight hasn't counted as stable: the throttle is at 30%, below 40%, with
+# the sticks centred (runaway-takeoff-prevention-switches-off-once-the-flight-counts-as-stable.toml).
+# So once the pitch sum has stayed at 600 or more with the gyro moving for
+# more than 75 ms, it disarms, and arming is blocked (RUNAWAY) until the Arm
+# switch goes off. Disarmed, every motor stops, and the Quad falls by the
+# wall.
+#
+# It starts as that Scenario does: 2 m up on test/wall (the wall's face 5 m
+# east, facing west), level and armed, its motors "settled", flying east at
+# 10 m/s with the sticks centred and the throttle at 30%. A mid-air start is
+# a fresh Flight Controller, as just after arming.
+format = 2
+name   = "A Quad pinned against a wall right after arming disarms, as runaway takeoff prevention does"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/wall"
+position          = "0 m east, 0 m north, 2 m up"
+attitude          = "level, heading 90°"
+speed             = "10 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+]
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 0.55 s"
+first = "never"
+basis = "source: before the hit, level flight holds no PID sum near 600, so runaway takeoff prevention has nothing to disarm"
+
+[[expect]]
+what   = "pitch PID sum"
+over   = "0.556 s to 0.63 s"
+lowest = "between 600 and 3000"
+basis  = "observed: from just after the hit, at about 0.555 s, the struck front props stop and the Flight Controller asks for all the nose-up pitch it can, as in a-quad-that-hits-a-wall-stays-armed.toml"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.55 s to 1 s"
+first = "0.0805 s ± 0.002 s"
+basis = "source: subTaskPidController: the first loop that finds the pitch PID sum at 600 or more with the gyro moving, at 0.555 s, sets the disarm for 75 ms later, and the first loop after that disarms: 0.630 s"
+
+[[expect]]
+what  = "RUNAWAY blocks arming"
+over  = "0.55 s to 1 s"
+first = "0.0805 s ± 0.002 s"
+basis = "source: subTaskPidController: the disarm sets RUNAWAY, which holds until the Arm switch goes off"
+
+[[expect]]
+what  = "runaway takeoff prevention switches off"
+over  = "0 s to 1 s"
+first = "never"
+basis = "source: processRx: at 25% throttle (30% on the stick), below 40%, with no stick moved 15%, the flight never counts as stable"
+
+[[expect]]
+what  = "motor 1 DShot"
+over  = "0.7 s to 1 s"
+highest = "between 0 and 20"
+basis = "source: disarm: disarmed, every motor gets 0, stop, or 20, the DShot command spin direction normal that every disarm sends, which Bluejay takes as no throttle"

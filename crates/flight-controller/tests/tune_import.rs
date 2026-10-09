@@ -201,16 +201,17 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
         assert_eq!(got(&meteor, name), is(value, "ADR-0008"), "{name}");
     }
     // The Flight Controller already knows low-throttle TPA, so the Tune
-    // spells it out, flown as off (#50). It doesn't know the others yet; the
-    // Tune spells them out all the same, under "Not simulated yet".
+    // spells it out, flown as off (#50), and reads Crash Flip's rate fade
+    // (#54), so the Tune sets it under its tab. It doesn't know the others
+    // yet; the Tune spells them out all the same, under "Not simulated yet".
     let tpa_low = meteor.setting("tpa_low_rate").unwrap();
     assert_eq!(tpa_low.written, Where::FlownAsOff);
     assert_eq!(tpa_low.note, "not simulated yet (#50)");
-    for name in [
-        "feedforward_yaw_hold_gain",
-        "angle_earth_ref",
-        "crashflip_rate",
-    ] {
+    assert_eq!(
+        meteor.setting("crashflip_rate").unwrap().written,
+        Where::UnderItsTab
+    );
+    for name in ["feedforward_yaw_hold_gain", "angle_earth_ref"] {
         assert_eq!(
             meteor.setting(name).unwrap().written,
             Where::NotSimulatedYet
@@ -447,7 +448,6 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
         "set feedforward_yaw_hold_gain = 0      # ADR-0008",
         "set angle_earth_ref = 0                # ADR-0008; percent",
         "set d_max_advance = 7                  # ADR-0008;",
-        "set crashflip_rate = 0                 # ADR-0008;",
         "set failsafe_switch_mode = STAGE1      # 4.3 default",
         "set blackbox_sample_rate = 1/2         # diff",
         "set dyn_notch_q = 350                  # diff",

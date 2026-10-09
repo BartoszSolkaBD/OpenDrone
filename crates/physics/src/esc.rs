@@ -171,8 +171,9 @@
 //! (`Pgm_Rpm_Power_Slope`; the measured spin-up times already include whatever
 //! a real ESC does), the beacon after 10 idle minutes, signal loss, a stall
 //! found by a zero-cross timeout above the minimum speed (a motor slowed
-//! suddenly but not stopped), Bluejay's own direction change while running,
-//! which Crash Flip's ticket (#54) may need, and the start-up power floor and
+//! suddenly but not stopped), Bluejay's own direction change while running
+//! (Crash Flip doesn't need it: Betaflight sends a spin direction command
+//! only once every motor has been sent "stop"), and the start-up power floor and
 //! stall boost: during the initial-run phase Bluejay raises a command to at
 //! least Startup Power Min (21 of 2047) and adds 40 of 2047 for each failed
 //! start in a row before the start-up cap (Isrs.asm L286–318), which matters

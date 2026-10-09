@@ -1,0 +1,64 @@
+# Results of a-quad-pinned-against-a-wall-right-after-arming-disarms.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Quad pinned against a wall right after arming disarms, as runaway takeoff prevention does"
+
+[[expect]]
+what     = "the Quad disarms, first over 0 s to 0.55 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "pitch PID sum, lowest over 0.556 s to 0.63 s"
+basis    = "Observed"
+expected = "between 600 and 3000"
+measured = "1810"
+
+[[expect]]
+what     = "the Quad disarms, first over 0.55 s to 1 s"
+basis    = "Source"
+expected = "0.0805 s ± 0.002 s"
+measured = "0.0805 s"
+
+[[expect]]
+what     = "RUNAWAY blocks arming, first over 0.55 s to 1 s"
+basis    = "Source"
+expected = "0.0805 s ± 0.002 s"
+measured = "0.0805 s"
+
+[[expect]]
+what     = "runaway takeoff prevention switches off, first over 0 s to 1 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "motor 1 DShot, highest over 0.7 s to 1 s"
+basis    = "Source"
+expected = "between 0 and 20"
+measured = "0"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "132dc07cd7c0886c"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "8cd45d96dbcada03"
+"0.2 s" = "16afe764bc9452b0"
+"0.3 s" = "79ffec40dd2137aa"
+"0.4 s" = "42dbdffe1ebbd262"
+"0.5 s" = "ef2401306047e4fa"
+"0.6 s" = "99d034f57884cd45"
+"0.7 s" = "62d2302f776883a4"
+"0.8 s" = "c8c26cfacea8d541"
+"0.9 s" = "ecaf0008bd86979d"
+"1 s" = "b7f7eda2c0d51655"

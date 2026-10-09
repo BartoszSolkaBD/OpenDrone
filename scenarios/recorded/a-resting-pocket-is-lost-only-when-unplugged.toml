@@ -7,7 +7,7 @@
 # left alone for 11.27 s, then fast circles, switches and buttons, then
 # unplugged at 45.215 s (pocket-rest-and-unplug.csv). At 250 Hz the link
 # locks to its 1 kHz beat, a frame every four reports.
-format = 1
+format = 2
 name   = "A resting Pocket is never lost for silence, only when unplugged"
 
 [start]

@@ -15,7 +15,7 @@
 # - The motors are held at 29.07%, their settled drive. Its pack sags a
 #   little under the load, so the thrust eases smoothly and the descent
 #   speeds up a little.
-format = 1
+format = 2
 name   = "Without Prop Wash, a Whoop 65 sinking through its own air stays level"
 
 [start]

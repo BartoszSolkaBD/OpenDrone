@@ -9,7 +9,7 @@
 # 30%, high enough for Airmode to start (25%); then holds full right roll for
 # half a second. Betaflight's default Rates, Actual 70/670/0, ask for 670 °/s
 # at full stick.
-format = 1
+format = 2
 name   = "Full right roll reaches the max rate"
 
 [start]
@@ -42,7 +42,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "1 s",   roll = "100%" },
   { at = "1.5 s", roll = "0%" },
 ]

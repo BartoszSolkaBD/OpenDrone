@@ -5,7 +5,7 @@
 # open-air hover speed, and 37.2%, just short of the open-air hover drive,
 # lets it sink slowly away from the ceiling: what pulls the Whoop 65 up onto
 # the ceiling is the ceiling effect alone (E21 in #10).
-format = 1
+format = 2
 name   = "With no ceiling effect, a Whoop 65 on a slowly sinking drive sinks away from the ceiling"
 
 [start]

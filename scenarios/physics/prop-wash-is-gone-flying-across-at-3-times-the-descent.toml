@@ -22,7 +22,7 @@
 #
 # The motors are held at 4.88%, their settled drive: so much air crossing a
 # sinking disc lets it carry the weight turning slowly, at 3,781 RPM.
-format = 1
+format = 2
 name   = "Flying forward at 3 times its descent, a Whoop 65 escapes Prop Wash"
 
 [start]

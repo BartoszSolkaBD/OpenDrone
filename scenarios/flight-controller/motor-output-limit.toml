@@ -8,7 +8,7 @@
 # what Betaflight 2026.6.2 gives on that Tune, and stays so when those tickets
 # land. Each case is a fresh, armed Flight Controller, one Radio Link frame and
 # one loop, with nothing to correct but the centre stick's 0.11 °/s.
-format = 1
+format = 2
 name   = "A motor output limit of 80% cuts the top of the motors' range"
 
 [start]
@@ -40,6 +40,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"
@@ -53,6 +54,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "50%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"
@@ -66,6 +68,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "100%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 3 DShot"

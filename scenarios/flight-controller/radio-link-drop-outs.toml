@@ -9,7 +9,7 @@
 # leaves every 4 ms at 250 Hz, so before a drop-out at 1 s or 2 s the last
 # frame is at 0.996 s or 1.996 s, and after one the next leaves on the
 # link's own beat.
-format = 1
+format = 2
 name   = "A Radio Link drop-out shorter than 1.5 s never disarms the Quad"
 
 [start]
@@ -36,7 +36,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on" },
+  { at = "0 s", roll = "50%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
   { at = "1 s", radio_link = "drops out for 0.1 s" },
   { at = "2 s", radio_link = "drops out for 0.5 s" },
 ]

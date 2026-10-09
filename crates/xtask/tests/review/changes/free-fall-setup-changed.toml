@@ -1,6 +1,6 @@
 # A fixture: the same Expectations, but a different random seed and a second
 # motor command in the Timeline, so they check a different flight.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

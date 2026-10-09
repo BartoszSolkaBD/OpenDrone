@@ -4,15 +4,30 @@
 //! `updateArmingStatus`).
 //!
 //! Switches reach the Flight Controller with fixed meanings (ADR-0017), so
-//! the Modes table is built in: Arm on AUX1, high is armed. Flight Mode on
-//! AUX2 and Crash Flip on AUX3 join it with their tickets (#51, #54).
+//! the Modes table is built in: Arm on AUX1 and Crash Flip on AUX3, high is
+//! on. Flight Mode on AUX2 joins it with its ticket (#51).
 //!
 //! Arming follows Betaflight's checks, each named as Betaflight names it
 //! ([`ArmingBlocks`]): the throttle below `min_check` (`THROTTLE`), the tilt
 //! within the Tune's `small_angle` (`ANGLE`), the ESCs' ready beep
 //! (`BOOTGRACE`), the Radio Link (`RXLOSS`, `NOT_DISARMED`) and Failsafe
-//! (`FAILSAFE`), and the Arm switch going off before it can arm again once
-//! any of them refused it (`ARM_SWITCH`).
+//! (`FAILSAFE`), a disarm by runaway takeoff prevention (`RUNAWAY`) or by the
+//! Crash Flip switch (`FLIP_SWITCH`), and the Arm switch going off before it
+//! can arm again once any of them refused it (`ARM_SWITCH`).
+//!
+//! # Crash Flip
+//!
+//! As in Betaflight 2026.6 (`tryArm`, `updateArmingStatus` and `disarm` in
+//! `core.c`; the Betaflight research §4.1):
+//!
+//! - The Crash Flip switch is read only at the moment of arming: arming with
+//!   it on starts Crash Flip, which lasts until the Quad disarms. With it on,
+//!   the tilt check is skipped, so an upside-down Quad can arm.
+//! - Turning it on while armed does nothing.
+//! - Turning it off while armed in Crash Flip disarms the Quad, and arming
+//!   stays blocked (`FLIP_SWITCH`) until the pilot turns the Arm switch off.
+//!   With the Tune's `crashflip_auto_rearm` on, the Quad stays armed instead
+//!   and flies normally.
 //!
 //! # Power-up
 //!
@@ -23,20 +38,8 @@
 //! So an Arm switch already on at power-up is refused, and must go off and
 //! on again (`ARM_SWITCH`).
 //!
-//! # Not yet
-//!
-//! - On arming and on disarming, Betaflight sends each ESC the DShot
-//!   command "spin the normal way" (or reversed, for Crash Flip): ten times,
-//!   1 ms apart, after a 10 ms wait, so the throttle reaches the ESCs about
-//!   21 ms after the frame that armed or disarmed (`setMotorSpinDirection`,
-//!   `dshot_command.c`). It comes with Crash Flip (#54); until then the
-//!   motor commands change at once.
-//! - Runaway takeoff prevention (`runaway_takeoff_prevention`, on by
-//!   default) disarms a Quad whose PID sum on any axis stays at 600 or more
-//!   with the gyro moving for 75 ms, until half a second of normal flight
-//!   switches it off. It guards against wiring and orientation mistakes the
-//!   sim can't have, so it comes later (#21); the Tune lists it as not
-//!   simulated yet.
+//! Arming and disarming also tell the ESCs which way to spin, which the
+//! Flight Controller sends as DShot commands ([`crate::dshot_command`]).
 
 use opendrone_maths::{Attitude, Fingerprinter, Vec3, functions};
 
@@ -68,6 +71,14 @@ const ARM: ModeRange = ModeRange {
     end: 2100.0,
 };
 
+/// Crash Flip (Betaflight's `BOXCRASHFLIP`): AUX3 from 1700 to 2100 µs, so its
+/// switch's high position is on.
+const CRASH_FLIP: ModeRange = ModeRange {
+    aux: 2,
+    start: 1700.0,
+    end: 2100.0,
+};
+
 /// How many frames in a row the Arm switch must read off before an armed
 /// Quad disarms: more than three (`rcDisarmTicks`).
 const DISARM_FRAMES: u8 = 3;
@@ -75,9 +86,10 @@ const DISARM_FRAMES: u8 = 3;
 /// Why arming is refused right now: Betaflight's arming-disabled flags
 /// (`armingDisableFlags`) that OpenDrone's Flight Controller can raise, each
 /// named as Betaflight names it. `RXLOSS` and `FAILSAFE` are raised and
-/// cleared by the Radio Link and Failsafe whether armed or not; the others
-/// are checked only while disarmed, so an armed Quad's stay as they were when
-/// it armed (all clear).
+/// cleared by the Radio Link and Failsafe whether armed or not; `RUNAWAY` and
+/// `FLIP_SWITCH` are raised by the disarm they name; the others are checked
+/// only while disarmed, so an armed Quad's stay as they were when it armed
+/// (all clear).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ArmingBlocks {
     /// `FAILSAFE`: Failsafe dropped the Quad and hasn't ended.
@@ -87,6 +99,9 @@ pub struct ArmingBlocks {
     pub rx_loss: bool,
     /// `NOT_DISARMED`: the frames came back with the Arm switch on.
     pub not_disarmed: bool,
+    /// `RUNAWAY`: runaway takeoff prevention disarmed the Quad, until the Arm
+    /// switch goes off.
+    pub runaway: bool,
     /// `THROTTLE`: the throttle isn't below `min_check`.
     pub throttle: bool,
     /// `ANGLE`: the Quad is tilted further than `small_angle`.
@@ -94,6 +109,9 @@ pub struct ArmingBlocks {
     /// `BOOTGRACE`: just powered up, and the ESCs haven't played their ready
     /// beep yet.
     pub boot_grace: bool,
+    /// `FLIP_SWITCH`: the Crash Flip switch went off while armed in Crash
+    /// Flip, which disarmed the Quad, until the Arm switch goes off.
+    pub flip_switch: bool,
     /// `ARM_SWITCH`: the Arm switch went on while arming was refused, and
     /// must go off before it can arm.
     pub arm_switch: bool,
@@ -102,25 +120,29 @@ pub struct ArmingBlocks {
 impl ArmingBlocks {
     /// Betaflight's names for the flags, in its order (its OSD shows the
     /// first one raised).
-    pub const NAMES: [&'static str; 7] = [
+    pub const NAMES: [&'static str; 9] = [
         "FAILSAFE",
         "RXLOSS",
         "NOT_DISARMED",
+        "RUNAWAY",
         "THROTTLE",
         "ANGLE",
         "BOOTGRACE",
+        "FLIP_SWITCH",
         "ARM_SWITCH",
     ];
 
     /// Each flag, in [`ArmingBlocks::NAMES`] order.
-    pub fn flags(self) -> [bool; 7] {
+    pub fn flags(self) -> [bool; 9] {
         [
             self.failsafe,
             self.rx_loss,
             self.not_disarmed,
+            self.runaway,
             self.throttle,
             self.angle,
             self.boot_grace,
+            self.flip_switch,
             self.arm_switch,
         ]
     }
@@ -165,8 +187,18 @@ pub(crate) struct Readings {
 pub(crate) struct Arming {
     pub armed: bool,
     pub blocks: ArmingBlocks,
+    /// Crash Flip: armed with the Crash Flip switch on, until the Quad
+    /// disarms or, with `crashflip_auto_rearm`, the switch goes off
+    /// (`crashFlipModeActive`).
+    pub crash_flip: bool,
     /// Whether Arm was on as of the last frame's mode update.
     arm_mode: bool,
+    /// Whether the Crash Flip switch was on as of the last frame's mode
+    /// update.
+    crash_flip_mode: bool,
+    /// Whether the Arm switch has read off since the Crash Flip switch last
+    /// disarmed the Quad (`wasLastDisarmUserRequested`).
+    user_disarm: bool,
     /// Frames in a row with Arm off while armed.
     disarm_frames: u8,
     /// Whether frames were arriving when the arming status was last updated
@@ -184,15 +216,20 @@ impl Arming {
                 boot_grace: !armed,
                 ..ArmingBlocks::default()
             },
+            crash_flip: false,
             arm_mode: armed,
+            crash_flip_mode: false,
+            user_disarm: false,
             disarm_frames: 0,
             had_signal: true,
         }
     }
 
-    /// Disarms (`disarm`), as Failsafe's DROP does.
+    /// Disarms (`disarm`), as Failsafe's DROP and runaway takeoff prevention
+    /// do. Crash Flip ends with it.
     pub fn disarm(&mut self) {
         self.armed = false;
+        self.crash_flip = false;
     }
 
     /// One frame's arming work, in Betaflight's order: the stick and switch
@@ -208,23 +245,39 @@ impl Arming {
             self.update_status(rc, tune, readings);
             if !self.blocks.any() && !self.armed {
                 self.armed = true;
+                // `tryArm`: the Crash Flip switch is read now, and only now.
+                self.crash_flip = self.crash_flip_mode;
             }
-        } else if self.armed && readings.link_up {
-            self.disarm_frames += 1;
-            if self.disarm_frames > DISARM_FRAMES {
-                self.armed = false;
-                self.disarm_frames = 0;
+        } else {
+            self.user_disarm = true;
+            if self.armed && readings.link_up {
+                self.disarm_frames += 1;
+                if self.disarm_frames > DISARM_FRAMES {
+                    self.disarm();
+                    self.disarm_frames = 0;
+                }
             }
         }
         self.arm_mode = ARM.is_on(rc);
+        self.crash_flip_mode = CRASH_FLIP.is_on(rc);
         self.update_status(rc, tune, readings);
     }
 
-    /// Betaflight's `updateArmingStatus` while disarmed: each check sets or
-    /// clears its flag; the Arm switch's flag is set whenever any flag stands
-    /// with the switch on, and cleared only with the switch off.
+    /// Betaflight's `updateArmingStatus`. Armed, it watches only the Crash
+    /// Flip switch. Disarmed, each check sets or clears its flag; the Arm
+    /// switch's flag is set whenever any flag stands with the switch on, and
+    /// cleared only with the switch off.
     fn update_status(&mut self, rc: &RcData, tune: &Tune, readings: Readings) {
         if self.armed {
+            if self.crash_flip && !self.crash_flip_mode {
+                if tune.crashflip_auto_rearm {
+                    self.crash_flip = false;
+                } else {
+                    self.blocks.flip_switch = true;
+                    self.user_disarm = false;
+                    self.disarm();
+                }
+            }
             return;
         }
         if self.blocks.boot_grace && readings.escs_ready {
@@ -237,8 +290,14 @@ impl Arming {
             self.blocks.not_disarmed = false;
         }
         self.had_signal = readings.signal;
+        if self.blocks.flip_switch && self.user_disarm {
+            self.blocks.flip_switch = false;
+        }
         self.blocks.throttle = !rc.throttle_low(tune);
-        self.blocks.angle = !is_upright(readings.attitude, tune);
+        self.blocks.angle = !is_upright(readings.attitude, tune) && !self.crash_flip_mode;
+        if !self.arm_mode {
+            self.blocks.runaway = false;
+        }
         if self.blocks.any() && self.arm_mode {
             self.blocks.arm_switch = true;
         } else if !self.arm_mode {
@@ -251,7 +310,10 @@ impl Arming {
         for flag in self.blocks.flags() {
             f.write_u64(u64::from(flag));
         }
+        f.write_u64(u64::from(self.crash_flip));
         f.write_u64(u64::from(self.arm_mode));
+        f.write_u64(u64::from(self.crash_flip_mode));
+        f.write_u64(u64::from(self.user_disarm));
         f.write_u64(u64::from(self.disarm_frames));
         f.write_u64(u64::from(self.had_signal));
     }

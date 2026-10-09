@@ -1,7 +1,7 @@
 # A fixture: the second half of free-fall.toml split in two. "height at 1 s"
 # is unchanged, but the flight starts 100 m up at 1 kHz (the Reviewer's case
 # on #92).
-format = 1
+format = 2
 name   = "Free fall drops ½ g t²"
 
 [start]

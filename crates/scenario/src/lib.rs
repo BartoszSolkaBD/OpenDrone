@@ -6,8 +6,9 @@
 //!
 //! It runs all four kinds: Flight Scenarios fly our Flight Controller and
 //! the physics together, the pilot's sticks entering as Flight Inputs;
-//! Physics and Thrust Stand Scenarios script the motors in its place (on the
-//! thrust stand the Quad is held still); Flight Controller Scenarios run the
+//! Physics Scenarios script the motors in its place; Thrust Stand Scenarios
+//! hold the Quad still, and script the motors or fly our Flight Controller
+//! from the pilot's sticks and switches; Flight Controller Scenarios run the
 //! Flight Controller alone, fed a Timeline of sticks and sensor readings or a
 //! table of cases. For each Scenario in `scenarios/` it:
 //!

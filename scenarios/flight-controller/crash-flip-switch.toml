@@ -1,0 +1,179 @@
+# The Crash Flip switch on AUX3 works as in Betaflight 2026.6.2 (`tryArm`,
+# `updateArmingStatus` and `disarm`, src/main/fc/core.c; the Betaflight
+# research §4.1, #26 §3, ADR-0017):
+#
+# - It is read only at the moment of arming. Turned on while armed, it does
+#   nothing.
+# - Armed with it on, the Quad is in Crash Flip. Turning it off then disarms
+#   the Quad (the Freestyle 5″'s Tune keeps `crashflip_auto_rearm` OFF, the
+#   default), and arming stays blocked (FLIP_SWITCH) until the Arm switch has
+#   gone off.
+# - With it on, the tilt check is skipped, so an upside-down Quad can arm.
+#
+# The Flight Controller alone, level and disarmed at the start. Each frame,
+# Betaflight reads the switches as the frame before left them, then takes
+# this frame's (see arming.toml): so the Quad arms one frame after the Arm
+# switch goes on, and disarms more than three frames after it goes off. The
+# Crash Flip switch going off disarms in the frame that brings it, since
+# Betaflight checks it again once that frame's switches are in.
+format = 2
+name   = "The Crash Flip switch works only at the moment of arming, and turning it off disarms"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
+  # Armed normally, then the Crash Flip switch on: nothing changes.
+  { at = "0.1 s", arm = "on" },
+  { at = "0.3 s", crash_flip = "on" },
+  # Disarmed, then armed with it on: Crash Flip.
+  { at = "0.5 s", arm = "off" },
+  { at = "0.6 s", arm = "on" },
+  # The Crash Flip switch off: disarmed, and blocked until Arm goes off.
+  { at = "0.8 s", crash_flip = "off" },
+  { at = "1.1 s", arm = "off" },
+  { at = "1.2 s", arm = "on" },
+  # Upside down: the tilt check refuses arming, unless the Crash Flip switch
+  # is on.
+  { at = "1.4 s", arm = "off" },
+  { at = "1.5 s", attitude = "roll 180°, pitch 0°, heading 0°" },
+  { at = "1.6 s", arm = "on" },
+  { at = "1.8 s", arm = "off" },
+  { at = "1.9 s", crash_flip = "on" },
+  { at = "2 s",   arm = "on" },
+]
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0.1 s to 0.2 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm: level, throttle low, the Crash Flip switch off: the frame at 0.104 s arms, normally"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "0.1 s to 0.5 s"
+first = "never"
+basis = "source: tryArm reads the Crash Flip switch only at the moment of arming (crashFlipModeActive is set there and nowhere else), so turning it on at 0.3 s, armed, does nothing"
+
+[[expect]]
+what  = "motor 1 direction"
+at    = "0.45 s"
+value = "1 ± 0"
+basis = "source: tryArm: the arm at 0.104 s sent DShot command 20, spin direction normal, and nothing since"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.45 s"
+value = "158 ± 1"
+basis = "source: mixTable: armed and not in Crash Flip, the motors idle (48 + 5.5% × 1999 = 157.9); the centred sticks' 0.11 °/s corrections move a motor by at most a step"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "0.6 s to 0.7 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm: disarmed at 0.516 s with the switch still on, the frame at 0.604 s arms in Crash Flip"
+
+[[expect]]
+what  = "motor 1 direction"
+at    = "0.75 s"
+value = "-1 ± 0"
+basis = "source: tryArm and setMotorSpinDirection: arming in Crash Flip sends DShot command 21, spin direction reversed"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.8 s to 0.9 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: armed in Crash Flip with the switch now off and crashflip_auto_rearm OFF, it disarms (DISARM_REASON_CRASHFLIP) in the frame at 0.8 s"
+
+[[expect]]
+what  = "FLIP_SWITCH blocks arming"
+over  = "0.8 s to 0.9 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the same frame sets ARMING_DISABLED_CRASHFLIP, which Betaflight names FLIP_SWITCH (src/main/fc/runtime_config.c)"
+
+[[expect]]
+what  = "ARM_SWITCH blocks arming"
+over  = "0.8 s to 0.9 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the next frame finds arming blocked with the Arm switch still on: ARM_SWITCH"
+
+[[expect]]
+what  = "motor 1 direction"
+at    = "0.85 s"
+value = "1 ± 0"
+basis = "source: disarm: every disarm sends DShot command 20, spin direction normal; Bluejay takes it on its seventh frame, 16.9 ms after the disarm (dshot_command.c, Bluejay's DShot.asm)"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0.8 s to 1.1 s"
+first = "never"
+basis = "source: updateArmingStatus: FLIP_SWITCH and ARM_SWITCH both hold while the Arm switch stays on"
+
+[[expect]]
+what  = "ARM_SWITCH stops blocking arming"
+over  = "1.1 s to 1.2 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the frame at 1.1 s turns the Arm switch off, which clears ARM_SWITCH"
+
+[[expect]]
+what  = "FLIP_SWITCH stops blocking arming"
+over  = "1.1 s to 1.2 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and updateArmingStatus: the next frame reads the switch off as the pilot's own disarm (disarmUserRequested), which clears FLIP_SWITCH"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "1.2 s to 1.3 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm: Arm cycled, nothing blocks: it arms normally, the Crash Flip switch being off"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "1.1 s to 1.4 s"
+first = "never"
+basis = "source: tryArm: the Crash Flip switch is off when it arms at 1.204 s"
+
+[[expect]]
+what  = "ANGLE blocks arming"
+over  = "1.5 s to 1.6 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus and isUpright: upside down, cos 180° = -1 isn't above cos 25° (small_angle), and the Crash Flip switch is off: ANGLE"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "1.5 s to 1.9 s"
+first = "never"
+basis = "source: tryArm: ANGLE blocks arming, and ARM_SWITCH with it once the switch is on"
+
+[[expect]]
+what  = "ANGLE stops blocking arming"
+over  = "1.9 s to 2 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: with the Crash Flip switch on, the tilt check is skipped (!isUpright() && !IS_RC_MODE_ACTIVE(BOXCRASHFLIP))"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "2 s to 2.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm: upside down with the Crash Flip switch on, the frame at 2.004 s arms in Crash Flip"

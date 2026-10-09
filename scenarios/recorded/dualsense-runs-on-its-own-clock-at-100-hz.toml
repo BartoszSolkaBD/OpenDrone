@@ -6,7 +6,7 @@
 #
 # The same Input Track as at 250 Hz: the maintainer's DualSense on the desk,
 # untouched, its motion sensors reporting every 4 ms (dualsense-at-rest.csv).
-format = 1
+format = 2
 name   = "A DualSense's Radio Link frames at 100 Hz run on the link's own clock and carry two or three reports"
 
 [start]

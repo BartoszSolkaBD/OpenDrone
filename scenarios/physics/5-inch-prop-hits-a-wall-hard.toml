@@ -12,7 +12,7 @@
 # electrical turns, then the motor speeds up with its spin-up time back to
 # the speed its drive holds. Proves a hard hit's Prop Strike and the restart
 # (#26 §6).
-format = 1
+format = 2
 name   = "A hard hit stops a 5-inch's motor at once; it restarts after 0.1 s and is back to speed within its spin-up time"
 
 [start]

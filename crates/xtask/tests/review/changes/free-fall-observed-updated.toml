@@ -1,6 +1,6 @@
 # A fixture: the Observed Expectation moved to what the Simulation does now,
 # with a one-line reason, and the same tolerance.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

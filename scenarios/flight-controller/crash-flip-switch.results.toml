@@ -1,0 +1,142 @@
+# Results of crash-flip-switch.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Crash Flip switch works only at the moment of arming, and turning it off disarms"
+
+[[expect]]
+what     = "the Quad arms, first over 0.1 s to 0.2 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "Crash Flip starts, first over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "motor 1 direction at 0.45 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "motor 1 DShot at 0.45 s"
+basis    = "Source"
+expected = "158 ± 1"
+measured = "158"
+
+[[expect]]
+what     = "Crash Flip starts, first over 0.6 s to 0.7 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "motor 1 direction at 0.75 s"
+basis    = "Source"
+expected = "-1 ± 0"
+measured = "-1.00"
+
+[[expect]]
+what     = "the Quad disarms, first over 0.8 s to 0.9 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "FLIP_SWITCH blocks arming, first over 0.8 s to 0.9 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "ARM_SWITCH blocks arming, first over 0.8 s to 0.9 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "motor 1 direction at 0.85 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "the Quad arms, first over 0.8 s to 1.1 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "ARM_SWITCH stops blocking arming, first over 1.1 s to 1.2 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "FLIP_SWITCH stops blocking arming, first over 1.1 s to 1.2 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "the Quad arms, first over 1.2 s to 1.3 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "Crash Flip starts, first over 1.1 s to 1.4 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "ANGLE blocks arming, first over 1.5 s to 1.6 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "the Quad arms, first over 1.5 s to 1.9 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "ANGLE stops blocking arming, first over 1.9 s to 2 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "Crash Flip starts, first over 2 s to 2.1 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "7ef91c621c4477e5"   # the whole state after each of 16800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.21 s" = "5d8751babb18e387"
+"0.42 s" = "f00e7ddae395117e"
+"0.63 s" = "f8c90a01a244096e"
+"0.84 s" = "09231834c57d2b4c"
+"1.05 s" = "d3b028d9d6a7ed1f"
+"1.26 s" = "0aa37bd499281bd1"
+"1.47 s" = "69753c3530db3a95"
+"1.68 s" = "55f6f4bd381edf02"
+"1.89 s" = "36e1809a220263d0"
+"2.1 s" = "31fdf0fe38d90179"

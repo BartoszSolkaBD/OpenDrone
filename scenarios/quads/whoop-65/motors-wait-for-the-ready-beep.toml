@@ -13,7 +13,7 @@
 #
 # A command at 0.5 s, during the melody, is ignored. One at 1.7 s, after the
 # ready beep, starts the motors once the 0.1 s start wait is over.
-format = 1
+format = 2
 name   = "The Whoop 65's motors ignore commands until their ESCs' ready beep"
 
 [start]

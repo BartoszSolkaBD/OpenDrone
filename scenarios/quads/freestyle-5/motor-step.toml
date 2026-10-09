@@ -15,7 +15,7 @@
 #   of its speed is left, after 66 ms 13.5%. Below Bluejay's minimum speed
 #   (1,330 electrical RPM, 190 RPM on a 14-pole motor) the ESC lets go and the
 #   motor turns freely.
-format = 1
+format = 2
 name   = "A Freestyle 5″ motor stepped 0 → 100 → 0% follows its spin-up and slow-down times"
 
 [start]

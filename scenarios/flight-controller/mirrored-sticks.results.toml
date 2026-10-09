@@ -20,7 +20,7 @@ measured = "-100%"
 what     = "pitch rate at 0.9 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 °/s ± 0.001 °/s"
-measured = "0.000000000000227 °/s"
+measured = "0.000000000000254 °/s"
 
 [[expect]]
 what     = "distance east at 1 s, as a share of the same run with roll and yaw mirrored"
@@ -32,13 +32,13 @@ measured = "-100%"
 what     = "distance north at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "0.0000000000000164 m"
+measured = "0.00000000000000866 m"
 
 [[expect]]
 what     = "height at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "0.0000000000000142 m"
+measured = "0.00000000000000711 m"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -47,18 +47,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "3d3f7cf1f128c147"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
+quad = "21bc9b2a7cf782fd"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "77fa86ad4a92f780"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "dc3bdde0d544f96e"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "1de5a166d050d703"
-"0.2 s" = "13a60c58bc007321"
-"0.3 s" = "5d29683a23975e81"
-"0.4 s" = "c43a9e9a51594e97"
-"0.5 s" = "bf7d79b2b1d071bb"
-"0.6 s" = "0d22787355e32c84"
-"0.7 s" = "cd8fd08fb1331e4e"
-"0.8 s" = "29647da892319ba2"
-"0.9 s" = "a48c24ea136559f4"
-"1 s" = "0dbe923f3b7ce619"
+"0.1 s" = "685b40a48cc08087"
+"0.2 s" = "8196d81357b1b7ed"
+"0.3 s" = "711abc8a770c4d55"
+"0.4 s" = "bb9cc010ff548b23"
+"0.5 s" = "64eaa4e93a8b551a"
+"0.6 s" = "40c57ff87f85be95"
+"0.7 s" = "ab3e13b439decef8"
+"0.8 s" = "07931a9710f07d13"
+"0.9 s" = "8b50a85fcaa24861"
+"1 s" = "eeb405cbe2599951"

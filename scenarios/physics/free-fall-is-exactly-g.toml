@@ -1,7 +1,7 @@
 # With every kind of drag set to zero and the motors stopped, gravity is the
 # only force on the Quad, so it must fall with exactly the Map's gravity.
 # Proves rigid-body motion at a fixed step (E1–E3 in #10).
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

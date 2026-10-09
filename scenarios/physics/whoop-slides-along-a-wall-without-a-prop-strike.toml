@@ -6,7 +6,7 @@
 # and 2, reach 3.5 mm further east than the props, so the rings take the
 # contact and the props never touch: no Prop Strike. Proves #26 §1's "the
 # whoop's duct ring keeps most things off its props" (#26 §6).
-format = 1
+format = 2
 name   = "A whoop sliding along a wall at 3 m/s has no Prop Strike: its duct rings take the contact"
 
 [start]

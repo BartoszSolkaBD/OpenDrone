@@ -1,0 +1,118 @@
+# Results of yaw-spin-recovery.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Yaw spin recovery starts past the max yaw rate plus 200 °/s, drops I and roll and pitch, brakes the yaw, and ends 20 ms below"
+
+[[expect]]
+what     = "runaway takeoff prevention switches off, first over 0 s to 0.6 s"
+basis    = "Source"
+expected = "0.252125 s ± 0.000001 s"
+measured = "0.252 s"
+
+[[expect]]
+what     = "yaw spin recovery starts, first over 0 s to 0.8 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "yaw I term at 0.75 s"
+basis    = "Source"
+expected = "-320 ± 0.01"
+measured = "-320"
+
+[[expect]]
+what     = "motor 1 DShot at 0.75 s"
+basis    = "Source"
+expected = "between 1660 and 1700"
+measured = "1680"
+
+[[expect]]
+what     = "yaw spin recovery starts, first over 0.8 s to 0.9 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "yaw P term at 0.85 s"
+basis    = "Source"
+expected = "-1268.35 ± 0.01"
+measured = "-1270"
+
+[[expect]]
+what     = "yaw I term at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll I term at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll P term at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll PID sum at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.85 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 DShot at 0.85 s"
+basis    = "Source"
+expected = "158 ± 0"
+measured = "158"
+
+[[expect]]
+what     = "yaw spin recovery ends, first over 0.8 s to 1.1 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "yaw spin recovery ends, first over 1.1 s to 1.2 s"
+basis    = "Source"
+expected = "0.020125 s ± 0.000001 s"
+measured = "0.0201 s"
+
+[[expect]]
+what     = "roll P term at 1.15 s"
+basis    = "Source"
+expected = "-143.97 ± 0.01"
+measured = "-144"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "2e903599175e4249"   # the whole state after each of 9600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.12 s" = "e45c9d3eb96e3b0d"
+"0.24 s" = "6a112ad91d3c5802"
+"0.36 s" = "0ede8ceda77a98e1"
+"0.48 s" = "571b67085d3b4378"
+"0.6 s" = "cd62b8d2607ffce6"
+"0.72 s" = "bcb843e6be2f2af4"
+"0.84 s" = "060ff72375299e73"
+"0.96 s" = "9c88d892318e058f"
+"1.08 s" = "2f6d43ed2f6b516e"
+"1.2 s" = "66a273f3f88aeac1"

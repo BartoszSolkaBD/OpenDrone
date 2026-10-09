@@ -20,6 +20,9 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 - When a prop touches something, it rubs, brakes its motor and pushes the Quad, as a Prop Strike does. Nothing breaks in the alpha.
 - After a crash, nothing disarms or resets on its own. An upside-down Quad comes back with Betaflight's Crash Flip, or with Reset.
+  - **Crash Flip** works as on Betaflight 2026.6: turn the Crash Flip switch on, then arm. Upside down, it arms anyway. Move the stick the way you want the Quad to tip over: pitch forward lifts the front, roll right the right side, and a diagonal one corner. Let go as it comes over, then turn the Crash Flip switch off, which disarms the Quad; flip the Arm switch off and on to fly. Turning Crash Flip on while you're armed does nothing.
+  - **Runaway takeoff prevention** is on, as it is on a real quad: right after arming, until you've flown about half a second normally, a Quad that can't turn the way its Flight Controller asks, because it's pinned against a wall, say, disarms after 75 ms. Flip the Arm switch off and on to fly again.
+  - **Yaw spin recovery** is on: a hit that spins the Quad faster than your Rates ever ask makes the Flight Controller brake the spin before you get control back.
 - Prop Wash comes from the Quad descending into its own air, never from an artificial shake or a slider.
 - A tired pack sags and fades until the Quad can't hover, with no hard cutoff.
 - No setting changes the physics. Every Preset flies the same physics.

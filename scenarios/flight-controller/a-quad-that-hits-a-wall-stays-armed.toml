@@ -5,18 +5,21 @@
 # switch, Failsafe or Reset disarm, and armed, Airmode keeps every motor at
 # idle or above.
 #
-# One default could: runaway takeoff prevention (`runaway_takeoff_prevention`
-# ON, a guard against wiring and orientation mistakes, not simulated yet, #54)
+# One default does: runaway takeoff prevention (`runaway_takeoff_prevention`
+# ON, a guard against wiring and orientation mistakes, simulated since #54)
 # disarms a Quad whose PID sum on any axis stays at 600 or more (60% of the
 # motor range) with the gyro moving for 75 ms, until half a second of normal
 # flight switches it off (src/main/fc/core.c). Flown with the sticks centred
 # below 40% throttle, as here, a Quad never counts as in that normal flight
-# (core.c L885–895), so it would still be on. Since Prop Strikes (#45) the hit
+# (core.c L885–895), so it is still on. Since Prop Strikes (#45) the hit
 # holds the pitch sum above 600 for about 300 ms (see below), long enough for
-# it to disarm a real Quad on Betaflight's defaults. Ours doesn't simulate it
-# yet, so this Scenario flies test/freestyle-5-no-runaway-takeoff-prevention,
-# the Freestyle 5″ with that one setting off in its Tune, as other Scenarios
-# do for settings not simulated yet; #54 can turn it back on.
+# it to disarm the Quad on Betaflight's defaults:
+# a-quad-pinned-against-a-wall-right-after-arming-disarms.toml flies this
+# flight on the Freestyle 5″'s own Tune, and it disarms at 0.630 s. This
+# Scenario is the other half of that pair: it flies
+# test/freestyle-5-no-runaway-takeoff-prevention, the Freestyle 5″ with that
+# one setting off in its Tune, to show what the hit does to a Quad with no
+# guard to disarm it.
 #
 # What the hit does (since the air, #42, and Prop Strikes, #45): rotor and
 # body drag slow the Quad from 10 m/s to 7.8 m/s before it reaches the wall
@@ -42,7 +45,7 @@
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with
 # the sticks centred and the throttle at 30%.
-format = 1
+format = 2
 name   = "A Quad that hits a wall stays armed"
 
 [start]
@@ -74,7 +77,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
 ]
 
 [[expect]]
@@ -93,7 +96,7 @@ basis = "observed: its front props strike the wall and it bounces back at about 
 what  = "the Quad disarms"
 over  = "0 s to 3 s"
 first = "never"
-basis = "source: Betaflight 2026.6.2's defaults (crash_recovery OFF, landing_disarm_threshold 0, pid.c): nothing disarms on a hit, and the Arm switch stays on; runaway takeoff prevention, which on its defaults would disarm this Quad (see the PID sums below), is off in this Scenario's Tune, because the Flight Controller doesn't simulate that guard yet; #54 can turn it back on once it does"
+basis = "source: Betaflight 2026.6.2's defaults (crash_recovery OFF, landing_disarm_threshold 0, pid.c): nothing disarms on a hit, and the Arm switch stays on; runaway takeoff prevention, which on its defaults disarms this Quad (see the PID sums below, and a-quad-pinned-against-a-wall-right-after-arming-disarms.toml), is off in this Scenario's Tune"
 
 [[expect]]
 what   = "motor 1 DShot"
@@ -121,7 +124,7 @@ basis   = "observed: with its front props struck and stopped, the Flight Control
 what   = "pitch PID sum"
 over   = "0.556 s to 0.85 s"
 lowest = "between 600 and 3000"
-basis  = "observed: the pitch sum is above 600 from just after the hit until the struck props run again, about 0.86 s: about 300 ms, far longer than the 75 ms Betaflight's runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c)"
+basis  = "observed: the pitch sum is above 600 from just after the hit until the struck props run again, about 0.86 s: about 300 ms, far longer than the 75 ms Betaflight's runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c), which disarms the same flight with the guard on (a-quad-pinned-against-a-wall-right-after-arming-disarms.toml)"
 
 [[expect]]
 what   = "pitch PID sum"

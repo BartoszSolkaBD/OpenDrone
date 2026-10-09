@@ -20,7 +20,7 @@
 #   (ū − x)·ū² = 1: x = ū − 1/ū² = 0.517078. The climb is x·v_h = 3.2345 m/s.
 #
 # It gets there as a lag: about 99.9% of the way by 12 s.
-format = 1
+format = 2
 name   = "At a fixed command, a drag-free Whoop 65's thrust falls as it climbs, until it climbs steadily"
 
 [start]

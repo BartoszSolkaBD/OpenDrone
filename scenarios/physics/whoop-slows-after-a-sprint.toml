@@ -18,7 +18,7 @@
 # 13.560 m/s² in all, against the motion. The ducts' nose-up moment then lifts
 # the nose ("A Whoop 65's ducts drag it back and lift its nose"), tipping the
 # thrust back, which slows it harder still.
-format = 1
+format = 2
 name   = "A Whoop 65 sprinting at 8 m/s slows at once when it lets go"
 
 [start]

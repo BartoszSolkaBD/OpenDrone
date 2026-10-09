@@ -17,7 +17,7 @@
 # rotor radius, growing to +7.4% at half a radius, the closest the formula is
 # used. Its duct rings stand 7 mm above its props, so pressed against the
 # ceiling its props are 7 mm (0.4 rotor radius) below it.
-format = 1
+format = 2
 name   = "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on a drive that sinks it in open air"
 
 [start]
