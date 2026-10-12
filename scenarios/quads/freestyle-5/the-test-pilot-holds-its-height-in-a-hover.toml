@@ -1,0 +1,121 @@
+# The Test Pilot holds the Freestyle 5″ at 20 m, level and on heading 0°, and
+# the whole Quad (Flight Controller, ESCs, motors, props, air and battery)
+# settles into a hover (the whole-Quad row of #10 §6). It flies mid-air from a
+# hover's "settled" motors, armed, on Betaflight's default Rates, with the
+# Test Pilot's thumb starting on a 40% throttle.
+#
+# What it checks:
+#
+# - The Test Pilot does its three jobs: height, level and heading stay where it
+#   was told, and it moves only the sticks.
+# - A Quad that holds its height has thrust equal to its weight: the
+#   Freestyle 5″'s 652 g (419 g dry, 233 g pack).
+# - The motor command in a hover is about 15-30% (#10 §6): the weight is a
+#   small share of what four 5″ motors on a 6S pack can lift.
+# - Power never drops below the physical minimum: no rotor lifts a weight for
+#   less power than momentum theory's ideal hover, P = (m g)^1.5 / sqrt(2 ρ A),
+#   with the weight m g = 652 g × 9.81 m/s² = 6.40 N, air at 1.225 kg/m³ and
+#   the four 129.5 mm props' disc area A = 4 × π × (64.75 mm)² = 527 cm²:
+#   45.0 W. The Freestyle 5″ draws about twice that.
+format = 2
+name   = "The Test Pilot holds the Freestyle 5″'s height, with its motors at about 25% and its power above the physical minimum"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 20 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight's default rate profile.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "30 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+]
+
+[[expect]]
+what  = "height"
+at    = "30 s"
+value = "20 m ± 0.5 m"
+basis = "rule: the Test Pilot's hold height job, asked for 20 m"
+
+[[expect]]
+what    = "height"
+over    = "5 s to 30 s"
+lowest  = "20 m ± 0.5 m"
+basis   = "rule: the Test Pilot's hold height job, asked for 20 m"
+
+[[expect]]
+what    = "height"
+over    = "5 s to 30 s"
+highest = "20 m ± 0.5 m"
+basis   = "rule: the Test Pilot's hold height job, asked for 20 m"
+
+[[expect]]
+what    = "roll"
+over    = "0 s to 30 s"
+highest = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold level job"
+
+[[expect]]
+what    = "pitch"
+over    = "0 s to 30 s"
+lowest  = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold level job"
+
+[[expect]]
+what  = "heading"
+at    = "30 s"
+value = "0° ± 2°"
+basis = "rule: the Test Pilot's hold heading job, asked for 0°"
+
+[[expect]]
+what  = "total thrust"
+over  = "10 s to 30 s"
+mean  = "652 gf ± 10 gf"
+basis = "rule: a Quad that holds its height has thrust equal to its weight: 419 g dry + 233 g pack = 652 g"
+
+[[expect]]
+what  = "average motor command"
+over  = "10 s to 30 s"
+mean  = "between 15% and 30%"
+basis = "rule: #10 §6, the Whole Quad row: a hover takes the weight, a small share of what four 5″ motors on a 6S pack can lift"
+
+[[expect]]
+what  = "average motor command"
+over  = "10 s to 30 s"
+mean  = "24.8% ± 0.5%"
+basis = "observed: the hover of a full pack"
+
+[[expect]]
+what    = "battery power"
+over    = "5 s to 30 s"
+lowest  = "between 45.0 W and 400 W"
+basis   = "rule: the lowest power that lifts 652 g on four 129.5 mm props in sea-level air, P = (m g)^1.5 / sqrt(2 ρ A) = 6.40 N^1.5 / sqrt(2 × 1.225 kg/m³ × 527 cm²) = 45.0 W; the top of the range only keeps a broken number out"
+
+[[expect]]
+what  = "battery power"
+over  = "5 s to 30 s"
+mean  = "100 W ± 1 W"
+basis = "observed: about 2.2 times the physical minimum"

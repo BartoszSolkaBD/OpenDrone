@@ -156,6 +156,15 @@ impl Battery {
         self.current = current;
     }
 
+    /// Gives back the charge it has lost, so it reads full again: the
+    /// Endless Battery Assist, on session state. What it has counted drawn
+    /// stays counted, and its slow sag stays: it still sags under load.
+    pub(crate) fn top_up(&mut self, parameters: &BatteryParameters) {
+        if self.charge(parameters) < 1.0 {
+            self.starting_charge = 1.0 + self.charge_used / parameters.capacity;
+        }
+    }
+
     pub(crate) fn output(&self, parameters: &BatteryParameters) -> BatteryOutput {
         let charge = self.charge(parameters);
         let resting = f64::from(parameters.cells) * parameters.resting_cell_voltage(charge);

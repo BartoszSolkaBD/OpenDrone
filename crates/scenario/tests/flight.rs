@@ -246,22 +246,66 @@ fn what_a_flight_controller_loop_did_cant_be_measured_before_the_first_loop() {
 }
 
 #[test]
-fn angle_horizon_and_endless_battery_wait_for_their_tickets() {
-    let text = tracer()
-        .replacen(
-            "flight_mode       = \"Acro\"",
-            "flight_mode       = \"Angle\"",
-            1,
-        )
-        .replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);
-    let found = failures(&report(&fixture("angle-assists", &text)));
-    assert_eq!(found.len(), 2, "{found:#?}");
+fn angle_and_horizon_wait_for_their_ticket() {
+    let text = tracer().replacen(
+        "flight_mode       = \"Acro\"",
+        "flight_mode       = \"Angle\"",
+        1,
+    );
+    let found = failures(&report(&fixture("angle-assist", &text)));
+    assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].ends_with(
         "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)"
     ));
-    assert!(found[1].ends_with(
-        "Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"
+}
+
+#[test]
+fn endless_battery_runs_in_a_flight_scenario_but_not_with_the_flight_controller_alone() {
+    // Endless Battery is the Simulation's Assist, on session state (#13, #57).
+    let flying = tracer().replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);
+    assert!(failures(&report(&fixture("flying-endless-battery", &flying))).is_empty());
+    let alone = arming().replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);
+    let found = failures(&report(&fixture("fc-endless-battery", &alone)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].ends_with(
+        "Endless Battery is an Assist of the Simulation, on its session state, and a Flight Controller Scenario runs the Flight Controller alone, so `endless_battery` must be \"off\""
     ));
+}
+
+#[test]
+fn the_test_pilot_takes_only_jobs_it_has_and_never_a_stick_it_is_moving() {
+    let with_jobs = |jobs: &str| {
+        tracer().replacen(
+            "  { at = \"1 s\",   roll = \"100%\" },",
+            &format!(
+                "  {{ at = \"0.5 s\", test_pilot = \"{jobs}\" }},\n  {{ at = \"1 s\",   roll = \"100%\" }},"
+            ),
+            1,
+        )
+    };
+    let ok = with_jobs("hold height 50 m, hold heading 90°");
+    let found = failures(&report(&fixture("pilot-jobs-ok", &ok)));
+    assert!(
+        found.iter().all(|f| !f.contains("Test Pilot")),
+        "{found:#?}"
+    );
+
+    let unknown = with_jobs("hold position");
+    let found = failures(&report(&fixture("pilot-unknown-job", &unknown)));
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].contains("the Test Pilot has no job \"hold position\""));
+
+    let moving = with_jobs("hold level");
+    let found = failures(&report(&fixture("pilot-moving-stick", &moving)));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].contains("the Test Pilot is moving the `roll` stick"));
+
+    let alone = arming().replacen(
+        "{ at = \"0 s\",",
+        "{ at = \"0 s\", test_pilot = \"hold level\",",
+        1,
+    );
+    assert!(!failures(&report(&fixture("fc-test-pilot", &alone))).is_empty());
 }
 
 #[test]
