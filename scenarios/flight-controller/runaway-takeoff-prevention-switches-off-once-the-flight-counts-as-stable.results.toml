@@ -1,0 +1,52 @@
+# Results of runaway-takeoff-prevention-switches-off-once-the-flight-counts-as-stable.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Runaway takeoff prevention switches off once the flight counts as stable, and then never disarms"
+
+[[expect]]
+what     = "runaway takeoff prevention switches off, first over 0 s to 0.7 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "runaway takeoff prevention switches off, first over 0.7 s to 0.8 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "roll PID sum at 1 s"
+basis    = "Source"
+expected = "-1120.49 ± 0.01"
+measured = "-1120"
+
+[[expect]]
+what     = "the Quad disarms, first over 0.9 s to 1.5 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "a15f43af4ce3ec48"   # the whole state after each of 12000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.15 s" = "7fc6c662e33649e5"
+"0.3 s" = "c1928c30b919e53d"
+"0.45 s" = "45d7f8f78e4fe09a"
+"0.6 s" = "da082d25069305e5"
+"0.75 s" = "a0bbdf8501dce06f"
+"0.9 s" = "1a495009b2251a37"
+"1.05 s" = "4593d650afc88ef6"
+"1.2 s" = "4e2fc6ad619c1205"
+"1.35 s" = "c054d777d174fb32"
+"1.5 s" = "3f77d21533d85149"

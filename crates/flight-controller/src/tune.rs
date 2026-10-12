@@ -27,6 +27,22 @@ use opendrone_maths::Fingerprinter;
 pub struct Tune {
     /// `small_angle`: the most the Quad may be tilted to arm, in degrees.
     pub small_angle: u8,
+    /// `yaw_spin_recovery`: whether a yaw spin past the threshold drops the
+    /// I term and roll and pitch control and brakes the yaw.
+    pub yaw_spin_recovery: YawSpinRecovery,
+    /// `yaw_spin_threshold`: with `yaw_spin_recovery` ON, the yaw rate that
+    /// starts it, in °/s (AUTO works its own out from the Rates).
+    pub yaw_spin_threshold: u16,
+    /// `runaway_takeoff_prevention`: whether a PID sum held high right after
+    /// arming disarms the Quad.
+    pub runaway_takeoff_prevention: bool,
+    /// `runaway_takeoff_deactivate_delay`: how long the flight must count as
+    /// stable before runaway takeoff prevention switches itself off, in ms.
+    pub runaway_takeoff_deactivate_delay: u16,
+    /// `runaway_takeoff_deactivate_throttle_percent`: the throttle, in
+    /// percent, a stable flight needs with a stick moved (twice it, up to
+    /// 75%, without).
+    pub runaway_takeoff_deactivate_throttle_percent: u8,
     /// `rx_min_usec`: a Channel below this, in µs, is invalid. It is also
     /// the throttle Failsafe's stage 1 sets.
     pub rx_min_usec: u16,
@@ -79,6 +95,28 @@ pub struct Tune {
     /// `motor_idle`: the motors' idle, in hundredths of a percent (550 is
     /// 5.5%).
     pub motor_idle: u16,
+    /// `crashflip_motor_percent`: in Crash Flip, the share of its mix, in
+    /// percent, a motor that would push the wrong way gets (0: it stays
+    /// stopped).
+    pub crashflip_motor_percent: u8,
+    /// `crashflip_rate`: in Crash Flip, the roll or pitch rate, in tens of
+    /// °/s, at which power has faded to nothing (0: no fade).
+    pub crashflip_rate: u8,
+    /// `crashflip_auto_rearm`: whether turning the Crash Flip switch off
+    /// while armed keeps the Quad armed, flying normally, instead of
+    /// disarming it.
+    pub crashflip_auto_rearm: bool,
+}
+
+/// `yaw_spin_recovery`, in Betaflight's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum YawSpinRecovery {
+    Off,
+    /// Starts at `yaw_spin_threshold`.
+    On,
+    /// Starts at the Rates' max yaw rate plus a quarter of it, or 200 °/s if
+    /// that's more, held within 500–1950 °/s.
+    Auto,
 }
 
 /// One axis's PID gains, as Betaflight stores them.
@@ -164,6 +202,14 @@ enum Kind {
 /// (`src/main/cli/settings.c`).
 const SPECS: &[(&str, Kind)] = &[
     ("small_angle", Kind::Number(0, 180)),
+    ("yaw_spin_recovery", Kind::Word(&["OFF", "ON", "AUTO"])),
+    ("yaw_spin_threshold", Kind::Number(500, 1950)),
+    ("runaway_takeoff_prevention", Kind::OffOn),
+    ("runaway_takeoff_deactivate_delay", Kind::Number(100, 1000)),
+    (
+        "runaway_takeoff_deactivate_throttle_percent",
+        Kind::Number(0, 100),
+    ),
     ("rx_min_usec", Kind::Number(750, 2250)),
     ("rx_max_usec", Kind::Number(750, 2250)),
     ("failsafe_delay", Kind::Number(1, 200)),
@@ -209,6 +255,9 @@ const SPECS: &[(&str, Kind)] = &[
             "only the Legacy mixer is simulated; LINEAR, DYNAMIC and EZLANDING aren't",
         ),
     ),
+    ("crashflip_motor_percent", Kind::Number(0, 100)),
+    ("crashflip_rate", Kind::Number(0, 250)),
+    ("crashflip_auto_rearm", Kind::OffOn),
 ];
 
 /// Settings this Flight Controller knows but doesn't simulate yet, with
@@ -253,11 +302,6 @@ const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
     ("yaw_lowpass_hz", Kind::Number(0, 500), "#49"),
     // Receiver: RC smoothing.
     ("rc_smoothing", Kind::OffOn, "#49"),
-    // CLI only: runaway takeoff prevention, which disarms a Quad whose PID
-    // sum stays at 60% of the motor range for 75 ms before half a second of
-    // normal flight switches it off. It guards against wiring and orientation
-    // mistakes the sim can't have, so it comes later (#21).
-    ("runaway_takeoff_prevention", Kind::OffOn, "later"),
 ];
 
 /// Betaflight's words for every value of the two lookups read here, so a
@@ -357,6 +401,17 @@ impl Tune {
         };
         Ok(Tune {
             small_angle: small("small_angle"),
+            yaw_spin_recovery: match n("yaw_spin_recovery") {
+                0 => YawSpinRecovery::Off,
+                1 => YawSpinRecovery::On,
+                _ => YawSpinRecovery::Auto,
+            },
+            yaw_spin_threshold: n("yaw_spin_threshold") as u16,
+            runaway_takeoff_prevention: n("runaway_takeoff_prevention") == 1,
+            runaway_takeoff_deactivate_delay: n("runaway_takeoff_deactivate_delay") as u16,
+            runaway_takeoff_deactivate_throttle_percent: small(
+                "runaway_takeoff_deactivate_throttle_percent",
+            ),
             rx_min_usec: n("rx_min_usec") as u16,
             rx_max_usec: n("rx_max_usec") as u16,
             failsafe_delay: small("failsafe_delay"),
@@ -387,6 +442,9 @@ impl Tune {
                 _ => MotorProtocol::Dshot600,
             },
             motor_idle: n("motor_idle") as u16,
+            crashflip_motor_percent: small("crashflip_motor_percent"),
+            crashflip_rate: small("crashflip_rate"),
+            crashflip_auto_rearm: n("crashflip_auto_rearm") == 1,
         })
     }
 
@@ -411,6 +469,15 @@ impl Tune {
     pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
         let mut numbers: Vec<u64> = vec![
             u64::from(self.small_angle),
+            match self.yaw_spin_recovery {
+                YawSpinRecovery::Off => 0,
+                YawSpinRecovery::On => 1,
+                YawSpinRecovery::Auto => 2,
+            },
+            u64::from(self.yaw_spin_threshold),
+            u64::from(self.runaway_takeoff_prevention),
+            u64::from(self.runaway_takeoff_deactivate_delay),
+            u64::from(self.runaway_takeoff_deactivate_throttle_percent),
             u64::from(self.rx_min_usec),
             u64::from(self.rx_max_usec),
             u64::from(self.failsafe_delay),
@@ -447,6 +514,9 @@ impl Tune {
             match self.mixer_type {
                 MixerType::Legacy => 0,
             },
+            u64::from(self.crashflip_motor_percent),
+            u64::from(self.crashflip_rate),
+            u64::from(self.crashflip_auto_rearm),
         ]);
         for n in numbers {
             f.write_u64(n);

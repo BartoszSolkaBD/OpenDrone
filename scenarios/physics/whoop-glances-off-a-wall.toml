@@ -2,7 +2,7 @@
 # Map's wall, whose face is 5 m east. It bounces off the wall with its bounce
 # of 0.3 while friction slows it along the wall. Shows bounce and slide
 # together (E29 in #10).
-format = 1
+format = 2
 name   = "A whoop glances off a wall"
 
 [start]

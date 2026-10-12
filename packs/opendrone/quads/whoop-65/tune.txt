@@ -20,6 +20,12 @@
 
 # Configuration
 set small_angle = 180                  # diff; degrees: the most it may tilt and still arm
+# Configuration, CLI only
+set yaw_spin_recovery = AUTO           # 4.3 default
+set yaw_spin_threshold = 1950          # 4.3 default; °/s
+set runaway_takeoff_prevention = ON    # 4.3 default
+set runaway_takeoff_deactivate_delay = 500 # 4.3 default; ms
+set runaway_takeoff_deactivate_throttle_percent = 20 # 4.3 default; percent
 
 # Failsafe
 set rx_min_usec = 885                  # 4.3 default; µs
@@ -63,6 +69,9 @@ set motor_poles = 12                   # diff; must match [motors] poles
 set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
 # Motors, CLI only
 set mixer_type = LEGACY                # 4.3 default
+set crashflip_motor_percent = 0        # 4.3 default; percent
+set crashflip_rate = 0                 # ADR-0008; tens of °/s; 0 is off
+set crashflip_auto_rearm = OFF         # 2026.6 default
 
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands (ADR-0015).
@@ -89,14 +98,9 @@ set dterm_lpf2_static_hz = 165         # diff; not simulated yet (#49)
 set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
 # Receiver
 set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
-# Configuration
-set runaway_takeoff_prevention = ON    # 4.3 default; not simulated yet (later)
 
 # Not simulated yet either: settings the Flight Controller doesn't know
 # yet, which later tickets read or the alpha leaves out.
-# Configuration
-set yaw_spin_recovery = AUTO           # 4.3 default
-set yaw_spin_threshold = 1950          # 4.3 default; °/s
 # Failsafe
 set failsafe_switch_mode = STAGE1      # 4.3 default
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
@@ -148,10 +152,6 @@ set rc_smoothing_auto_factor = 30      # 4.3 default
 set rc_smoothing_auto_factor_throttle = 30 # 4.3 default
 set rc_smoothing_setpoint_cutoff = 0   # 4.3 default; Hz; 0 is automatic
 set rc_smoothing_throttle_cutoff = 0   # 4.3 default; Hz; 0 is automatic
-# Motors
-set crashflip_motor_percent = 0        # 4.3 default; percent
-set crashflip_rate = 0                 # ADR-0008; °/s; 0 is off
-set crashflip_auto_rearm = OFF         # 2026.6 default
 # Blackbox
 set blackbox_sample_rate = 1/2         # diff
 

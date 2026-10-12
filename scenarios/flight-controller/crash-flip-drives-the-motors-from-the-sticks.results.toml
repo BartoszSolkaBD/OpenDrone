@@ -1,0 +1,280 @@
+# Results of crash-flip-drives-the-motors-from-the-sticks.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Crash Flip drives the motors straight from the sticks, as Betaflight does"
+
+[[expect]]
+what     = "Crash Flip starts, first over 0.1 s to 0.2 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "motor 1 direction at 0.25 s"
+basis    = "Source"
+expected = "-1 ± 0"
+measured = "-1.00"
+
+[[expect]]
+what     = "motor 4 direction at 0.25 s"
+basis    = "Source"
+expected = "-1 ± 0"
+measured = "-1.00"
+
+[[expect]]
+what     = "motor 1 DShot at 0.25 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 DShot at 0.25 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 3 DShot at 0.25 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 4 DShot at 0.25 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot at 0.35 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 DShot at 0.35 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 3 DShot at 0.35 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 4 DShot at 0.35 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.45 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 DShot at 0.45 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 3 DShot at 0.45 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 4 DShot at 0.45 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.55 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 3 DShot at 0.55 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 4 DShot at 0.55 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot at 0.65 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 DShot at 0.65 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 3 DShot at 0.65 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 4 DShot at 0.65 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.75 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 DShot at 0.75 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot at 0.85 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 DShot at 0.85 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 4 DShot at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 0.95 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 DShot at 0.95 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 3 DShot at 0.95 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 4 DShot at 0.95 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot at 1.05 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 DShot at 1.05 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 3 DShot at 1.05 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 1 DShot at 1.15 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 2 DShot at 1.15 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 1.25 s"
+basis    = "Source"
+expected = "470 ± 0"
+measured = "470"
+
+[[expect]]
+what     = "motor 2 DShot at 1.25 s"
+basis    = "Source"
+expected = "470 ± 0"
+measured = "470"
+
+[[expect]]
+what     = "motor 1 DShot at 1.35 s"
+basis    = "Source"
+expected = "1126 ± 0"
+measured = "1130"
+
+[[expect]]
+what     = "motor 3 DShot at 1.35 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "motor 1 DShot at 1.45 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 3 DShot at 1.45 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "8d39fd6a4437535c"   # the whole state after each of 11600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.145 s" = "a4110dc083070eb0"
+"0.29 s" = "8cf5354f5164f7c9"
+"0.435 s" = "cb75acfc12ef7f91"
+"0.58 s" = "6b87eee189246989"
+"0.725 s" = "15a7397f96ce74ff"
+"0.87 s" = "c3d6eefbfc023577"
+"1.015 s" = "f66b1db89ca88d94"
+"1.16 s" = "8812af37f2266ae7"
+"1.305 s" = "cb4e67cff3236e47"
+"1.45 s" = "5d650fae316667bb"

@@ -1,0 +1,27 @@
+# The Freestyle 5″ with Crash Flip's three settings away from their defaults.    id: test/freestyle-5-crash-flip-settings
+#
+# Both alpha Tunes keep Betaflight 2026.6.2's defaults for Crash Flip: no
+# power for a motor whose mix would push the wrong way, no fade, and turning
+# the switch off while armed disarms (src/main/flight/mixer_init.c). Those
+# defaults never show what the settings do, so this Test Quad sets each one,
+# and crash-flip-follows-the-tunes-settings.toml shows each at work:
+#
+# - `crashflip_motor_percent` 50: a motor whose mix would push the wrong way
+#   gets half of it.
+# - `crashflip_rate` 35: power fades as the Quad turns faster than 175 °/s,
+#   to nothing at 350 °/s, and as its tilt changes.
+# - `crashflip_auto_rearm` ON: turning the switch off while armed keeps the
+#   Quad armed, flying normally.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "Crash Flip's motor percent, rate fade and auto re-arm away from their defaults, so a Scenario can show each one at work"
+
+# Tune changes keep Betaflight's own units, as `tune.txt` does.
+[tune]
+crashflip_motor_percent = 50 # percent of the wrong-way mix
+crashflip_rate = 35          # tens of °/s: no power by 350 °/s
+crashflip_auto_rearm = "ON"  # the switch off keeps the Quad armed

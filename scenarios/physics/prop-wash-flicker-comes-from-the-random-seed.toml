@@ -12,7 +12,7 @@
 # Time (crates/physics/src/prop_wash.rs, "The flicker"), so at 4 kHz each rotor
 # draws the same levels at the same moments, to within rounding in the timing
 # (a readable check sweeps seeds 0 to 199 at 1, 4 and 8 kHz).
-format = 1
+format = 2
 name   = "Prop Wash's flicker comes from the random seed"
 
 [start]

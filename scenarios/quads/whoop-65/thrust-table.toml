@@ -20,7 +20,7 @@
 # 30.6 g at 3.4 A, is the Meteor65 Pro's full thrust at 4.0 V.
 #
 # One motor runs; "gf" is grams of thrust, as the table's "g" means.
-format = 1
+format = 2
 name   = "The Whoop 65's motor and prop meet BetaFPV's 0802SE thrust table"
 
 [start]

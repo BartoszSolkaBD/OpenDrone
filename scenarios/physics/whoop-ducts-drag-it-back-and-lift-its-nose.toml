@@ -13,7 +13,7 @@
 # the centre of mass: 0.021 m × 0.0312 kg × 9.6 m/s² = 6.2899 × 10⁻³ N·m nose
 # up, 698.88 rad/s² over a pitch inertia of 90 g·cm², and 5.0054 °/s after one
 # step. That nose-up moment is more than ten times rotor drag's.
-format = 1
+format = 2
 name   = "A Whoop 65's ducts drag it back and lift its nose"
 
 [start]

@@ -1,0 +1,64 @@
+# Results of a-quad-spinning-at-2500-degrees-a-second-stops-spinning.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A Freestyle 5″ started at 2,500 °/s on yaw stops spinning"
+
+[[expect]]
+what     = "gyro yaw rate at 0.000125 s"
+basis    = "Source"
+expected = "2000 °/s ± 0.001 °/s"
+measured = "2000 °/s"
+
+[[expect]]
+what     = "yaw I term at 0.05 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll P term at 0.05 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "yaw spin recovery ends, first over 0 s to 2 s"
+basis    = "Observed"
+expected = "0.145 s ± 0.02 s"
+measured = "0.145 s"
+
+[[expect]]
+what     = "yaw rate at 2 s"
+basis    = "Observed"
+expected = "0 °/s ± 1 °/s"
+measured = "0.110 °/s"
+
+[[expect]]
+what     = "the Quad disarms, first over 0 s to 2 s"
+basis    = "Rule"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "8eef3761485a76f7"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "288210d5a1104b90"   # the whole state after each of 16000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.2 s" = "df33138c9c9292b3"
+"0.4 s" = "7a511a7172e34291"
+"0.6 s" = "9a827a1a54f3da56"
+"0.8 s" = "17c4b1c7661b7ee2"
+"1 s" = "e2314c07413a1dea"
+"1.2 s" = "c9ee60cb8743a1cf"
+"1.4 s" = "b2e3076586da1fb3"
+"1.6 s" = "004f199900582b73"
+"1.8 s" = "ac0b6c669b5185ac"
+"2 s" = "84578d28d87cbb81"

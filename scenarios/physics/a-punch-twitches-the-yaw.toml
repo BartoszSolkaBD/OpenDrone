@@ -17,7 +17,7 @@
 #   inertia, 140 g·cm², turns it at about 2 °/s.
 # - The pair's extra drag over that step is k_m·(2,390² − 2,380²) ≈
 #   3.1 × 10⁻⁶ N·m a rotor: 600 times less.
-format = 1
+format = 2
 name   = "A punch on its anticlockwise pair twitches a Whoop 65's nose right at once, and the chop twitches it back"
 
 [start]

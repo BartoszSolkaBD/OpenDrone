@@ -1,0 +1,88 @@
+# A Freestyle 5″ started mid-air spinning at 2,500 °/s on yaw, as a hit can
+# leave it, stops spinning (#26 §4 and §6). Its gyro reads only up to
+# ±2000 °/s, far past yaw spin recovery's threshold, 870 °/s on these Rates
+# (yaw-spin-recovery.toml): so recovery starts at once, drops I and roll and
+# pitch control, and brakes the yaw with the whole motor range until the yaw
+# rate has stayed under 770 °/s for 20 ms. Then the PID loop, I included,
+# brings it to the centred stick's yaw.
+#
+# A start that spins is a fresh Flight Controller whose flight hasn't
+# counted as stable, and the brake holds the yaw PID sum far past 600: on its
+# own Tune, runaway takeoff prevention would disarm it after 75 ms, as it
+# would a real one (runaway-takeoff-prevention-disarms-a-quad-that-runs-away.toml).
+# A Quad spun by a hit in flight has long since counted as stable, so this
+# flies test/freestyle-5-no-runaway-takeoff-prevention, the Freestyle 5″
+# with that one setting off.
+#
+# It starts 50 m up on test/empty-air, level, armed, its motors "settled",
+# with the sticks centred and the throttle at 30%.
+format = 2
+name   = "A Freestyle 5″ started at 2,500 °/s on yaw stops spinning"
+
+[start]
+kind              = "flight"
+quad              = "test/freestyle-5-no-runaway-takeoff-prevention"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "roll 0 °/s, pitch 0 °/s, yaw 2500 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+]
+
+[[expect]]
+what  = "gyro yaw rate"
+at    = "0.000125 s"
+value = "2000 °/s ± 0.001 °/s"
+basis = "source: the gyro reads up to ±2000 °/s (#26 §4), so 2,500 °/s reads 2,000"
+
+[[expect]]
+what  = "yaw I term"
+at    = "0.05 s"
+value = "0 ± 0"
+basis = "source: checkForYawSpin and pidController (Betaflight 2026.6.2's gyro.c and pid.c): 2,000 °/s is past 870 °/s, so recovery is on from the first loop, and I stays 0 however far the yaw is from its setpoint"
+
+[[expect]]
+what  = "roll P term"
+at    = "0.05 s"
+value = "0 ± 0"
+basis = "source: pidController: in yaw spin recovery roll and pitch's P is 0"
+
+[[expect]]
+what  = "yaw spin recovery ends"
+over  = "0 s to 2 s"
+first = "0.145 s ± 0.02 s"
+basis = "observed: the brake brings the yaw under 770 °/s by about 0.125 s (it is 1,030 °/s at 0.1 s), and recovery ends 20 ms later"
+
+[[expect]]
+what  = "yaw rate"
+at    = "2 s"
+value = "0 °/s ± 1 °/s"
+basis = "observed: the spin is gone by 0.3 s, past a small overshoot to -37 °/s, and the Quad yaws as the centred stick asks, next to nothing"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 2 s"
+first = "never"
+basis = "rule: nothing here disarms: the Arm switch stays on, and this Tune has runaway takeoff prevention off"

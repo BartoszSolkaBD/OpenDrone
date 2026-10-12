@@ -9,10 +9,10 @@
 # those yet (#49, #50); this Test Quad switches each one off in the Tune, the
 # way Betaflight reads "off", so those Scenarios' numbers are what Betaflight
 # 2026.6.2 gives on this Tune today, and still will once #49 and #50 land. It
-# also switches off runaway takeoff prevention (not simulated yet either,
-# #21's "later"), which would disarm a fresh Flight Controller holding a PID
-# sum of 600 or more, with the gyro moving, for 75 ms, as these Scenarios'
-# held sensor readings can. Everything else is the Freestyle 5″'s.
+# also switches off runaway takeoff prevention (simulated since #54), which
+# would disarm a fresh Flight Controller holding a PID sum of 600 or more,
+# with the gyro moving, for 75 ms, as these Scenarios' held sensor readings
+# can. Everything else is the Freestyle 5″'s.
 #
 # A Test Quad lists only what it changes, so any other change to the Freestyle
 # 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never

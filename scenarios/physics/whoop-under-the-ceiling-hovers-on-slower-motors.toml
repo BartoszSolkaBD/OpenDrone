@@ -27,7 +27,7 @@
 # rest the Quad's drag does nothing. The run is one step long: it checks the
 # start. "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on
 # a drive that sinks it in open air" shows what the pull does next.
-format = 1
+format = 2
 name   = "One rotor radius under the ceiling, a Whoop 65's rotors give 2% more thrust, so it hovers on slower motors"
 
 [start]

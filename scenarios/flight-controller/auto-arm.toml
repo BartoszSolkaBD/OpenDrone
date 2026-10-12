@@ -15,7 +15,7 @@
 # Controller's filters and loop shaping off, so the mixer's throttle shows the
 # pilot's throttle straight from each frame, as Betaflight does with RC
 # smoothing (#49) and throttle boost (#50) off.
-format = 1
+format = 2
 name   = "Auto-arm arms on the first throttle raise that passes the arming checks, and only Reset or a Failsafe drop disarms"
 
 [start]
@@ -47,7 +47,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",    roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s",    roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   # A raise while the ESCs start up: BOOTGRACE, so nothing.
   { at = "0.5 s",  throttle = "20%" },
   { at = "1 s",    throttle = "0%" },

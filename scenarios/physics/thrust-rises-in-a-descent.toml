@@ -20,7 +20,7 @@
 #
 # That is about a quarter of v_h, below the band where a rotor sinks into its
 # own air (0.4 to 1.4 v_h, research §4.4), where Prop Wash takes over.
-format = 1
+format = 2
 name   = "At a fixed command, a drag-free Whoop 65's thrust rises as it sinks, until it sinks steadily"
 
 [start]

@@ -1,0 +1,94 @@
+# Results of a-reversed-motor-gives-the-quads-reverse-share.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A reversed motor gives the Quad's reverse share of thrust and torque, from 0.12 s after arming"
+
+[[expect]]
+what     = "Crash Flip starts, first over 0 s to 0.2 s"
+basis    = "Source"
+expected = "0.104125 s ± 0.000001 s"
+measured = "0.104 s"
+
+[[expect]]
+what     = "motor 2 DShot at 0.12 s"
+basis    = "Source"
+expected = "21 ± 0"
+measured = "21.0"
+
+[[expect]]
+what     = "motor 2 DShot at 0.13 s"
+basis    = "Source"
+expected = "2047 ± 0"
+measured = "2050"
+
+[[expect]]
+what     = "motor 2 speed, highest over 0 s to 0.225 s"
+basis    = "Source"
+expected = "0 RPM ± 0 RPM"
+measured = "0 RPM"
+
+[[expect]]
+what     = "motor 2 drive at 0.2255 s"
+basis    = "Source"
+expected = "1.96% ± 0.001%"
+measured = "1.96%"
+
+[[expect]]
+what     = "motor 2 direction at 0.2255 s"
+basis    = "Source"
+expected = "-1 ± 0"
+measured = "-1.00"
+
+[[expect]]
+what     = "motor 2 speed at 1.5 s"
+basis    = "Rule"
+expected = "-29500 RPM ± 0.5%"
+measured = "-29500 RPM"
+
+[[expect]]
+what     = "motor 2 thrust at 1.5 s"
+basis    = "Rule"
+expected = "-762 gf ± 1%"
+measured = "-761 gf"
+
+[[expect]]
+what     = "motor 2 torque at 1.5 s"
+basis    = "Rule"
+expected = "-0.1802 N·m ± 1%"
+measured = "-0.180 N·m"
+
+[[expect]]
+what     = "battery current at 1.5 s"
+basis    = "Rule"
+expected = "35.0 A ± 1%"
+measured = "35.0 A"
+
+[[expect]]
+what     = "motor 1 thrust at 1.5 s"
+basis    = "Source"
+expected = "0 gf ± 0 gf"
+measured = "0 gf"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "5d67cbbfb1e1d7cb"   # test/freestyle-5-bench-supply: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "b0626e567491b68b"   # the whole state after each of 12000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.15 s" = "83a0be53f233f219"
+"0.3 s" = "690a831ff4505424"
+"0.45 s" = "7dc636280a49484e"
+"0.6 s" = "2e0978682b4adf5c"
+"0.75 s" = "605500205d23b8cb"
+"0.9 s" = "85f6f6fcaf4203e7"
+"1.05 s" = "a501fbb6ef9a1972"
+"1.2 s" = "1e1f43b29ef623dc"
+"1.35 s" = "4c9c7f5c9e316abf"
+"1.5 s" = "f2f9a5853a0f1bea"

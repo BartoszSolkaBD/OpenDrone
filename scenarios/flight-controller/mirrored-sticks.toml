@@ -12,19 +12,22 @@
 # asking for 0.11 °/s the same way in both runs. The throttle ramps, which
 # changes nothing about the mirror.
 #
-# On a real quad, Betaflight 2026.6.2's runaway takeoff prevention (on by
-# default, not simulated yet, #21's "later") would disarm this fresh Flight
-# Controller at about 0.08 s: full stick from the first frame holds a PID sum
-# of 600 or more with the gyro moving for 75 ms, before half a second of
-# normal flight could switch the prevention off (src/main/fc/core.c). This
-# Scenario checks only the symmetry, which holds either way.
+# Betaflight 2026.6.2's runaway takeoff prevention (on by default, and
+# simulated since #54) disarms this fresh Flight Controller at 0.675 s, in
+# both runs: with full stick from the first frame the flight never counts as
+# stable, and the yaw stick reversing at 0.6 s holds the yaw PID sum past 600
+# with the gyro moving for 75 ms (src/main/fc/core.c). From the first frame
+# the roll and yaw sums are past 600 too, but only for about 50 ms, as the
+# rates come up. Disarmed, both runs fall and tumble on, still each other's
+# mirror image. This Scenario checks only the symmetry, which holds either
+# way.
 #
 # It flies the Freestyle 5″ with Prop Wash off (test/freestyle-5-no-prop-wash).
 # Low on throttle and rolling hard, its rotors sink into their own air, and
 # Prop Wash's flicker is random, each rotor its own way, so it is no mirror
 # image of itself: with it on, the two runs part by about a thousandth of a
 # degree a second in pitch by 0.9 s.
-format = 1
+format = 2
 name   = "Mirrored sticks give a mirrored flight"
 
 [start]
@@ -56,7 +59,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "100%", throttle = "30%", arm = "on" },
+  { at = "0 s",   roll = "100%", pitch = "0%", yaw = "100%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "0.3 s", roll = "-100%" },
   { at = "0.6 s", yaw = "-100%", throttle = "30%" },
   { at = "1 s",   throttle = "ramp to 60%" },

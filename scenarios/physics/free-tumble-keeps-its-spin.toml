@@ -3,7 +3,7 @@
 # Starting pitched up and turned to the north-east means the roll axis points
 # neither along a world axis nor level, so turning in the wrong axes would show.
 # Proves exact attitude maths at a fixed step (E1–E3 in #10).
-format = 1
+format = 2
 name   = "A free tumble at 2,000 °/s keeps its spin and ends at the exact attitude"
 
 [start]

@@ -22,7 +22,7 @@
 #
 # The drag here (rotor, duct and body) acts across the Quad, level: it slows
 # it but never holds it up, so it doesn't change the settled speed.
-format = 1
+format = 2
 name   = "Flying level at 8 m/s, a Whoop 65 holds its height with its rotors 13.5% slower than hovering"
 
 [start]

@@ -24,7 +24,7 @@
 # The Map is the floor and ceiling Test Map: the floor is a triangle-mesh
 # sheet, and the ceiling, 3.1 m up, is far beyond the 17.5 cm each rotor
 # looks (ten rotor radii). At rest the Quad's drag does nothing.
-format = 1
+format = 2
 name   = "Two rotor radii over the floor, a Whoop 65's rotors give 9.6% more thrust, so it hovers on slower motors"
 
 [start]

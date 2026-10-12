@@ -134,17 +134,28 @@ impl Rates {
     /// deflection from −1 to +1, within the axis's rate limit: Betaflight's
     /// raw setpoint, before any smoothing.
     pub fn setpoint(&self, axis: Axis, deflection: f64) -> f64 {
+        let limit = f64::from(self.rate_limit[axis.index()]);
+        self.curve(axis, deflection).clamp(-limit, limit)
+    }
+
+    /// The rotation speed these Rates ask for on one axis at full stick, in
+    /// °/s, before the rate limit: Betaflight's `maxRcRate`, from which
+    /// yaw spin recovery's AUTO threshold is worked out (`initRcProcessing`).
+    pub fn max_rate(&self, axis: Axis) -> f64 {
+        self.curve(axis, 1.0)
+    }
+
+    /// The Rates type's curve at a stick deflection from −1 to +1.
+    fn curve(&self, axis: Axis, deflection: f64) -> f64 {
         let numbers = self.axis(axis);
         let a = deflection.abs();
-        let rate = match self.rates_type {
+        match self.rates_type {
             RatesType::Betaflight => betaflight(numbers, deflection, a),
             RatesType::Raceflight => raceflight(numbers, deflection, a),
             RatesType::Kiss => kiss(numbers, deflection, a),
             RatesType::Actual => actual(numbers, deflection, a),
             RatesType::Quick => quick(numbers, deflection, a, self.quickrates_rc_expo),
-        };
-        let limit = f64::from(self.rate_limit[axis.index()]);
-        rate.clamp(-limit, limit)
+        }
     }
 
     /// Feeds every field into a fingerprint, in a fixed order.

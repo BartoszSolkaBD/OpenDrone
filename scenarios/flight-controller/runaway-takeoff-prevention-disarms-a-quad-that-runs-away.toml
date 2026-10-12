@@ -1,0 +1,110 @@
+# Runaway takeoff prevention copies Betaflight 2026.6.2 (`processRx` and
+# `subTaskPidController`, src/main/fc/core.c): from arming until the flight
+# counts as stable, it disarms a Quad whose PID sum on any axis stays at 600
+# or more (RUNAWAY_TAKEOFF_PIDSUM_THRESHOLD) with the gyro moving, roll or
+# pitch faster than 15 °/s or yaw faster than 50 °/s, for more than 75 ms
+# (RUNAWAY_TAKEOFF_ACTIVATE_DELAY). Arming is then blocked (RUNAWAY) until
+# the Arm switch goes off. The Freestyle 5″'s Tune has
+# `runaway_takeoff_prevention` ON, Betaflight's default.
+#
+# The Flight Controller alone, armed, the throttle at 30% with the sticks
+# centred: below 40% with no stick moved 15%, the flight never counts as
+# stable, so the prevention stays on (see
+# runaway-takeoff-prevention-switches-off-once-the-flight-counts-as-stable.toml).
+# Full right roll asks for 670 °/s, so with the gyro reading next to nothing
+# the roll PID sum is 0.032029 × 45 × (670 - 15) = 944 plus I, far past 600:
+# a quad that doesn't turn as it's told, as with a motor wired backwards.
+format = 2
+name   = "Runaway takeoff prevention disarms a Quad whose PID sum stays at 600 with the gyro moving for 75 ms"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+  # A PID sum far past 600, but the gyro at 15 °/s isn't moving, as on a
+  # bench without props.
+  { at = "0.1 s", roll = "100%", rotation = "roll 15 °/s, pitch 0 °/s, yaw 0 °/s" },
+  # At 16 °/s it is.
+  { at = "0.3 s", rotation = "roll 16 °/s, pitch 0 °/s, yaw 0 °/s" },
+  # Disarmed: the sticks back, and the Arm switch must go off.
+  { at = "0.5 s", roll = "0%", throttle = "0%", rotation = "0 °/s" },
+  { at = "0.6 s", arm = "off" },
+  { at = "0.7 s", arm = "on" },
+  # Armed again, it watches again.
+  { at = "0.8 s", roll = "100%", throttle = "30%", rotation = "roll 100 °/s, pitch 0 °/s, yaw 0 °/s" },
+]
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0 s to 0.3 s"
+first = "never"
+basis = "source: subTaskPidController: the roll PID sum is past 600, but the gyro must read more than 15 °/s on roll or pitch, or 50 °/s on yaw (gyroAbsRateDps, cut to whole °/s), and 15 isn't"
+
+[[expect]]
+what  = "roll PID sum"
+at    = "0.25 s"
+value = "1344.05 ± 0.01"
+basis = "source: pidController: P is 0.032029 × 45 × (670 - 15) = 944.05, and I has wound up to its limit, 80% of pidsum_limit 500 = 400: 1344.05"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.3 s to 0.5 s"
+first = "0.07525 s ± 0.000001 s"
+basis = "source: subTaskPidController: at 16 °/s the gyro is moving, so the loop at 0.3 s sets the disarm for 75 ms later, 0.375 s, and the first loop after that, at 0.375125 s, disarms"
+
+[[expect]]
+what  = "RUNAWAY blocks arming"
+over  = "0.3 s to 0.5 s"
+first = "0.07525 s ± 0.000001 s"
+basis = "source: subTaskPidController: the same loop sets ARMING_DISABLED_RUNAWAY_TAKEOFF, which Betaflight names RUNAWAY (src/main/fc/runtime_config.c)"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.4 s"
+value = "0 ± 0"
+basis = "source: disarm: disarmed, every motor gets 0, stop, whatever the PID sums"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0.38 s to 0.6 s"
+first = "never"
+basis = "source: updateArmingStatus: RUNAWAY, and ARM_SWITCH with it, hold while the Arm switch stays on"
+
+[[expect]]
+what  = "RUNAWAY stops blocking arming"
+over  = "0.6 s to 0.7 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: the Arm switch off clears RUNAWAY"
+
+[[expect]]
+what  = "the Quad arms"
+over  = "0.7 s to 0.8 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm: with the throttle low and nothing blocking, the frame after the switch goes on arms"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.8 s to 1 s"
+first = "0.07525 s ± 0.000001 s"
+basis = "source: tryArm starts runaway takeoff prevention's timers afresh, and the flight hasn't counted as stable, so a PID sum past 600 with the gyro moving disarms it 75 ms on again"

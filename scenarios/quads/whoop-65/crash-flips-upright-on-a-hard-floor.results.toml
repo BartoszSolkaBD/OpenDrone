@@ -1,0 +1,88 @@
+# Results of crash-flips-upright-on-a-hard-floor.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "An upside-down Whoop 65 on a hard floor Crash Flips upright on roll and on pitch"
+
+[[expect]]
+what     = "tilt at 1.9 s"
+basis    = "Rule"
+expected = "180° ± 1°"
+measured = "180°"
+
+[[expect]]
+what     = "Crash Flip starts, first over 2 s to 2.1 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "tilt at 3.1 s"
+basis    = "Source"
+expected = "between 0° and 45°"
+measured = "0.0000000475°"
+
+[[expect]]
+what     = "the Quad turns right side up, first over 2 s to 3 s"
+basis    = "Observed"
+expected = "0.495 s ± 0.05 s"
+measured = "0.495 s"
+
+[[expect]]
+what     = "tilt at 3 s"
+basis    = "Observed"
+expected = "0° ± 1°"
+measured = "0.0000000475°"
+
+[[expect]]
+what     = "the Quad disarms, first over 3.2 s to 3.3 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "tilt at 5.9 s"
+basis    = "Rule"
+expected = "180° ± 1°"
+measured = "180°"
+
+[[expect]]
+what     = "tilt at 7.1 s"
+basis    = "Source"
+expected = "between 0° and 45°"
+measured = "0.000000380°"
+
+[[expect]]
+what     = "the Quad turns right side up, first over 6 s to 7 s"
+basis    = "Observed"
+expected = "0.501 s ± 0.05 s"
+measured = "0.501 s"
+
+[[expect]]
+what     = "tilt at 7 s"
+basis    = "Observed"
+expected = "0° ± 1°"
+measured = "0.000000380°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "f8b70bb726306cb3"   # the whole state after each of 60000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.75 s" = "1983e7e791292d04"
+"1.5 s" = "5cbff73b61309f6f"
+"2.25 s" = "b94b1bbd45a77779"
+"3 s" = "481ec17b71c2acd9"
+"3.75 s" = "2093b544b820ecec"
+"4.5 s" = "cf3b0281345c433d"
+"5.25 s" = "553b44996d46585c"
+"6 s" = "92f7a6b8596a856c"
+"6.75 s" = "5c1a40fe93ea5a9a"
+"7.5 s" = "3aeaee076f0403bd"

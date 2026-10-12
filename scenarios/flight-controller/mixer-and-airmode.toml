@@ -36,7 +36,7 @@
 #   throttle moves just enough that no motor clips.
 # - Each motor's DShot value is idle plus its share of the range: 48 + 5.5% ×
 #   1999 = 157.9 up to 2047, sent as the nearest whole number.
-format = 1
+format = 2
 name   = "The mixer spreads corrections over the motors with Airmode, as Betaflight does"
 
 [start]
@@ -68,6 +68,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"
@@ -96,6 +97,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
 
 [[case.expect]]
@@ -130,6 +132,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "50%"
 arm      = "on"
+crash_flip = "off"
 rotation = "roll -1000 °/s, pitch 1000 °/s, yaw 0 °/s"
 
 [[case.expect]]
@@ -164,6 +167,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "100%"
 arm      = "on"
+crash_flip = "off"
 rotation = "roll -100 °/s, pitch 0 °/s, yaw 0 °/s"
 
 [[case.expect]]
@@ -194,6 +198,7 @@ pitch    = "0%"
 yaw      = "100%"
 throttle = "50%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "yaw PID sum"

@@ -220,9 +220,9 @@ pub const SETTINGS: &[Setting] = &[
     all("small_angle", Configuration, "degrees: the most it may tilt and still arm", "25"),
     all("yaw_spin_recovery", ConfigurationCli, "", "AUTO"),
     all("yaw_spin_threshold", ConfigurationCli, "°/s", "1950"),
-    // Runaway takeoff prevention guards against wiring and orientation
-    // mistakes the sim can't have (#21).
     all("runaway_takeoff_prevention", ConfigurationCli, "", "ON"),
+    all("runaway_takeoff_deactivate_delay", ConfigurationCli, "ms", "500"),
+    all("runaway_takeoff_deactivate_throttle_percent", ConfigurationCli, "percent", "20"),
     // Failsafe. A Channel outside rx_min_usec to rx_max_usec is invalid.
     all("rx_min_usec", Failsafe, "µs", "885"),
     all("rx_max_usec", Failsafe, "µs", "2115"),
@@ -379,7 +379,7 @@ pub const SETTINGS: &[Setting] = &[
     // Crash Flip. Before 2025.12 it had no rate fade: 0 turns it off. Leaving
     // Crash Flip changed then, and no setting brings the old way back (#26).
     all("crashflip_motor_percent", MotorsCli, "percent", "0"),
-    row("crashflip_rate", MotorsCli, "°/s; 0 is off",
+    row("crashflip_rate", MotorsCli, "tens of °/s; 0 is off",
         [Adr0008("0"), Adr0008("0"), Adr0008("0"), Same("0"), Same("0")]),
     row("crashflip_auto_rearm", MotorsCli, "",
         [Newer, Newer, Newer, Same("OFF"), Same("OFF")]),

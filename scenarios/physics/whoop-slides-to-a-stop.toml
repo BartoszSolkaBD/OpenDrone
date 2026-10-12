@@ -2,7 +2,7 @@
 # 3 m/s. Coulomb friction with its friction of 0.5 slows it at
 # 0.5 × 9.81 m/s² = 4.9 m/s², so it stops after 0.61 s and 3² / (2 × 4.9) =
 # 0.92 m. Shows the friction half of E29 in #10.
-format = 1
+format = 2
 name   = "A sliding whoop stops where its friction says"
 
 [start]

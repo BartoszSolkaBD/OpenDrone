@@ -31,7 +31,7 @@
 # their settled drive. How hard it shakes comes from the Whoop 65's feel
 # numbers, prop_wash_strength 20% and prop_wash_flicker 15 Hz, which are
 # Estimates for a Feel Test to tune: so its size is Observed.
-format = 1
+format = 2
 name   = "Sinking through the middle of its band, a Whoop 65 is shaken by Prop Wash"
 
 [start]

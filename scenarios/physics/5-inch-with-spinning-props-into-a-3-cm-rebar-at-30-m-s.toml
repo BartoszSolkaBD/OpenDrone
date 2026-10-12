@@ -5,7 +5,7 @@
 # its weight, and stay at the drive that holds them there. Its front prop
 # discs meet the stub first, and rub as they strike it. Proves the thin-rail
 # half of E29 in #10 with spinning props, now that prop discs rub (#26 §6).
-format = 1
+format = 2
 name   = "A 5-inch with spinning props at 30 m/s never passes through a 3 cm rebar stub"
 
 [start]

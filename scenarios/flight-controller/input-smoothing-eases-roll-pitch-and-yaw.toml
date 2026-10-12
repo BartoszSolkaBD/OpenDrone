@@ -11,7 +11,7 @@
 # 50%. Frames leave every 4 ms from the start (250 Hz); a frame that leaves at
 # 1.012 s shows after its step, at 1.012125 s. The sticks at rest read 0.06%
 # (receiver step 992 is 1500.31 µs).
-format = 1
+format = 2
 name   = "Input smoothing eases roll, pitch and yaw with a gentle 15 Hz low-pass and leaves the throttle"
 
 [start]
@@ -43,7 +43,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   { at = "1 s", roll = "100%", pitch = "-100%", yaw = "100%", throttle = "50%" },
 ]
 

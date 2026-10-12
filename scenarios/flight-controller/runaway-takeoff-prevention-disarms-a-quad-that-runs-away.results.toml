@@ -1,0 +1,82 @@
+# Results of runaway-takeoff-prevention-disarms-a-quad-that-runs-away.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Runaway takeoff prevention disarms a Quad whose PID sum stays at 600 with the gyro moving for 75 ms"
+
+[[expect]]
+what     = "the Quad disarms, first over 0 s to 0.3 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "roll PID sum at 0.25 s"
+basis    = "Source"
+expected = "1344.05 ± 0.01"
+measured = "1340"
+
+[[expect]]
+what     = "the Quad disarms, first over 0.3 s to 0.5 s"
+basis    = "Source"
+expected = "0.07525 s ± 0.000001 s"
+measured = "0.0752 s"
+
+[[expect]]
+what     = "RUNAWAY blocks arming, first over 0.3 s to 0.5 s"
+basis    = "Source"
+expected = "0.07525 s ± 0.000001 s"
+measured = "0.0752 s"
+
+[[expect]]
+what     = "motor 1 DShot at 0.4 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "the Quad arms, first over 0.38 s to 0.6 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "RUNAWAY stops blocking arming, first over 0.6 s to 0.7 s"
+basis    = "Source"
+expected = "0.000125 s ± 0.000001 s"
+measured = "0.000125 s"
+
+[[expect]]
+what     = "the Quad arms, first over 0.7 s to 0.8 s"
+basis    = "Source"
+expected = "0.004125 s ± 0.000001 s"
+measured = "0.00413 s"
+
+[[expect]]
+what     = "the Quad disarms, first over 0.8 s to 1 s"
+basis    = "Source"
+expected = "0.07525 s ± 0.000001 s"
+measured = "0.0752 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "d0e8abad53fa7c7b"   # the whole state after each of 8000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.1 s" = "05a2454a513c06ef"
+"0.2 s" = "3b92f8f50c5de37c"
+"0.3 s" = "96ad76ddf15d6fb2"
+"0.4 s" = "bf2556bc0ed2a206"
+"0.5 s" = "ab1e7bd98fdb7d72"
+"0.6 s" = "606f5bd170416bfc"
+"0.7 s" = "431eabd1bf7b77bc"
+"0.8 s" = "f3d0b39b43f6b029"
+"0.9 s" = "92ef96bb7d4567c1"
+"1 s" = "c06e53a544803b10"

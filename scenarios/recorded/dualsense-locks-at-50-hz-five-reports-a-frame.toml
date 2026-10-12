@@ -7,7 +7,7 @@
 # untouched, its motion sensors reporting every 4 ms (dualsense-at-rest.csv).
 # The first frame, 0.75 ms after the first report, carries that report
 # alone, so the stretches start after it.
-format = 1
+format = 2
 name   = "A DualSense's Radio Link frames at 50 Hz each carry exactly five fresh reports"
 
 [start]

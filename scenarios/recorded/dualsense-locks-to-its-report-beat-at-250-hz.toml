@@ -10,7 +10,7 @@
 # 6 s, its motion sensors on: a report every 4 ms that changes nothing, its
 # heartbeat (dualsense-at-rest.csv). The Flight Controller runs alone; only
 # the Radio Link's frames are measured.
-format = 1
+format = 2
 name   = "A DualSense's Radio Link frames at 250 Hz each carry exactly one fresh report"
 
 [start]

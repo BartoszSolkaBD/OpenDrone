@@ -7,7 +7,7 @@
 # Past empty the pack's resting voltage carries on down the last stretch of
 # its voltage curve (3.77 V at 20% to 3.30 V at 0%: 0.0235 V per 1% of
 # charge), so the pack keeps giving less and less.
-format = 1
+format = 2
 name   = "A flat Whoop 65 pack fades, with no cutoff"
 
 [start]

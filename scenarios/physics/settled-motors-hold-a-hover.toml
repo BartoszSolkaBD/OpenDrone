@@ -7,7 +7,7 @@
 # 0.29 × 1.225 kg/m³ × (0.035 m)⁴ / 4π² = 1.3503 × 10⁻⁸ N/(rad/s)². A quarter
 # of its weight, 0.0312 kg × 9.81 m/s² / 4 = 0.076518 N, takes
 # √(0.076518 / 1.3503 × 10⁻⁸) = 2,380.5 rad/s: 22,733 RPM.
-format = 1
+format = 2
 name   = "Settled motors hold a Whoop 65 in a hover from the first step"
 
 [start]

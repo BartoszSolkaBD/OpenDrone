@@ -239,6 +239,18 @@ pub fn add_after(
 ) -> Result<(), String> {
     let name = table_name(table);
     let target = table_mut(doc, table)?;
+    add_after_in(target, &name, after, key, value)
+}
+
+/// [`add_after`] in a table found some other way, such as each of an array
+/// of tables (`[[case]]`); `name` is what its problems call it.
+pub fn add_after_in(
+    target: &mut Table,
+    name: &str,
+    after: &str,
+    key: &str,
+    value: impl Into<Value>,
+) -> Result<(), String> {
     if target.contains_key(key) {
         return Err(format!("{name} already has `{key}`"));
     }
