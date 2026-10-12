@@ -63,7 +63,7 @@ pub use read::{
     Start, StartingFlightController, Statistic, Stick, When, read_scenario,
 };
 pub use results::{fingerprints_text, read_fingerprints, results_text};
-pub use run::{Measured, Outcome, Received, run};
+pub use run::{Measured, Outcome, Received, ScenarioInputs, run, simulation};
 pub use track::INPUT_TRACK_HEADER;
 
 /// The ending of every Results file, beside its Scenario.

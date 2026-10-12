@@ -145,6 +145,14 @@ pub fn works_out_eigenvalues(
     let wide = parry3d_f64::glamx::Mat3A::ZERO;
     let _ = parry3d_f64::glamx::SymmetricEigen3A::new(wide);
     let _ = parry3d_f64::glamx::SymmetricEigen3A::eigenvalues(wide);
+    // glamx's 2 x 2 eigen types, whose powi Windows takes from the C
+    // library's pow (#62).
+    let double_2 = parry3d_f64::glamx::DMat2::ZERO;
+    let _ = parry3d_f64::glamx::DSymmetricEigen2::new(double_2);
+    let _ = parry3d_f64::glamx::DSymmetricEigen2::eigenvalues(double_2);
+    let single_2 = parry3d_f64::glamx::Mat2::ZERO;
+    let _ = parry3d_f64::glamx::SymmetricEigen2::new(single_2);
+    let _ = parry3d_f64::glamx::SymmetricEigen2::eigenvalues(single_2);
 }
 
 pub fn order_changes_from_run_to_run() -> usize {

@@ -57,13 +57,15 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
-      - name: Install the Linux packages SDL's source build needs
+      - name: Install the Linux packages SDL's source build and Bevy's window need
         # opendrone-input builds SDL 3.4 from source with CMake (preinstalled
         # on every runner) as a no-window console build, so no X11 or Wayland
         # headers (ADR-0018). libudev's headers let SDL notice Input Devices
-        # being plugged in and out through udev.
+        # being plugged in and out through udev. The game's window (Bevy's
+        # winit, #62) links Wayland's client library, so it needs its
+        # headers; X11 it loads while running, with no headers.
         if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev pkg-config
 
       - name: Reuse the build cache
         if: steps.changes.outputs.rust == 'true'
@@ -123,6 +125,25 @@ jobs:
       - name: Tests (cargo-nextest)
         if: steps.changes.outputs.rust == 'true'
         run: cargo nextest run --workspace --locked --profile ci
+
+      - name: The game flies the reference Scenarios exactly as the headless runner does
+        # Each Scenario flown through the game's own stepping, in the game's
+        # build (the core compiled together with Bevy), must give the run
+        # fingerprint its Results file holds, which the headless runner
+        # wrote (ADR-0003, "Checks in CI"). One flies our Flight Controller
+        # into a wall; the other a whoop into a rail, a convex Map shape.
+        if: steps.changes.outputs.rust == 'true'
+        run: >-
+          cargo run --locked --quiet --package opendrone -- --reference
+          scenarios/flight-controller/a-quad-that-hits-a-wall-stays-armed.toml
+          scenarios/physics/whoop-into-a-6-cm-rail-at-30-m-s.toml
+
+      - name: The game starts and steps headless, with no sound device
+        # GitHub's machines have no screen and no sound device. The game runs
+        # with no window for 3 s, with its input thread, and fails if the
+        # Simulation didn't step (ADR-0003, "Checks in CI").
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo run --locked --quiet --package opendrone -- --headless --seconds 3
 
       - name: Examples in the docs (doctests, which cargo-nextest doesn't run)
         if: steps.changes.outputs.rust == 'true'
@@ -289,10 +310,11 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
-      - name: Install the Linux packages SDL's source build needs
+      - name: Install the Linux packages SDL's source build and Bevy's window need
         # rustdoc builds opendrone-input, which builds SDL 3.4 from source
-        # (ADR-0018), as the Rust job does.
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+        # (ADR-0018), and the game, whose window links Wayland's client
+        # library (#62), as the Rust job does.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev pkg-config
 
       - name: Reuse the build cache
         uses: Swatinem/rust-cache@v2

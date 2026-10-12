@@ -114,7 +114,9 @@ disallowed-methods = [
     # and goes through SharedShape::convex_mesh, #141), the mass-properties
     # code (the type, its constructors and Shape::mass_properties; the
     # physics works out its own inertia), utils::obb, and the eigen types and
-    # functions themselves, further down.
+    # functions themselves, further down. The 2 x 2 eigen code squares with
+    # powi, which Windows compiles into a call to the operating system's pow
+    # (#62), so it is banned too.
     { path = "parry3d_f64::transformation::convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::transformation::try_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::shape::ConvexPolyhedron::from_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
@@ -147,6 +149,10 @@ disallowed-methods = [
     { path = "glamx::SymmetricEigen3::eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
     { path = "glamx::SymmetricEigen3A::new", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
     { path = "glamx::SymmetricEigen3A::eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen2::new", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen2::eigenvalues", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen2::new", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen2::eigenvalues", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
 
     # std's min and max may return either zero when given +0 and -0, and the
     # two kinds of processor pick differently. Use opendrone-maths' own, which
@@ -196,6 +202,8 @@ disallowed-types = [
     { path = "glamx::DSymmetricEigen3", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
     { path = "glamx::SymmetricEigen3", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
     { path = "glamx::SymmetricEigen3A", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen2", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen2", reason = "it works out eigenvalues with powi, which Windows takes from the operating system's pow, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
 
     # Their order changes from run to run (ADR-0001).
     { path = "std::collections::HashMap", reason = "its order changes from run to run; use BTreeMap or a Vec (ADR-0001)" },

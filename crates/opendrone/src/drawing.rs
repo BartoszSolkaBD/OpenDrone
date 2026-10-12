@@ -1,0 +1,350 @@
+//! Drawing the flight: the Map from its solid parts, a grid on a Test Map's
+//! floor, the Quad from its collision shapes, and a placeholder camera
+//! bolted to its frame. The FPV Camera, its Lens and its Video Look arrive
+//! with their own tickets.
+//!
+//! The Simulation counts in 64-bit numbers, east, north and up from the
+//! Map's origin; the picture is drawn in 32-bit numbers, in Bevy's axes:
+//! east is +x, up is +y and north is −z. A Quad's body axes (forward, left,
+//! up) turn into Bevy's the same way, so forward is +x, up +y and left −z.
+
+use std::f32::consts::FRAC_PI_2;
+
+use bevy::asset::RenderAssetUsages;
+use bevy::camera::visibility::{NoCpuCulling, RenderLayers};
+use bevy::mesh::PrimitiveTopology;
+use bevy::prelude::*;
+use opendrone_maths::{Attitude, Vec3 as Vec3d};
+use opendrone_physics::{DUCT_RING_SEGMENTS, PROP_DISC_THICKNESS};
+use opendrone_sim::{MapShape, QuadShape};
+
+use crate::set_up::FlightPlan;
+use crate::stepping::Flight;
+
+/// The placeholder camera's field of view, top to bottom: a plain
+/// rectilinear lens, about 120° across a 16:9 picture. The Quad's own
+/// fisheye Lens and FOV arrive with the FPV Camera ticket.
+pub const PLACEHOLDER_FOV_DEGREES: f32 = 90.0;
+
+/// A point in the Map (east, north, up, in metres) in Bevy's axes.
+pub fn point(v: Vec3d) -> Vec3 {
+    Vec3::new(v.x as f32, v.z as f32, -v.y as f32)
+}
+
+/// A size along a shape's own axes (front to back, side to side, top to
+/// bottom) in Bevy's axes.
+fn size(v: Vec3d) -> Vec3 {
+    Vec3::new(v.x as f32, v.z as f32, v.y as f32)
+}
+
+/// An attitude (from body axes to east, north and up) as a turn in Bevy's
+/// axes.
+pub fn turn(attitude: Attitude) -> Quat {
+    let [w, x, y, z] = attitude.quaternion();
+    Quat::from_xyzw(x as f32, z as f32, -y as f32, w as f32).normalize()
+}
+
+/// The Quad as it's drawn: where the Simulation puts it, between its last
+/// two ticks.
+#[derive(Component)]
+pub struct QuadDrawing;
+
+/// Draws the flight in the game's window.
+pub struct DrawingPlugin;
+
+impl Plugin for DrawingPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<View>()
+            .insert_resource(ClearColor(Color::srgb(0.55, 0.7, 0.9)))
+            .insert_resource(GlobalAmbientLight {
+                color: Color::WHITE,
+                brightness: 600.0,
+                ..default()
+            })
+            .add_systems(Startup, (draw_the_map, draw_the_quad, set_up_the_grid))
+            .add_systems(
+                RunFixedMainLoop,
+                place_the_quad.in_set(RunFixedMainLoopSystems::AfterFixedMainLoop),
+            )
+            .add_systems(Update, draw_the_grid);
+    }
+}
+
+/// The grid's lines sit on the floor, so they're drawn a little nearer the
+/// camera than they are, or the floor would hide them at a low angle.
+fn set_up_the_grid(mut gizmos: ResMut<GizmoConfigStore>) {
+    let (config, _) = gizmos.config_mut::<DefaultGizmoConfigGroup>();
+    config.depth_bias = -0.0002;
+    config.line.width = 1.5;
+}
+
+fn draw_the_map(
+    plan: Res<FlightPlan>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let surface = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.42, 0.42, 0.4),
+        perceptual_roughness: 0.9,
+        ..default()
+    });
+    for shape in &plan.map.shapes {
+        let (mesh, transform) = match shape {
+            MapShape::Box {
+                centre,
+                size: box_size,
+                attitude,
+            } => {
+                let s = size(*box_size);
+                (
+                    Mesh::from(Cuboid::new(s.x, s.y, s.z)),
+                    Transform::from_translation(point(*centre)).with_rotation(turn(*attitude)),
+                )
+            }
+            MapShape::Convex { corners, triangles }
+            | MapShape::TriangleMesh { corners, triangles } => {
+                (triangle_mesh(corners, triangles), Transform::IDENTITY)
+            }
+        };
+        commands.spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(surface.clone()),
+            transform,
+        ));
+    }
+    // The sun.
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 8_000.0,
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        Transform::IDENTITY.looking_to(Vec3::new(-0.4, -1.0, -0.6), Vec3::Y),
+    ));
+}
+
+/// Triangles between corners, each with its own flat face.
+fn triangle_mesh(corners: &[Vec3d], triangles: &[[u32; 3]]) -> Mesh {
+    let positions: Vec<[f32; 3]> = triangles
+        .iter()
+        .flatten()
+        .map(|&i| point(corners[i as usize]).to_array())
+        .collect();
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.compute_flat_normals();
+    mesh
+}
+
+/// A Test Map's floor gets a grid: a line every metre, and a brighter one
+/// every 10 m, over its whole 200 m.
+fn draw_the_grid(plan: Res<FlightPlan>, mut gizmos: Gizmos) {
+    if !plan.map.id.starts_with("test/") {
+        return;
+    }
+    let floor = Isometry3d::new(Vec3::new(0.0, 0.002, 0.0), Quat::from_rotation_x(FRAC_PI_2));
+    gizmos.grid(
+        floor,
+        UVec2::splat(200),
+        Vec2::splat(1.0),
+        Color::srgba(0.9, 0.9, 0.9, 0.35),
+    );
+    gizmos.grid(
+        Isometry3d::new(Vec3::new(0.0, 0.003, 0.0), floor.rotation),
+        UVec2::splat(20),
+        Vec2::splat(10.0),
+        Color::srgb(1.0, 1.0, 1.0),
+    );
+}
+
+/// The Quad from its collision shapes, as the physics builds them (the body,
+/// the pack, a prop disc per motor and, on a whoop, the duct rings), with
+/// the placeholder camera at the Quad's camera position and Camera Tilt.
+fn draw_the_quad(
+    plan: Res<FlightPlan>,
+    flight: NonSend<Flight>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    view: Res<View>,
+) {
+    let shape = &plan.quad.parameters.shape;
+    let frame = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.12, 0.12, 0.14),
+        perceptual_roughness: 0.6,
+        ..default()
+    });
+    let pack = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.85, 0.65, 0.1),
+        ..default()
+    });
+    // Opaque: Bevy 0.20.0 stops on a rendering error with a few see-through
+    // meshes in view ("Binding size 168 ... less than minimum 176"), as the
+    // Freestyle 5″'s four discs are. The FPV camera doesn't see them anyway.
+    let props = materials.add(StandardMaterial {
+        base_color: Color::srgb(0.25, 0.25, 0.27),
+        ..default()
+    });
+    let (_, state) = flight.drawn_between();
+    let mut quad = commands.spawn((
+        QuadDrawing,
+        Transform::from_translation(point(state.position)).with_rotation(turn(state.attitude)),
+        Visibility::default(),
+    ));
+    quad.with_children(|parts| {
+        let body = size(shape.body);
+        parts.spawn((
+            Mesh3d(meshes.add(Cuboid::new(body.x, body.y, body.z))),
+            MeshMaterial3d(frame.clone()),
+            Transform::IDENTITY,
+        ));
+        let pack_size = size(shape.pack);
+        parts.spawn((
+            Mesh3d(meshes.add(Cuboid::new(pack_size.x, pack_size.y, pack_size.z))),
+            MeshMaterial3d(pack),
+            Transform::from_translation(point(Vec3d::new(0.0, 0.0, shape.pack_height))),
+        ));
+        let disc = meshes.add(Cylinder::new(
+            (shape.prop_diameter / 2.0) as f32,
+            PROP_DISC_THICKNESS as f32,
+        ));
+        for centre in motor_positions(shape) {
+            // Bevy's cylinders stand along their own up axis, so a disc lies
+            // flat in the props' plane as it is.
+            // A spinning prop is a blur a pilot's camera hardly shows, so
+            // only the chase view draws the discs.
+            parts.spawn((
+                Mesh3d(disc.clone()),
+                MeshMaterial3d(props.clone()),
+                Transform::from_translation(point(centre)),
+                RenderLayers::layer(CHASE_ONLY),
+            ));
+            if let Some(rings) = shape.duct_rings {
+                let inside = rings.inside_diameter / 2.0;
+                let outside = inside + rings.wall;
+                let middle = inside + rings.wall / 2.0;
+                let step = std::f64::consts::TAU / f64::from(DUCT_RING_SEGMENTS);
+                let length = 2.0 * outside * (step / 2.0).tan();
+                let segment = meshes.add(Cuboid::new(
+                    rings.wall as f32,
+                    rings.height as f32,
+                    length as f32,
+                ));
+                for k in 0..DUCT_RING_SEGMENTS {
+                    let angle = step * f64::from(k);
+                    let at = centre + Vec3d::new(middle * angle.cos(), middle * angle.sin(), 0.0);
+                    parts.spawn((
+                        Mesh3d(segment.clone()),
+                        MeshMaterial3d(frame.clone()),
+                        Transform::from_translation(point(at))
+                            .with_rotation(Quat::from_rotation_y(angle as f32)),
+                    ));
+                }
+            }
+        }
+        if *view == View::Fpv {
+            let camera = &plan.quad.camera;
+            let tilt = camera.camera_tilt as f32;
+            parts.spawn((
+                Camera3d::default(),
+                NoCpuCulling,
+                projection(0.005),
+                Transform::from_translation(point(Vec3d::new(
+                    camera.position[0],
+                    camera.position[1],
+                    camera.position[2],
+                )))
+                .looking_to(
+                    Vec3::new(tilt.cos(), tilt.sin(), 0.0),
+                    Vec3::new(-tilt.sin(), tilt.cos(), 0.0),
+                ),
+            ));
+        }
+    });
+    if *view == View::Chase {
+        commands.spawn((
+            ChaseCamera,
+            Camera3d::default(),
+            NoCpuCulling,
+            projection(0.05),
+            RenderLayers::from_layers(&[0, CHASE_ONLY]),
+            Transform::IDENTITY,
+        ));
+    }
+}
+
+/// The placeholder camera's lens, with its nearest drawn distance in metres.
+fn projection(near: f32) -> Projection {
+    Projection::Perspective(PerspectiveProjection {
+        fov: PLACEHOLDER_FOV_DEGREES.to_radians(),
+        near,
+        far: 1000.0,
+        ..default()
+    })
+}
+
+/// Which camera draws the picture.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum View {
+    /// The placeholder camera bolted to the Quad's frame at its Camera
+    /// Tilt: what the pilot flies with.
+    #[default]
+    Fpv,
+    /// A developer view: a camera that follows a little behind and above
+    /// the Quad, level, to watch it from outside.
+    Chase,
+}
+
+/// The render layer only the chase view draws.
+const CHASE_ONLY: usize = 1;
+
+/// The chase view's camera.
+#[derive(Component)]
+struct ChaseCamera;
+
+/// Where each motor sits, in body axes, in Betaflight's motor order: half the
+/// diagonal out from the centre at 45°, in the props' plane, as the physics
+/// places them.
+fn motor_positions(shape: &QuadShape) -> [Vec3d; 4] {
+    let a = shape.diagonal / 2.0 * std::f64::consts::FRAC_1_SQRT_2;
+    let z = shape.rotor_height;
+    [
+        Vec3d::new(-a, -a, z),
+        Vec3d::new(a, -a, z),
+        Vec3d::new(-a, a, z),
+        Vec3d::new(a, a, z),
+    ]
+}
+
+/// Places the Quad between the last two ticks' states, by how far the game's
+/// clock is into the next tick.
+fn place_the_quad(
+    flight: NonSend<Flight>,
+    plan: Res<FlightPlan>,
+    fixed: Res<Time<Fixed>>,
+    mut quads: Query<&mut Transform, (With<QuadDrawing>, Without<ChaseCamera>)>,
+    mut chase: Query<&mut Transform, (With<ChaseCamera>, Without<QuadDrawing>)>,
+) {
+    let along = fixed.overstep_fraction_f64().clamp(0.0, 1.0);
+    let (before, after) = flight.drawn_between();
+    let position = point(before.position + (after.position - before.position) * along);
+    let rotation = turn(before.attitude).slerp(turn(after.attitude), along as f32);
+    for mut transform in &mut quads {
+        transform.translation = position;
+        transform.rotation = rotation;
+    }
+    // The chase view: behind the Quad's heading and above it, ten frame
+    // diagonals away, looking at it.
+    let distance = 10.0 * plan.quad.parameters.shape.diagonal as f32;
+    let forward = rotation * Vec3::X;
+    let level = Vec3::new(forward.x, 0.0, forward.z).normalize_or(Vec3::X);
+    for mut camera in &mut chase {
+        *camera =
+            Transform::from_translation(position - level * distance + Vec3::Y * 0.4 * distance)
+                .looking_at(position, Vec3::Y);
+    }
+}

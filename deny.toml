@@ -12,6 +12,10 @@ all-features = true
 # code with no licence are never linked.
 allow = [
     "MIT",
+    # MIT No Attribution: MIT without even the duty to keep the copyright
+    # notice, so more permissive than MIT. Bevy's renderer needs it, for
+    # encase, encase_derive and encase_derive_impl (#62).
+    "MIT-0",
     "Apache-2.0",
     # Apache-2.0 with an extra permission for linked code; still Apache-2.0.
     "Apache-2.0 WITH LLVM-exception",
@@ -48,8 +52,9 @@ unused-allowed-license = "allow"
 #   (SDL_UDEV_DYNAMIC), to notice Input Devices being plugged in and out; it
 #   is never linked or shipped. Linux builds need the `libudev-dev` package
 #   for its headers. SDL's other optional Linux libraries, libusb and D-Bus,
-#   are switched off (crates/input/sdl-linux.cmake), and CI checks they stay
-#   off.
+#   are switched off on x86_64 Linux only, the Linux build CI and the alpha
+#   use (crates/input/sdl-linux.cmake), and CI checks they stay off there. On
+#   other Linux machines SDL turns them on if their headers are installed.
 
 [licenses.private]
 # OpenDrone's own crates are unpublished, but they are checked too: each is
@@ -76,4 +81,10 @@ allow-git = []
 [advisories]
 # A library with a known security advisory blocks the PR that adds or upgrades
 # it. CI runs this check when a PR changes Cargo.lock or this file.
-ignore = []
+ignore = [
+    # ttf-parser 0.25.1 is unmaintained, which isn't a vulnerability. Bevy's
+    # window library reaches it on Linux (bevy_winit, winit, sctk-adwaita,
+    # ab_glyph, owned_ttf_parser) to draw the window's title bar. Decided by
+    # the maintainer in #62. Revisit it at the next Bevy upgrade.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained, not vulnerable; only Bevy's window library reaches it, to draw the Linux window's title bar. Revisit at the next Bevy upgrade (#62)" },
+]

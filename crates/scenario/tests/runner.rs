@@ -10,6 +10,7 @@ use opendrone_pack::Packs;
 use opendrone_scenario::agreement::{Computer, compare};
 use opendrone_scenario::{
     Repo, Report, ResultsFile, ScenarioFile, fingerprints_text, read_scenario, run, run_one,
+    simulation,
 };
 
 fn repo() -> Repo {
@@ -1113,5 +1114,43 @@ fn the_agreement_check_fails_when_a_computer_has_no_fingerprints() {
             "Linux: no fingerprints at all; did its Scenario run finish?",
             "physics/free-fall: Linux has no fingerprints for it; did its run of this Scenario finish?",
         ]
+    );
+}
+
+fn scenario(relative: &str) -> opendrone_scenario::Scenario {
+    let path = repo().root.join("scenarios").join(relative);
+    read_scenario(relative, &fs::read_to_string(path).unwrap()).unwrap()
+}
+
+#[test]
+fn a_scenarios_simulation_stepped_by_its_caller_with_its_flight_inputs_matches_the_runner_step_for_step()
+ {
+    // The game's reference check steps a Scenario's Simulation itself (#62).
+    // This one has Reset, the Arm switch and the ESCs' power-up: the Flight
+    // Inputs arrive at their moments, and the set-up is the runner's.
+    let scenario = scenario("flight-controller/arming-waits-for-the-escs-after-reset.toml");
+    let (mut sim, mut inputs) = simulation(&scenario, &packs()).unwrap();
+    let mut fingerprints = vec![sim.fingerprint()];
+    while sim.time() < inputs.length() {
+        let now = sim.time();
+        for input in inputs.at(now, sim.quad_state(0)) {
+            sim.flight_input(0, now, input);
+        }
+        sim.step();
+        fingerprints.push(sim.fingerprint());
+    }
+    let outcome = run(&scenario, &packs()).unwrap();
+    assert_eq!(fingerprints, outcome.step_fingerprints);
+}
+
+#[test]
+fn a_flight_controller_scenario_has_no_simulation_to_set_up() {
+    let scenario = scenario("flight-controller/actual-rates.toml");
+    let Err(problems) = simulation(&scenario, &packs()) else {
+        panic!("a Flight Controller Scenario should have no Simulation");
+    };
+    assert!(
+        problems.to_string().contains("no Simulation to set up"),
+        "{problems}"
     );
 }
