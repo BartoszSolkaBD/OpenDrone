@@ -108,7 +108,7 @@ Verdict: pass
 - **The first line** is exactly `Reviewed commit ` and the full SHA. Get it with `gh pr view <PR> -R BartoszSolkaBD/OpenDrone --json headRefOid -q .headRefOid`, and check it again just before you post.
 - **The last line** is exactly `Verdict: pass` or `Verdict: changes needed`. Nothing comes after it.
 - **Say pass** only when no problem blocks the merge. List non-blocking problems anyway.
-- **Post it** with `gh pr comment <PR> -R BartoszSolkaBD/OpenDrone --body-file verdict.md`.
+- **Post it** with `gh pr comment <PR> -R BartoszSolkaBD/OpenDrone --body-file verdict-<PR>.md`. Name the file after the PR: other agents share your scratchpad, and a plain `verdict.md` could be another Reviewer's.
 - **Never edit** an earlier Verdict to change what it says. Post a new one.
 
 PR [#88](https://github.com/BartoszSolkaBD/OpenDrone/pull/88) has two real Verdicts: a changes needed, then a pass.

@@ -74,7 +74,7 @@ Your job is small and mechanical: confirm the update brought in main's changes a
 
 ## The result
 
-**If every step holds,** post one comment with `gh pr comment <PR> -R BartoszSolkaBD/OpenDrone --body-file verdict.md`:
+**If every step holds,** post one comment with `gh pr comment <PR> -R BartoszSolkaBD/OpenDrone --body-file verdict-<PR>.md`, named after the PR because other agents share your scratchpad:
 
 ```text
 Reviewed commit <H, all 40 characters>
