@@ -1,0 +1,76 @@
+# Results of anti-gravity.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Anti-gravity strengthens I and P while the throttle moves fast, most at low throttle"
+
+[[expect]]
+what     = "roll P term at 0.5 s"
+basis    = "Source"
+expected = "14.5711 ± 0.0001"
+measured = "14.6"
+
+[[expect]]
+what     = "roll I term at 0.5 s"
+basis    = "Source"
+expected = "98.824 ± 0.001"
+measured = "98.8"
+
+[[expect]]
+what     = "roll P term at 0.51 s"
+basis    = "Source"
+expected = "29.303 ± 0.001"
+measured = "29.3"
+
+[[expect]]
+what     = "roll P term at 0.6 s"
+basis    = "Source"
+expected = "16.4376 ± 0.001"
+measured = "16.4"
+
+[[expect]]
+what     = "roll I term at 0.6 s"
+basis    = "Source"
+expected = "186.059 ± 0.001"
+measured = "186"
+
+[[expect]]
+what     = "yaw I term at 0.6 s"
+basis    = "Source"
+expected = "3.2158 ± 0.0001"
+measured = "3.22"
+
+[[expect]]
+what     = "roll P term at 1.01 s"
+basis    = "Source"
+expected = "16.555 ± 0.001"
+measured = "16.6"
+
+[[expect]]
+what     = "roll I term at 1.1 s"
+basis    = "Source"
+expected = "297.172 ± 0.001"
+measured = "297"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "62b9cebc0c969b9d"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "8b16841e6e1818bd"   # the whole state after each of 8800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.11 s" = "74d573393270defc"
+"0.22 s" = "915cc8babc36ee40"
+"0.33 s" = "5bfaec9da40180bf"
+"0.44 s" = "821dc8887fa50f0f"
+"0.55 s" = "3216ac8cdca1f9c7"
+"0.66 s" = "e34fff0a7b05c9a7"
+"0.77 s" = "1a60950d2c1e059f"
+"0.88 s" = "7c8e6a6170a47ba2"
+"0.99 s" = "a02fdeb385f13b5d"
+"1.1 s" = "26175ffe1334a395"

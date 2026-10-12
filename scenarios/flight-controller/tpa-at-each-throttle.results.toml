@@ -1,0 +1,66 @@
+# Results of tpa-at-each-throttle.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "TPA cuts more the higher the throttle, and low-throttle TPA cuts at the bottom"
+
+[[expect]]
+what     = "TPA factor with arm on"
+basis    = "Source"
+expected = "0.8 ± 0.000001"
+measured = "0.800"
+
+[[expect]]
+what     = "mixer throttle with throttle 10%, arm on"
+basis    = "Source"
+expected = "4.2% ± 0.000001%"
+measured = "4.20%"
+
+[[expect]]
+what     = "TPA factor with throttle 10%, arm on"
+basis    = "Source"
+expected = "0.968 ± 0.000001"
+measured = "0.968"
+
+[[expect]]
+what     = "TPA factor with throttle 35%, arm on"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "TPA factor with throttle 50%, arm on"
+basis    = "Source"
+expected = "0.877 ± 0.000001"
+measured = "0.877"
+
+[[expect]]
+what     = "TPA factor with throttle 75%, arm on"
+basis    = "Source"
+expected = "0.608 ± 0.000001"
+measured = "0.608"
+
+[[expect]]
+what     = "TPA factor with throttle 100%, arm on"
+basis    = "Source"
+expected = "0.35 ± 0.000001"
+measured = "0.350"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "62b9cebc0c969b9d"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "d6a1a03901985903"   # the Flight Controller's whole state after each of 6 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "dddb92db3bd0e67e"
+"case 2" = "920d065cd722260c"
+"case 3" = "438a68f44450e582"
+"case 4" = "9d731d2b517e848b"
+"case 5" = "aeb9dd04b3ab3ba3"
+"case 6" = "6bc4745c4619a69e"

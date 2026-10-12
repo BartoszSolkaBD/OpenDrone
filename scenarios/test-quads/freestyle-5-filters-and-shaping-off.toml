@@ -4,13 +4,12 @@
 # and Airmode, and the motors' range work their numbers out from Betaflight's
 # maths with nothing in between. On the 5″'s own Tune, Betaflight 2026.6.2
 # puts more in between: low-passes on the gyro, the D term and yaw's P term,
-# RC smoothing and feedforward, which the Flight Controller simulates (#49),
-# and the dynamic notch, Dynamic D, I-term relax, anti-gravity, TPA and
-# throttle boost, which it doesn't yet (#21, #50). This Test Quad switches
-# each one off in the Tune, the way Betaflight reads "off", so those
-# Scenarios' numbers are what Betaflight 2026.6.2 gives on this Tune today,
-# and still will once #50 lands. It
-# also switches off runaway takeoff prevention (simulated since #54), which
+# RC smoothing and feedforward (#49), Dynamic D, I-term relax,
+# anti-gravity, TPA and throttle boost (#50), which the Flight Controller
+# simulates, and the dynamic notch, which it doesn't yet (#21). This Test
+# Quad switches each one off in the Tune, the way Betaflight reads "off", so
+# those Scenarios' numbers are what Betaflight 2026.6.2 gives on this Tune.
+# It also switches off runaway takeoff prevention (simulated since #54), which
 # would disarm a fresh Flight Controller holding a PID sum of 600 or more,
 # with the gyro moving, for 75 ms, as these Scenarios' held sensor readings
 # can. Everything else is the Freestyle 5″'s.

@@ -1,0 +1,116 @@
+# TPA cuts the D term by its factor, and low-throttle TPA stops for good once
+# the throttle first passes its breakpoint, as in Betaflight 2026.6.2
+# (`getTpaFactorClassic` and `getTpaFactor`, src/main/flight/pid.c; the
+# Betaflight research §3). tpa-at-each-throttle.toml works the factors out
+# throttle by throttle.
+#
+# - The mixer works the factor out from its throttle each loop, and the next
+#   loop's PID loop multiplies D by it. On the Freestyle 5″'s Tune
+#   (`tpa_mode` D) it cuts D only.
+# - Low-throttle TPA's `isTpaLowFaded`: once the throttle reaches
+#   `tpa_low_breakpoint` (a throttle of 0.05), low-throttle TPA is over until
+#   the next power-up (`tpa_low_always` OFF), however low the throttle goes.
+#
+# The Flight Controller alone, armed, sticks centred, the throttle at 0%. At
+# 0.1 s the gyro starts reading a roll left at 1 °/s, and at 0.3 s it reads
+# still again, and so on: on the loop the reading steps by 1 °/s, D is
+# 0.000529 × 30 × 1 °/s × 8000 = 126.96 before TPA, the sign the step's. The
+# throttle goes to 50% (a mixer throttle of 0.473) at 0.2 s, back to 0% at
+# 0.4 s and to 100% at 0.6 s.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only, with no D-term
+# low-passes, so all of a step's D lands in one loop. Its Dynamic D takes
+# the gyro's speed into account (`d_max_gain` 37), which on such a loop
+# multiplies D by 1.0000033: 0.0004 on 126.96, too little to show here.
+format = 2
+name   = "TPA cuts the D term, and low-throttle TPA stops once the throttle passes its breakpoint"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.1 s", rotation = "roll -1 °/s, pitch 0 °/s, yaw 0 °/s" },
+  { at = "0.2 s", throttle = "50%" },
+  { at = "0.3 s", rotation = "0 °/s" },
+  { at = "0.4 s", throttle = "0%" },
+  { at = "0.5 s", rotation = "roll -1 °/s, pitch 0 °/s, yaw 0 °/s" },
+  { at = "0.6 s", throttle = "100%" },
+  { at = "0.7 s", rotation = "0 °/s" },
+]
+
+# Zero throttle since power-up: low-throttle TPA.
+
+[[expect]]
+what  = "TPA factor"
+at    = "0.1 s"
+value = "0.8 ± 0.000001"
+basis = "source: getTpaFactorClassic: at zero throttle, below the low breakpoint since power-up, 1 − 0.20 = 0.80"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.100125 s"
+value = "101.568 ± 0.001"
+basis = "source: pidController: 126.96 × 0.80 = 101.568"
+
+# 50%: TPA above its breakpoint, and low-throttle TPA is over.
+
+[[expect]]
+what  = "TPA factor"
+at    = "0.25 s"
+value = "0.877 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − (0.473 − 0.35) = 0.877"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.300125 s"
+value = "-111.344 ± 0.001"
+basis = "source: pidController: the reading rises back by 1 °/s, so D is -126.96 × 0.877 = -111.344"
+
+# Back to zero throttle: no more low-throttle TPA.
+
+[[expect]]
+what  = "TPA factor"
+at    = "0.45 s"
+value = "1 ± 0"
+basis = "source: getTpaFactorClassic: the throttle passed the low breakpoint at 0.2 s, so isTpaLowFaded holds until the next power-up, and at zero throttle nothing is cut"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.500125 s"
+value = "126.960 ± 0.001"
+basis = "source: pidController: no cut, D is 126.96"
+
+# Full throttle: TPA's whole cut.
+
+[[expect]]
+what  = "TPA factor"
+at    = "0.65 s"
+value = "0.35 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − (1 − 0.35) = 0.35"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.700125 s"
+value = "-44.436 ± 0.001"
+basis = "source: pidController: -126.96 × 0.35 = -44.436"

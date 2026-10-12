@@ -153,6 +153,12 @@ pub enum Measure {
     /// motor range), in the pilot's directions: a positive pitch term pushes
     /// the nose up.
     PidTerm(Axis, Term),
+    /// The TPA factor the PID loop used: what D (and P with `tpa_mode` PD)
+    /// was multiplied by, 1 being no cut (Betaflight's `DEBUG_TPA`).
+    TpaFactor,
+    /// An axis's Dynamic D multiplier, from 1 to D max ÷ D (Betaflight's
+    /// `DEBUG_D_MAX`).
+    DynamicDFactor(Axis),
     /// The DShot value our Flight Controller sends a motor: 0 is "stop", 48
     /// to 2047 the throttle.
     MotorDshot(usize),
@@ -160,8 +166,8 @@ pub enum Measure {
     /// normal way, -1 backwards (Crash Flip).
     MotorDirection(usize),
     /// The throttle our Flight Controller's mixer starts from, from 0% to
-    /// 100%, before Airmode moves it: what Betaflight's Blackbox logs as the
-    /// mixer's throttle.
+    /// 100%, after the throttle limit and throttle boost and before Airmode
+    /// moves it: what Betaflight's Blackbox logs as the mixer's throttle.
     MixerThrottle,
     /// How many reports from the Input Device reached the Radio Link since
     /// its last frame: the fresh ones the frame carries, the newest winning
@@ -454,7 +460,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 99] = [
+const ALL: [(&str, Measure); 103] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -557,6 +563,13 @@ const ALL: [(&str, Measure); 99] = [
     ("yaw D term", Measure::PidTerm(Axis::Yaw, Term::D)),
     ("yaw F term", Measure::PidTerm(Axis::Yaw, Term::F)),
     ("yaw PID sum", Measure::PidTerm(Axis::Yaw, Term::Sum)),
+    ("TPA factor", Measure::TpaFactor),
+    ("roll Dynamic D factor", Measure::DynamicDFactor(Axis::Roll)),
+    (
+        "pitch Dynamic D factor",
+        Measure::DynamicDFactor(Axis::Pitch),
+    ),
+    ("yaw Dynamic D factor", Measure::DynamicDFactor(Axis::Yaw)),
     ("motor 1 DShot", Measure::MotorDshot(0)),
     ("motor 2 DShot", Measure::MotorDshot(1)),
     ("motor 3 DShot", Measure::MotorDshot(2)),
@@ -680,9 +693,11 @@ impl Measure {
             Measure::DetectedPacketRate
             | Measure::SetpointSmoothingCutoff
             | Measure::ThrottleSmoothingCutoff => Dimension::PER_SECOND,
-            Measure::PidTerm(..) | Measure::MotorDshot(_) | Measure::MotorDirection(_) => {
-                Dimension::NONE
-            }
+            Measure::PidTerm(..)
+            | Measure::TpaFactor
+            | Measure::DynamicDFactor(_)
+            | Measure::MotorDshot(_)
+            | Measure::MotorDirection(_) => Dimension::NONE,
             Measure::MixerThrottle => Dimension::PERCENT,
             Measure::ReportsInTheFrame => Dimension::NONE,
             Measure::FrameAge => Dimension::TIME,
@@ -703,6 +718,8 @@ impl Measure {
             | Measure::SetpointSmoothingCutoff
             | Measure::ThrottleSmoothingCutoff
             | Measure::PidTerm(..)
+            | Measure::TpaFactor
+            | Measure::DynamicDFactor(_)
             | Measure::MotorDshot(_)
             | Measure::MotorDirection(_)
             | Measure::MixerThrottle => true,
@@ -832,6 +849,8 @@ impl Measure {
             | Measure::SetpointSmoothingCutoff
             | Measure::ThrottleSmoothingCutoff
             | Measure::PidTerm(..)
+            | Measure::TpaFactor
+            | Measure::DynamicDFactor(_)
             | Measure::MotorDshot(_)
             | Measure::MotorDirection(_)
             | Measure::MixerThrottle
@@ -875,6 +894,8 @@ impl Measure {
                     },
                 )
             }
+            Measure::TpaFactor => record.tpa_factor,
+            Measure::DynamicDFactor(axis) => record.dynamic_d_factor[index(axis)],
             Measure::MotorDshot(k) => f64::from(record.motors[k].dshot),
             Measure::MotorDirection(k) => match record.motors[k].direction {
                 opendrone_flight_controller::SpinDirection::Normal => 1.0,
