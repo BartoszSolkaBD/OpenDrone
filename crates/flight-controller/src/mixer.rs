@@ -28,9 +28,12 @@
 //! In Crash Flip the mixer is bypassed: [`crash_flip`] drives the motors
 //! straight from the sticks.
 //!
-//! Not here yet: throttle boost, anti-gravity's and TPA's reading of the
-//! throttle (#50), thrust linearisation, battery-sag compensation and
-//! dynamic idle (later).
+//! Before the PID sums are mixed, the throttle passes the pilot's throttle
+//! limit ([`throttle`]), then the mixer's throttle work for the PID loop and
+//! throttle boost ([`crate::throttle_shaping`]).
+//!
+//! Not here yet: thrust linearisation, battery-sag compensation and dynamic
+//! idle (later).
 
 use opendrone_maths::functions;
 
@@ -66,16 +69,6 @@ const CRASH_FLIP_STICK_DEADBAND: f64 = 0.15;
 /// stopped (`CRASHFLIP_MOTOR_DEADBAND`).
 const CRASH_FLIP_MOTOR_DEADBAND: f64 = 0.02;
 
-/// What the mixer gives for one loop.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct Mixed {
-    /// The throttle after the throttle limit, from 0 to 1, before Airmode
-    /// moves it: what Betaflight's Blackbox logs as the mixer's throttle.
-    pub throttle: f64,
-    /// Each motor's DShot value.
-    pub dshot: [u16; 4],
-}
-
 /// The motors' endpoints, in DShot values: idle, and the top of the range
 /// after the output limit (`motorOutputLow`, `motorOutputHigh`).
 fn endpoints(tune: &Tune) -> (f64, f64) {
@@ -86,30 +79,36 @@ fn endpoints(tune: &Tune) -> (f64, f64) {
     (output_low, output_high)
 }
 
-/// Mixes one loop's PID sums and throttle command (in µs, from 1000 to 2000,
-/// after RC smoothing) into four DShot values. `yaw_spin` is true during yaw
-/// spin recovery.
-pub(crate) fn mix(
-    tune: &Tune,
-    rates: &Rates,
-    pid_sums: [f64; 3],
-    throttle_command: f64,
-    armed: bool,
-    yaw_spin: bool,
-) -> Mixed {
-    let (output_low, output_high) = endpoints(tune);
-
-    // The throttle, from 0 to 1, then the pilot's throttle limit.
-    let mut throttle = constrain((throttle_command - 1000.0) / 1000.0, 0.0, 1.0);
+/// The mixer's throttle, from 0 to 1, from the throttle command (in µs, from
+/// 1000 to 2000, after RC smoothing), through the pilot's throttle limit
+/// (`calculateThrottleAndCurrentMotorEndpoints`, `applyThrottleLimit`):
+/// SCALE shrinks the whole range to `throttle_limit_percent`, CLIP cuts it
+/// off there.
+pub(crate) fn throttle(rates: &Rates, throttle_command: f64) -> f64 {
+    let throttle = constrain((throttle_command - 1000.0) / 1000.0, 0.0, 1.0);
     if rates.throttle_limit_type != ThrottleLimitType::Off && rates.throttle_limit_percent < 100 {
         let factor = f64::from(rates.throttle_limit_percent) / 100.0;
-        throttle = match rates.throttle_limit_type {
+        match rates.throttle_limit_type {
             ThrottleLimitType::Scale => throttle * factor,
-            ThrottleLimitType::Clip => opendrone_maths::functions::min(throttle, factor),
+            ThrottleLimitType::Clip => functions::min(throttle, factor),
             ThrottleLimitType::Off => throttle,
-        };
+        }
+    } else {
+        throttle
     }
-    let mixer_throttle = throttle;
+}
+
+/// Mixes one loop's PID sums and the mixer's throttle, from 0 to 1 (after
+/// the throttle limit and throttle boost), into four DShot values. `yaw_spin`
+/// is true during yaw spin recovery.
+pub(crate) fn mix(
+    tune: &Tune,
+    pid_sums: [f64; 3],
+    mut throttle: f64,
+    armed: bool,
+    yaw_spin: bool,
+) -> [u16; 4] {
+    let (output_low, output_high) = endpoints(tune);
 
     // 1. The PID sums, held within their limits.
     let roll_pitch = f64::from(tune.pidsum_limit);
@@ -161,10 +160,7 @@ pub(crate) fn mix(
             *value = output.round_ties_even() as u16;
         }
     }
-    Mixed {
-        throttle: mixer_throttle,
-        dshot,
-    }
+    dshot
 }
 
 /// What Crash Flip reads besides the Tune: the sticks and the sensors.

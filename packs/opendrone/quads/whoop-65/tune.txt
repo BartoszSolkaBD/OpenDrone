@@ -56,14 +56,17 @@ set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
 set p_roll = 40                        # diff
 set i_roll = 64                        # diff
 set d_roll = 45                        # diff (was d_min_roll)
+set d_max_roll = 48                    # diff (was d_roll)
 set f_roll = 125                       # diff
 set p_pitch = 39                       # diff
 set i_pitch = 64                       # diff
 set d_pitch = 49                       # diff (was d_min_pitch)
+set d_max_pitch = 52                   # diff (was d_pitch)
 set f_pitch = 124                      # diff
 set p_yaw = 35                         # diff
 set i_yaw = 50                         # diff
 set d_yaw = 0                          # 4.3 default
+set d_max_yaw = 0                      # 4.3 default (was d_min_yaw)
 set f_yaw = 100                        # diff
 set feedforward_transition = 0         # 4.3 default
 set feedforward_averaging = 2_POINT    # diff
@@ -71,6 +74,16 @@ set feedforward_smooth_factor = 25     # 4.3 default
 set feedforward_jitter_factor = 9      # diff
 set feedforward_boost = 15             # 4.3 default
 set feedforward_max_rate_limit = 90    # 4.3 default
+set d_max_gain = 37                    # 4.3 default
+set d_max_advance = 7                  # ADR-0008; 4.3's stick boost: d_max_gain 37 × d_max_advance 20 ÷ 100
+set iterm_relax = RP                   # 4.3 default
+set iterm_relax_type = SETPOINT        # 4.3 default
+set iterm_relax_cutoff = 15            # 4.3 default; Hz
+set anti_gravity_gain = 80             # 2026.6 default; 0 is off
+set tpa_mode = D                       # 4.3 default
+set tpa_rate = 70                      # diff; percent
+set tpa_breakpoint = 1350              # 4.3 default; µs
+set throttle_boost = 5                 # 4.3 default; 0 is off
 set motor_output_limit = 100           # 4.3 default; percent
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
@@ -79,6 +92,12 @@ set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% 
 set pid_at_min_throttle = ON           # 4.3 default
 set feedforward_yaw_hold_gain = 0      # ADR-0008
 set feedforward_yaw_hold_time = 100    # 2026.6 default; ms
+set anti_gravity_cutoff_hz = 5         # 2026.6 default; Hz
+set anti_gravity_p_gain = 100          # 2026.6 default
+set tpa_low_rate = 0                   # ADR-0008; percent; 0 is off
+set tpa_low_breakpoint = 1050          # 2026.6 default; µs
+set tpa_low_always = OFF               # 2026.6 default
+set throttle_boost_cutoff = 15         # 4.3 default; Hz
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 4.3 default
@@ -126,15 +145,6 @@ set crashflip_auto_rearm = OFF         # 2026.6 default
 
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands (ADR-0015).
-# PID Tuning
-set d_max_roll = 48                    # diff (was d_roll); not simulated yet (#50)
-set d_max_pitch = 52                   # diff (was d_pitch); not simulated yet (#50)
-set d_max_yaw = 0                      # 4.3 default (was d_min_yaw); not simulated yet (#50)
-set iterm_relax = RP                   # 4.3 default; not simulated yet (#50)
-set anti_gravity_gain = 80             # 2026.6 default; not simulated yet (#50)
-set tpa_rate = 70                      # diff; not simulated yet (#50)
-set tpa_low_rate = 0                   # ADR-0008; not simulated yet (#50)
-set throttle_boost = 5                 # 4.3 default; not simulated yet (#50)
 # PID Tuning, filters
 set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)
 
@@ -145,20 +155,9 @@ set failsafe_switch_mode = STAGE1      # 4.3 default
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
 set failsafe_stick_threshold = 30      # 4.3 default; percent
 # PID Tuning
-set d_max_gain = 37                    # 4.3 default
-set d_max_advance = 7                  # ADR-0008; 4.3's stick boost: d_max_gain 37 × d_max_advance 20 ÷ 100
-set iterm_relax_type = SETPOINT        # 4.3 default
-set iterm_relax_cutoff = 15            # 4.3 default; Hz
-set tpa_mode = D                       # 4.3 default
-set tpa_breakpoint = 1350              # 4.3 default; µs
 set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
 set angle_limit = 55                   # 4.3 default (was level_limit); degrees
 set horizon_level_strength = 50        # 4.3 default
-set anti_gravity_cutoff_hz = 5         # 2026.6 default; Hz
-set anti_gravity_p_gain = 100          # 2026.6 default
-set tpa_low_breakpoint = 1050          # 2026.6 default; µs
-set tpa_low_always = OFF               # 2026.6 default
-set throttle_boost_cutoff = 15         # 4.3 default; Hz
 set angle_feedforward = 50             # 2026.6 default
 set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
 set angle_earth_ref = 0                # ADR-0008; percent

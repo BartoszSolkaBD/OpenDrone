@@ -24,7 +24,11 @@
 //!   Betaflight's boot grace, the Radio Link and Failsafe, and the Arm switch
 //!   going off before it can arm again) ([ADR-0017], [`arming`]);
 //! - the Radio Link's loss and Failsafe, flying DROP ([`failsafe`]);
-//! - the PID loop with Betaflight's scaling, I limit and PID-sum limits;
+//! - the PID loop with Betaflight's scaling, I limit and PID-sum limits, and
+//!   its loop shaping: I-term relax, anti-gravity, Dynamic D and TPA,
+//!   including low-throttle TPA (`pid`, `throttle_shaping`);
+//! - the throttle curve (`thr_mid`, `thr_hover`, `thr_expo`) and the
+//!   throttle limit from the pilot's [`Rates`], and throttle boost;
 //! - the gyro's, the D term's and yaw P's low-pass filters, static or
 //!   following the throttle (`gyro_filter`, `pid`, `filter`);
 //! - Betaflight's detection of the Packet Rate from the frames' timing, and
@@ -51,8 +55,7 @@
 //!   a 2026.6 Tune, and the pilot's pasted Rates, `aux` switches and OSD
 //!   layout.
 //!
-//! The rest of the loop shaping (#50) and Angle and Horizon (#51) arrive
-//! with their tickets.
+//! Angle and Horizon (#51) arrive with their ticket.
 //!
 //! # Power-up
 //!
@@ -91,13 +94,16 @@
 //!    counts) and feedforward is worked out for the frame. Then RC smoothing
 //!    takes a step on the setpoints, the throttle and feedforward.
 //! 6. Yaw spin recovery watches the filtered gyro's yaw rate.
-//! 7. The PID loop compares each smoothed setpoint with the filtered gyro;
-//!    then runaway takeoff prevention checks the PID sums.
-//! 8. The mixer turns the PID sums and the smoothed throttle into four motor
-//!    commands, or in Crash Flip the sticks do; a spin direction command
-//!    queued by arming or disarming goes out in their place
-//!    ([`dshot_command`]). Outside Crash Flip, the mixer's throttle then
-//!    moves the dynamic low-passes for the next loop.
+//! 7. The PID loop compares each smoothed setpoint with the filtered gyro,
+//!    with the TPA factor and anti-gravity the mixer worked out the loop
+//!    before; then runaway takeoff prevention checks the PID sums.
+//! 8. The smoothed throttle passes the pilot's throttle limit. Outside Crash
+//!    Flip, the mixer works out anti-gravity and the TPA factor from it for
+//!    the next loop, moves the dynamic low-passes, adds throttle boost, and
+//!    turns the PID sums and the boosted throttle into four motor commands;
+//!    in Crash Flip the sticks drive the motors instead. A spin direction
+//!    command queued by arming or disarming goes out in their place
+//!    ([`dshot_command`]).
 //! 9. The battery's tasks run when due, 50 times a second for the voltage
 //!    and current and 5 for its state ([`battery`]); then the beeper is told
 //!    what to beep (the "gyro calibrated" beeps on the first loop, arming,
@@ -154,6 +160,7 @@ pub mod rates;
 mod rc_smoothing;
 mod receiver;
 mod runaway;
+mod throttle_shaping;
 pub mod tune;
 mod yaw_spin;
 
@@ -167,10 +174,11 @@ use failsafe::{Failsafe, Receiver};
 use feedforward::{Feedforward, FeedforwardFrame};
 use gyro_filter::{DynamicThrottle, GyroFilters};
 use mixer::CrashFlipInputs;
-use pid::Pid;
+use pid::{Modes, Pid};
 use rc_smoothing::{PacketRate, RcSmoothing};
 use receiver::RcCommand;
 use runaway::Runaway;
+use throttle_shaping::ThrottleShaping;
 use yaw_spin::YawSpin;
 
 pub use arming::ArmingBlocks;
@@ -182,8 +190,8 @@ pub use mixer::{DSHOT_HIGHEST, DSHOT_LOWEST};
 pub use pid::Terms;
 pub use rates::{Axis, AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use tune::{
-    CurrentMeter, FailsafeProcedure, FeedforwardAveraging, Gains, LowpassType, MixerType,
-    MotorProtocol, Tune, TuneProblems, YawSpinRecovery,
+    CurrentMeter, FailsafeProcedure, FeedforwardAveraging, Gains, ItermRelax, ItermRelaxType,
+    LowpassType, MixerType, MotorProtocol, TpaMode, Tune, TuneProblems, YawSpinRecovery,
 };
 
 /// What a real board's sensors read, which is all the Flight Controller
@@ -300,7 +308,16 @@ pub struct DebugRecord {
     /// Each axis's P, I, D and F terms and their sum, on Betaflight's scale
     /// (1000 is the whole motor range). I is the one the sum used.
     pub terms: [Terms; 3],
-    /// The mixer's throttle, from 0 to 1, after RC smoothing.
+    /// The TPA factor the PID loop used: what D (and P with `tpa_mode` PD)
+    /// was multiplied by, 1 being no cut (Betaflight's `DEBUG_TPA`).
+    pub tpa_factor: f64,
+    /// Each axis's Dynamic D multiplier, from 1 to D max ÷ D: 1 with
+    /// Dynamic D off on the axis (Betaflight's `DEBUG_D_MAX`).
+    pub dynamic_d_factor: [f64; 3],
+    /// The mixer's throttle, from 0 to 1, after RC smoothing, the throttle
+    /// limit and throttle boost, before Airmode moves it: what Betaflight's
+    /// Blackbox logs as the mixer's throttle. In Crash Flip, which skips the
+    /// rest of the mixer, it's the throttle before throttle boost.
     pub throttle: f64,
     /// The four motor commands, in Betaflight's motor order.
     pub motors: [MotorCommand; 4],
@@ -379,6 +396,8 @@ pub struct FlightController {
     /// The gyro's low-passes, and when the dynamic ones last moved.
     gyro_filters: GyroFilters,
     dynamic_throttle: DynamicThrottle,
+    /// Anti-gravity, TPA and throttle boost's work on the mixer's throttle.
+    throttle_shaping: ThrottleShaping,
     arming: Arming,
     /// Airmode's start: the throttle passed its threshold since arming.
     throttle_raised: bool,
@@ -425,6 +444,7 @@ impl FlightController {
         let rc_smoothing = RcSmoothing::new(&tune, loop_hz, packet_rate.detected_hz);
         let feedforward = Feedforward::new(&tune, &rates, packet_rate.detected_hz);
         let gyro_filters = GyroFilters::new(&tune, loop_hz);
+        let throttle_shaping = ThrottleShaping::new(&tune, loop_hz);
         let throttle_lookup = receiver::throttle_lookup(&rates);
         let arming = Arming::new(armed);
         let receiver = Receiver::at_power_up(&tune);
@@ -444,6 +464,8 @@ impl FlightController {
                 detected_packet_rate: packet_rate.detected_hz,
                 rc_smoothing_cutoffs: cutoffs(&rc_smoothing),
                 terms: [Terms::default(); 3],
+                tpa_factor: 1.0,
+                dynamic_d_factor: [1.0; 3],
                 throttle: 0.0,
                 motors: [stopped(); 4],
                 crash_flip: false,
@@ -480,6 +502,7 @@ impl FlightController {
             feedforward,
             gyro_filters,
             dynamic_throttle: DynamicThrottle::new(),
+            throttle_shaping,
             arming,
             throttle_raised: false,
             stabilising: false,
@@ -546,14 +569,23 @@ impl FlightController {
         self.process_sticks(changed);
         let smoothed = self.rc_smoothing.smoothed;
         let smoothed_setpoint = [smoothed[0], smoothed[1], smoothed[2]];
+        // The mixer's throttle, through the pilot's throttle limit. The PID
+        // loop reads what the mixer worked out from it the loop before; a
+        // fresh Flight Controller settles on this first one.
+        let throttle = mixer::throttle(&self.rates, smoothed[3]);
+        self.throttle_shaping.settle(throttle);
+        let shaping = self.throttle_shaping.shaping();
         self.yaw_spin.check(gyro[2], now_us);
         self.pid.step(
             smoothed_setpoint,
             gyro,
             self.rc_smoothing.feedforward_smoothed,
-            self.stabilising,
-            self.reset_iterm,
-            self.yaw_spin.active,
+            shaping,
+            Modes {
+                stabilising: self.stabilising,
+                reset_iterm: self.reset_iterm,
+                yaw_spin: self.yaw_spin.active,
+            },
         );
         let sums = self.pid.terms.map(|terms| terms.sum);
         if self
@@ -576,15 +608,7 @@ impl FlightController {
             }
             _ => {}
         }
-        let mixed = mixer::mix(
-            &self.tune,
-            &self.rates,
-            sums,
-            smoothed[3],
-            self.arming.armed,
-            self.yaw_spin.active,
-        );
-        let dshot = if self.arming.crash_flip {
+        let (dshot, mixer_throttle) = if self.arming.crash_flip {
             let deflection = self.command.map_or([0.0; 3], |command| {
                 Axis::ALL.map(|axis| command.deflection(&self.tune, axis))
             });
@@ -593,18 +617,28 @@ impl FlightController {
                 gyro,
                 cos_tilt: readings.attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0)).z,
             };
-            mixer::crash_flip(&self.tune, inputs, &mut self.tilt_at_start)
+            let dshot = mixer::crash_flip(&self.tune, inputs, &mut self.tilt_at_start);
+            (dshot, throttle)
         } else {
             self.tilt_at_start = None;
-            // Betaflight's mixer moves the dynamic low-passes, except in
-            // Crash Flip, which skips the rest of the mixer.
+            // Betaflight's mixer works out anti-gravity, TPA and throttle
+            // boost and moves the dynamic low-passes, except in Crash Flip,
+            // which skips the rest of the mixer.
+            let boosted = self.throttle_shaping.mixer(throttle);
             if let Some(throttle) =
                 self.dynamic_throttle
-                    .after_mixing(now_us, mixed.throttle, &mut self.gyro_filters)
+                    .after_mixing(now_us, throttle, &mut self.gyro_filters)
             {
                 self.pid.follow(throttle);
             }
-            mixed.dshot
+            let dshot = mixer::mix(
+                &self.tune,
+                sums,
+                boosted,
+                self.arming.armed,
+                self.yaw_spin.active,
+            );
+            (dshot, boosted)
         };
         let (sent, direction) = self.dshot.output(dshot);
         let motors = sent.map(|dshot| MotorCommand { dshot, direction });
@@ -622,7 +656,9 @@ impl FlightController {
             detected_packet_rate: self.packet_rate.detected_hz,
             rc_smoothing_cutoffs: cutoffs(&self.rc_smoothing),
             terms: self.pid.terms,
-            throttle: mixed.throttle,
+            tpa_factor: shaping.tpa,
+            dynamic_d_factor: self.pid.d_max_factor,
+            throttle: mixer_throttle,
             motors,
             crash_flip: self.arming.crash_flip,
             yaw_spin_recovery: self.yaw_spin.active,
@@ -827,6 +863,7 @@ impl FlightController {
         self.feedforward.write_fingerprint(f);
         self.gyro_filters.write_fingerprint(f);
         self.dynamic_throttle.write_fingerprint(f);
+        self.throttle_shaping.write_fingerprint(f);
         self.arming.write_fingerprint(f);
         for flag in [self.throttle_raised, self.stabilising, self.reset_iterm] {
             f.write_u64(u64::from(flag));

@@ -1,0 +1,64 @@
+# Results of i-term-relax.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "I-term relax holds roll's and pitch's I back while the stick moves fast"
+
+[[expect]]
+what     = "roll I term at 0.5 s"
+basis    = "Source"
+expected = "1.0719 ± 0.0001"
+measured = "1.07"
+
+[[expect]]
+what     = "roll I term at 0.51 s"
+basis    = "Source"
+expected = "1.0719 ± 0.0001"
+measured = "1.07"
+
+[[expect]]
+what     = "yaw I term at 0.51 s"
+basis    = "Source"
+expected = "4.4117 ± 0.0001"
+measured = "4.41"
+
+[[expect]]
+what     = "roll I term at 0.53 s"
+basis    = "Source"
+expected = "1.4637 ± 0.0001"
+measured = "1.46"
+
+[[expect]]
+what     = "roll I term at 0.6 s"
+basis    = "Source"
+expected = "6.0994 ± 0.0001"
+measured = "6.10"
+
+[[expect]]
+what     = "roll I term at 0.7 s"
+basis    = "Source"
+expected = "13.0266 ± 0.0001"
+measured = "13.0"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "62b9cebc0c969b9d"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "2378e82b2aaa10ab"   # the whole state after each of 5600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.07 s" = "b3030e4befcaa238"
+"0.14 s" = "3f8aa7f1d13c2d4d"
+"0.21 s" = "c424fa0fa7afbbc2"
+"0.28 s" = "2097bf1c84e31c3b"
+"0.35 s" = "ba991bd4069a22d5"
+"0.42 s" = "9288785be1146b25"
+"0.49 s" = "ecb895a09550e096"
+"0.56 s" = "e8d1fff907e2e7b1"
+"0.63 s" = "eabf489666b58039"
+"0.7 s" = "5ecb6adee828a153"

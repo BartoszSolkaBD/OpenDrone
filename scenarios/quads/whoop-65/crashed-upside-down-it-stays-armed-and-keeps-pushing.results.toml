@@ -31,20 +31,20 @@ measured = "never"
 [[expect]]
 what     = "roll I term at 6 s"
 basis    = "Observed"
-expected = "-293 ± 10"
-measured = "-293"
+expected = "94.6 ± 10"
+measured = "94.6"
 
 [[expect]]
 what     = "motor 1 DShot, lowest over 2 s to 12 s"
 basis    = "Source"
 expected = "between 168 and 2047"
-measured = "1240"
+measured = "168"
 
 [[expect]]
 what     = "motor 2 DShot, lowest over 2 s to 12 s"
 basis    = "Source"
 expected = "between 168 and 2047"
-measured = "1330"
+measured = "168"
 
 [[expect]]
 what     = "motor 3 DShot, lowest over 2 s to 12 s"
@@ -59,10 +59,10 @@ expected = "between 168 and 2047"
 measured = "168"
 
 [[expect]]
-what     = "motor 2 DShot, mean over 6 s to 12 s"
+what     = "motor 4 DShot, mean over 6 s to 12 s"
 basis    = "Observed"
-expected = "1370 ± 100"
-measured = "1370"
+expected = "986 ± 100"
+measured = "986"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "536ddc3d29a1db34"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "11d28001ee091887"   # the whole state after each of 96000 steps at 8000 Hz, in order
+run  = "0c918ecd96f5cc34"   # the whole state after each of 96000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"1.2 s" = "9d38372de2b0f280"
-"2.4 s" = "993739a2a3d63f49"
-"3.6 s" = "33ca803e7756e00d"
-"4.8 s" = "34a53ee1906ee592"
-"6 s" = "6b4479bf0b22403b"
-"7.2 s" = "fbbfc2ab09249454"
-"8.4 s" = "221efe0a3942b137"
-"9.6 s" = "1db000a071447e4e"
-"10.8 s" = "39281bb5d90ce05c"
-"12 s" = "4bca6824ec5c070c"
+"1.2 s" = "bdd7cd92a9e44265"
+"2.4 s" = "831fd8b3a2a68e6c"
+"3.6 s" = "fbb5692b931038f2"
+"4.8 s" = "314519914d685e3c"
+"6 s" = "b63e1e258ee1d4f6"
+"7.2 s" = "71057dcb9619893e"
+"8.4 s" = "16c36a5dce53a5b3"
+"9.6 s" = "0831760a3a24825d"
+"10.8 s" = "7e103e9059e5199c"
+"12 s" = "1355892af56920c4"

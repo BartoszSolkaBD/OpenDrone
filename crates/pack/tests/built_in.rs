@@ -53,6 +53,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/freestyle-5-feedforward-transition",
             "test/freestyle-5-filters-and-shaping-off",
             "test/freestyle-5-loop-shaping-off",
+            "test/freestyle-5-loop-shaping-only",
             "test/freestyle-5-no-drag",
             "test/freestyle-5-no-prop-wash",
             "test/freestyle-5-no-runaway-takeoff-prevention",
@@ -241,8 +242,10 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     // for the crashflip_* settings; src/main/flight/pid.h and pid.c
     // resetPidProfile for the F gains, feedforward, the D-term low-passes and
     // the yaw P low-pass; src/main/sensors/gyro.h and gyro.c for the gyro
-    // low-passes; src/main/pg/rx.c for RC smoothing; src/main/sensors/battery.c
-    // for the battery's settings; src/main/pg/motor.c for dshot_bidir and
+    // low-passes; src/main/pg/rx.c for RC smoothing; src/main/flight/pid.h
+    // D_MAX_DEFAULT and pid.c resetPidProfile for Dynamic D, I-term relax,
+    // anti-gravity, TPA and throttle boost; src/main/sensors/battery.c for
+    // the battery's settings; src/main/pg/motor.c for dshot_bidir and
     // motor_poles).
     const DEFAULTS: &[(&str, &str)] = &[
         ("small_angle", "25"),
@@ -273,14 +276,17 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("p_roll", "45"),
         ("i_roll", "80"),
         ("d_roll", "30"),
+        ("d_max_roll", "40"),
         ("f_roll", "120"),
         ("p_pitch", "47"),
         ("i_pitch", "84"),
         ("d_pitch", "34"),
+        ("d_max_pitch", "46"),
         ("f_pitch", "125"),
         ("p_yaw", "45"),
         ("i_yaw", "80"),
         ("d_yaw", "0"),
+        ("d_max_yaw", "0"),
         ("f_yaw", "120"),
         ("feedforward_transition", "0"),
         ("feedforward_averaging", "2_POINT"),
@@ -288,6 +294,16 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("feedforward_jitter_factor", "7"),
         ("feedforward_boost", "15"),
         ("feedforward_max_rate_limit", "90"),
+        ("d_max_gain", "0"),
+        ("d_max_advance", "35"),
+        ("iterm_relax", "RP"),
+        ("iterm_relax_type", "SETPOINT"),
+        ("iterm_relax_cutoff", "15"),
+        ("anti_gravity_gain", "80"),
+        ("tpa_mode", "D"),
+        ("tpa_rate", "65"),
+        ("tpa_breakpoint", "1350"),
+        ("throttle_boost", "5"),
         ("motor_output_limit", "100"),
         ("pidsum_limit", "500"),
         ("pidsum_limit_yaw", "400"),
@@ -295,6 +311,12 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("pid_at_min_throttle", "ON"),
         ("feedforward_yaw_hold_gain", "15"),
         ("feedforward_yaw_hold_time", "100"),
+        ("anti_gravity_cutoff_hz", "5"),
+        ("anti_gravity_p_gain", "100"),
+        ("tpa_low_rate", "20"),
+        ("tpa_low_breakpoint", "1050"),
+        ("tpa_low_always", "OFF"),
+        ("throttle_boost_cutoff", "15"),
         ("gyro_lpf1_type", "PT1"),
         ("gyro_lpf1_static_hz", "250"),
         ("gyro_lpf1_dyn_min_hz", "250"),
@@ -365,20 +387,9 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
 
 #[test]
 fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
-    // Basis: Source (Betaflight 2026.6.2's defaults: src/main/flight/pid.h and
-    // pid.c resetPidProfile for D max, I-term relax, anti-gravity, TPA and
-    // throttle boost; src/main/pg/dyn_notch.c for the dynamic notch).
-    const DEFAULTS: &[(&str, &str)] = &[
-        ("d_max_roll", "40"),
-        ("d_max_pitch", "46"),
-        ("d_max_yaw", "0"),
-        ("iterm_relax", "RP"),
-        ("anti_gravity_gain", "80"),
-        ("tpa_rate", "65"),
-        ("tpa_low_rate", "20"),
-        ("throttle_boost", "5"),
-        ("dyn_notch_count", "3"),
-    ];
+    // Basis: Source (Betaflight 2026.6.2's defaults: src/main/pg/dyn_notch.c
+    // for the dynamic notch).
+    const DEFAULTS: &[(&str, &str)] = &[("dyn_notch_count", "3")];
     let five = quad("opendrone/freestyle-5");
     let later = opendrone_flight_controller::Tune::not_simulated_yet();
     assert_eq!(
@@ -404,6 +415,7 @@ fn the_freestyle_5_test_quads_for_the_flight_controller_switch_off_what_isnt_sim
         "test/freestyle-5-filters-and-shaping-off",
         "test/freestyle-5-output-limit-80",
         "test/freestyle-5-loop-shaping-off",
+        "test/freestyle-5-loop-shaping-only",
         "test/freestyle-5-other-low-pass-kinds",
         "test/freestyle-5-feedforward-transition",
     ] {
@@ -440,6 +452,25 @@ fn the_freestyle_5_test_quads_for_the_flight_controller_switch_off_what_isnt_sim
             assert_eq!(hz, 0, "{id}: {name}");
         }
     }
+    // The loop shaping's own Test Quad keeps the 5″'s loop shaping, with the
+    // gyro's pull on Dynamic D at 4.3–2025.12's 37, and switches off what
+    // sits around it (#50).
+    let only = quad("test/freestyle-5-loop-shaping-only")
+        .flight_controller
+        .unwrap();
+    let five = quad("opendrone/freestyle-5").flight_controller.unwrap();
+    assert!(!only.rc_smoothing);
+    assert_eq!(only.gyro_lpf1_dyn_min_hz, 0);
+    assert_eq!(only.dterm_lpf1_dyn_min_hz, 0);
+    assert_eq!(only.feedforward_smooth_factor, 0);
+    assert_eq!(only.d_max_gain, 37);
+    assert_eq!(only.d_max, five.d_max);
+    assert_eq!(only.anti_gravity_gain, five.anti_gravity_gain);
+    assert_eq!(
+        (only.tpa_rate, only.tpa_low_rate, only.throttle_boost),
+        (five.tpa_rate, five.tpa_low_rate, five.throttle_boost)
+    );
+    assert_eq!(only.iterm_relax, five.iterm_relax);
 }
 
 #[test]
@@ -495,9 +526,17 @@ fn the_whoop_65s_tune_spells_out_every_setting_the_flight_controller_reads() {
         ("287", "diff; Hz, at zero throttle; 0 is static")
     );
     assert_eq!(mark("rc_smoothing"), ("ON", "4.3 default"));
+    // Dynamic D, I-term relax, anti-gravity, TPA and throttle boost, from the
+    // diff, 4.3's defaults, ADR-0008 or 2026.6's defaults (#50).
+    assert_eq!(mark("tpa_rate"), ("70", "diff; percent"));
+    assert_eq!(mark("d_max_roll"), ("48", "diff (was d_roll)"));
+    assert_eq!(mark("tpa_low_rate"), ("0", "ADR-0008; percent; 0 is off"));
+    assert_eq!(
+        mark("anti_gravity_gain"),
+        ("80", "2026.6 default; 0 is off")
+    );
     // What the Flight Controller knows but doesn't simulate yet is spelled
     // out too, from the diff or 4.3's defaults, flown as off for now.
-    assert_eq!(mark("tpa_rate"), ("70", "diff; not simulated yet (#50)"));
     assert_eq!(
         mark("dyn_notch_count"),
         ("2", "diff; not simulated yet (waits for gyro noise, #21)")

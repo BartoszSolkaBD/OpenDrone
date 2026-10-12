@@ -30,10 +30,11 @@
 //! A row is written into a Tune under its [`Place`] once the Flight
 //! Controller reads it ([`crate::Tune::settings`]); until then the importer
 //! keeps it under "Not simulated yet" when the export sets it. The table also
-//! holds rows for the settings the next Flight Controller tickets read (#50
-//! anti-gravity, I-term relax, TPA, Dynamic D and throttle boost; #51 Angle
-//! and Horizon; #52 Failsafe), so their Tunes come out of the importer as soon
-//! as the Flight Controller reads them; those tickets check their rows.
+//! holds rows for the settings the next Flight Controller tickets read (#51
+//! Angle and Horizon; #52 Failsafe), so their Tunes come out of the importer
+//! as soon as the Flight Controller reads them; those tickets check their
+//! rows. #50 checked the rows for anti-gravity, I-term relax, TPA, Dynamic D
+//! and throttle boost against each version's source.
 //!
 //! [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
 
@@ -299,12 +300,12 @@ pub const SETTINGS: &[Setting] = &[
     all("iterm_relax", PidTuning, "", "RP"),
     all("iterm_relax_type", PidTuning, "", "SETPOINT"),
     all("iterm_relax_cutoff", PidTuning, "Hz", "15"),
-    row("anti_gravity_gain", PidTuning, "",
+    row("anti_gravity_gain", PidTuning, "0 is off",
         [Newer, Same("80"), Same("80"), Same("80"), Same("80")]),
     all("tpa_mode", PidTuning, "", "D"),
     all("tpa_rate", PidTuning, "percent", "65"),
     all("tpa_breakpoint", PidTuning, "µs", "1350"),
-    all("throttle_boost", PidTuning, "", "5"),
+    all("throttle_boost", PidTuning, "0 is off", "5"),
     all("motor_output_limit", PidTuning, "percent", "100"),
     // Angle and Horizon. 4.5 rebuilt both; 4.3 and 4.4 named Angle's strength
     // angle_level_strength, its limit level_limit and Horizon's stick
@@ -331,7 +332,7 @@ pub const SETTINGS: &[Setting] = &[
     row("anti_gravity_p_gain", PidTuningCli, "",
         [Newer, Same("100"), Same("100"), Same("100"), Same("100")]),
     // Low-throttle TPA arrived in 4.5: a rate of 0 turns it off.
-    row("tpa_low_rate", PidTuningCli, "percent",
+    row("tpa_low_rate", PidTuningCli, "percent; 0 is off",
         [Adr0008("0"), Adr0008("0"), Same("20"), Same("20"), Same("20")]),
     row("tpa_low_breakpoint", PidTuningCli, "µs",
         [Newer, Newer, Same("1050"), Same("1050"), Same("1050")]),

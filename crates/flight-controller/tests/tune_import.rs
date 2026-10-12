@@ -200,15 +200,15 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
     ] {
         assert_eq!(got(&meteor, name), is(value, "ADR-0008"), "{name}");
     }
-    // The Flight Controller already knows low-throttle TPA, so the Tune
-    // spells it out, flown as off (#50), and reads Crash Flip's rate fade
-    // (#54) and yaw hold (#49), so the Tune sets them under their tabs. It
-    // doesn't know Angle's earth reference yet; the Tune spells it out all
-    // the same, under "Not simulated yet".
-    let tpa_low = meteor.setting("tpa_low_rate").unwrap();
-    assert_eq!(tpa_low.written, Where::FlownAsOff);
-    assert_eq!(tpa_low.note, "not simulated yet (#50)");
-    for name in ["crashflip_rate", "feedforward_yaw_hold_gain"] {
+    // The Flight Controller reads low-throttle TPA (#50), Crash Flip's rate
+    // fade (#54) and yaw hold (#49), so the Tune sets them under their tabs.
+    // It doesn't know Angle's earth reference yet; the Tune spells it out
+    // all the same, under "Not simulated yet".
+    for name in [
+        "tpa_low_rate",
+        "crashflip_rate",
+        "feedforward_yaw_hold_gain",
+    ] {
         assert_eq!(
             meteor.setting(name).unwrap().written,
             Where::UnderItsTab,
@@ -420,7 +420,8 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
         .expect("a Not simulated yet heading");
     // What the Flight Controller reads comes first, under its tabs: the
     // filters, RC smoothing and feedforward among it (#49), ADR-0008's yaw
-    // hold off too.
+    // hold off too, and the loop shaping (#50), with ADR-0008's Dynamic D
+    // stick boost and low-throttle TPA off.
     for line in [
         "set f_roll = 125                       # diff",
         "set feedforward_jitter_factor = 9      # diff",
@@ -428,6 +429,11 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
         "set feedforward_yaw_hold_gain = 0      # ADR-0008",
         "set gyro_lpf1_dyn_min_hz = 287         # diff; Hz, at zero throttle; 0 is static",
         "set rc_smoothing = ON                  # 4.3 default",
+        "set d_max_roll = 48                    # diff (was d_roll)",
+        "set d_max_advance = 7                  # ADR-0008;",
+        "set tpa_rate = 70                      # diff; percent",
+        "set tpa_low_rate = 0                   # ADR-0008; percent; 0 is off",
+        "set anti_gravity_gain = 80             # 2026.6 default; 0 is off",
     ] {
         assert!(read.contains(line), "{line} not under its tab");
     }
@@ -456,14 +462,10 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
     assert!(known.contains(
         "set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)"
     ));
-    assert!(
-        known.contains("set tpa_rate = 70                      # diff; not simulated yet (#50)")
-    );
     // Then every other setting the translator knows, spelled out, ADR-0008's
     // values among them.
     for line in [
         "set angle_earth_ref = 0                # ADR-0008; percent",
-        "set d_max_advance = 7                  # ADR-0008;",
         "set failsafe_switch_mode = STAGE1      # 4.3 default",
         "set blackbox_sample_rate = 1/2         # diff",
         "set dyn_notch_q = 350                  # diff",

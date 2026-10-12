@@ -13,20 +13,20 @@ measured = "97.1%"
 [[expect]]
 what     = "battery current, highest over 5 s to 7 s"
 basis    = "Observed"
-expected = "13.3 A ± 0.5 A"
-measured = "13.3 A"
+expected = "13.8 A ± 0.5 A"
+measured = "13.8 A"
 
 [[expect]]
 what     = "battery sag, highest over 5 s to 7 s"
 basis    = "Rule"
-expected = "0.52 V ± 0.02 V"
-measured = "0.518 V"
+expected = "0.54 V ± 0.02 V"
+measured = "0.539 V"
 
 [[expect]]
 what     = "battery charge used at 8 s"
 basis    = "Observed"
 expected = "9.24 mAh ± 0.3 mAh"
-measured = "9.20 mAh"
+measured = "9.19 mAh"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -35,18 +35,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "536ddc3d29a1db34"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "6e0398a15b7045e2"   # the whole state after each of 64000 steps at 8000 Hz, in order
+run  = "16d40c93ca803ad6"   # the whole state after each of 64000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.8 s" = "a85bad6e48f5002a"
-"1.6 s" = "4380ac653511f23f"
-"2.4 s" = "6a15aa6c8ba52927"
-"3.2 s" = "44033183134bdf25"
-"4 s" = "e868500b09db95ad"
-"4.8 s" = "aed8cbc2f5b42bc6"
-"5.6 s" = "5632c4ec9f8535b4"
-"6.4 s" = "1ec60d7f606f666a"
-"7.2 s" = "d89b174ad546a641"
-"8 s" = "378433c2754fe37c"
+"0.8 s" = "afd7fcfec3cd3563"
+"1.6 s" = "8beb7befff0f0f7d"
+"2.4 s" = "cbb7c9a2833a20c5"
+"3.2 s" = "50c6684d7a1f745b"
+"4 s" = "e868e8a82186c129"
+"4.8 s" = "c1285e9ced589264"
+"5.6 s" = "625eda0935a839fb"
+"6.4 s" = "c1170bff3327d03d"
+"7.2 s" = "444a7e6f962ff1cd"
+"8 s" = "9a8ecd4518fb521e"

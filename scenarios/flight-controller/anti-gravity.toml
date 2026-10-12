@@ -1,0 +1,123 @@
+# Anti-gravity strengthens I, and a little P, while the throttle moves fast,
+# most of all at low throttle, as Betaflight 2026.6.2's does
+# (`pidUpdateAntiGravityThrottleFilter` and `pidController`,
+# src/main/flight/pid.c; the gains in `pidInitConfig`, pid_init.c; the
+# Betaflight research §3):
+#
+# - Each loop the mixer takes how fast its throttle moved, per second, times
+#   (1 − throttle)²; when the throttle rose, times half of (1 − throttle)
+#   again. A second-order low-pass (PT2) at `anti_gravity_cutoff_hz`, 5 Hz,
+#   smooths it, and the next loop's PID loop multiplies it by
+#   `anti_gravity_gain`, 80: call that A.
+# - Roll's and pitch's I grows by (I gain's share + 0.34 × A) × the loop's
+#   step × the error, where I alone would grow by its share: yaw's I gets no
+#   boost.
+# - Roll's and pitch's P is multiplied by 1 + A × `anti_gravity_p_gain` 100%
+#   × 0.0034, less once the setpoint passes 50 °/s.
+#
+# The Flight Controller alone, armed, sticks centred, the throttle at 30%, so
+# Airmode starts at once. The gyro reads a roll left at 10 °/s throughout:
+# the centred stick asks for 0.10966 °/s, so the roll error is 10.10966 °/s
+# and P is 0.032029 × 45 × 10.10966 = 14.5711. At 0.5 s the throttle is
+# chopped to 0%; at 1 s it is punched to 50%. Each lands with a frame (every
+# 4 ms from 0 s). The mixer's throttle is 25.7% at 30% (as 30% reaches
+# Betaflight at 1295.85 µs, (1295 − 1050) × 1000 ÷ 950 = 257 thousandths
+# through the straight throttle curve), 0% at 0% and 47.3% at 50%.
+#
+# Each value is worked out loop by loop from Betaflight's maths; the PT2 at
+# 5 Hz moves each of its two stages k = ω ÷ (ω + 1) of the way a loop, with
+# ω = 2π × 5 Hz × 1.553774 ÷ 8000.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only: the Freestyle
+# 5″ with the filters, RC smoothing and feedforward's own shaping off, so
+# the throttle reaches the mixer in one step and nothing but the loop
+# shaping sits between the gyro and the terms. Its anti-gravity is the 5″'s.
+format = 2
+name   = "Anti-gravity strengthens I and P while the throttle moves fast, most at low throttle"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "roll -10 °/s, pitch 0 °/s, yaw 0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", throttle = "0%" },
+  { at = "1 s",   throttle = "50%" },
+]
+
+# A steady throttle: nothing to add.
+
+[[expect]]
+what  = "roll P term"
+at    = "0.5 s"
+value = "14.5711 ± 0.0001"
+basis = "source: pidController: with the throttle steady, anti-gravity adds nothing: P = 0.032029 × 45 × 10.10966 = 14.5711"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.5 s"
+value = "98.824 ± 0.001"
+basis = "source: pidController: with the throttle steady, I grows by 0.244381 × 80 × 10.10966 ÷ 8000 = 0.024706 a loop: 4000 loops give 98.824"
+
+# The chop, 25.7% to 0%: the throttle's speed, 0.257 × 8000 × 1² = 2056 a
+# second for one loop, through the PT2.
+
+[[expect]]
+what  = "roll P term"
+at    = "0.51 s"
+value = "29.303 ± 0.001"
+basis = "source: pidUpdateAntiGravityThrottleFilter and pidController: the one loop of 2056 has left the PT2 at 3.717 by the 79th loop after the chop, so A = 80 × 3.717 = 297.36 and P is 14.5711 × (1 + 297.36 × 0.0034) = 14.5711 × 2.0110 = 29.303: twice what it was"
+
+[[expect]]
+what  = "roll P term"
+at    = "0.6 s"
+value = "16.4376 ± 0.001"
+basis = "source: the PT2 at 5 Hz dies away: 0.1 s on, A is 37.68, so P is 14.5711 × (1 + 37.68 × 0.0034) = 14.5711 × 1.1281 = 16.4376"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.6 s"
+value = "186.059 ± 0.001"
+basis = "source: pidController, loop by loop: I grows by (0.244381 × 80 + 0.34 × A) ÷ 8000 × 10.10966 each loop; over the 0.1 s after the chop it gains 87.23, where it would gain 19.76 with the throttle steady"
+
+[[expect]]
+what  = "yaw I term"
+at    = "0.6 s"
+value = "3.2158 ± 0.0001"
+basis = "source: pidController: yaw's I gets no anti-gravity, so it grows only by 0.244381 × 80 × 2.5 × 0.10966 ÷ 8000 a loop, the centred stick's 0.10966 °/s nose right: 4800 loops give 3.2158"
+
+# The punch, 0% to 47.3%, from a slow throttle: the throttle's speed is
+# 0.473 × 8000 × (1 − 0.473)², and as it rose, times half of (1 − 0.473)
+# again: 276.9 a second for one loop, 13% of the chop's, as Betaflight keeps
+# anti-gravity for the low throttle.
+
+[[expect]]
+what  = "roll P term"
+at    = "1.01 s"
+value = "16.555 ± 0.001"
+basis = "source: pidUpdateAntiGravityThrottleFilter and pidController, loop by loop: 79 loops after the punch, with what is left of the chop's, A is 40.05, so P is 14.5711 × (1 + 40.05 × 0.0034) = 14.5711 × 1.1362 = 16.555: 14% up, where the chop doubled it"
+
+[[expect]]
+what  = "roll I term"
+at    = "1.1 s"
+value = "297.172 ± 0.001"
+basis = "source: pidController, loop by loop: from 268.319 at 1 s, I gains 28.853 in the 0.1 s after the punch, where it would gain 19.765 with the throttle steady"

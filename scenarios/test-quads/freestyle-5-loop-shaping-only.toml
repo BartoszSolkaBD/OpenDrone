@@ -1,0 +1,50 @@
+# The Freestyle 5″ with only its loop shaping between the sticks, the gyro and the PID loop.    id: test/freestyle-5-loop-shaping-only
+#
+# The Flight Controller Scenarios that check the loop shaping #50 brings,
+# Dynamic D, I-term relax, anti-gravity, TPA and throttle boost, work their
+# numbers out from Betaflight's maths loop by loop. On the 5″'s own Tune,
+# Betaflight 2026.6.2 also puts the gyro's, the D term's and yaw P's
+# low-passes, RC smoothing, and feedforward's smoothing, averaging, jitter
+# attenuation, boost and max-rate limit in between (#49). This Test Quad
+# switches each of those off in the Tune, the way Betaflight reads "off",
+# so the loop shaping is all that sits between the sticks, the gyro and the
+# PID loop's terms. Feedforward still works out each frame's stick speed,
+# which Dynamic D reads, now simply the setpoint's change times the Packet
+# Rate. It switches off the dynamic notch too (it waits for gyro noise, #21),
+# and runaway takeoff prevention, which would disarm a fresh Flight
+# Controller holding a PID sum of 600 or more, with the gyro moving, for
+# 75 ms.
+#
+# Its loop shaping is the Freestyle 5″'s, Betaflight 2026.6.2's defaults,
+# with one change: `d_max_gain` is 37, as in Betaflight 4.3 to 2025.12 and on
+# the Whoop 65, where 2026.6.2's default is 0. With 0, only the sticks raise
+# D towards D max; at 37 the gyro does too, so a Scenario can check that half
+# of Dynamic D.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "The filters, RC smoothing and feedforward's own shaping off, so Flight Controller Scenarios can check Dynamic D, I-term relax, anti-gravity, TPA and throttle boost on their own"
+
+# Tune changes keep Betaflight's own units, as `tune.txt` does. Each is off as
+# Betaflight 2026.6.2 reads it, but `d_max_gain`.
+[tune]
+gyro_lpf1_static_hz = 0          # gyro low-pass 1 off, static and dynamic (gyro_init.c)
+gyro_lpf1_dyn_min_hz = 0
+gyro_lpf2_static_hz = 0          # gyro low-pass 2 off
+dyn_notch_count = 0              # the dynamic notch off (dyn_notch_filter.c, isDynNotchActive)
+dterm_lpf1_static_hz = 0         # D-term low-pass 1 off, static and dynamic (pid_init.c)
+dterm_lpf1_dyn_min_hz = 0
+dterm_lpf2_static_hz = 0         # D-term low-pass 2 off
+yaw_lowpass_hz = 0               # yaw P low-pass off (pid_init.c)
+rc_smoothing = "OFF"             # setpoints, throttle and feedforward straight from each frame (rc.c)
+feedforward_averaging = "OFF"    # feedforward: no averaging over frames (rc.c, calculateFeedforward)
+feedforward_smooth_factor = 0    # no smoothing of the stick's speed
+feedforward_jitter_factor = 0    # no jitter attenuation
+feedforward_boost = 0            # no stick acceleration added
+feedforward_max_rate_limit = 0   # no fade near the max rate
+feedforward_yaw_hold_gain = 0    # no yaw hold
+d_max_gain = 37                  # the gyro raises D towards D max too, as in 4.3 to 2025.12 (2026.6.2: 0)
+runaway_takeoff_prevention = "OFF" # no disarm on a PID sum held at 60% for 75 ms (core.c)

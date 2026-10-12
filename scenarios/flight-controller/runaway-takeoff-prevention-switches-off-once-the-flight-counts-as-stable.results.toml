@@ -19,8 +19,8 @@ measured = "0.00413 s"
 [[expect]]
 what     = "roll PID sum at 1 s"
 basis    = "Source"
-expected = "-1120.49 ± 0.01"
-measured = "-1120"
+expected = "-1156.18 ± 0.01"
+measured = "-1160"
 
 [[expect]]
 what     = "the Quad disarms, first over 0.9 s to 1.5 s"
@@ -35,18 +35,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "943169a834404ac3"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "f047463a313d0d7a"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "b62732c318d44eeb"   # the whole state after each of 12000 steps at 8000 Hz, in order
+run  = "2dfacd17edb79453"   # the whole state after each of 12000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.15 s" = "9cd701482f321d3a"
-"0.3 s" = "3c0be802e27c7c7c"
-"0.45 s" = "9694c105aa5162e8"
-"0.6 s" = "7d5dd4c47a22419b"
-"0.75 s" = "10c4fac78443cd18"
-"0.9 s" = "c590a2deaf626162"
-"1.05 s" = "f52077927cf199e2"
-"1.2 s" = "d52a900769aee114"
-"1.35 s" = "80876afee90ec573"
-"1.5 s" = "89e6ea9327155c10"
+"0.15 s" = "cf455c880b3b986b"
+"0.3 s" = "1403b58bd4c9330a"
+"0.45 s" = "dcbd44baffc6fd59"
+"0.6 s" = "bd5da8133ea8ff82"
+"0.75 s" = "fd4d86412dedbdce"
+"0.9 s" = "f2064aed1570ed50"
+"1.05 s" = "feb988c670e3c51d"
+"1.2 s" = "96d8dc565b0215c8"
+"1.35 s" = "c667c4c6c380af72"
+"1.5 s" = "626f6e865a8cd73a"

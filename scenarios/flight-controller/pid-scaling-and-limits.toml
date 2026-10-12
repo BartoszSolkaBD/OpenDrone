@@ -14,7 +14,7 @@
 # notch (which waits for gyro noise, #21), and Dynamic D, I-term relax,
 # anti-gravity, TPA and throttle boost (#50). So every number here is what
 # Betaflight 2026.6.2 gives on that Tune with nothing between the PID loop's
-# maths and the gyro, and stays so when #50 lands. On the 5″'s own Tune they
+# maths and the gyro. On the 5″'s own Tune they
 # would come out otherwise: its gyro and D-term low-passes would spread the
 # D term's kick over several loops, for one
 # (gyro-d-term-and-yaw-p-low-passes.toml).

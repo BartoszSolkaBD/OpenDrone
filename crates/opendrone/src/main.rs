@@ -11,7 +11,8 @@ use opendrone::drawing::View;
 use opendrone::pilot::Pilot;
 use opendrone::set_up::{FlightPlan, open_packs, repo_folder};
 use opendrone::settings::{QUADS, Settings};
-use opendrone::{game, headless, measure_camera_cost, reference, screenshot_after};
+use opendrone::watch::open_scenario;
+use opendrone::{game, headless, measure_camera_cost, reference, screenshot_after, watching_game};
 
 const HELP: &str = "\
 OpenDrone, the first flight: fly a Quad over the grid floor, through its FPV
@@ -47,11 +48,20 @@ Camera.
   opendrone --chase               a developer command: watch the Quad from a
                                   camera that follows it, instead of flying
                                   from the camera on its frame
+  opendrone --scenario FILE       a developer command: watch a Flight or
+                                  Thrust Stand Scenario (a file in
+                                  scenarios/) in the FPV view, nobody flying
+                                  it. Esc pauses. It goes with --screenshot,
+                                  --look, --aspect, --tilt, --fov and --chase
 
 Move a stick on the Input Device you want to fly with: it becomes the Flying
 Input Device. R resets, Esc pauses. The up and down arrows change the Camera
 Tilt, and the right and left arrows change the FOV, 1\u{b0} a press, repeating
-while held.";
+while held.
+
+Save Flight is an Action with no default key: bind it to a button or a switch
+in an Input Device profile (save_flight). It writes the flight so far as a
+Scenario and its Input Track into scenarios/saved/.";
 
 enum Mode {
     Game,
@@ -69,6 +79,8 @@ fn main() -> ExitCode {
     let mut camera = CameraSettings::default();
     let (mut tilt, mut fov) = (None, None);
     let mut size = None;
+    let mut scenario: Option<PathBuf> = None;
+    let mut quad_given = false;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -76,7 +88,10 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--quad" => match args.next() {
-                Some(name) if QUADS.contains(&name.as_str()) => quad = name,
+                Some(name) if QUADS.contains(&name.as_str()) => {
+                    quad = name;
+                    quad_given = true;
+                }
                 _ => return usage(&format!("--quad takes one of {}", QUADS.join(", "))),
             },
             "--headless" => mode = Mode::Headless { seconds: 3.0 },
@@ -126,6 +141,10 @@ fn main() -> ExitCode {
                 None => return usage("--size takes the picture's size, such as 1920x1080"),
             },
             "--chase" => view = View::Chase,
+            "--scenario" => match args.next() {
+                Some(path) => scenario = Some(PathBuf::from(path)),
+                None => return usage("--scenario takes the Scenario file to watch"),
+            },
             "--reference" => mode = Mode::Reference(Vec::new()),
             path => match &mut mode {
                 Mode::Reference(paths) => paths.push(PathBuf::from(path)),
@@ -138,16 +157,39 @@ fn main() -> ExitCode {
     if let Mode::Reference(paths) = mode {
         return check_references(&repo, &paths);
     }
+    if scenario.is_some() && !matches!(mode, Mode::Game | Mode::Screenshot { .. }) {
+        return usage(
+            "--scenario opens a window: it goes with --screenshot, but not with --headless, --camera-cost or --reference",
+        );
+    }
+    if scenario.is_some() && quad_given {
+        return usage("--scenario names its own Quad, so it doesn't go with --quad");
+    }
     let packs = match open_packs(&repo) {
         Ok(packs) => packs,
         Err(problems) => return fail(&format!("the Packs can't be read:\n{problems}")),
     };
-    let plan = match FlightPlan::from_packs(&packs, Settings::tracer(&quad)) {
-        Ok(plan) => plan,
-        Err(problem) => return fail(&problem),
+    let watched = match &scenario {
+        Some(path) => match open_scenario(&repo, path) {
+            Ok(watched) => Some(watched),
+            Err(problem) => return fail(&problem),
+        },
+        None => None,
+    };
+    let plan = match &watched {
+        Some(watched) => watched.plan.clone(),
+        None => match FlightPlan::from_packs(&packs, Settings::tracer(&quad)) {
+            Ok(plan) => plan,
+            Err(problem) => return fail(&problem),
+        },
     };
     let profiles = packs.input_devices().into_iter().cloned().collect();
     let pilot = Pilot::start(&plan, profiles);
+    // A window flying the pilot's own flight, or watching the Scenario.
+    let window = |plan, pilot| match watched {
+        Some(watched) => Ok(watching_game(watched, pilot)),
+        None => game(plan, pilot),
+    };
     if tilt.is_some() || fov.is_some() {
         let own = camera.quad(&plan.quad.id, &plan.quad.camera);
         camera.set_quad(
@@ -160,17 +202,17 @@ fn main() -> ExitCode {
     }
     let app = match mode {
         Mode::Headless { seconds } => headless(plan, pilot, seconds),
-        Mode::Screenshot { path, seconds } => game(plan, pilot).map(|mut app| {
+        Mode::Screenshot { path, seconds } => window(plan, pilot).map(|mut app| {
             let size = size.unwrap_or(UVec2::new(1280, 720));
             screenshot_after(&mut app, seconds, path, size);
             app
         }),
-        Mode::CameraCost { seconds } => game(plan, pilot).map(|mut app| {
+        Mode::CameraCost { seconds } => window(plan, pilot).map(|mut app| {
             let size = size.unwrap_or(UVec2::new(2560, 1440));
             measure_camera_cost(&mut app, seconds, size);
             app
         }),
-        _ => game(plan, pilot),
+        _ => window(plan, pilot),
     };
     match app {
         Ok(mut app) => {
