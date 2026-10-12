@@ -261,14 +261,61 @@ fn asking_the_line_question_never_changes_the_simulation() {
 
 #[test]
 fn a_map_shape_that_isnt_a_solid_is_refused_naming_it() {
-    let flat = MapShape::Convex {
-        corners: vec![
+    let cube_corners = vec![
+        Vec3::new(0.0, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+        Vec3::new(1.0, 1.0, 0.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        Vec3::new(0.0, 0.0, 1.0),
+        Vec3::new(1.0, 0.0, 1.0),
+        Vec3::new(1.0, 1.0, 1.0),
+        Vec3::new(0.0, 1.0, 1.0),
+    ];
+    // Every triangle anticlockwise seen from outside.
+    let cube_triangles: Vec<[u32; 3]> = vec![
+        [0, 2, 1],
+        [0, 3, 2],
+        [4, 5, 6],
+        [4, 6, 7],
+        [0, 1, 5],
+        [0, 5, 4],
+        [3, 6, 2],
+        [3, 7, 6],
+        [0, 4, 7],
+        [0, 7, 3],
+        [1, 2, 6],
+        [1, 6, 5],
+    ];
+    let convex =
+        |corners: Vec<Vec3>, triangles: Vec<[u32; 3]>| MapShape::Convex { corners, triangles };
+    let flat = convex(
+        vec![
             Vec3::new(0.0, 0.0, 0.0),
             Vec3::new(1.0, 0.0, 0.0),
             Vec3::new(0.0, 1.0, 0.0),
             Vec3::new(1.0, 1.0, 0.0),
         ],
+        // Two sheets back to back, split along different diagonals.
+        vec![[0, 1, 3], [0, 3, 2], [0, 2, 1], [2, 3, 1]],
+    );
+    let open = convex(cube_corners.clone(), cube_triangles[1..].to_vec());
+    let inside_out = convex(
+        cube_corners.clone(),
+        cube_triangles.iter().map(|t| [t[0], t[2], t[1]]).collect(),
+    );
+    let mut dented_corners = cube_corners.clone();
+    dented_corners[6] = Vec3::new(0.6, 0.6, 0.6);
+    let dented = convex(dented_corners, cube_triangles.clone());
+    let unused_corner = {
+        let mut corners = cube_corners.clone();
+        corners.push(Vec3::new(0.5, 0.5, 0.5));
+        convex(corners, cube_triangles.clone())
     };
+    let missing_convex_corner = convex(cube_corners, {
+        let mut triangles = cube_triangles;
+        triangles[0] = [0, 2, 9];
+        triangles
+    });
     let missing_corner = MapShape::TriangleMesh {
         corners: vec![Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0)],
         triangles: vec![[0, 1, 2]],
@@ -276,6 +323,11 @@ fn a_map_shape_that_isnt_a_solid_is_refused_naming_it() {
     let no_size = level_box(Vec3::ZERO, Vec3::new(1.0, 0.0, 1.0));
     for (shape, problem) in [
         (flat, MapShapeProblem::ConvexHasNoVolume),
+        (open, MapShapeProblem::ConvexIsNotClosed),
+        (unused_corner, MapShapeProblem::ConvexIsNotClosed),
+        (inside_out, MapShapeProblem::ConvexIsNotConvex),
+        (dented, MapShapeProblem::ConvexIsNotConvex),
+        (missing_convex_corner, MapShapeProblem::MeshCornerMissing),
         (missing_corner, MapShapeProblem::MeshCornerMissing),
         (no_size, MapShapeProblem::BoxHasNoSize),
     ] {

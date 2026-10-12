@@ -334,7 +334,13 @@ fn simulate(
                     MapShapeProblem::NotARealNumber => "a number in it isn't a real number",
                     MapShapeProblem::BoxHasNoSize => "a box needs a size above zero each way",
                     MapShapeProblem::ConvexHasNoVolume => {
-                        "a convex shape needs four corners that aren't all in one plane"
+                        "a convex shape needs at least four triangles that enclose some volume"
+                    }
+                    MapShapeProblem::ConvexIsNotClosed => {
+                        "a convex shape's triangles must close it: every edge shared by two triangles running opposite ways, and every corner used"
+                    }
+                    MapShapeProblem::ConvexIsNotConvex => {
+                        "a convex shape's triangles must face outward with every corner behind each triangle's plane"
                     }
                     MapShapeProblem::MeshHasNoTriangles => "a triangle mesh needs a triangle",
                     MapShapeProblem::MeshCornerMissing => {
