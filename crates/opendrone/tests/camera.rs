@@ -1,0 +1,709 @@
+//! Readable checks for the FPV Camera's calculations: the Lens, the picture's
+//! shape, the Video Looks, Auto-exposure, Camera Tilt and FOV, and Digital's
+//! late picture. None of it enters the Simulation, so none of it is a
+//! Scenario. Angles in degrees, lengths in metres, times in seconds, light in
+//! stops. How the picture looks is judged by eye, never here.
+
+mod common;
+
+use std::time::Duration;
+
+use bevy::math::{Quat, UVec2, Vec3};
+use bevy::time::{Fixed, Time};
+use opendrone::camera::controls::{
+    CameraSettings, QuadCamera, REPEAT_AFTER, REPEAT_EVERY, Repeater,
+};
+use opendrone::camera::drawn_moment;
+use opendrone::camera::exposure::{adaptation, compensation_points, curve_at, metering_mask};
+use opendrone::camera::lens::{Aspect, GENTLE_CURVE, Lens, Picture, STOCK_CURVE};
+use opendrone::camera::look::{
+    ANALOG_AUTO_EXPOSURE, ANALOG_GRADE, DIGITAL_AUTO_EXPOSURE, DIGITAL_CAMERA, DIGITAL_GRADE,
+    VideoLook, camera_limits,
+};
+use opendrone::camera::params::FrameInputs;
+use opendrone::camera::pose::{DIGITAL_DELAY, MAX_EDGE_DELAY, Pose, PoseHistory, picture_delay};
+use opendrone::stepping::Flight;
+use opendrone_input::profile::Action;
+
+fn close(a: f64, b: f64, within: f64) -> bool {
+    (a - b).abs() <= within
+}
+
+// ---------------------------------------------------------------------------
+// The Lens and the picture's shape
+
+#[test]
+fn fov_is_measured_to_the_corner_of_the_4_3_picture() {
+    // Basis: Rule. FOV is corner to corner of the 4:3 picture, like the number
+    // on a camera's box (#14 §2): the corner sees half the FOV off the axis,
+    // whatever the FOV and the Lens curve.
+    for fov in [90.0f32, 120.0, 155.0, 160.0, 170.0] {
+        for curve in [STOCK_CURVE, GENTLE_CURVE] {
+            let lens = Lens::new(fov, curve);
+            let corner = lens.angle_at(1.0).to_degrees();
+            assert!(
+                (corner - fov / 2.0).abs() < 1e-3,
+                "{fov}° at curve {curve}: the corner sees {corner}°"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_160_degree_lens_sees_128_degrees_across_and_96_degrees_up_and_down() {
+    // Basis: Source. #14 §2: "a 160° fisheye is about 128° across and 96° top
+    // to bottom", with the stock curve, in a 4:3 picture.
+    let picture = Picture::in_window(UVec2::new(1280, 720), Aspect::FourThree);
+    let lens = Lens::new(160.0, STOCK_CURVE);
+    let half_width = picture.width / 2.0 / picture.frame_radius;
+    let half_height = picture.height / 2.0 / picture.frame_radius;
+    assert!(close(
+        f64::from(lens.angle_at(half_width).to_degrees()) * 2.0,
+        128.0,
+        1e-3
+    ));
+    assert!(close(
+        f64::from(lens.angle_at(half_height).to_degrees()) * 2.0,
+        96.0,
+        1e-3
+    ));
+}
+
+#[test]
+fn a_16_9_picture_crops_the_top_and_bottom_and_never_stretches() {
+    // Basis: Rule. 16:9 keeps the view across the same and crops the top and
+    // bottom (#14 §3): the same angle to each side, less up and down, and the
+    // picture a true 16:9, scaled the same both ways.
+    let window = UVec2::new(1280, 720);
+    let four_three = Picture::in_window(window, Aspect::FourThree);
+    let sixteen_nine = Picture::in_window(window, Aspect::SixteenNine);
+    let lens = Lens::new(160.0, STOCK_CURVE);
+    let across = |p: &Picture| lens.angle_at(p.width / 2.0 / p.frame_radius).to_degrees();
+    let up = |p: &Picture| lens.angle_at(p.height / 2.0 / p.frame_radius).to_degrees();
+    assert!((across(&four_three) - across(&sixteen_nine)).abs() < 1e-3);
+    assert!(up(&sixteen_nine) < up(&four_three) - 10.0);
+    assert_eq!(sixteen_nine.size(), UVec2::new(1280, 720));
+    assert_eq!(four_three.size(), UVec2::new(960, 720));
+    // Pixels per degree, the same across and up and down, at the middle of
+    // each picture: a circle on the Map stays a circle.
+    let per_pixel = |p: &Picture| lens.angle_at(1.0 / p.frame_radius).to_degrees();
+    let ratio = per_pixel(&sixteen_nine) / per_pixel(&four_three);
+    assert!((ratio - 960.0 / 1280.0).abs() < 1e-3, "{ratio}");
+}
+
+#[test]
+fn a_picture_is_centred_in_a_window_of_another_shape() {
+    // Basis: Rule. A 4:3 picture in a 16:9 window has bars either side, a
+    // 16:9 picture in a 4:3 window has bars above and below.
+    let wide = Picture::in_window(UVec2::new(1920, 1080), Aspect::FourThree);
+    assert_eq!(
+        (wide.x, wide.y, wide.width, wide.height),
+        (240.0, 0.0, 1440.0, 1080.0)
+    );
+    let tall = Picture::in_window(UVec2::new(1600, 1200), Aspect::SixteenNine);
+    assert_eq!(
+        (tall.x, tall.y, tall.width, tall.height),
+        (0.0, 150.0, 1600.0, 900.0)
+    );
+}
+
+#[test]
+fn analog_uses_the_stock_curve_and_digital_a_gentler_one_of_0_35() {
+    // Basis: Source. #28 §1: Analog keeps the stock fisheye curve, Digital's
+    // is 0.35.
+    assert_eq!(VideoLook::Analog.lens_curve(), 0.0);
+    assert_eq!(VideoLook::Digital.lens_curve(), 0.35);
+}
+
+#[test]
+fn digitals_gentler_curve_puts_more_of_the_view_in_the_middle_of_the_picture() {
+    // Basis: Rule. Digital's sharper centre comes from the gentler curve
+    // (#28 §1): in the same part of the picture it holds more of the view,
+    // so more of the flat render's detail goes into each pixel, while the
+    // corner still sees half the FOV.
+    let analog = Lens::new(155.0, VideoLook::Analog.lens_curve());
+    let digital = Lens::new(155.0, VideoLook::Digital.lens_curve());
+    for distance in [0.1f32, 0.3, 0.5, 0.8] {
+        assert!(
+            digital.angle_at(distance) > analog.angle_at(distance),
+            "at {distance}"
+        );
+    }
+}
+
+#[test]
+fn an_angle_off_the_axis_and_its_place_in_the_picture_are_each_others_inverse() {
+    // Basis: Rule. The Lens maps places to angles and back.
+    for curve in [STOCK_CURVE, GENTLE_CURVE] {
+        let lens = Lens::new(140.0, curve);
+        for distance in [0.0f32, 0.2, 0.55, 0.9, 1.0] {
+            let back = lens.distance_of(lens.angle_at(distance));
+            assert!(
+                (back - distance).abs() < 1e-4,
+                "{distance} came back as {back}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_flat_render_reaches_wider_than_the_picture_to_cover_its_corners() {
+    // Basis: Rule. ADR-0009: the Map is drawn once, wider than the picture, and
+    // warped into the Lens. The flat render's far corner is the direction the
+    // picture's corner sees: a tangent of half the FOV, and a vertical field
+    // wider than the picture's 96°.
+    let picture = Picture::in_window(UVec2::new(2560, 1440), Aspect::FourThree);
+    let lens = Lens::new(160.0, STOCK_CURVE);
+    let reach = lens.flat_reach(&picture);
+    assert!((reach.length() - 80f32.to_radians().tan()).abs() < 1e-3);
+    let flat_field = 2.0 * reach.y.atan().to_degrees();
+    assert!(flat_field > 140.0 && flat_field < 150.0, "{flat_field}°");
+}
+
+#[test]
+fn the_flat_render_stops_short_of_a_tangent_that_runs_out() {
+    // Basis: Rule. A flat camera can't reach 90°: the render reaches at most
+    // 87.7° off the axis, which the widest FOV (170°, 85° to a corner) stays
+    // inside.
+    let picture = Picture::in_window(UVec2::new(2560, 1440), Aspect::FourThree);
+    let reach = Lens::new(170.0, STOCK_CURVE).flat_reach(&picture);
+    assert!(reach.length().is_finite() && reach.length() < 25.0);
+    assert!((reach.length() - 85f32.to_radians().tan()).abs() < 1e-2);
+}
+
+// ---------------------------------------------------------------------------
+// The Video Looks and the cameras
+
+#[test]
+fn the_analog_look_is_soft_and_grainy_with_bleeding_colour_and_a_punchy_grade() {
+    // Basis: Observed. #28 §3, tuned by eye with the maintainer: grain 0.1,
+    // colour bleed 3 analog pixels, contrast 1.1, saturation 0.9.
+    assert_eq!(ANALOG_GRADE.grain, 0.1);
+    assert_eq!(ANALOG_GRADE.colour_bleed, 3.0);
+    assert_eq!(ANALOG_GRADE.contrast, 1.1);
+    assert_eq!(ANALOG_GRADE.saturation, 0.9);
+}
+
+#[test]
+fn the_digital_look_is_clean_with_10_stops_and_1080_lines() {
+    // Basis: Source. #28 §2 and §3: one generic camera for every Quad, 10
+    // stops and 1080 lines, and no grain, bleed or grade of its own.
+    assert_eq!(DIGITAL_CAMERA.dynamic_range, 10.0);
+    assert_eq!(DIGITAL_CAMERA.lines, 1080.0);
+    assert_eq!(
+        (
+            DIGITAL_GRADE.contrast,
+            DIGITAL_GRADE.saturation,
+            DIGITAL_GRADE.sharpen
+        ),
+        (1.0, 1.0, 0.0)
+    );
+    for quad in ["whoop-65", "freestyle-5"] {
+        let plan = common::plan(quad);
+        assert_eq!(
+            camera_limits(VideoLook::Digital, &plan.quad.camera),
+            DIGITAL_CAMERA
+        );
+    }
+}
+
+#[test]
+fn each_quads_analog_camera_has_its_own_dynamic_range_lines_and_sharpness() {
+    // Basis: Source. #28 §2: the Whoop 65's C03 camera is 7 stops, 480 lines
+    // and 300 TV lines; the Freestyle 5″'s typical camera is 8.5 stops, 480
+    // lines and 400 TV lines. They come from the Quad definitions.
+    let whoop = common::plan("whoop-65");
+    let limits = camera_limits(VideoLook::Analog, &whoop.quad.camera);
+    assert_eq!(
+        (limits.dynamic_range, limits.lines, limits.sharpness),
+        (7.0, 480.0, 300.0)
+    );
+    let five = common::plan("freestyle-5");
+    let limits = camera_limits(VideoLook::Analog, &five.quad.camera);
+    assert_eq!(
+        (limits.dynamic_range, limits.lines, limits.sharpness),
+        (8.5, 480.0, 400.0)
+    );
+}
+
+fn frame(quad: &str, look: VideoLook, window: UVec2, aspect: Aspect) -> FrameInputs {
+    let plan = common::plan(quad);
+    let picture = Picture::in_window(window, aspect);
+    let lens = Lens::new(plan.quad.camera.fov.to_degrees() as f32, look.lens_curve());
+    FrameInputs {
+        picture,
+        lens,
+        reach: lens.flat_reach(&picture),
+        source: picture.size(),
+        look,
+        limits: camera_limits(look, &plan.quad.camera),
+        time: 0.0,
+        frame: 0,
+    }
+}
+
+#[test]
+fn the_whoops_analog_picture_is_softer_than_the_freestyles_and_both_have_480_lines() {
+    // Basis: Rule. A camera's TV lines are counted over the picture's height:
+    // at native 1440p a 4:3 picture is 1440 pixels tall, so 300 TV lines make
+    // an analog pixel 4.8 window pixels across and 400 make it 3.6. Both
+    // cameras have 480 lines, 3 window pixels each.
+    let window = UVec2::new(2560, 1440);
+    let whoop = frame("whoop-65", VideoLook::Analog, window, Aspect::FourThree).params();
+    let five = frame("freestyle-5", VideoLook::Analog, window, Aspect::FourThree).params();
+    assert!((whoop.analog.x - 4.8).abs() < 1e-4, "{}", whoop.analog.x);
+    assert!((five.analog.x - 3.6).abs() < 1e-4, "{}", five.analog.x);
+    assert!((whoop.camera.y - 3.0).abs() < 1e-4);
+    assert!((five.camera.y - 3.0).abs() < 1e-4);
+}
+
+#[test]
+fn a_camera_with_fewer_stops_squeezes_the_light_harder() {
+    // Basis: Rule. The picture holds 8.6 stops with the punchy curve, so a
+    // 7-stop camera squeezes the light around the middle grey by 8.6 / 7 and a
+    // 10-stop camera by 8.6 / 10: more squeeze means more blown highlights and
+    // sunk shadows.
+    let window = UVec2::new(1280, 720);
+    let analog = frame("whoop-65", VideoLook::Analog, window, Aspect::FourThree).params();
+    let digital = frame("whoop-65", VideoLook::Digital, window, Aspect::FourThree).params();
+    assert!((analog.camera.x - 8.6 / 7.0).abs() < 1e-4);
+    assert!((digital.camera.x - 8.6 / 10.0).abs() < 1e-4);
+    assert!(analog.camera.x > digital.camera.x);
+}
+
+#[test]
+fn digital_draws_1080_lines_one_to_one_in_a_1080p_window_and_a_16_9_picture_shows_810_of_them() {
+    // Basis: Rule. 1080 lines over a 4:3 picture 1080 pixels tall (a 1080p
+    // window) is one window pixel a line. A 16:9 picture is that frame with its top and bottom
+    // cropped: 1920 × 1080 pixels over a frame 1440 pixels tall shows 810 of the
+    // 1080 lines.
+    let four_three = frame(
+        "whoop-65",
+        VideoLook::Digital,
+        UVec2::new(1920, 1080),
+        Aspect::FourThree,
+    );
+    assert!((four_three.params().camera.z - 1.0).abs() < 1e-4);
+    let sixteen_nine = frame(
+        "whoop-65",
+        VideoLook::Digital,
+        UVec2::new(1920, 1080),
+        Aspect::SixteenNine,
+    );
+    let line = sixteen_nine.params().camera.z;
+    assert!(
+        (sixteen_nine.picture.height / line - 810.0).abs() < 0.5,
+        "{line}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Auto-exposure
+
+#[test]
+fn analog_may_brighten_5_stops_and_darken_1_5_digital_6_and_2_at_their_own_speeds() {
+    // Basis: Source. #28 §4: Analog brightens up to 5 stops (3 a second) and
+    // darkens up to 1.5 (4 a second); Digital brightens up to 6 (4 a second)
+    // and darkens up to 2 (6 a second); both aim 2 stops below Bevy's default.
+    let a = VideoLook::Analog.auto_exposure();
+    assert_eq!(
+        (
+            a.max_brighten,
+            a.speed_brighten,
+            a.max_darken,
+            a.speed_darken
+        ),
+        (5.0, 3.0, 1.5, 4.0)
+    );
+    let d = VideoLook::Digital.auto_exposure();
+    assert_eq!(
+        (
+            d.max_brighten,
+            d.speed_brighten,
+            d.max_darken,
+            d.speed_darken
+        ),
+        (6.0, 4.0, 2.0, 6.0)
+    );
+    assert_eq!((a.target, d.target), (-2.0, -2.0));
+}
+
+#[test]
+fn a_dark_room_is_brightened_only_as_far_as_the_camera_may_and_the_sun_darkened_only_as_far() {
+    // Basis: Rule. Flying into a room 6 stops under the target, Analog brightens
+    // 5 stops, so the room stays near black, and Digital 6; in the sun 3 stops
+    // over the target, Analog darkens 1.5 stops, so the picture blows out,
+    // and Digital 2. Within its limits the camera aims the view's average light at
+    // the target.
+    assert_eq!(adaptation(&ANALOG_AUTO_EXPOSURE, -8.0), 5.0);
+    assert_eq!(adaptation(&DIGITAL_AUTO_EXPOSURE, -8.0), 6.0);
+    assert_eq!(adaptation(&ANALOG_AUTO_EXPOSURE, 1.0), -1.5);
+    assert_eq!(adaptation(&DIGITAL_AUTO_EXPOSURE, 1.0), -2.0);
+    assert_eq!(adaptation(&ANALOG_AUTO_EXPOSURE, -3.0), 1.0);
+    assert_eq!(adaptation(&ANALOG_AUTO_EXPOSURE, -2.0), 0.0);
+}
+
+#[test]
+fn the_compensation_curve_makes_bevys_auto_exposure_follow_those_limits() {
+    // Basis: Rule. For every average luminance the curve gives the exposure the
+    // average plus the camera's own adaptation.
+    for limits in [ANALOG_AUTO_EXPOSURE, DIGITAL_AUTO_EXPOSURE] {
+        let points = compensation_points(&limits);
+        for average in [-13.0f32, -9.0, -7.0, -4.0, -2.0, -1.0, 0.0, 1.5, 4.0, 5.5] {
+            let curve = curve_at(&points, average);
+            let wanted = average + adaptation(&limits, average);
+            assert!(
+                (curve - wanted).abs() < 0.02,
+                "at {average}: {curve}, not {wanted}"
+            );
+        }
+    }
+}
+
+#[test]
+fn metering_counts_the_middle_of_the_picture_more_than_its_edges() {
+    // Basis: Rule. The metering mask weighs the flat render by how much of the
+    // picture each part becomes, and the middle counts for more.
+    let picture = Picture::in_window(UVec2::new(1280, 720), Aspect::FourThree);
+    let lens = Lens::new(160.0, STOCK_CURVE);
+    let reach = lens.flat_reach(&picture);
+    let (size, weights) = metering_mask(&picture, &lens, reach);
+    let at = |x: u32, y: u32| weights[(y * size.x + x) as usize];
+    let middle = at(size.x / 2, size.y / 2);
+    assert!(middle > 200, "{middle}");
+    assert!(middle > at(size.x / 2, size.y * 9 / 20) / 2);
+    // The flat render's left and right edges reach wider than the picture
+    // shows across, so there the mask is zero.
+    assert_eq!(at(0, size.y / 2), 0);
+    assert_eq!(at(size.x - 1, size.y / 2), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Camera Tilt and FOV
+
+#[test]
+fn each_quads_camera_tilt_and_fov_start_from_its_definition() {
+    // Basis: Source. #14 §2: the Whoop 65 starts at Camera Tilt 30° and FOV
+    // 160°, the Freestyle 5″ at 30° and 155°.
+    let settings = CameraSettings::default();
+    let whoop = common::plan("whoop-65");
+    let five = common::plan("freestyle-5");
+    let quad = settings.quad(&whoop.quad.id, &whoop.quad.camera);
+    assert!(close(quad.tilt, 30.0, 1e-9) && close(quad.fov, 160.0, 1e-9));
+    let quad = settings.quad(&five.quad.id, &five.quad.camera);
+    assert!(close(quad.tilt, 30.0, 1e-9) && close(quad.fov, 155.0, 1e-9));
+}
+
+#[test]
+fn the_camera_starts_4_3_and_analog() {
+    // Basis: Rule. Aspect ratio is 4:3 by default (#14 §3).
+    let settings = CameraSettings::default();
+    assert_eq!(settings.aspect, Aspect::FourThree);
+    assert_eq!(settings.look, VideoLook::Analog);
+}
+
+#[test]
+fn up_and_down_change_camera_tilt_by_1_degree_a_press_within_0_to_80_degrees() {
+    // Basis: Source. #14 §2 and the spec: ↑/↓ change Camera Tilt by 1° a press,
+    // in a range of 0 to 80°.
+    let plan = common::plan("whoop-65");
+    let mut settings = CameraSettings::default();
+    let tilt = |s: &CameraSettings| s.quad(&plan.quad.id, &plan.quad.camera).tilt;
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltUp);
+    assert!(close(tilt(&settings), 31.0, 1e-9));
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltDown);
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltDown);
+    assert!(close(tilt(&settings), 29.0, 1e-9));
+    for _ in 0..100 {
+        settings.press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltUp);
+    }
+    assert!(close(tilt(&settings), 80.0, 1e-9));
+    for _ in 0..100 {
+        settings.press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltDown);
+    }
+    assert!(close(tilt(&settings), 0.0, 1e-9));
+}
+
+#[test]
+fn right_and_left_change_fov_by_1_degree_a_press_within_90_to_170_degrees() {
+    // Basis: Source. #14 §2 and the spec: →/← change FOV by 1° a press, in a
+    // range of 90 to 170°; wider is →.
+    let plan = common::plan("freestyle-5");
+    let mut settings = CameraSettings::default();
+    let fov = |s: &CameraSettings| s.quad(&plan.quad.id, &plan.quad.camera).fov;
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::FovWider);
+    assert!(close(fov(&settings), 156.0, 1e-9));
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::FovNarrower);
+    settings.press(&plan.quad.id, &plan.quad.camera, Action::FovNarrower);
+    assert!(close(fov(&settings), 154.0, 1e-9));
+    for _ in 0..100 {
+        settings.press(&plan.quad.id, &plan.quad.camera, Action::FovWider);
+    }
+    assert!(close(fov(&settings), 170.0, 1e-9));
+    for _ in 0..200 {
+        settings.press(&plan.quad.id, &plan.quad.camera, Action::FovNarrower);
+    }
+    assert!(close(fov(&settings), 90.0, 1e-9));
+}
+
+#[test]
+fn a_quad_keeps_the_camera_tilt_and_fov_the_pilot_gave_it_and_the_other_quad_is_untouched() {
+    // Basis: Rule. The values are kept for each Quad (#14 §2).
+    let whoop = common::plan("whoop-65");
+    let five = common::plan("freestyle-5");
+    let mut settings = CameraSettings::default();
+    for _ in 0..10 {
+        settings.press(&whoop.quad.id, &whoop.quad.camera, Action::CameraTiltUp);
+    }
+    settings.press(&whoop.quad.id, &whoop.quad.camera, Action::FovNarrower);
+    let kept = settings.quad(&whoop.quad.id, &whoop.quad.camera);
+    assert!(close(kept.tilt, 40.0, 1e-9) && close(kept.fov, 159.0, 1e-9));
+    let other = settings.quad(&five.quad.id, &five.quad.camera);
+    assert!(close(other.tilt, 30.0, 1e-9) && close(other.fov, 155.0, 1e-9));
+}
+
+#[test]
+fn a_press_shows_a_brief_readout_of_the_new_value_and_stopping_at_the_end_shows_none() {
+    // Basis: Rule. The readout names the value, in whole degrees, and a press
+    // that changes nothing, at the end of the range, has nothing to show.
+    let plan = common::plan("whoop-65");
+    let mut settings = CameraSettings::default();
+    let up = settings
+        .press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltUp)
+        .expect("tilt moved");
+    assert_eq!(up.text, "Camera Tilt 31°");
+    let wider = settings
+        .press(&plan.quad.id, &plan.quad.camera, Action::FovNarrower)
+        .expect("FOV moved");
+    assert_eq!(wider.text, "FOV 159°");
+    settings.set_quad(
+        &plan.quad.id,
+        QuadCamera {
+            tilt: 80.0,
+            fov: 170.0,
+        },
+    );
+    assert!(
+        settings
+            .press(&plan.quad.id, &plan.quad.camera, Action::CameraTiltUp)
+            .is_none()
+    );
+    assert!(
+        settings
+            .press(&plan.quad.id, &plan.quad.camera, Action::FovWider)
+            .is_none()
+    );
+}
+
+fn acts(
+    repeater: &mut Repeater,
+    held: &[Action],
+    from_ms: u64,
+    to_ms: u64,
+    step_ms: u64,
+) -> Vec<u64> {
+    let mut at = Vec::new();
+    let mut now = from_ms;
+    while now <= to_ms {
+        for _ in repeater.update(Duration::from_millis(now), held) {
+            at.push(now);
+        }
+        now += step_ms;
+    }
+    at
+}
+
+#[test]
+fn a_held_key_acts_at_once_again_after_1_s_and_then_every_200_ms() {
+    // Basis: Source. #14 §2: "Holding a key repeats it after 1 s, every
+    // 200 ms." Frames 10 ms apart.
+    assert_eq!(REPEAT_AFTER, Duration::from_secs(1));
+    assert_eq!(REPEAT_EVERY, Duration::from_millis(200));
+    let mut repeater = Repeater::new();
+    let held = [Action::FovWider];
+    let at = acts(&mut repeater, &held, 0, 2000, 10);
+    assert_eq!(at, vec![0, 1000, 1200, 1400, 1600, 1800, 2000]);
+}
+
+#[test]
+fn a_repeat_is_not_lost_when_a_frame_runs_long_and_a_released_key_starts_afresh() {
+    // Basis: Rule. A frame that spans several repeats acts for each, and a key
+    // let go and pressed again acts at once.
+    let mut repeater = Repeater::new();
+    let held = [Action::CameraTiltUp];
+    assert_eq!(repeater.update(Duration::ZERO, &held).len(), 1);
+    // One long frame from 0.9 s to 1.45 s: the repeats due at 1.0, 1.2, 1.4 s.
+    assert_eq!(repeater.update(Duration::from_millis(900), &held).len(), 0);
+    assert_eq!(repeater.update(Duration::from_millis(1450), &held).len(), 3);
+    // Let go, then press again: it acts at once and waits a second again.
+    assert_eq!(repeater.update(Duration::from_millis(1500), &[]).len(), 0);
+    assert_eq!(repeater.update(Duration::from_millis(1600), &held).len(), 1);
+    assert_eq!(repeater.update(Duration::from_millis(2500), &held).len(), 0);
+    assert_eq!(repeater.update(Duration::from_millis(2600), &held).len(), 1);
+}
+
+#[test]
+fn two_keys_held_together_repeat_on_their_own() {
+    // Basis: Rule. Camera Tilt and FOV keys each follow their own clock.
+    let mut repeater = Repeater::new();
+    let tilt = [Action::CameraTiltUp];
+    let both = [Action::CameraTiltUp, Action::FovWider];
+    assert_eq!(repeater.update(Duration::ZERO, &tilt).len(), 1);
+    // FOV is pressed at 0.5 s: it acts at once, tilt does not.
+    assert_eq!(
+        repeater.update(Duration::from_millis(500), &both),
+        vec![Action::FovWider]
+    );
+    // At 1.0 s tilt repeats; FOV waits until 1.5 s.
+    assert_eq!(
+        repeater.update(Duration::from_millis(1000), &both),
+        vec![Action::CameraTiltUp]
+    );
+    assert_eq!(repeater.update(Duration::from_millis(1500), &both).len(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Digital's late picture
+
+/// The Quad flying east at 10 m/s, a pose every millisecond, as the game
+/// records them.
+fn flying_east() -> PoseHistory {
+    let mut history = PoseHistory::new();
+    for tick in 0..=1000u32 {
+        let t = f64::from(tick) / 1000.0;
+        history.push(
+            t,
+            Pose {
+                position: Vec3::new((10.0 * t) as f32, 2.0, 0.0),
+                rotation: Quat::IDENTITY,
+            },
+        );
+    }
+    history
+}
+
+#[test]
+fn digital_shows_the_picture_15_ms_later_than_analog() {
+    // Basis: Source. #14 §4: Digital is always 15 ms later than Analog. At
+    // 10 m/s that is 0.15 m behind, and Digital shows exactly the place
+    // Analog showed 15 ms before.
+    let history = flying_east();
+    let now = 1.0;
+    let analog = history.shown(now, VideoLook::Analog, 0.0).expect("a pose");
+    let digital = history.shown(now, VideoLook::Digital, 0.0).expect("a pose");
+    assert!((analog.position.x - 10.0).abs() < 1e-4);
+    assert!(((analog.position.x - digital.position.x) - 0.15).abs() < 1e-4);
+    let analog_then = history
+        .shown(now - 0.015, VideoLook::Analog, 0.0)
+        .expect("a pose");
+    assert!((digital.position.x - analog_then.position.x).abs() < 1e-5);
+    assert_eq!(DIGITAL_DELAY, 0.015);
+}
+
+#[test]
+fn the_picture_is_drawn_one_tick_behind_the_last_tick_by_how_far_the_clock_is_into_the_next() {
+    // Basis: Rule. The Quad has always been drawn between the last two ticks'
+    // states, by how far the game's clock is into the next tick: with 10 ticks
+    // done and half a tick over, at 1 kHz, that is 9.5 ms.
+    let mut fixed = Time::<Fixed>::from_hz(1000.0);
+    fixed.advance_by(Duration::from_millis(10));
+    fixed.accumulate_overstep(Duration::from_micros(500));
+    assert!(
+        (drawn_moment(&fixed) - 0.0095).abs() < 1e-9,
+        "{}",
+        drawn_moment(&fixed)
+    );
+    // Paused: the clock doesn't move, so the moment doesn't.
+    let moment = drawn_moment(&fixed);
+    assert_eq!(drawn_moment(&fixed), moment);
+}
+
+#[test]
+fn near_the_edge_of_range_digital_may_be_up_to_20_ms_later_still_and_never_more() {
+    // Basis: Source. #28 §3: Digital's delay rises by up to 20 ms near the edge
+    // of range. Analog never has any.
+    assert_eq!(picture_delay(VideoLook::Analog, 0.0), 0.0);
+    assert_eq!(picture_delay(VideoLook::Analog, 0.02), 0.0);
+    assert_eq!(picture_delay(VideoLook::Digital, 0.0), 0.015);
+    assert!((picture_delay(VideoLook::Digital, 0.01) - 0.025).abs() < 1e-12);
+    assert!((picture_delay(VideoLook::Digital, 0.02) - 0.035).abs() < 1e-12);
+    assert!((picture_delay(VideoLook::Digital, 0.5) - 0.035).abs() < 1e-12);
+    assert_eq!(picture_delay(VideoLook::Digital, -1.0), 0.015);
+    assert_eq!(MAX_EDGE_DELAY, 0.020);
+    let history = flying_east();
+    let late = history
+        .shown(1.0, VideoLook::Digital, 0.02)
+        .expect("a pose");
+    assert!((late.position.x - (10.0 - 0.35)).abs() < 1e-4);
+}
+
+#[test]
+fn right_after_a_reset_the_picture_shows_no_motion_across_it_and_nothing_of_the_old_place() {
+    // Basis: Rule. Reset moves the Quad at once: the picture never draws it
+    // moving across the jump, and Digital doesn't show the old place late.
+    let mut history = flying_east();
+    history.restart(
+        1.0,
+        Pose {
+            position: Vec3::new(0.0, 0.01, 0.0),
+            rotation: Quat::IDENTITY,
+        },
+    );
+    history.push(
+        1.001,
+        Pose {
+            position: Vec3::new(0.0, 0.01, 0.0),
+            rotation: Quat::IDENTITY,
+        },
+    );
+    for look in [VideoLook::Analog, VideoLook::Digital] {
+        for moment in [0.99, 1.0, 1.0005, 1.001, 1.02] {
+            let pose = history.shown(moment, look, 0.0).expect("a pose");
+            assert_eq!(
+                pose.position,
+                Vec3::new(0.0, 0.01, 0.0),
+                "{look:?} at {moment}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_history_forgets_what_is_too_old_to_draw_and_before_the_first_pose_shows_the_first() {
+    // Basis: Rule. It keeps about 0.1 s, more than the longest delay of 35 ms,
+    // and a moment before its oldest pose shows that pose.
+    let history = flying_east();
+    assert!(history.len() < 130, "{} poses", history.len());
+    let oldest = history.at(0.0).expect("a pose");
+    assert!(oldest.position.x > 8.0, "{}", oldest.position.x);
+    assert!(PoseHistory::new().at(1.0).is_none());
+}
+
+#[test]
+fn the_late_picture_never_enters_the_simulation() {
+    // Basis: Rule. The camera and the video are outside the Simulation (the
+    // Camera and video deep dive): recording poses and drawing them late leaves
+    // a flight's fingerprint exactly as it was.
+    let plan = common::plan("whoop-65");
+    let mut plain = Flight::new(plan.simulation(None).unwrap()).unwrap();
+    let mut watched = Flight::new(plan.simulation(None).unwrap()).unwrap();
+    let mut history = PoseHistory::new();
+    for tick in 0..300u32 {
+        plain.tick();
+        watched.tick();
+        let (_, after) = watched.drawn_between();
+        let at = f64::from(tick + 1) / 1000.0;
+        history.push(
+            at,
+            Pose {
+                position: Vec3::new(after.position.x as f32, after.position.z as f32, 0.0),
+                rotation: Quat::IDENTITY,
+            },
+        );
+        let _ = history.shown(at, VideoLook::Digital, 0.02);
+    }
+    assert_eq!(
+        plain.simulation().fingerprint(),
+        watched.simulation().fingerprint()
+    );
+}

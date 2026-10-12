@@ -6,7 +6,7 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 ## Your first flight
 
-The first flight is a test: either Quad over a flat floor with a grid, through a plain camera on the Quad's frame. There are no menus, no sound, no OSD and no fisheye yet, and the settings are fixed.
+The first flight is a test: either Quad over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no sound, no OSD and no Breakup yet, and the settings are fixed.
 
 **Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
 
@@ -34,11 +34,24 @@ The first build takes a few minutes. `--release` matters: without it the picture
 - Options pauses, and Create resets the Quad.
 - It has no Flight Mode switch, so it flies Acro.
 
-**On the keyboard:** R resets the Quad, and Esc pauses and goes on.
+**On the keyboard:** R resets the Quad, and Esc pauses and goes on. The up and down arrows change the Camera Tilt, and the right and left arrows change the FOV (see [The camera](#the-camera)).
 
 **The fixed settings, for now:** a 250 Hz Packet Rate, Betaflight 2026.6's default Rates (Actual, 70 °/s at centre and 670 °/s at full stick), Acro for a device with no Flight Mode switch, every Assist off (so the battery runs down: Reset gives a fresh one), and your device uncalibrated, on its profile's starting values.
 
-**What's a placeholder:** the camera is a plain wide lens, 90° top to bottom, at the Quad's Camera Tilt. The Quad's own fisheye Lens, its Video Look and the OSD come later. On the Whoop 65 you see the front ducts at the sides.
+**What's a placeholder:** the floor and the light. The Maps bring their own light later. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
+
+### The camera
+
+You fly through the Quad's FPV Camera, bolted to its frame, as on a real quad.
+
+- **The Lens.** Every Quad's camera is a fisheye: straight lines bend towards the edges. The Whoop 65's is 160° and the Freestyle 5″'s 155°, measured corner to corner of the 4:3 picture, like the number on a camera's box. That is about 128° across on the Whoop.
+- **Camera Tilt and FOV.** Both start at the Quad's own values (30° on both, and 160° or 155°), and you can change them in flight: the up and down arrows tilt the camera between 0° and 80°, and the right and left arrows widen and narrow the FOV between 90° and 170°. A press moves 1°. Hold the key and it repeats after a second, then five times a second. A Gamepad or Radio button bound to the same Actions does the same. The window's title shows the new value for a moment. Each Quad keeps its own values for as long as the game runs; they'll be kept in the settings file once it exists.
+- **Analog or Digital.** `--look analog` (the default) is a soft picture with a little grain and colour that bleeds sideways, like analog goggles. Each Quad's own camera sets how soft it is: the Whoop 65's is the softest. `--look digital` is clean and sharp, with a gentler fisheye, and it shows the picture 15 ms later than Analog, as real digital systems do. That delay is in the picture only: the sticks and the flight are untouched.
+- **4:3 or 16:9.** `--aspect 16:9` crops the top and bottom of the picture and never stretches it. 4:3 is the default.
+- **Light.** The camera adapts to light as a real one does, over about a second: flying into a dark room starts near black, then the room shows within a second, with its windows blown out; flying back out blows out to white before the picture recovers. Each camera holds only so many stops of light between black and white (7 on the Whoop 65, 8.5 on the Freestyle 5″, 10 on Digital), so bright things blow out and dark things sink to black.
+- **Your own Quad.** The Whoop 65's ducts and the props of both Quads show where the Camera Tilt and FOV let you see them.
+
+Pick the Video Look and the picture's shape when you start the game: `cargo run --release -p opendrone -- --look digital --aspect 16:9`. The screens ticket adds menus for them.
 
 **If something's wrong:** the terminal you started it from lists the devices it finds and why one might not fly. `cargo run -p opendrone -- --help` lists the other ways to start it.
 

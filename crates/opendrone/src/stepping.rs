@@ -37,6 +37,9 @@ pub struct Flight {
     after: QuadState,
     /// A Reset arrives during the next tick: draw no motion across it.
     reset_in_last_tick: bool,
+    /// The last tick moved the Quad at once (Reset): the picture shows no
+    /// motion across it.
+    jumped: bool,
 }
 
 impl Flight {
@@ -59,6 +62,7 @@ impl Flight {
             before: state,
             after: state,
             reset_in_last_tick: false,
+            jumped: false,
         })
     }
 
@@ -114,7 +118,8 @@ impl Flight {
         self.after = *self.simulation.quad_state(0);
         // Reset moves the Quad to its Launch Spot at once: no motion to draw
         // across it.
-        if std::mem::take(&mut self.reset_in_last_tick) {
+        self.jumped = std::mem::take(&mut self.reset_in_last_tick);
+        if self.jumped {
             self.before = self.after;
         }
     }
@@ -144,6 +149,12 @@ impl Flight {
         Some(f.finish())
     }
 
+    /// Whether the last tick moved the Quad at once, as Reset does: there is
+    /// no motion to draw across it, and nothing of the old place to show late.
+    pub fn jumped_in_last_tick(&self) -> bool {
+        self.jumped
+    }
+
     /// The last two ticks' states, to draw between.
     pub fn drawn_between(&self) -> (&QuadState, &QuadState) {
         (&self.before, &self.after)
@@ -160,7 +171,7 @@ impl Plugin for SteppingPlugin {
     }
 }
 
-fn step_the_flight(flight: Option<NonSendMut<Flight>>) {
+pub fn step_the_flight(flight: Option<NonSendMut<Flight>>) {
     if let Some(mut flight) = flight {
         flight.tick();
     }
