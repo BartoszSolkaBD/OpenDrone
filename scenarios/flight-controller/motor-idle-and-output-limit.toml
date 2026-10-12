@@ -15,10 +15,10 @@
 # and yaw P low-passes, RC smoothing and feedforward (#49), the dynamic
 # notch (which waits for gyro noise, #21), and Dynamic D, I-term relax,
 # anti-gravity, TPA and throttle boost (#50). So every number here is what
-# Betaflight 2026.6.2 gives on that Tune, and stays so when #50 lands. A
+# Betaflight 2026.6.2 gives on that Tune. A
 # fresh Flight Controller's filters, RC smoothing and feedforward start
-# settled on its first frame, so on a case's one loop they change nothing;
-# the loop shaping #50 brings, such as throttle boost, could.
+# settled on its first frame, so on a case's one loop they change nothing,
+# and nor does throttle boost (#50), which starts settled too.
 format = 2
 name   = "Motor idle and the output limit set the motors' range, as Betaflight does"
 

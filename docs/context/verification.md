@@ -2,7 +2,7 @@
 
 How we prove the simulation behaves correctly, and keeps behaving correctly. Back to the [map](../../CONTEXT.md).
 
-How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). How every number is written: [the unit list](../units.md). What the Pack checker refuses, how Test Quads are written, and the Feel Test log rules CI checks: [Checking a Pack](../verification/checking-a-pack.md).
+How to read a Scenario file and the Results beside it: [Reading a Scenario and its Results](../verification/reading-a-scenario.md). Watching a Scenario in the game, and turning a flight into one: [Watching a Scenario and saving a flight](../verification/watching-and-saving-flights.md). How every number is written: [the unit list](../units.md). What the Pack checker refuses, how Test Quads are written, and the Feel Test log rules CI checks: [Checking a Pack](../verification/checking-a-pack.md).
 
 ## Language
 
@@ -41,6 +41,10 @@ _Avoid_: script
 
 **Input Track**:
 A separate file of recorded inputs that a Scenario plays back, such as a flight saved in the sim or a Betaflight log.
+_Avoid_: recording, replay
+
+**Save Flight**:
+A developer Action with no default key and no menu entry that writes the flight so far as a Flight Scenario, starting landed at the Launch Spot, plus an Input Track of every Flight Input, so that a flight the maintainer cares about becomes a test. Flown again by the headless runner, it gives the fingerprint it had in the game. Expectations are added afterwards.
 _Avoid_: recording, replay
 
 **Test Pilot**:

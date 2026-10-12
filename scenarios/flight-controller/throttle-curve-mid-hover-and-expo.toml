@@ -1,0 +1,129 @@
+# The throttle curve from the pilot's Rates, `thr_mid`, `thr_hover` and
+# `thr_expo` (the Betaflight App's Throttle MID, Throttle Hover and Throttle
+# EXPO), shapes the throttle as Betaflight 2026.6.2's does
+# (`initRcProcessing`, `quadraticBezier` and `rcLookupThrottle`,
+# src/main/fc/rc.c; the Betaflight research §1):
+#
+# - Two quadratic Bézier curves meet at the hover point: across at `thr_mid`
+#   0.30 of the stick, up at `thr_hover` 0.40 of the throttle. Expo 0.60
+#   pulls each curve's middle control point towards the hover point's
+#   height, flattening the curve around it: (0, 0) to (0.30, 0.40) through
+#   (0.15, 0.32), then to (1, 1) through (0.65, 0.52).
+# - Betaflight works out 12 points of it, at every eleventh of the stick, in
+#   whole µs: 1000, 1172, 1300, 1383, 1425, 1471, 1528, 1598, 1681, 1775, 1881
+#   and 2000.
+# - Each frame the throttle stick, from `min_check` 1050 µs to 2000 µs, is
+#   turned into 0 to 1000 thousandths, (µs − 1050) × 1000 ÷ 950 in whole
+#   numbers, and joined between the two points either side in whole µs.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop,
+# and measures the mixer's throttle: on a fresh Flight Controller RC
+# smoothing and throttle boost start settled on the first frame, so on that
+# loop they leave the throttle as the curve gives it. It flies the Freestyle
+# 5″ on its own Tune; the throttle curve is the pilot's, in `[start.rates]`.
+format = 2
+name   = "The pilot's throttle mid, hover and expo shape the throttle as Betaflight's do"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.30, hover 0.40, expo 0.60, limit off"
+quickrates_rc_expo = "off"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "0%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "0% ± 0.0001%"
+basis = "source: updateRcCommands: 0% reaches Betaflight at 988.46 µs, below min_check, so 0 thousandths: the curve's first point, 1000 µs"
+
+# 15%: 1142.15 µs, (1142 − 1050) × 1000 ÷ 950 = 96 thousandths.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "15%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "17.9% ± 0.0001%"
+basis = "source: rcLookupThrottle: 96 × 11 = 1056, so between points 1 and 2, 56 thousandths of the way: 1172 + (1300 − 1172) × 56 ÷ 1000 = 1179 µs, in whole µs: 17.9%, where the straight curve gives 9.6%"
+
+# 30%: 1295.85 µs, 257 thousandths, near the hover point.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "30%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "36.8% ± 0.0001%"
+basis = "source: rcLookupThrottle: 257 × 11 = 2827, between points 2 and 3: 1300 + (1383 − 1300) × 827 ÷ 1000 = 1368 µs: 36.8%"
+
+# 50%: 1500.77 µs, 473 thousandths.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "48.2% ± 0.0001%"
+basis = "source: rcLookupThrottle: 473 × 11 = 5203, between points 5 and 6: 1471 + (1528 − 1471) × 203 ÷ 1000 = 1482 µs: 48.2%, flatter around the hover point than the straight 47.3%"
+
+# 75%: 1756.30 µs, 743 thousandths.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "75%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "69.7% ± 0.0001%"
+basis = "source: rcLookupThrottle: 743 × 11 = 8173, between points 8 and 9: 1681 + (1775 − 1681) × 173 ÷ 1000 = 1697 µs: 69.7%"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "100%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "100% ± 0.0001%"
+basis = "source: rcLookupThrottle: full stick is 1000 thousandths, the curve's last point, 2000 µs"

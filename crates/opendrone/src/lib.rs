@@ -23,7 +23,12 @@
 //! - [`developer`]: commands that draw into an image instead of the window,
 //!   to save the picture or measure what the camera costs a frame;
 //! - [`reference`](mod@reference): the reference check, a Scenario flown through the game's
-//!   stepping, which must match the headless runner's fingerprint.
+//!   stepping, which must match the headless runner's fingerprint;
+//! - [`watch`]: a developer command that opens a Flight or Thrust Stand
+//!   Scenario in the FPV view, with pause (#73);
+//! - [`save`]: the Save Flight Action (#73), which writes the flight as a
+//!   Scenario and an Input Track the headless runner flies again to the same
+//!   fingerprint.
 //!
 //! Rendering isn't pipelined and VSync is off, for the least delay from the
 //! sticks to the picture (#28 §7).
@@ -38,10 +43,12 @@ pub mod drawing;
 pub mod map_drawing;
 pub mod pilot;
 pub mod reference;
+pub mod save;
 pub mod set_up;
 pub mod settings;
 pub mod status;
 pub mod stepping;
+pub mod watch;
 
 use std::time::Duration;
 
@@ -57,6 +64,7 @@ use crate::pilot::{KeyboardPlugin, Pilot, PilotPlugin};
 use crate::set_up::FlightPlan;
 use crate::status::StatusPlugin;
 use crate::stepping::{Flight, SteppingPlugin};
+use crate::watch::WatchedScenario;
 
 pub use crate::developer::{measure_camera_cost, screenshot_after};
 
@@ -64,6 +72,24 @@ pub use crate::developer::{measure_camera_cost, screenshot_after};
 /// keyboard, drawn with no pipelining and no VSync.
 pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
     let flight = Flight::new(plan.simulation(None)?)?;
+    Ok(window_game(plan, pilot, flight))
+}
+
+/// The game in its window, watching a Scenario (#73): its flight stepped by
+/// the game, with nobody flying it. Pause works as in any flight.
+pub fn watching_game(watched: WatchedScenario, pilot: Pilot) -> App {
+    let WatchedScenario {
+        plan,
+        flight,
+        watching,
+    } = watched;
+    let mut app = window_game(plan, pilot.watching(), flight);
+    app.insert_resource(watching);
+    app
+}
+
+/// The game's window, systems and resources, flying `flight`.
+fn window_game(plan: FlightPlan, pilot: Pilot, flight: Flight) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -89,7 +115,7 @@ pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
     .insert_resource(plan)
     .insert_non_send(flight)
     .insert_resource(pilot);
-    Ok(app)
+    app
 }
 
 /// How long a headless run lasts, in the computer's time.

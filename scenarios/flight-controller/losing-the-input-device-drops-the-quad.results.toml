@@ -14,7 +14,7 @@ measured = "25.7%"
 what     = "mixer throttle at 1.4 s"
 basis    = "Source"
 expected = "0% ± 0.01%"
-measured = "0.000000000000102%"
+measured = "0%"
 
 [[expect]]
 what     = "motor 1 DShot at 1.4 s"
@@ -53,18 +53,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "930ed539d6c22485"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "f047463a313d0d7a"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "51aa8c4ab6dd9724"   # the whole state after each of 32000 steps at 8000 Hz, in order
+run  = "6179136abadcf2ca"   # the whole state after each of 32000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.4 s" = "df74b66fd160a599"
-"0.8 s" = "7b5ea530b115926d"
-"1.2 s" = "52d7992ed21b222f"
-"1.6 s" = "d6c3efa368553ba4"
-"2 s" = "47a8ab8777e1dc5f"
-"2.4 s" = "11ff19c32ba2f245"
-"2.8 s" = "2cd9a35dc94c306c"
-"3.2 s" = "9e890f64ec67135a"
-"3.6 s" = "7b4b80426bc60967"
-"4 s" = "54a2141dca0f0e81"
+"0.4 s" = "6b4c062b1736a706"
+"0.8 s" = "04dddc7ef0486324"
+"1.2 s" = "e70b06e43bafff31"
+"1.6 s" = "1fea1209ce116d18"
+"2 s" = "aee8c23e8f289134"
+"2.4 s" = "c281adf6072cd419"
+"2.8 s" = "9cf9555da4826bc8"
+"3.2 s" = "2130f7c377269afb"
+"3.6 s" = "7736bfa4af5405c3"
+"4 s" = "c99328b9aa8db125"

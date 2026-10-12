@@ -1,0 +1,140 @@
+# TPA (throttle PID attenuation) works out its factor from the mixer's
+# throttle as Betaflight 2026.6.2 does (`pidUpdateTpaFactor` and
+# `getTpaFactorClassic`, src/main/flight/pid.c; the breakpoints in
+# `pidInitConfig`, pid_init.c; the Betaflight research §3). The PID loop
+# multiplies D by it (and P too, with `tpa_mode` PD).
+#
+# On the Freestyle 5″'s Tune, Betaflight 2026.6.2's defaults:
+#
+# - Above `tpa_breakpoint` 1350 µs, a throttle of 0.35, the factor falls in a
+#   straight line from 1 to 1 − `tpa_rate` 65% = 0.35 at full throttle:
+#   1 − (throttle − 0.35) × 0.65 ÷ 0.65.
+# - Below `tpa_low_breakpoint` 1050 µs, a throttle of 0.05, low-throttle
+#   TPA cuts instead, up to `tpa_low_rate` 20% at zero throttle:
+#   1 − 0.20 × (0.05 − throttle) ÷ 0.05. Only until the throttle first
+#   reaches 0.05 after power-up (`tpa_low_always` OFF): see
+#   tpa-cuts-the-d-term.toml.
+# - In between, 1.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop:
+# a fresh one starts as if its first throttle had held since power-up, so a
+# throttle at or past 0.05 has already ended low-throttle TPA. Each throttle
+# is the mixer's, through Betaflight's straight throttle curve: the stick
+# reaches Betaflight over CRSF, and (µs − 1050) × 1000 ÷ 950, in whole µs,
+# passes the curve's table of whole µs.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only, whose TPA is
+# the 5″'s.
+format = 2
+name   = "TPA cuts more the higher the throttle, and low-throttle TPA cuts at the bottom"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+# Zero throttle: low-throttle TPA's whole cut.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "0%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "0.8 ± 0.000001"
+basis = "source: getTpaFactorClassic: below the low breakpoint, 1 − 0.20 × (0.05 − 0) ÷ 0.05 = 0.80"
+
+# 10%: 1090.92 µs, a throttle of 0.042, still below the low breakpoint.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "10%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "4.2% ± 0.000001%"
+basis = "source: updateRcCommands: 10% stick reaches Betaflight at 1090.92 µs: (1090 − 1050) × 1000 ÷ 950 = 42 thousandths"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "0.968 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − 0.20 × (0.05 − 0.042) ÷ 0.05 = 0.968"
+
+# 35%: 1347.08 µs, a throttle of 0.312, between the breakpoints.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "35%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "1 ± 0"
+basis = "source: getTpaFactorClassic: past the low breakpoint and below 0.35, no cut"
+
+# 50%: a throttle of 0.473.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "0.877 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − (0.473 − 0.35) × 0.65 ÷ 0.65 = 0.877"
+
+# 75%: 1756.30 µs, a throttle of 0.742.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "75%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "0.608 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − (0.742 − 0.35) × 0.65 ÷ 0.65 = 0.608"
+
+# Full throttle: TPA's whole cut.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "100%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "TPA factor"
+value = "0.35 ± 0.000001"
+basis = "source: getTpaFactorClassic: 1 − (1 − 0.35) × 0.65 ÷ 0.65 = 0.35, 1 − tpa_rate 65%"

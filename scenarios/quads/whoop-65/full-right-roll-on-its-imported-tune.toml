@@ -20,11 +20,12 @@
 # shakes. How hard comes from the Whoop 65's Prop Wash numbers and the
 # random seed.
 #
-# The Flight Controller flies the Tune's "Not simulated yet" settings as off
-# until their tickets land: Dynamic D and I-term relax (#50). So the roll
-# spins up on P, I, D and feedforward, through the Tune's filters and RC
-# smoothing (#49), without Dynamic D or I-term relax. The Source Expectations hold either way; the Observed swings
-# will move when those land.
+# The roll spins up on P, I, D and feedforward, through the Tune's filters
+# and RC smoothing (#49), with the Tune's loop shaping (#50): Dynamic D
+# raising D from 45 towards 48 on fast moves, I-term relax holding I back
+# while the setpoint climbs, anti-gravity, TPA from 1350 µs and throttle
+# boost. The Source Expectations hold either way; the Observed swings moved
+# when the loop shaping landed.
 format = 2
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
 
@@ -84,14 +85,14 @@ basis = "observed: with the sticks centred the whoop holds still; a centred stic
 [[expect]]
 what    = "roll rate"
 over    = "1.5 s to 3 s"
-highest = "829 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); I-term relax (#50) will change how far"
+highest = "837 °/s ± 3%"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); it peaked at 836 °/s before the loop shaping (#50)"
 
 [[expect]]
 what    = "roll rate"
 over    = "1.5 s to 3 s"
-lowest  = "491 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108) and Prop Wash shaking it (#46: was 530 °/s without it); I-term relax (#50) will change how far"
+lowest  = "501 °/s ± 3%"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108) and Prop Wash shaking it (#46: was 530 °/s without it); it dipped to 495 °/s before the loop shaping (#50)"
 
 [[expect]]
 what    = "pitch rate"
@@ -102,7 +103,7 @@ basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash sh
 [[expect]]
 what    = "pitch rate"
 over    = "1 s to 3 s"
-highest = "14.7 °/s ± 3 °/s"
+highest = "17.0 °/s ± 3 °/s"
 basis   = "observed: full right roll asks for nothing in pitch, but Prop Wash shakes the sinking whoop (#46), and the PID loop holds pitch within about 27 °/s of what the centred stick asks (it held it within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
 
 [[expect]]
@@ -114,11 +115,11 @@ basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicke
 [[expect]]
 what    = "yaw rate"
 over    = "1 s to 3 s"
-highest = "10.6 °/s ± 1.5 °/s"
-basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 10 °/s (within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor"
+highest = "12.2 °/s ± 1.5 °/s"
+basis   = "observed: full right roll asks for nothing in yaw; Prop Wash's flicker (#46) yaws it a little as the rotors' thrusts and speeds part, and the PID loop holds it within about 12 °/s (within 1 °/s without Prop Wash); the values moved when the flicker began to draw per rotor, and again with the loop shaping (#50)"
 
 [[expect]]
 what  = "roll rate"
 at    = "3.5 s"
-value = "5.22 °/s ± 5 °/s"
-basis = "observed: half a second after the stick is let go the roll has stopped, but the whoop still sinks through its own air, so Prop Wash still shakes it (#46: it read 0 °/s ± 1 °/s without it); it moved when the flicker began to draw per rotor"
+value = "-4.93 °/s ± 5 °/s"
+basis = "observed: half a second after the stick is let go the roll has stopped, but the whoop still sinks through its own air, so Prop Wash still shakes it (#46: it read 0 °/s ± 1 °/s without it); it moved when the flicker began to draw per rotor, and again with the loop shaping (#50)"

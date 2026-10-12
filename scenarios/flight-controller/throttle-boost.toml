@@ -1,0 +1,104 @@
+# Throttle boost pushes a fast throttle move further for a moment, as
+# Betaflight 2026.6.2's mixer does (`mixTable`, src/main/flight/mixer.c; the
+# Betaflight research §1): the mixer's throttle, after the throttle limit,
+# gets `throttle_boost` ÷ 10 times its distance from a first-order low-pass
+# (PT1) of itself at `throttle_boost_cutoff`, held within 0% to 100%.
+# Betaflight's Blackbox logs the boosted throttle as the mixer's, which is
+# what "mixer throttle" measures here, and the motors get it.
+#
+# On the Freestyle 5″'s Tune `throttle_boost` is 5, so 0.5 times the
+# distance, and the cutoff 15 Hz: the low-pass moves k = ω ÷ (ω + 1) =
+# 0.0116438 of the way each loop, with ω = 2π × 15 Hz ÷ 8000. After a step
+# of size s, the n-th loop's throttle is the new throttle + 0.5 × s ×
+# (1 − k)ⁿ.
+#
+# The Flight Controller alone, armed, sticks centred. The throttle steps
+# from 30% to 75% at 0.5 s, back to 30% at 1 s, and to 100% at 1.5 s, each
+# with a frame. Through Betaflight's throttle curve (straight, mid 0.50) 30%
+# is a mixer throttle of 25.7%, 75% of 74.2% (it reaches Betaflight at
+# 1756.30 µs: (1756 − 1050) × 1000 ÷ 950 = 743, which the throttle curve's
+# table of whole µs makes 742) and 100% of 100%.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only, so RC smoothing
+# is off and each step reaches the mixer at once; its throttle boost is the
+# 5″'s.
+format = 2
+name   = "Throttle boost pushes a fast throttle move further for a moment"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", throttle = "75%" },
+  { at = "1 s",   throttle = "30%" },
+  { at = "1.5 s", throttle = "100%" },
+]
+
+[[expect]]
+what  = "mixer throttle"
+at    = "0.5 s"
+value = "25.7% ± 0.0001%"
+basis = "source: mixTable: a steady throttle has nothing to boost: the low-pass sits on it"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "0.500125 s"
+value = "98.1676% ± 0.0001%"
+basis = "source: mixTable: the first loop of the step up from 25.7% to 74.2% boosts it by 0.5 × 48.5% × (1 − 0.0116438) = 23.9676%: 98.1676%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "0.501 s"
+value = "96.2810% ± 0.0001%"
+basis = "source: mixTable: eight loops on, 74.2% + 0.5 × 48.5% × 0.98836⁸ = 96.2810%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "0.51 s"
+value = "83.7015% ± 0.0001%"
+basis = "source: mixTable: 80 loops on, 74.2% + 0.5 × 48.5% × 0.98836⁸⁰ = 83.7015%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "0.6 s"
+value = "74.2021% ± 0.0001%"
+basis = "source: mixTable: 0.1 s on the boost has all but gone: 74.2% + 0.5 × 48.5% × 0.98836⁸⁰⁰ = 74.2021%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.000125 s"
+value = "1.7324% ± 0.0001%"
+basis = "source: mixTable: a step down is pushed further down too: 25.7% − 0.5 × 48.5% × 0.98836 = 1.7324%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.01 s"
+value = "16.1985% ± 0.0001%"
+basis = "source: mixTable: 80 loops on, 25.7% − 0.5 × 48.5% × 0.98836⁸⁰ = 16.1985%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.500125 s"
+value = "100% ± 0%"
+basis = "source: mixTable: the boost is held within 0% to 100%, so a step to full throttle stays at 100%"

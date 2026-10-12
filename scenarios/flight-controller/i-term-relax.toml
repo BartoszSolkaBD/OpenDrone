@@ -1,0 +1,95 @@
+# I-term relax holds roll's and pitch's I back while the stick moves fast, as
+# Betaflight 2026.6.2's does (`applyItermRelax` and `pidController`,
+# src/main/flight/pid.c; the Betaflight research §3), so I doesn't wind up
+# in a flip and bounce back at its end:
+#
+# - A first-order low-pass (PT1) at `iterm_relax_cutoff` 15 Hz follows each
+#   axis's setpoint; the setpoint less it is how fast the stick is moving. It
+#   moves k = ω ÷ (ω + 1) = 0.0116438 of the way each loop, with
+#   ω = 2π × 15 Hz ÷ 8000.
+# - With `iterm_relax_type` SETPOINT, I grows by the error times
+#   max(0, 1 − that ÷ 40 °/s): not at all while the setpoint is more than
+#   40 °/s from the low-pass.
+# - `iterm_relax` RP relaxes roll and pitch only; yaw's I grows as ever.
+#
+# On the Freestyle 5″'s Tune: RP, SETPOINT and 15 Hz, Betaflight 2026.6.2's
+# defaults. The Flight Controller alone, armed, the throttle at 50%, the
+# sticks centred, which ask for 0.10966 °/s. At 0.5 s the roll and yaw
+# sticks jump to 50%, which asks for 193.543 °/s (rc-smoothing-at-250-hz.toml)
+# on each, and the gyro reads a roll right and a yaw right at 190 °/s, so
+# each error is 3.543 °/s. Roll's I would grow by 0.244381 × 80 × 3.543 ÷
+# 8000 = 0.0086593 a loop; yaw's by 2.5 times that share.
+#
+# After the jump the setpoint is 193.434 °/s from the low-pass, which closes
+# by k each loop: it is within 40 °/s after 135 loops (0.0169 s), and roll's
+# I starts growing, slowly at first.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only: the Freestyle
+# 5″ with RC smoothing off, so the setpoint jumps in one loop, and the other
+# filters off. Its I-term relax is the 5″'s.
+format = 2
+name   = "I-term relax holds roll's and pitch's I back while the stick moves fast"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "50%", yaw = "50%", rotation = "roll 190 °/s, pitch 0 °/s, yaw 190 °/s" },
+]
+
+[[expect]]
+what  = "roll I term"
+at    = "0.5 s"
+value = "1.0719 ± 0.0001"
+basis = "source: pidController: the centred stick's 0.10966 °/s, 4000 loops: 0.244381 × 80 × 0.10966 × 4000 ÷ 8000 = 1.0719"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.51 s"
+value = "1.0719 ± 0.0001"
+basis = "source: applyItermRelax: 80 loops after the jump the setpoint is still 193.434 × 0.98836⁸⁰ = 75.8 °/s from its low-pass, more than 40 °/s, so roll's I hasn't grown at all; it would have grown by 80 × 0.0086593 = 0.69"
+
+[[expect]]
+what  = "yaw I term"
+at    = "0.51 s"
+value = "4.4117 ± 0.0001"
+basis = "source: applyItermRelax: RP leaves yaw alone, so yaw's I grows by 2.5 × 0.244381 × 80 × 3.543 ÷ 8000 = 0.021648 a loop: from 2.6799 at 0.5 s, 80 loops give 4.4117"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.53 s"
+value = "1.4637 ± 0.0001"
+basis = "source: applyItermRelax, loop by loop: from the 136th loop the setpoint is within 40 °/s of its low-pass, and I grows by 0.0086593 × (1 − that ÷ 40) each loop: 0.39 by 0.53 s"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.6 s"
+value = "6.0994 ± 0.0001"
+basis = "source: applyItermRelax, loop by loop: by 0.6 s roll's I has grown by 5.03, where it would have grown by 800 × 0.0086593 = 6.93 without I-term relax"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.7 s"
+value = "13.0266 ± 0.0001"
+basis = "source: applyItermRelax: with the setpoint steady the low-pass has caught up, so I grows at its whole 0.0086593 a loop again: 6.0994 + 800 × 0.0086593 = 13.0266"
