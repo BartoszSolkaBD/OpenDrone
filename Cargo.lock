@@ -3144,6 +3144,7 @@ dependencies = [
  "opendrone-sim",
  "opendrone-sound",
  "opendrone-test-pilot",
+ "toml",
 ]
 
 [[package]]
