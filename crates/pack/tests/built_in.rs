@@ -62,7 +62,8 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
             "test/whoop-65-no-drag",
             "test/whoop-65-no-drag-bench-supply",
             "test/whoop-65-no-prop-wash",
-            "test/whoop-65-rotor-drag-only"
+            "test/whoop-65-rotor-drag-only",
+            "test/whoop-65-small-pack"
         ]
     );
 }

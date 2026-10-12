@@ -1,0 +1,19 @@
+# The Whoop 65 on a pack with a sixteenth of its charge.    id: test/whoop-65-small-pack
+#
+# A real LAVA II pack takes about three and a half minutes of hover to run
+# from empty to the point where the Quad can no longer hold its weight, and
+# the Scenarios that prove a flat pack fades don't need to wait for that. This
+# pack holds 20 mAh instead of 320 mAh, so it runs down sixteen times as
+# fast, along the same voltage curve, with the same resistance and the same
+# sag. Everything else is the Whoop 65's.
+#
+# A Test Quad lists only what it changes, so any other change to the Whoop 65
+# carries into it. Only the Scenario runner reads Test Quads; pilots never fly
+# them.
+format   = 1
+based_on = "opendrone/whoop-65"
+why      = "A pack of 20 mAh, so a flat pack and the fade past empty come in seconds, not minutes"
+
+# Deliberate test values: no Confidence or source.
+[battery]
+capacity = "20 mAh"

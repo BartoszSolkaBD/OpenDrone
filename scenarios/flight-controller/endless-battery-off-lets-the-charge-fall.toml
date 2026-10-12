@@ -1,0 +1,71 @@
+# Endless Battery off (#13, #57): the battery is simulated as always. The Whoop 65 hovers at 20 m with the Test
+# Pilot for 5 s, then the throttle goes to 100% for 2 s (a punch), with the
+# Test Pilot keeping it level and on heading 0°.
+#
+# The same flight as endless-battery-keeps-the-charge-full-while-the-voltage-sags.toml
+# with the Assist off: the charge falls by what the pack gave, and the voltage
+# sags exactly the same.
+#
+# The pack's sag is its current times its resistance, 29 mΩ plus the
+# connector's 10 mΩ, and the Whoop 65 adds no slow sag on top
+# (scenarios/quads/whoop-65/battery-counts-and-sags.toml).
+format = 2
+name   = "With Endless Battery off, the same punch draws the charge down and the voltage sags the same"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 20 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "5 s", throttle = "100%", test_pilot = "hold level, hold heading 0°" },
+  { at = "7 s", throttle = "40%" },
+]
+
+[[expect]]
+what  = "battery charge"
+at    = "8 s"
+value = "97.1% ± 0.1%"
+basis = "rule: the charge left is 100% minus what the pack gave, 9.24 mAh of its 320 mAh (2.9%)"
+
+[[expect]]
+what    = "battery current"
+over    = "5 s to 7 s"
+highest = "18.4 A ± 0.5 A"
+basis   = "observed: the punch's peak draw"
+
+[[expect]]
+what    = "battery sag"
+over    = "5 s to 7 s"
+highest = "0.72 V ± 0.02 V"
+basis   = "rule: the voltage sags by the current times the pack's resistance, 29 mΩ + 10 mΩ = 39 mΩ: the punch's peak of 18.4 A gives 0.72 V"
+
+[[expect]]
+what  = "battery charge used"
+at    = "8 s"
+value = "9.24 mAh ± 0.3 mAh"
+basis = "observed: the pack still counts what it gave, 5 s of hover and 2 s of punch"

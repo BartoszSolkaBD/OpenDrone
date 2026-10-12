@@ -1,0 +1,94 @@
+# Results of the-test-pilot-holds-its-height-in-a-hover.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Test Pilot holds the Whoop 65's height, with its motors at about 40% and its power above the physical minimum"
+
+[[expect]]
+what     = "height at 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "height, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "height, highest over 5 s to 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "roll, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.118°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "-0.119°"
+
+[[expect]]
+what     = "heading at 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.116°"
+
+[[expect]]
+what     = "total thrust, mean over 10 s to 30 s"
+basis    = "Rule"
+expected = "31.2 gf ± 0.5 gf"
+measured = "31.2 gf"
+
+[[expect]]
+what     = "average motor command, mean over 10 s to 30 s"
+basis    = "Source"
+expected = "between 35% and 55%"
+measured = "37.4%"
+
+[[expect]]
+what     = "average motor command, mean over 10 s to 30 s"
+basis    = "Observed"
+expected = "37.4% ± 0.5%"
+measured = "37.4%"
+
+[[expect]]
+what     = "battery power, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "between 1.74 W and 20 W"
+measured = "5.51 W"
+
+[[expect]]
+what     = "battery power, mean over 5 s to 30 s"
+basis    = "Observed"
+expected = "5.58 W ± 0.1 W"
+measured = "5.58 W"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "642eedb3723ea52d"   # the whole state after each of 240000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"3 s" = "92d4b34b0c90f126"
+"6 s" = "f5ad61dc9a91da01"
+"9 s" = "d15655ed965e43f2"
+"12 s" = "ec8e9db9fdb41ecb"
+"15 s" = "525f7ced1f6ad57d"
+"18 s" = "58a98e20fe7580a1"
+"21 s" = "754f4b42766c4b16"
+"24 s" = "e09ace7ae739c963"
+"27 s" = "296fcdc17e8c60d2"
+"30 s" = "a92c2ed522937bef"

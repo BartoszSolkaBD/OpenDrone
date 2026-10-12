@@ -1,0 +1,82 @@
+# Results of a-hover-lasts-as-long-as-the-packs-energy-allows.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A hover lasts as long as the pack's energy allows, then a flat pack fades and the Whoop 65 sinks"
+
+[[expect]]
+what     = "battery current, mean over 0 s to 49 s"
+basis    = "Observed"
+expected = "1.44 A ± 0.02 A"
+measured = "1.44 A"
+
+[[expect]]
+what     = "the pack is empty, first over 0 s to 75 s"
+basis    = "Rule"
+expected = "between 49 s and 51 s"
+measured = "49.9 s"
+
+[[expect]]
+what     = "height, lowest over 5 s to 50 s"
+basis    = "Rule"
+expected = "20 m ± 1 m"
+measured = "19.9 m"
+
+[[expect]]
+what     = "average motor command at 50 s"
+basis    = "Rule"
+expected = "between 40% and 60%"
+measured = "49.6%"
+
+[[expect]]
+what     = "average motor command at 70 s"
+basis    = "Rule"
+expected = "between 90% and 100%"
+measured = "94.1%"
+
+[[expect]]
+what     = "battery voltage at 50 s"
+basis    = "Observed"
+expected = "3.23 V ± 0.05 V"
+measured = "3.23 V"
+
+[[expect]]
+what     = "battery voltage at 75 s"
+basis    = "Observed"
+expected = "1.27 V ± 0.05 V"
+measured = "1.27 V"
+
+[[expect]]
+what     = "height at 75 s"
+basis    = "Rule"
+expected = "between 0 m and 19 m"
+measured = "12.0 m"
+
+[[expect]]
+what     = "vertical speed at 75 s"
+basis    = "Rule"
+expected = "between -30 m/s and -1 m/s"
+measured = "-5.15 m/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "fe3edc8d0daeb081"   # test/whoop-65-small-pack: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "63c4f0a210dd3c91"   # the whole state after each of 600000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"7.5 s" = "13023bac288d262b"
+"15 s" = "7680ed520aa90298"
+"22.5 s" = "117f5960321eb968"
+"30 s" = "4d1ba93c54996449"
+"37.5 s" = "f377e371382456d1"
+"45 s" = "f228b5e756c20799"
+"52.5 s" = "94e204aabb2ce2d0"
+"60 s" = "6ae1fa713492e2cc"
+"67.5 s" = "f0e64ac3346520c2"
+"75 s" = "9421c87fb97b7bcb"

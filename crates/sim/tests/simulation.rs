@@ -115,6 +115,7 @@ fn quad_at(height: f64) -> QuadSetUp {
         packet_rate: PacketRate::from_hz(250).unwrap(),
         input_device: None,
         input_smoothing: false,
+        endless_battery: false,
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }
@@ -174,6 +175,34 @@ fn the_same_set_up_gives_the_same_fingerprint_at_every_step() {
         one.step();
         two.step();
     }
+}
+
+#[test]
+fn endless_battery_keeps_the_charge_full_while_the_voltage_still_sags() {
+    let run = |endless: bool| {
+        let mut quad = quad_at(10.0);
+        quad.motors = StartingMotors::Settled;
+        quad.endless_battery = endless;
+        let mut quad = quad;
+        quad.flight_controller = Box::new(ScriptedMotors::new(vec![(
+            SimulationTime::START,
+            MotorCommands::all(1.0),
+        )]));
+        let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+        let mut sag = 0.0_f64;
+        for _ in 0..4000 {
+            sim.step();
+            sag = functions::max(sag, sim.quad_output(0).battery.sag);
+        }
+        (sim.quad_output(0).battery, sag)
+    };
+    let (flat, _) = run(false);
+    let (endless, sag) = run(true);
+    assert!(flat.charge < 1.0);
+    assert!((endless.charge - 1.0).abs() < 1e-12);
+    // What the pack gave is still counted, and the voltage still sags.
+    assert!((endless.charge_used - flat.charge_used).abs() < 0.01 * flat.charge_used);
+    assert!(sag > 0.1);
 }
 
 #[test]

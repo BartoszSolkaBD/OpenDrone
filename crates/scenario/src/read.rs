@@ -8,6 +8,7 @@ use opendrone_sim::{
     FlightInput, InputDeviceFacts, MotorCommands, PhysicsRate, ReportRate, SimulationTime,
     StartingMotors,
 };
+use opendrone_test_pilot::Jobs;
 
 use crate::format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 use crate::measure::Measure;
@@ -133,6 +134,10 @@ pub struct PilotChanges {
     /// Reset: the Quad back where the Scenario starts, its Launch Spot,
     /// powered up fresh.
     pub reset: bool,
+    /// The Test Pilot's jobs from now on, in a Flight Scenario: each moves
+    /// the sticks it needs in place of the Timeline's, until the next moment
+    /// that names jobs. `Jobs::NONE` hands the sticks back.
+    pub test_pilot: Option<Jobs>,
 }
 
 /// The Flying Input Device lost or back: both are Flight Inputs.
@@ -686,7 +691,8 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
                 "input_smoothing" => None,
                 "auto_arm" if alone => Some("Auto-arm is an Assist of the Simulation, in front of the Flight Controller, and a Flight Controller Scenario runs the Flight Controller alone, so `auto_arm` must be \"off\""),
                 "auto_arm" => None,
-                _ => Some("Endless Battery doesn't run yet, so `endless_battery` must be \"off\": Endless Battery arrives with its ticket (#57)"),
+                _ if alone => Some("Endless Battery is an Assist of the Simulation, on its session state, and a Flight Controller Scenario runs the Flight Controller alone, so `endless_battery` must be \"off\""),
+                _ => None,
             };
             if flies
                 && on == Some(true)
@@ -1126,6 +1132,7 @@ impl Reader<'_> {
                 "input_device",
                 "radio_link",
                 "reset",
+                "test_pilot",
             ],
             Kind::FlightController => &[
                 "at",
@@ -1461,6 +1468,18 @@ impl Reader<'_> {
                 None => fine = false,
             }
         }
+        if let Some(item) = entry.get("test_pilot") {
+            match item.text(self.problems) {
+                Some(text) => match test_pilot_jobs(text) {
+                    Ok(jobs) => changes.test_pilot = Some(jobs),
+                    Err(sentence) => {
+                        self.problems.push(item.problem(sentence));
+                        fine = false;
+                    }
+                },
+                None => fine = false,
+            }
+        }
         if let Some(item) = entry.get("reset") {
             match item.boolean() {
                 Some(true) => changes.reset = true,
@@ -1505,10 +1524,39 @@ impl Reader<'_> {
         ordered.sort_by(|a, b| a.seconds.total_cmp(&b.seconds));
         let mut lost = false;
         let mut found = Vec::new();
+        let mut jobs = Jobs::NONE;
         for moment in ordered {
             let Entry::Pilot(changes) = moment.entry else {
                 continue;
             };
+            // A stick the Test Pilot moves is set only at the moment that
+            // gives it the job, where its thumb starts, never while it holds.
+            let started = changes.test_pilot.unwrap_or(jobs);
+            for (name, taken, was_taken) in [
+                (
+                    "throttle",
+                    started.hold_height.is_some(),
+                    jobs.hold_height.is_some(),
+                ),
+                ("roll", started.hold_level, jobs.hold_level),
+                ("pitch", started.hold_level, jobs.hold_level),
+                (
+                    "yaw",
+                    started.hold_heading.is_some(),
+                    jobs.hold_heading.is_some(),
+                ),
+            ] {
+                if taken && was_taken && sticks(&changes)[stick_index(name)].is_some() {
+                    found.push((
+                        moment.line,
+                        format!(
+                            "the Test Pilot is moving the `{name}` stick at {}, so the Timeline can't set it: hand the sticks back first with `test_pilot = \"off\"`",
+                            moment.text
+                        ),
+                    ));
+                }
+            }
+            jobs = started;
             match changes.input_device {
                 Some(InputDevice::Lost) if lost => found.push((
                     moment.line,
@@ -2333,6 +2381,45 @@ fn stick(name: &str, text: &str) -> Result<Stick, String> {
         });
     }
     Ok(Stick { share, ramp })
+}
+
+/// The Test Pilot's jobs as a Timeline writes them: "off", or any of "hold
+/// height 2 m", "hold level" and "hold heading 90°", separated by commas.
+fn test_pilot_jobs(text: &str) -> Result<Jobs, String> {
+    let help = "`test_pilot` is \"off\", or jobs separated by commas: \"hold height 2 m\", \"hold level\" and \"hold heading 90°\"";
+    let text = text.trim();
+    if text == "off" {
+        return Ok(Jobs::NONE);
+    }
+    let mut jobs = Jobs::NONE;
+    for job in text.split(',').map(str::trim) {
+        let again = |what: &str| format!("\"{what}\" is there twice; {help}");
+        if job == "hold level" {
+            if jobs.hold_level {
+                return Err(again("hold level"));
+            }
+            jobs.hold_level = true;
+        } else if let Some(height) = job.strip_prefix("hold height ") {
+            if jobs.hold_height.is_some() {
+                return Err(again("hold height"));
+            }
+            let metres = units::parse_quantity(height)
+                .and_then(|q| q.as_a(Dimension::LENGTH))
+                .map_err(|p| format!("hold height: {}", p.0))?;
+            jobs.hold_height = Some(metres);
+        } else if let Some(heading) = job.strip_prefix("hold heading ") {
+            if jobs.hold_heading.is_some() {
+                return Err(again("hold heading"));
+            }
+            let radians = units::parse_quantity(heading)
+                .and_then(|q| q.as_a(Dimension::ANGLE))
+                .map_err(|p| format!("hold heading: {}", p.0))?;
+            jobs.hold_heading = Some(radians);
+        } else {
+            return Err(format!("the Test Pilot has no job \"{job}\"; {help}"));
+        }
+    }
+    Ok(jobs)
 }
 
 fn sticks(changes: &PilotChanges) -> [Option<Stick>; 4] {
