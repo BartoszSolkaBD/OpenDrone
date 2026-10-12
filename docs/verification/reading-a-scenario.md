@@ -236,6 +236,8 @@ time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (
 
 The Input Tracks in `scenarios/recorded/` are the maintainer's own device recordings from the SDL3 input probe (#18, #27, #30), committed trimmed in `crates/input/tests/traces/`, played through the built-in Pack's Input Device profiles exactly as the game does. A readable check in `crates/input/tests/input_tracks.rs` makes each track afresh and fails if the committed one differs; `OPENDRONE_WRITE_INPUT_TRACKS=1 cargo test -p opendrone-input --test input_tracks` writes them again.
 
+A flight saved in the game with Save Flight is an Input Track too, written beside its Scenario in `scenarios/saved/`: see [Watching a Scenario and saving a flight](watching-and-saving-flights.md).
+
 What the Radio Link does with an Input Track's device ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md), #27):
 
 - **It locks to the device's report beat** when the Packet Rate divides its Report Rate evenly: the DualSense over USB (250 Hz) at 250 and 50 Hz, the Pocket (1 kHz) at 1000, 500, 333, 250, 100 and 50 Hz (333 Hz counts as a frame every 3 ms). It learns the beat only from the Flight Inputs' stamps, so a replay learns it exactly the same way: a report is due where the earliest of the last second's reports arrived, counted on whole report periods, and each frame leaves 0.75 ms after a report is due. So every frame carries the reports due since the last one, and the newest is at most 0.75 ms old. Between reports the beat carries on by itself. A report that arrives after its frame has left costs one repeated frame.

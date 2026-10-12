@@ -19,8 +19,8 @@ use bevy::app::TaskPoolPlugin;
 use bevy::prelude::*;
 use bevy::time::{TimePlugin, TimeUpdateStrategy};
 use opendrone_maths::Fingerprint;
-use opendrone_pack::Problems;
-use opendrone_scenario::{Repo, read_scenario, simulation};
+use opendrone_pack::{Packs, Problems};
+use opendrone_scenario::{Repo, Scenario, ScenarioFile, read_scenario, simulation};
 
 use crate::stepping::{Flight, SteppingPlugin};
 
@@ -50,9 +50,18 @@ impl ReferenceFlight {
     }
 }
 
-/// Flies the Scenario at `path` (inside the repo's `scenarios/` folder)
-/// through the game's stepping.
-pub fn fly(repo: &Path, path: &Path) -> Result<ReferenceFlight, String> {
+/// A Scenario read from the repo, with its Input Track if it plays one, and
+/// the Packs (and Test Quads) it names its Quad and Map in.
+pub struct LoadedScenario {
+    pub file: ScenarioFile,
+    pub label: String,
+    pub scenario: Scenario,
+    pub packs: Packs,
+}
+
+/// Reads the Scenario at `path` (inside the repo's `scenarios/` folder), its
+/// Input Track and the Packs, as the headless runner does.
+pub fn load(repo: &Path, path: &Path) -> Result<LoadedScenario, String> {
     let repo = Repo {
         root: repo.to_path_buf(),
     };
@@ -70,6 +79,23 @@ pub fn fly(repo: &Path, path: &Path) -> Result<ReferenceFlight, String> {
             .map_err(|p: Problems| p.to_string())?;
     }
     let packs = repo.packs().map_err(|p| p.to_string())?;
+    Ok(LoadedScenario {
+        file,
+        label,
+        scenario,
+        packs,
+    })
+}
+
+/// Flies the Scenario at `path` (inside the repo's `scenarios/` folder)
+/// through the game's stepping.
+pub fn fly(repo: &Path, path: &Path) -> Result<ReferenceFlight, String> {
+    let LoadedScenario {
+        file,
+        label,
+        scenario,
+        packs,
+    } = load(repo, path)?;
     let (sim, inputs) = simulation(&scenario, &packs).map_err(|p| p.to_string())?;
     let flight = Flight::scripted(sim, inputs)?;
     let runner = runner_fingerprint(&file.results_path())?;
