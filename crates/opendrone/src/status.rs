@@ -1,13 +1,16 @@
 //! What the pilot needs to know, in the window's title until the OSD and the
 //! screens arrive: the Quad, the Flying Input Device or how to pick one,
-//! whether the Quad is armed or what blocks arming, Failsafe and Pause.
+//! whether the Quad is armed or what blocks arming, Failsafe, Pause, and
+//! that there's no sound device, which the Hub will say instead.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use opendrone_input::Lost;
+use opendrone_sound::Device;
 
 use crate::pilot::Pilot;
 use crate::set_up::FlightPlan;
+use crate::sound::QuadSoundPlaying;
 use crate::stepping::Flight;
 
 /// Keeps the window's title up to date.
@@ -24,6 +27,7 @@ fn show_the_status(
     pilot: Res<Pilot>,
     flight: NonSend<Flight>,
     game_clock: Res<Time<Virtual>>,
+    sound: Option<Res<QuadSoundPlaying>>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
     let mut parts = vec![format!("OpenDrone: {}", plan.quad.name)];
@@ -57,6 +61,9 @@ fn show_the_status(
     }
     if game_clock.is_paused() {
         parts.push("paused (Esc goes on)".to_string());
+    }
+    if sound.is_none_or(|s| matches!(s.device(), Device::None(_))) {
+        parts.push("no sound device: running silent".to_string());
     }
     let title = parts.join("  |  ");
     for mut window in &mut windows {

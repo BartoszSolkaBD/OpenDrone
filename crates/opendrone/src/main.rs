@@ -15,9 +15,10 @@ OpenDrone, the first flight: fly a Quad over the grid floor.
   opendrone                       fly the Whoop 65
   opendrone --quad freestyle-5    fly the Freestyle 5\u{2033} (or --quad whoop-65)
   opendrone --headless [--seconds N]
-                                  run with no window and no sound for N seconds
-                                  (3 if not given), then say how far the
-                                  Simulation stepped
+                                  run with no window for N seconds (3 if not
+                                  given), then say how far the Simulation
+                                  stepped; the sound plays if there's a sound
+                                  device, and runs silent if not
   opendrone --reference SCENARIO...
                                   fly each Scenario through the game's own
                                   stepping and check its fingerprint matches
