@@ -212,7 +212,7 @@ How you merge depends on what main has done since the PR's base:
   ```
 
   Then watch main's CI. If it fails, that comes first, before any other work.
-- **Something merged in the PR's Lanes, but GitHub shows no conflict:** bring main in first.
+- **Something merged in the PR's Lanes, but GitHub shows no conflict:** bring main in first. For a PR whose cleared Red Flag gate still fails, skip the Light check and use a fresh Reviewer instead ([Clearing the Red Flag gate](#when-a-pr-waits-for-the-maintainer)).
   1. Run `gh pr update-branch <P> -R BartoszSolkaBD/OpenDrone`.
   2. Wait for CI with the background command under "Saving tokens".
   3. Start a Light agent with `docs/agents/merge-update.md`.
@@ -292,9 +292,10 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
   - If the Red Flags after that are the same ones the maintainer cleared, the clearance still holds.
 - **Clearing the Red Flag gate.** Nothing in the repo clears the gate: it keeps failing until the PR merges. The maintainer can merge the PR by hand, or tell you to. When they tell you, in the session or on the PR, that they clear what it holds:
   1. Record the decision on the PR.
-  2. Take `needs-maintainer` off.
-  3. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared. The wait command there lists the failing gate: that row is expected.
-  4. CI then gives the PR the `skipped-a-check` label and a comment naming each check that hadn't passed ([the Review Report](../review-report.md#merges-that-skipped-a-check)). Check that the comment names only the Red Flag gate. Leave the label for the maintainer to take off, and list the PR in your end-of-batch report. If the comment names any other check, tell the maintainer at once.
+  2. If main must come in first, bring it in and start a fresh Reviewer. That counts as a review round. Never use the Light merge-only check here: [it](merge-update.md) needs every check but the Review check to pass, so it always stops on the cleared gate.
+  3. Take `needs-maintainer` off right before merging, after the last push. CI puts it back each time the Review Report runs again while the gate fails, so check it's gone just before you merge.
+  4. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared. The wait command there lists the failing gate: that row is expected.
+  5. CI then gives the PR the `skipped-a-check` label and a comment naming each check that hadn't passed ([the Review Report](../review-report.md#merges-that-skipped-a-check)). Check that the comment names only the Red Flag gate. Leave the label for the maintainer to take off, and list the PR in your end-of-batch report. If the comment names any other check, tell the maintainer at once.
 
 ## Usage limits
 
