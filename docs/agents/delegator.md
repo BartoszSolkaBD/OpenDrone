@@ -1,6 +1,6 @@
 # The Delegator
 
-The **Delegator** is the agent session that works through the ready tickets. It picks the next ticket, starts an author to build it, starts a Reviewer for the author's PR, and merges what passes. It never writes or reviews code itself. To run a batch of tickets, start a session, point it at this page, and say which tickets or how many.
+The **Delegator** is the agent session that works through the ready tickets. It picks the next ticket, starts an author to build it, starts a Reviewer for the author's PR, and merges what passes. It never writes or reviews code itself, and it doesn't decide changes to these agent pages: it may propose one, in its report or as a question for the maintainer. Once the maintainer approves, it may write the change itself and open the PR, and a Reviewer reviews it as usual. To run a batch of tickets, start a session, point it at this page, and say which tickets or how many.
 
 The other pages it hands out:
 
@@ -118,7 +118,8 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
    ```
 
    If either shows something, the work is alive: carry on from that PR or branch. If both are empty, unassign the ticket with `gh issue edit <N> -R BartoszSolkaBD/OpenDrone --remove-assignee <login>`, and it's ready again.
-5. Keep a short **session note** in your scratchpad: one row per ticket with its Lane, stage, PR, agent and model. You need it to resume agents after a usage limit, or after your conversation is summarised.
+5. Finish any hand-off left by an earlier session ([Hand-offs](#hand-offs)).
+6. Keep a short **session note** in your scratchpad: one row per ticket with its Lane, stage, PR, agent and model. You need it to resume agents after a usage limit, or after your conversation is summarised.
 
 ## Order of work
 
@@ -150,7 +151,7 @@ Everything else the author needs is on the ticket and in the brief. That way a f
   > You are the Reviewer for PR #P on BartoszSolkaBD/OpenDrone. Follow `docs/agents/reviewer.md` on origin/main exactly.
 
   If the PR's Lane already has a PR in review, wait.
-- **Notes for later tickets:** keep them in the session note until the PR merges.
+- **Notes for later tickets:** keep them in the session note until the PR merges. If the session ends first, they go in a hand-off ([Hand-offs](#hand-offs)).
 - **Questions for the maintainer:** see below.
 
 ## When a Verdict arrives
@@ -188,19 +189,19 @@ Merge when all of these hold:
 
   If it lists any file, don't merge. Such a PR can set the Review check and the Red Flag gate itself, so the maintainer merges it by hand, as [the Reviewer page](reviewer.md) and [the Review Report's limits](../review-report.md#limits) say. Leave it to them: label it `needs-maintainer`, tell the maintainer, and carry on in the other Lanes.
 
-**Wait for the Review check after a pass.** The Review check turns green a minute or two after a pass Verdict, once the Review workflow has run on the comment. So after a pass, check the conditions with this background command (`run_in_background`) rather than at once. It waits up to 10 minutes for every check, the Review check included, to stop pending. Then it lists every check that didn't pass or skip. It prints nothing when the PR may merge:
+**Wait for the Review check after a pass.** The Review check turns green a minute or two after a pass Verdict, once the Review workflow has run on the comment. After a changes-needed round, the Review check still shows that round's failure, not "pending", until then. So after a pass, check the conditions with this background command (`run_in_background`) rather than at once. It waits up to 10 minutes for the Review check to pass and for no check to be pending. Then it lists every check that didn't pass or skip. It prints nothing when the PR may merge:
 
 ```sh
 for i in $(seq 20); do
-  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json bucket \
-    --jq '[.[] | select(.bucket == "pending")] | length' | grep -qx 0 && break
+  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket \
+    --jq '[.[] | select(.bucket == "pending" or (.name == "Review check" and .bucket != "pass"))] | length' | grep -qx 0 && break
   sleep 30
 done
 gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
   --jq '.[] | select(.bucket != "pass" and .bucket != "skipping") | "\(.bucket)\t\(.name)\t\(.link)"'
 ```
 
-If the Review check is still pending after that, the Verdict doesn't cover the latest commit: compare its first line with `gh pr view <P> -R BartoszSolkaBD/OpenDrone --json headRefOid`.
+If the Review check still hasn't passed after that, the Verdict didn't count, for example because it doesn't cover the latest commit: compare its first line with `gh pr view <P> -R BartoszSolkaBD/OpenDrone --json headRefOid`. A Red Flag gate the maintainer has cleared still shows as failing, as expected.
 
 How you merge depends on what main has done since the PR's base:
 
@@ -225,7 +226,7 @@ How you merge depends on what main has done since the PR's base:
 
 **After a merge:**
 
-1. Post the author's notes for later tickets. Use one comment on each later ticket, starting "Notes from #N (PR #P):".
+1. Post the author's notes for later tickets. Use one comment on each later ticket, starting "Notes from #N (PR #P):". If the PR has a "Delegator's hand-off:" comment, take the notes and follow-ups from it, and finish as under [Hand-offs](#hand-offs).
 2. Check that the ticket closed. `Closes #N` usually closes it.
 3. Remove the author's worktree with `git worktree remove <path>`, only once its PR has merged or closed. Never sooner: a later fix round needs it. Reviewer worktrees can go as soon as their Verdict is posted. If your permission settings block the removal, list the worktrees for the maintainer.
 
@@ -300,6 +301,21 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
 - When a usage limit hits, the agents stop. After the reset, resume each one from your session note with SendMessage: "Continue where you left off."
 - Near a limit, start no new agents. Let the running ones finish.
 
+## Hand-offs
+
+The session note dies with its session, but a PR that waits for the maintainer can outlive it. So its notes for later tickets and its follow-ups go on the PR.
+
+- **When a session ends,** post a comment on each open PR that has passed review and waits for the maintainer. Start it "Delegator's hand-off:", and give:
+  - the author's notes for later tickets, grouped by ticket;
+  - the follow-ups to file after the merge, each with its Verdict's link.
+- **When the PR merges,** whoever merged it, post the notes and file the follow-ups as [After a merge](#merging) and [Follow-ups](#follow-ups) say. Then comment "Hand-off done:", naming the tickets that got notes and the follow-up issue.
+- **When a session starts,** finish any hand-off whose PR merged meanwhile, for example one the maintainer merged by hand. This lists merged PRs with a hand-off and no "Hand-off done" yet:
+
+  ```sh
+  gh pr list -R BartoszSolkaBD/OpenDrone --state merged --search "\"Delegator's hand-off\" in:comments" --limit 50 \
+    --json number,comments --jq '.[] | select([.comments[].body | startswith("Hand-off done")] | any | not) | .number'
+  ```
+
 ## Ending a batch
 
 Report to the maintainer:
@@ -307,6 +323,7 @@ Report to the maintainer:
 - what merged, as ticket and PR;
 - what waits for them, and why, including each PR that stepped out of its Lane, and each PR merged past a cleared Red Flag gate whose `skipped-a-check` label they should take off;
 - the follow-up issues you filed, and each issue you triaged a PR to;
+- each PR you left a hand-off on;
 - for each PR, the author's model and its number of review rounds;
 - the model the Delegator itself ran on, for the trial;
 - any Lane labels you added or fixed.
