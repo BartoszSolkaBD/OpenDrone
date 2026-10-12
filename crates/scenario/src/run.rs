@@ -84,6 +84,154 @@ impl Outcome {
 /// the way.
 pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let start = &scenario.start;
+    let Found { quad, map, tune } = find(scenario, packs)?;
+    let quad_received = Received {
+        id: quad.id.clone(),
+        fingerprint: quad.fingerprint(),
+    };
+    let map_received = map.as_ref().map(|map| Received {
+        id: map.id.clone(),
+        fingerprint: map.fingerprint(),
+    });
+
+    if start.kind == Kind::FlightController {
+        let tune = tune.expect("a Flight Controller Scenario reads the Tune");
+        return Ok(run_alone(scenario, &tune, quad_received));
+    }
+    let map = map.expect("every kind but the Flight Controller's names a Map");
+
+    // This run, measuring every Expectation.
+    let mut tallies: Vec<Tally> = scenario
+        .expectations
+        .iter()
+        .map(|e| Tally::new(e, e.when))
+        .collect();
+    let this_run = Plan::this_run(scenario);
+    let (step_fingerprints, first_broken_number) = simulate(
+        scenario,
+        &quad,
+        &map,
+        tune.as_ref(),
+        &this_run,
+        &mut tallies,
+    )?;
+
+    // Each other run, measuring the Expectations that compare with it.
+    let mut others: Vec<Option<Result<f64, String>>> = vec![None; tallies.len()];
+    for (index, other) in scenario.other_runs.iter().enumerate() {
+        let (numbers, mut other_tallies): (Vec<usize>, Vec<Tally>) = scenario
+            .expectations
+            .iter()
+            .enumerate()
+            .filter_map(|(n, e)| {
+                let compared = e.compared.filter(|c| c.run == index)?;
+                Some((n, Tally::new(e, compared.when)))
+            })
+            .unzip();
+        let plan = Plan {
+            physics_rate: other.physics_rate,
+            random_seed: other.random_seed.unwrap_or(start.random_seed),
+            battery: other
+                .battery
+                .or(start.battery)
+                .expect("the reader requires `battery` for every kind that runs the physics"),
+            inputs: &other.inputs,
+            length: other.length,
+        };
+        simulate(
+            scenario,
+            &quad,
+            &map,
+            tune.as_ref(),
+            &plan,
+            &mut other_tallies,
+        )?;
+        for (n, tally) in numbers.into_iter().zip(&other_tallies) {
+            others[n] = Some(tally.value());
+        }
+    }
+
+    Ok(Outcome {
+        expectations: tallies
+            .into_iter()
+            .zip(others)
+            .map(|(tally, other)| tally.finish(other))
+            .collect(),
+        first_broken_number,
+        step_fingerprints,
+        steps_are_cases: false,
+        quad: quad_received,
+        map: map_received,
+        physics_rate: start.physics_rate.hz(),
+    })
+}
+
+/// A Scenario's Simulation, set up exactly as [`run`] sets up its run, with
+/// the Flight Inputs its Timeline or Input Track gives, for a caller that
+/// steps the Simulation itself. The game's reference check flies one through
+/// the game's own stepping: its fingerprints must match the runner's
+/// (ADR-0003, #62).
+///
+/// Only the Scenario's own run: not the other runs its Expectations compare
+/// with. A Flight Controller Scenario has no Simulation, so it can't be set
+/// up this way.
+pub fn simulation(
+    scenario: &Scenario,
+    packs: &Packs,
+) -> Result<(Simulation, ScenarioInputs), Problems> {
+    let Found { quad, map, tune } = find(scenario, packs)?;
+    let Some(map) = map.filter(|_| scenario.start.kind != Kind::FlightController) else {
+        return Err(Problems(vec![Problem {
+            file: scenario.file.clone(),
+            line: 0,
+            sentence: "a Flight Controller Scenario runs the Flight Controller alone, with no Simulation to set up".to_string(),
+        }]));
+    };
+    let plan = Plan::this_run(scenario);
+    let (simulation, feed) = set_up(scenario, &quad, &map, tune.as_ref(), &plan)?;
+    Ok((
+        simulation,
+        ScenarioInputs {
+            feed,
+            length: scenario.length,
+        },
+    ))
+}
+
+/// The Flight Inputs of a Scenario's run, step by step ([`simulation`]).
+pub struct ScenarioInputs {
+    feed: Feed,
+    length: SimulationTime,
+}
+
+impl ScenarioInputs {
+    /// How long the run lasts: it ends once the Simulation has stepped to
+    /// this moment.
+    pub fn length(&self) -> SimulationTime {
+        self.length
+    }
+
+    /// The Flight Inputs that arrive at the step that starts at `now`, in
+    /// order, each to be stamped with `now`. Call it once for each step, in
+    /// order, with the Quad's state at the step's start: the Test Pilot reads
+    /// it, as in the runner.
+    pub fn at(&mut self, now: SimulationTime, state: &QuadState) -> Vec<FlightInput> {
+        self.feed.inputs_at(now.ticks(), Some(state))
+    }
+}
+
+/// What a Scenario flies with, from the Packs: its Quad, its Map (none when
+/// the Flight Controller runs alone), and the Tune our Flight Controller
+/// reads (none for scripted motors).
+struct Found {
+    quad: QuadDefinition,
+    map: Option<MapDefinition>,
+    tune: Option<Tune>,
+}
+
+/// Finds a Scenario's Quad, Map and Tune in the Packs, or says why it can't.
+fn find(scenario: &Scenario, packs: &Packs) -> Result<Found, Problems> {
+    let start = &scenario.start;
     let mut problems = Problems::new();
     let named = |what: &str, named: &Named, found: Problems| {
         let mut all = Problems(vec![Problem {
@@ -146,93 +294,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             }
         },
     };
-    let quad_received = Received {
-        id: quad.id.clone(),
-        fingerprint: quad.fingerprint(),
-    };
-    let map_received = map.as_ref().map(|map| Received {
-        id: map.id.clone(),
-        fingerprint: map.fingerprint(),
-    });
-
-    if start.kind == Kind::FlightController {
-        let tune = tune.expect("a Flight Controller Scenario reads the Tune");
-        return Ok(run_alone(scenario, &tune, quad_received));
-    }
-    let map = map.expect("every kind but the Flight Controller's names a Map");
-
-    // This run, measuring every Expectation.
-    let mut tallies: Vec<Tally> = scenario
-        .expectations
-        .iter()
-        .map(|e| Tally::new(e, e.when))
-        .collect();
-    let this_run = Plan {
-        physics_rate: start.physics_rate,
-        random_seed: start.random_seed,
-        battery: start
-            .battery
-            .expect("the reader requires `battery` for every kind that runs the physics"),
-        inputs: &scenario.inputs,
-        length: scenario.length,
-    };
-    let (step_fingerprints, first_broken_number) = simulate(
-        scenario,
-        &quad,
-        &map,
-        tune.as_ref(),
-        &this_run,
-        &mut tallies,
-    )?;
-
-    // Each other run, measuring the Expectations that compare with it.
-    let mut others: Vec<Option<Result<f64, String>>> = vec![None; tallies.len()];
-    for (index, other) in scenario.other_runs.iter().enumerate() {
-        let (numbers, mut other_tallies): (Vec<usize>, Vec<Tally>) = scenario
-            .expectations
-            .iter()
-            .enumerate()
-            .filter_map(|(n, e)| {
-                let compared = e.compared.filter(|c| c.run == index)?;
-                Some((n, Tally::new(e, compared.when)))
-            })
-            .unzip();
-        let plan = Plan {
-            physics_rate: other.physics_rate,
-            random_seed: other.random_seed.unwrap_or(start.random_seed),
-            battery: other
-                .battery
-                .or(start.battery)
-                .expect("the reader requires `battery` for every kind that runs the physics"),
-            inputs: &other.inputs,
-            length: other.length,
-        };
-        simulate(
-            scenario,
-            &quad,
-            &map,
-            tune.as_ref(),
-            &plan,
-            &mut other_tallies,
-        )?;
-        for (n, tally) in numbers.into_iter().zip(&other_tallies) {
-            others[n] = Some(tally.value());
-        }
-    }
-
-    Ok(Outcome {
-        expectations: tallies
-            .into_iter()
-            .zip(others)
-            .map(|(tally, other)| tally.finish(other))
-            .collect(),
-        first_broken_number,
-        step_fingerprints,
-        steps_are_cases: false,
-        quad: quad_received,
-        map: map_received,
-        physics_rate: start.physics_rate.hz(),
-    })
+    Ok(Found { quad, map, tune })
 }
 
 /// One run of a Scenario: its physics rate, random seed, battery and
@@ -243,6 +305,22 @@ struct Plan<'s> {
     battery: f64,
     inputs: &'s Inputs,
     length: SimulationTime,
+}
+
+impl<'s> Plan<'s> {
+    /// The Scenario's own run, as its starting state and Timeline give it.
+    fn this_run(scenario: &'s Scenario) -> Plan<'s> {
+        let start = &scenario.start;
+        Plan {
+            physics_rate: start.physics_rate,
+            random_seed: start.random_seed,
+            battery: start
+                .battery
+                .expect("the reader requires `battery` for every kind that runs the physics"),
+            inputs: &scenario.inputs,
+            length: scenario.length,
+        }
+    }
 }
 
 /// Builds the Simulation for one run and steps it to the run's end, showing
@@ -256,6 +334,54 @@ fn simulate(
     plan: &Plan<'_>,
     tallies: &mut [Tally<'_>],
 ) -> Result<(Vec<Fingerprint>, Option<String>), Problems> {
+    let (mut sim, mut feed) = set_up(scenario, quad, map, tune, plan)?;
+    // Where the motors are scripted, no sticks reach a Flight Controller.
+    let flies = !matches!(plan.inputs, Inputs::Motors(_));
+    let step = plan.physics_rate.step_length();
+    let mut step_fingerprints = Vec::with_capacity(plan.length.ticks() as usize + 1);
+    let mut first_broken_number = None;
+    let mut before: Option<Sample> = None;
+    for tick in 0..=plan.length.ticks() {
+        if tick > 0 {
+            // The pilot's Flight Inputs for the step that starts now enter the
+            // Simulation: from a Timeline, the Flying Input Device lost or
+            // back, Reset, and the Channels whenever they change; from an
+            // Input Track, each as it was recorded.
+            for input in feed.inputs_at(tick - 1, Some(sim.quad_state(0))) {
+                sim.flight_input(0, SimulationTime::from_ticks(tick - 1), input);
+            }
+            sim.step();
+        }
+        let output = sim.quad_output(0);
+        let now = Sample {
+            quad: Some(output),
+            flight_controller: output.flight_controller,
+            radio_link: (flies && tick > 0).then_some(output.radio_link),
+        };
+        step_fingerprints.push(sim.fingerprint());
+        let finite = sim.is_finite() && output.flight_controller.is_none_or(|r| finite_record(&r));
+        if first_broken_number.is_none() && !finite {
+            first_broken_number = Some(format!(
+                "first at {} s (step {tick}): the Quad's state holds a number that isn't a real number",
+                sim.time().seconds(plan.physics_rate)
+            ));
+        }
+        for tally in tallies.iter_mut() {
+            tally.see(tick, before.as_ref(), &now, step);
+        }
+        before = Some(now);
+    }
+    Ok((step_fingerprints, first_broken_number))
+}
+
+/// Builds the Simulation for one run, with its pilot's Flight Inputs.
+fn set_up(
+    scenario: &Scenario,
+    quad: &QuadDefinition,
+    map: &MapDefinition,
+    tune: Option<&Tune>,
+    plan: &Plan<'_>,
+) -> Result<(Simulation, Feed), Problems> {
     let start = &scenario.start;
     let state = QuadState {
         position: start.position,
@@ -280,7 +406,7 @@ fn simulate(
     };
     // Where the motors are scripted, no sticks reach a Flight Controller.
     let flies = !matches!(plan.inputs, Inputs::Motors(_));
-    let mut feed = Feed::new(plan.inputs, start, plan.physics_rate);
+    let feed = Feed::new(plan.inputs, start, plan.physics_rate);
     let set_up = SetUp {
         physics_rate: plan.physics_rate,
         world: map.world,
@@ -305,7 +431,7 @@ fn simulate(
             flight_controller,
         }],
     };
-    let mut sim = Simulation::new(set_up).map_err(|error| {
+    let sim = Simulation::new(set_up).map_err(|error| {
         let (line, sentence) = match error {
             SetUpError::Quad { problem, .. } => {
                 let why = match problem {
@@ -365,42 +491,7 @@ fn simulate(
             sentence,
         }])
     })?;
-
-    let step = plan.physics_rate.step_length();
-    let mut step_fingerprints = Vec::with_capacity(plan.length.ticks() as usize + 1);
-    let mut first_broken_number = None;
-    let mut before: Option<Sample> = None;
-    for tick in 0..=plan.length.ticks() {
-        if tick > 0 {
-            // The pilot's Flight Inputs for the step that starts now enter the
-            // Simulation: from a Timeline, the Flying Input Device lost or
-            // back, Reset, and the Channels whenever they change; from an
-            // Input Track, each as it was recorded.
-            for input in feed.inputs_at(tick - 1, Some(sim.quad_state(0))) {
-                sim.flight_input(0, SimulationTime::from_ticks(tick - 1), input);
-            }
-            sim.step();
-        }
-        let output = sim.quad_output(0);
-        let now = Sample {
-            quad: Some(output),
-            flight_controller: output.flight_controller,
-            radio_link: (flies && tick > 0).then_some(output.radio_link),
-        };
-        step_fingerprints.push(sim.fingerprint());
-        let finite = sim.is_finite() && output.flight_controller.is_none_or(|r| finite_record(&r));
-        if first_broken_number.is_none() && !finite {
-            first_broken_number = Some(format!(
-                "first at {} s (step {tick}): the Quad's state holds a number that isn't a real number",
-                sim.time().seconds(plan.physics_rate)
-            ));
-        }
-        for tally in tallies.iter_mut() {
-            tally.see(tick, before.as_ref(), &now, step);
-        }
-        before = Some(now);
-    }
-    Ok((step_fingerprints, first_broken_number))
+    Ok((sim, feed))
 }
 
 /// Runs a Flight Controller Scenario: the Flight Controller alone, fed its
@@ -474,7 +565,7 @@ fn case_timeline(case: &Case) -> Vec<PilotEntry> {
 fn loop_alone(
     start: &Start,
     tune: &Tune,
-    feed: &mut Feed<'_>,
+    feed: &mut Feed,
     length: SimulationTime,
     tallies: &mut [Tally<'_>],
 ) -> (Vec<Fingerprint>, Option<String>) {
@@ -557,7 +648,7 @@ fn finite_record(record: &opendrone_sim::DebugRecord) -> bool {
 
 /// The pilot's Flight Inputs, step by step, and for the Flight Controller
 /// alone the sensor readings.
-enum Feed<'s> {
+enum Feed {
     /// From a Timeline: the Flying Input Device lost or back, Reset, and the
     /// Channels whenever they change. Scripted sticks have no Input Device.
     ///
@@ -571,7 +662,7 @@ enum Feed<'s> {
     /// From an Input Track: each Flight Input as recorded, from the device
     /// whose facts it gives. The sensor readings hold `[start]`'s.
     Recorded {
-        inputs: &'s [(SimulationTime, FlightInput)],
+        inputs: Vec<(SimulationTime, FlightInput)>,
         next: usize,
         device: InputDeviceFacts,
         readings: SensorReadings,
@@ -580,8 +671,8 @@ enum Feed<'s> {
     None,
 }
 
-impl<'s> Feed<'s> {
-    fn new(inputs: &'s Inputs, start: &Start, rate: PhysicsRate) -> Feed<'s> {
+impl Feed {
+    fn new(inputs: &Inputs, start: &Start, rate: PhysicsRate) -> Feed {
         match inputs {
             Inputs::Pilot(entries) => Feed::Timeline {
                 track: Box::new(PilotTrack::new(entries, start)),
@@ -589,7 +680,7 @@ impl<'s> Feed<'s> {
                 last: None,
             },
             Inputs::Track(track) => Feed::Recorded {
-                inputs: &track.inputs,
+                inputs: track.inputs.clone(),
                 next: 0,
                 device: track.device,
                 readings: SensorReadings {
