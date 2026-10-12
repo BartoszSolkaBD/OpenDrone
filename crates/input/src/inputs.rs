@@ -129,6 +129,14 @@ impl Device {
         self.channels
     }
 
+    /// When it last reported, changed or not, on the input thread's clock: the
+    /// stamp of the last batch that brought it a report. A device that reports
+    /// at rest sends every report into the Simulation as Channels, so the game
+    /// reads this to tell when one came (#62).
+    pub fn last_heard(&self) -> Duration {
+        self.last_heard
+    }
+
     /// When its Channels last changed, on the input thread's clock: the
     /// stamp of the last [`InputEvent::Channels`] it handed over.
     pub fn channels_changed_at(&self) -> Duration {

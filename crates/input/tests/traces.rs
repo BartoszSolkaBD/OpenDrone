@@ -344,6 +344,36 @@ fn a_dualsense_that_keeps_reporting_is_never_lost_while_it_rests() {
 }
 
 #[test]
+fn a_resting_dualsense_is_heard_with_every_report_though_its_channels_never_change() {
+    // The game sends each of these reports into the Simulation as Channels,
+    // so the Radio Link hears its beat (#56, #62).
+    let trace = Trace::read("dualsense-at-rest-27.csv");
+    let mut inputs = Inputs::new(common::built_in_profiles());
+    let mut heard = 0;
+    let mut changed = 0;
+    for batch in trace.batches() {
+        let at = batch.at;
+        let events = inputs.take(batch);
+        let device = &inputs.devices()[0];
+        if device.last_heard() == at {
+            heard += 1;
+        }
+        if events
+            .iter()
+            .any(|e| matches!(e, InputEvent::Channels { .. }))
+        {
+            changed += 1;
+        }
+    }
+    assert!(inputs.devices()[0].lost_when_silent());
+    // Its sticks flicker a little at rest, but most reports change nothing.
+    assert!(
+        heard > 2 * changed,
+        "heard {heard} reports, {changed} with changed Channels"
+    );
+}
+
+#[test]
 fn a_dualsense_silent_for_one_second_is_lost_and_back_when_it_reports() {
     let trace = Trace::read("dualsense-at-rest-27.csv");
     let mut inputs = Inputs::new(common::built_in_profiles());
