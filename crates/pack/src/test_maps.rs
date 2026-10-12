@@ -90,15 +90,12 @@ pub(crate) const TEST_MAPS: &[TestMap] = &[
             let (west, east) = (-20.0, 0.0);
             let (south, north) = (-20.0, 20.0);
             let (bottom, top) = (0.0, 1.0);
-            let mut corners = Vec::new();
-            for x in [west, east] {
-                for y in [south, north] {
-                    for z in [bottom, top] {
-                        corners.push(Vec3::new(x, y, z));
-                    }
-                }
-            }
-            vec![ground(), MapShape::Convex { corners }]
+            let MapShape::TriangleMesh { corners, triangles } =
+                closed_slab(Vec3::new(west, south, bottom), Vec3::new(east, north, top))
+            else {
+                unreachable!("closed_slab makes a triangle mesh")
+            };
+            vec![ground(), MapShape::Convex { corners, triangles }]
         },
     },
     TestMap {
@@ -156,7 +153,30 @@ fn rail(start: Vec3, end: Vec3, diameter: f64) -> MapShape {
         corners.push(start + around);
         corners.push(end + around);
     }
-    MapShape::Convex { corners }
+    // Side by side, each side's two triangles, then a fan across each end.
+    let mut triangles = Vec::new();
+    for k in 0..RAIL_SIDES {
+        let next = (k + 1) % RAIL_SIDES;
+        let (start_k, end_k) = (2 * k, 2 * k + 1);
+        let (start_next, end_next) = (2 * next, 2 * next + 1);
+        triangles.push([start_k, start_next, end_next]);
+        triangles.push([start_k, end_next, end_k]);
+        if k >= 1 && k + 1 < RAIL_SIDES {
+            triangles.push([0, start_next, start_k]);
+            triangles.push([1, end_k, end_next]);
+        }
+    }
+    // The triangles are consistent with one another; turn them all round if
+    // they face inward, as they do for a rail running one way and not the
+    // other.
+    let middle = (start + end) / 2.0;
+    let [a, b, c] = triangles[0].map(|i| corners[i as usize]);
+    if (b - a).cross(c - a).dot(a - middle) < 0.0 {
+        for triangle in &mut triangles {
+            triangle.swap(1, 2);
+        }
+    }
+    MapShape::Convex { corners, triangles }
 }
 
 /// A closed slab between two opposite corners, as a triangle mesh, every

@@ -20,13 +20,13 @@ measured = "1700 RPM"
 what     = "speed east at 0.1 s"
 basis    = "Observed"
 expected = "-1.6 m/s ± 0.3 m/s"
-measured = "-1.43 m/s"
+measured = "-1.60 m/s"
 
 [[expect]]
 what     = "pitch rate at 0.05 s"
 basis    = "Observed"
 expected = "1830 °/s ± 50 °/s"
-measured = "1870 °/s"
+measured = "1830 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -35,18 +35,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "cb23db054824ceca"   # test/freestyle-5-no-drag: what the Simulation receives from it
-map  = "61249da54cc5d1fa"   # test/thin-rail
-run  = "524c5840f7459690"   # the whole state after each of 800 steps at 8000 Hz, in order
+quad = "0e03ecbfcd1ce5e7"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "a0fe03c0f9d79a5a"   # test/thin-rail
+run  = "3d9fdcac195d126e"   # the whole state after each of 800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.01 s" = "75ba70a0507a3ce9"
 "0.02 s" = "55e3f726af44d82f"
 "0.03 s" = "6cd58cc81e58b4f1"
-"0.04 s" = "99e6c84a96759e53"
-"0.05 s" = "4a11879402ac8068"
-"0.06 s" = "fdd2b72704a45695"
-"0.07 s" = "4a070ee8d6543e9f"
-"0.08 s" = "a4f7048c90337cef"
-"0.09 s" = "e5c789f56be2f428"
-"0.1 s" = "2f202eaad366e90d"
+"0.04 s" = "560129fa72975148"
+"0.05 s" = "483f7e645290d8ce"
+"0.06 s" = "2bf494a51fe12be3"
+"0.07 s" = "d3d7a8e79de95d95"
+"0.08 s" = "d4512dd29509dd15"
+"0.09 s" = "c5a5cdaf5178a7c8"
+"0.1 s" = "d64ebc28324aee2a"
