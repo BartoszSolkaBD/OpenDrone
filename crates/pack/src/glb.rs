@@ -244,7 +244,9 @@ impl Reader<'_> {
         launch_spots: &mut Vec<(String, LaunchSpot)>,
     ) {
         let Some(node) = gltf.nodes().get(index) else {
-            self.problem(format!("the file starts from node {index}, which doesn't exist"));
+            self.problem(format!(
+                "the file starts from node {index}, which doesn't exist"
+            ));
             return;
         };
         if std::mem::replace(&mut seen[index], true) {
