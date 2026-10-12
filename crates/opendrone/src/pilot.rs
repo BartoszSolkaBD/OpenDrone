@@ -184,6 +184,22 @@ impl Pilot {
         self.inputs.device(self.flying?)?.lost()
     }
 
+    /// The Actions held on every connected Input Device, each once, in a
+    /// fixed order. The camera's Actions repeat while held, so it reads what
+    /// is held rather than the presses [`Pilot::read`] fires.
+    pub fn actions_held(&self) -> Vec<Action> {
+        let mut held: Vec<Action> = self
+            .inputs
+            .devices()
+            .iter()
+            .filter(|device| device.lost().is_none())
+            .flat_map(|device| device.actions_held())
+            .collect();
+        held.sort();
+        held.dedup();
+        held
+    }
+
     /// How many Input Devices are plugged in.
     pub fn devices_plugged_in(&self) -> usize {
         self.inputs
@@ -348,7 +364,9 @@ impl Pilot {
                 self.forward(world, at, FlightInput::Reset);
             }
             Action::Pause => toggle_pause(world.game_clock),
-            // Camera Tilt, FOV and Save Flight arrive with their tickets.
+            // Camera Tilt and FOV never enter the Simulation: the camera's
+            // plugin reads them held, to repeat them. Save Flight arrives
+            // with its ticket.
             _ => {}
         }
     }

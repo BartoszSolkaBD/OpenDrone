@@ -1,7 +1,6 @@
 //! Drawing the flight: the Map from its solid parts, a grid on a Test Map's
-//! floor, the Quad from its collision shapes, and a placeholder camera
-//! bolted to its frame. The FPV Camera, its Lens and its Video Look arrive
-//! with their own tickets.
+//! floor, the Quad from its collision shapes, and the FPV Camera bolted to
+//! its frame ([`crate::camera`] makes its picture).
 //!
 //! The Simulation counts in 64-bit numbers, east, north and up from the
 //! Map's origin; the picture is drawn in 32-bit numbers, in Bevy's axes:
@@ -11,20 +10,19 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::asset::RenderAssetUsages;
-use bevy::camera::visibility::{NoCpuCulling, RenderLayers};
+use bevy::camera::Exposure;
+use bevy::camera::visibility::NoCpuCulling;
 use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 use opendrone_maths::{Attitude, Vec3 as Vec3d};
 use opendrone_physics::{DUCT_RING_SEGMENTS, PROP_DISC_THICKNESS};
 use opendrone_sim::{MapShape, QuadShape};
 
+use crate::camera::controls::CameraSettings;
+use crate::camera::look::VideoLook;
+use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
 use crate::set_up::FlightPlan;
 use crate::stepping::Flight;
-
-/// The placeholder camera's field of view, top to bottom: a plain
-/// rectilinear lens, about 120° across a 16:9 picture. The Quad's own
-/// fisheye Lens and FOV arrive with the FPV Camera ticket.
-pub const PLACEHOLDER_FOV_DEGREES: f32 = 90.0;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
 pub fn point(v: Vec3d) -> Vec3 {
@@ -116,7 +114,9 @@ fn draw_the_map(
     // The sun.
     commands.spawn((
         DirectionalLight {
-            illuminance: 8_000.0,
+            // Direct sun, 100,000 lux, which Exposure::SUNLIGHT (ev100 15)
+            // is set for: the Map's baked light arrives with its ticket.
+            illuminance: 100_000.0,
             shadow_maps_enabled: false,
             ..default()
         },
@@ -182,11 +182,10 @@ fn draw_the_quad(
         base_color: Color::srgb(0.85, 0.65, 0.1),
         ..default()
     });
-    // Opaque: Bevy 0.20.0 stops on a rendering error with a few see-through
-    // meshes in view ("Binding size 168 ... less than minimum 176"), as the
-    // Freestyle 5″'s four discs are. The FPV camera doesn't see them anyway.
     let props = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.25, 0.25, 0.27),
+        base_color: Color::srgba(0.25, 0.25, 0.27, 0.3),
+        alpha_mode: AlphaMode::Blend,
+        cull_mode: None,
         ..default()
     });
     let (_, state) = flight.drawn_between();
@@ -215,13 +214,10 @@ fn draw_the_quad(
         for centre in motor_positions(shape) {
             // Bevy's cylinders stand along their own up axis, so a disc lies
             // flat in the props' plane as it is.
-            // A spinning prop is a blur a pilot's camera hardly shows, so
-            // only the chase view draws the discs.
             parts.spawn((
                 Mesh3d(disc.clone()),
                 MeshMaterial3d(props.clone()),
                 Transform::from_translation(point(centre)),
-                RenderLayers::layer(CHASE_ONLY),
             ));
             if let Some(rings) = shape.duct_rings {
                 let inside = rings.inside_diameter / 2.0;
@@ -247,22 +243,9 @@ fn draw_the_quad(
             }
         }
         if *view == View::Fpv {
-            let camera = &plan.quad.camera;
-            let tilt = camera.camera_tilt as f32;
-            parts.spawn((
-                Camera3d::default(),
-                NoCpuCulling,
-                projection(0.005),
-                Transform::from_translation(point(Vec3d::new(
-                    camera.position[0],
-                    camera.position[1],
-                    camera.position[2],
-                )))
-                .looking_to(
-                    Vec3::new(tilt.cos(), tilt.sin(), 0.0),
-                    Vec3::new(-tilt.sin(), tilt.cos(), 0.0),
-                ),
-            ));
+            // The FPV Camera: its place and tilt are set each frame from the
+            // Quad's definition and the pilot's Camera Tilt.
+            parts.spawn((flat_camera(), Transform::IDENTITY));
         }
     });
     if *view == View::Chase {
@@ -270,17 +253,18 @@ fn draw_the_quad(
             ChaseCamera,
             Camera3d::default(),
             NoCpuCulling,
+            Exposure::SUNLIGHT,
             projection(0.05),
-            RenderLayers::from_layers(&[0, CHASE_ONLY]),
             Transform::IDENTITY,
         ));
     }
 }
 
-/// The placeholder camera's lens, with its nearest drawn distance in metres.
+/// The chase view's lens, a plain 90° top to bottom, with its nearest drawn
+/// distance in metres.
 fn projection(near: f32) -> Projection {
     Projection::Perspective(PerspectiveProjection {
-        fov: PLACEHOLDER_FOV_DEGREES.to_radians(),
+        fov: 90f32.to_radians(),
         near,
         far: 1000.0,
         ..default()
@@ -290,8 +274,8 @@ fn projection(near: f32) -> Projection {
 /// Which camera draws the picture.
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum View {
-    /// The placeholder camera bolted to the Quad's frame at its Camera
-    /// Tilt: what the pilot flies with.
+    /// The FPV Camera bolted to the Quad's frame at its Camera Tilt, through
+    /// its Lens and Video Look: what the pilot flies with.
     #[default]
     Fpv,
     /// A developer view: a camera that follows a little behind and above
@@ -299,12 +283,9 @@ pub enum View {
     Chase,
 }
 
-/// The render layer only the chase view draws.
-const CHASE_ONLY: usize = 1;
-
 /// The chase view's camera.
 #[derive(Component)]
-struct ChaseCamera;
+pub struct ChaseCamera;
 
 /// Where each motor sits, in body axes, in Betaflight's motor order: half the
 /// diagonal out from the centre at 45°, in the props' plane, as the physics
@@ -320,19 +301,40 @@ fn motor_positions(shape: &QuadShape) -> [Vec3d; 4] {
     ]
 }
 
-/// Places the Quad between the last two ticks' states, by how far the game's
-/// clock is into the next tick.
+/// Places the Quad where the pilot's picture shows it: between the last two
+/// ticks' states, by how far the game's clock is into the next tick, and in
+/// Digital a little further back, where it was when the picture left it
+/// (the delay is in the picture only: the Simulation never knows).
+#[allow(clippy::too_many_arguments)]
 fn place_the_quad(
     flight: NonSend<Flight>,
     plan: Res<FlightPlan>,
     fixed: Res<Time<Fixed>>,
+    poses: Res<QuadPoses>,
+    settings: Res<CameraSettings>,
+    edge_delay: Res<EdgeDelay>,
+    view: Res<View>,
     mut quads: Query<&mut Transform, (With<QuadDrawing>, Without<ChaseCamera>)>,
     mut chase: Query<&mut Transform, (With<ChaseCamera>, Without<QuadDrawing>)>,
 ) {
-    let along = fixed.overstep_fraction_f64().clamp(0.0, 1.0);
-    let (before, after) = flight.drawn_between();
-    let position = point(before.position + (after.position - before.position) * along);
-    let rotation = turn(before.attitude).slerp(turn(after.attitude), along as f32);
+    // The chase view is a developer's: it never shows the picture late.
+    let look = match *view {
+        View::Fpv => settings.look,
+        View::Chase => VideoLook::Analog,
+    };
+    let shown = poses.0.shown(drawn_moment(&fixed), look, edge_delay.0);
+    let (position, rotation) = match shown {
+        Some(pose) => (pose.position, pose.rotation),
+        None => {
+            // Before the first tick there is no history: the starting state.
+            let along = fixed.overstep_fraction_f64().clamp(0.0, 1.0);
+            let (before, after) = flight.drawn_between();
+            (
+                point(before.position + (after.position - before.position) * along),
+                turn(before.attitude).slerp(turn(after.attitude), along as f32),
+            )
+        }
+    };
     for mut transform in &mut quads {
         transform.translation = position;
         transform.rotation = rotation;

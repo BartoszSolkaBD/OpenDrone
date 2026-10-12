@@ -1,11 +1,13 @@
 //! What the pilot needs to know, in the window's title until the OSD and the
 //! screens arrive: the Quad, the Flying Input Device or how to pick one,
-//! whether the Quad is armed or what blocks arming, Failsafe and Pause.
+//! whether the Quad is armed or what blocks arming, Failsafe and Pause, and
+//! the brief readout after a Camera Tilt or FOV change.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use opendrone_input::Lost;
 
+use crate::camera::CameraReadout;
 use crate::pilot::Pilot;
 use crate::set_up::FlightPlan;
 use crate::stepping::Flight;
@@ -24,6 +26,8 @@ fn show_the_status(
     pilot: Res<Pilot>,
     flight: NonSend<Flight>,
     game_clock: Res<Time<Virtual>>,
+    readout: Res<CameraReadout>,
+    real: Res<Time<Real>>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
     let mut parts = vec![format!("OpenDrone: {}", plan.quad.name)];
@@ -57,6 +61,9 @@ fn show_the_status(
     }
     if game_clock.is_paused() {
         parts.push("paused (Esc goes on)".to_string());
+    }
+    if let Some(text) = readout.text(real.elapsed()) {
+        parts.push(text.to_string());
     }
     let title = parts.join("  |  ");
     for mut window in &mut windows {

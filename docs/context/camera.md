@@ -20,6 +20,10 @@ _Avoid_: Fisheye (as a setting name), distortion, lens FX
 How wide the FPV Camera sees, in degrees, measured corner to corner of the 4:3 picture, like the number on a camera's box. Each Quad has a default, and the pilot can change it on every Quad.
 _Avoid_: Zoom, horizontal FOV (other sims' numbers are measured across a flat lens and don't compare)
 
+**Aspect ratio**:
+The shape of the FPV picture: 4:3, the camera's own and the default, or 16:9. 16:9 crops the top and bottom of the 4:3 picture, so the view across stays the same and nothing stretches. It belongs to the pilot, and no Preset changes it.
+_Avoid_: Resolution, stretch
+
 **Video Look**:
 How the pilot's picture is made: Analog or Digital. It belongs to the pilot, not to the Quad.
 _Avoid_: Video mode, filter, VTX type, video system
