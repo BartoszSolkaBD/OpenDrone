@@ -1,0 +1,76 @@
+# Results of feedforward-at-250-hz.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "At 250 Hz, feedforward pushes ahead of the stick with boost, jitter attenuation, the max-rate limit, averaging and yaw hold"
+
+[[expect]]
+what     = "roll F term, mean over 0.6 s to 0.7 s"
+basis    = "Source"
+expected = "4.3377 ± 0.0001"
+measured = "4.34"
+
+[[expect]]
+what     = "roll F term at 0.52 s"
+basis    = "Source"
+expected = "5.5138 ± 0.0001"
+measured = "5.51"
+
+[[expect]]
+what     = "roll F term at 0.8 s"
+basis    = "Source"
+expected = "-0.0009 ± 0.0001"
+measured = "-0.000944"
+
+[[expect]]
+what     = "roll F term at 1.004 s"
+basis    = "Source"
+expected = "31.513 ± 0.001"
+measured = "31.5"
+
+[[expect]]
+what     = "roll F term, highest over 1 s to 1.1 s"
+basis    = "Source"
+expected = "71.423 ± 0.001"
+measured = "71.4"
+
+[[expect]]
+what     = "yaw F term at 1.6 s"
+basis    = "Source"
+expected = "19.580 ± 0.001"
+measured = "19.6"
+
+[[expect]]
+what     = "yaw F term at 1.7 s"
+basis    = "Source"
+expected = "7.344 ± 0.001"
+measured = "7.34"
+
+[[expect]]
+what     = "yaw F term at 1.9 s"
+basis    = "Source"
+expected = "1.033 ± 0.001"
+measured = "1.03"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "3e2ed17fef375992"   # test/freestyle-5-loop-shaping-off: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "db22651c467eed78"   # the whole state after each of 15200 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.19 s" = "270ee3a9c8e2bf42"
+"0.38 s" = "64b4ea395e94b50b"
+"0.57 s" = "a8811270470f56d4"
+"0.76 s" = "9fe3e20e6e2260e7"
+"0.95 s" = "54fa8c1fdeb7c4da"
+"1.14 s" = "69f45c14daa8a719"
+"1.33 s" = "b9f7ab840a883ca0"
+"1.52 s" = "abf9d20c5f209bc1"
+"1.71 s" = "3f728c5faea779b9"
+"1.9 s" = "459e95255578594c"

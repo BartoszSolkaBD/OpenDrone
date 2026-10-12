@@ -7,11 +7,11 @@
 # does.
 #
 # Like test/freestyle-5-filters-and-shaping-off, it also switches off what
-# Betaflight 2026.6.2 puts between a throttle step and the motors that the
-# Flight Controller doesn't simulate yet: RC smoothing (#49), and throttle
-# boost and anti-gravity (#50), with the rest of the filters and loop
-# shaping, and runaway takeoff prevention. So the motors' numbers are what
-# Betaflight gives on this Tune today and once those tickets land. (A Test Quad builds on a real Quad only, so the
+# Betaflight 2026.6.2 puts between a throttle step and the motors: RC
+# smoothing (#49), and throttle boost and anti-gravity (#50), which the
+# Flight Controller doesn't simulate yet, with the rest of the filters and
+# loop shaping, and runaway takeoff prevention. So the motors' numbers are
+# what Betaflight gives on this Tune today and once #50 lands. (A Test Quad builds on a real Quad only, so the
 # list is written out again here.) Everything else is the Freestyle 5″'s.
 #
 # A Test Quad lists only what it changes, so any other change to the Freestyle

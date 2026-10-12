@@ -1,0 +1,124 @@
+# RC smoothing tunes itself to the Packet Rate it detects, as Betaflight
+# 2026.6.2's does (`updateRcRefreshRate`, `shouldUpdateSmoothing`,
+# `rcSmoothingSetFilterCutoffs` and `processRcSmoothingFilter`,
+# src/main/fc/rc.c; the Betaflight research §3.1). This is the 500 Hz half
+# of a pair: rc-smoothing-at-250-hz.toml flies the same Timeline over a
+# 250 Hz Radio Link, and says how it works.
+#
+# At 500 Hz the detected Packet Rate is 500 Hz, and the cutoff 500 Hz × 1.5 ÷
+# (1 + 30 ÷ 10) = 187.5 Hz, kept as 187 Hz: the PT3's three stages each move
+# k = 0.223650 of the way a loop (ω = 2π × 187 Hz × 1.961459 ÷ 8000), and
+# the first loop after a step it passes k³ = 0.011187 of it. So the same
+# stick and throttle jumps reach the PID loop and the mixer about twice as
+# fast as at 250 Hz.
+#
+# The Flight Controller alone, armed, its sticks centred and the throttle at
+# 0%. At 0.5 s the roll stick jumps to 50% (193.54 °/s); at 1 s the
+# throttle jumps to 50%, a mixer throttle of 47.3%. Frames come every 2 ms
+# from 0 s, so both jumps arrive with a frame.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-off, so throttle boost
+# (#50) can't move the mixer's throttle.
+format = 2
+name   = "At 500 Hz, RC smoothing smooths the setpoints and the throttle at 187 Hz"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-off"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "500 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "50%" },
+  { at = "1 s",   throttle = "50%" },
+]
+
+[[expect]]
+what  = "detected Packet Rate"
+at    = "0.25 s"
+value = "500 Hz ± 0 Hz"
+basis = "source: updateRcRefreshRate and shouldUpdateSmoothing: every gap is 2 ms, 500 Hz, which moves the settled 500 Hz a tenth of the way to itself"
+
+[[expect]]
+what  = "setpoint smoothing cutoff"
+at    = "0.25 s"
+value = "187 Hz ± 0 Hz"
+basis = "source: rcSmoothingSetFilterCutoffs: 500 Hz × 1.5 ÷ (1 + 30 ÷ 10) = 187.5 Hz, kept in whole Hz"
+
+[[expect]]
+what  = "throttle smoothing cutoff"
+at    = "0.25 s"
+value = "187 Hz ± 0 Hz"
+basis = "source: rcSmoothingSetFilterCutoffs: the same with rc_smoothing_auto_factor_throttle 30"
+
+[[expect]]
+what  = "roll setpoint"
+at    = "0.500125 s"
+value = "193.543 °/s ± 0.001 °/s"
+basis = "source: applyActualRates: the frame's own setpoint is the same at any Packet Rate"
+
+[[expect]]
+what  = "roll smoothed setpoint"
+at    = "0.500125 s"
+value = "2.2736 °/s ± 0.0001 °/s"
+basis = "source: processRcSmoothingFilter: the first loop the PT3 passes k³ = 0.223650³ of the step: 0.10966 + 193.434 × 0.011187 = 2.2736 °/s, against 0.4903 °/s at 250 Hz"
+
+[[expect]]
+what  = "roll smoothed setpoint"
+at    = "0.501 s"
+value = "76.379 °/s ± 0.001 °/s"
+basis = "source: the PT3 at 187 Hz, eight loops after the step, loop by loop: as far as 250 Hz's gets in 16"
+
+[[expect]]
+what  = "roll smoothed setpoint"
+at    = "0.502 s"
+value = "155.205 °/s ± 0.001 °/s"
+basis = "source: the PT3 at 187 Hz, 16 loops after the step"
+
+[[expect]]
+what  = "roll smoothed setpoint"
+at    = "0.504 s"
+value = "191.515 °/s ± 0.001 °/s"
+basis = "source: the PT3 at 187 Hz, 32 loops after the step: 99% of the way, where 250 Hz's is at 82%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.000125 s"
+value = "0.5291% ± 0.0001%"
+basis = "source: processRcSmoothingFilter and mixTable: the throttle's PT3 passes k³ = 0.011187 of the step the first loop: 0.011187 × 47.3% = 0.5291%"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.001 s"
+value = "18.6500% ± 0.0001%"
+basis = "source: the throttle's PT3 at 187 Hz, eight loops after the step"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.002 s"
+value = "37.9251% ± 0.0001%"
+basis = "source: the throttle's PT3 at 187 Hz, 16 loops after the step"
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.004 s"
+value = "46.8041% ± 0.0001%"
+basis = "source: the throttle's PT3 at 187 Hz, 32 loops after the step"

@@ -1,0 +1,97 @@
+# Feedforward follows Betaflight 2026.6.2 (`calculateFeedforward` and
+# `updateFeedforwardFilters`, src/main/fc/rc.c; the Betaflight research
+# §3.1). This is the 500 Hz half of a pair: feedforward-at-250-hz.toml flies
+# the same Timeline over a 250 Hz Radio Link, and says how feedforward works.
+#
+# At 500 Hz Betaflight tunes feedforward's smoothing to the detected Packet
+# Rate, so its two low-passes keep the same 7.43 ms time constant: each
+# moves 2 ms ÷ (2 ms + 7.43 ms) = 0.21 of the way a frame. RC smoothing's
+# PT3 runs at 187 Hz (rc-smoothing-at-500-hz.toml). The stick's speed is the
+# setpoint's change times 500.
+#
+# The same thumb movement gives less feedforward on the faster link: during
+# the ramp each frame moves the stick only about 1.02 µs (1 or 2 receiver
+# steps), so jitter attenuation lets (1.02 + 1) ÷ 8 = 0.25 of the speed
+# through, where it lets 0.38 through at 250 Hz. That is real Betaflight
+# behaviour (the Betaflight research §3.1, ADR-0007), and why the Packet
+# Rate is a pilot's setting.
+#
+# The Flight Controller alone, armed, the sticks centred, the throttle at
+# 0%. From 0.5 s to 0.7 s the roll stick ramps from 0% to 20%; at 1 s it
+# jumps to 90% (618.05 °/s) and at 1.2 s back to centre; at 1.5 s the yaw
+# stick jumps to 30% right (206.15 °/s) and holds. The Rates are Actual
+# 670/670, a straight line. Each value is worked out frame by frame and loop
+# by loop from Betaflight's formulas.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-off, with the loop
+# shaping #50 brings off.
+format = 2
+name   = "At 500 Hz, the same stick moves give feedforward tuned to the faster link"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-off"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "500 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "0%" },
+  { at = "0.7 s", roll = "ramp to 20%" },
+  { at = "1 s",   roll = "90%" },
+  { at = "1.2 s", roll = "0%" },
+  { at = "1.5 s", yaw = "30%" },
+]
+
+[[expect]]
+what  = "roll F term"
+over  = "0.6 s to 0.7 s"
+mean  = "2.8655 ± 0.0001"
+basis = "source: calculateFeedforward: the ramp's speed is the same 686 °/s², but jitter attenuation lets only (1.02 + 1) ÷ 8 = 0.25 of it through: F ≈ 0.016505 × 686 × 0.25 = 2.9; frame by frame the mean is 2.8655, a third less than 250 Hz's 4.3377"
+
+[[expect]]
+what  = "roll F term"
+at    = "0.52 s"
+value = "4.1326 ± 0.0001"
+basis = "source: calculateFeedforward: 20 ms into the ramp, boost adds the stick's acceleration; without boost it would be 2.5569"
+
+[[expect]]
+what    = "roll F term"
+over    = "1 s to 1.1 s"
+highest = "76.773 ± 0.001"
+basis   = "source: calculateFeedforward: the jump to 90% is held within (670 − 618.05) × 90 = 4675.7, so F stays under 0.016505 × 4675.7 = 77.17; RC smoothing at 187 Hz lets it get closer than at 250 Hz. Without the limit the jump would give 1664.8"
+
+[[expect]]
+what  = "yaw F term"
+at    = "1.6 s"
+value = "19.135 ± 0.001"
+basis = "source: calculateFeedforward: yaw hold, 15 × (206.15 °/s − the setpoint low-passed over 100 ms), keeps pushing 100 ms after the jump; without it, 0.0005"
+
+[[expect]]
+what  = "yaw F term"
+at    = "1.7 s"
+value = "7.109 ± 0.001"
+basis = "source: calculateFeedforward: yaw hold fades with its 100 ms time constant"
+
+[[expect]]
+what  = "yaw F term"
+at    = "1.9 s"
+value = "0.981 ± 0.001"
+basis = "source: calculateFeedforward: yaw hold, 400 ms after the jump"

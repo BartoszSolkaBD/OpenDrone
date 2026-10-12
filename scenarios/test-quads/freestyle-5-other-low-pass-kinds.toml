@@ -1,0 +1,42 @@
+# The Freestyle 5″ with each of Betaflight's other low-pass kinds in its filters.    id: test/freestyle-5-other-low-pass-kinds
+#
+# Betaflight 2026.6.2's gyro and D-term low-passes can each be a PT1, PT2,
+# PT3 or BIQUAD (`lookupTableLowpassType`, src/main/cli/settings.c); its
+# defaults, which the Freestyle 5″ keeps, are all PT1. So that a Flight
+# Controller Scenario can check the other three kinds, this Test Quad sets
+# gyro low-pass 2 to a BIQUAD at 400 Hz, gyro low-pass 1 to a static PT2 at
+# 200 Hz, and D-term low-pass 1 to a static PT3 at 100 Hz, leaving D-term
+# low-pass 2 a PT1 at 150 Hz. Both first low-passes are static, their
+# `*_dyn_min_hz` at 0, so the throttle doesn't move them.
+#
+# As test/freestyle-5-loop-shaping-off does, it switches off Dynamic D,
+# I-term relax, anti-gravity, TPA and throttle boost (#50), the dynamic notch
+# (#21) and runaway takeoff prevention, so the D term is Betaflight's with
+# these filters and nothing else.
+#
+# A Test Quad lists only what it changes, so any other change to the Freestyle
+# 5″ carries into it. Only the Scenario runner reads Test Quads; pilots never
+# fly them.
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "The gyro and D-term low-passes set to a BIQUAD, a PT2 and a PT3, with the loop shaping #50 brings off, so a Flight Controller Scenario can check each kind of low-pass"
+
+# Tune changes keep Betaflight's own units, as `tune.txt` does.
+[tune]
+gyro_lpf2_type = "BIQUAD"   # a state-variable Butterworth low-pass (filter.c, svfLowpassFilterApply)
+gyro_lpf2_static_hz = 400
+gyro_lpf1_type = "PT2"
+gyro_lpf1_static_hz = 200
+gyro_lpf1_dyn_min_hz = 0    # static: the throttle doesn't move it (gyro_init.c, dynLpfFilterInit)
+dterm_lpf1_type = "PT3"
+dterm_lpf1_static_hz = 100
+dterm_lpf1_dyn_min_hz = 0   # static (pid_init.c)
+d_max_roll = 0              # Dynamic D: a D max not above D gives no boost (pid_init.c)
+d_max_pitch = 0
+iterm_relax = "OFF"         # I-term relax off
+anti_gravity_gain = 0       # anti-gravity: no I or P boost (pid.c, pidController)
+tpa_rate = 0                # TPA: no cut above the breakpoint (pid_init.c)
+tpa_low_rate = 0            # low-throttle TPA: no cut below its breakpoint
+throttle_boost = 0          # no throttle boost (mixer.c, mixTable)
+dyn_notch_count = 0         # the dynamic notch off (dyn_notch_filter.c, isDynNotchActive)
+runaway_takeoff_prevention = "OFF" # no disarm on a PID sum held at 60% for 75 ms (core.c)

@@ -1,0 +1,64 @@
+# Results of feedforward-at-500-hz.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "At 500 Hz, the same stick moves give feedforward tuned to the faster link"
+
+[[expect]]
+what     = "roll F term, mean over 0.6 s to 0.7 s"
+basis    = "Source"
+expected = "2.8655 ± 0.0001"
+measured = "2.87"
+
+[[expect]]
+what     = "roll F term at 0.52 s"
+basis    = "Source"
+expected = "4.1326 ± 0.0001"
+measured = "4.13"
+
+[[expect]]
+what     = "roll F term, highest over 1 s to 1.1 s"
+basis    = "Source"
+expected = "76.773 ± 0.001"
+measured = "76.8"
+
+[[expect]]
+what     = "yaw F term at 1.6 s"
+basis    = "Source"
+expected = "19.135 ± 0.001"
+measured = "19.1"
+
+[[expect]]
+what     = "yaw F term at 1.7 s"
+basis    = "Source"
+expected = "7.109 ± 0.001"
+measured = "7.11"
+
+[[expect]]
+what     = "yaw F term at 1.9 s"
+basis    = "Source"
+expected = "0.981 ± 0.001"
+measured = "0.981"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "3e2ed17fef375992"   # test/freestyle-5-loop-shaping-off: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "b2766ee9b8b80cf9"   # the whole state after each of 15200 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.19 s" = "24913f2efbaadc18"
+"0.38 s" = "1f1f6a07647a54e1"
+"0.57 s" = "ba7565e4ff67fb62"
+"0.76 s" = "5ac7460c68ad10be"
+"0.95 s" = "e96cb64399bfb888"
+"1.14 s" = "1153df9ccc3ae685"
+"1.33 s" = "c47a4f03df10e280"
+"1.52 s" = "d04dd6068fc45af7"
+"1.71 s" = "19add31d0a557eb0"
+"1.9 s" = "e8f13d740fd09234"

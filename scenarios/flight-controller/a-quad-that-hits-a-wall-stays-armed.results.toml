@@ -14,7 +14,7 @@ measured = "4.86 m"
 what     = "speed east at 1 s"
 basis    = "Observed"
 expected = "-0.09 m/s ± 0.5 m/s"
-measured = "-0.0858 m/s"
+measured = "-0.0631 m/s"
 
 [[expect]]
 what     = "the Quad disarms, first over 0 s to 3 s"
@@ -32,7 +32,7 @@ measured = "158"
 what     = "pitch PID sum, highest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "8.22"
+measured = "10.9"
 
 [[expect]]
 what     = "pitch PID sum, highest over 0.59 s to 1.04 s"
@@ -44,13 +44,13 @@ measured = "2460"
 what     = "pitch PID sum, lowest over 0.556 s to 0.85 s"
 basis    = "Observed"
 expected = "between 600 and 3000"
-measured = "1810"
+measured = "2160"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 0.52 s to 1.4 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-202"
+measured = "-245"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.04 s to 1.07 s"
@@ -62,133 +62,133 @@ measured = "-1.12"
 what     = "pitch PID sum, lowest over 1.07 s to 1.10 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-0.296"
+measured = "-0.377"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.10 s to 1.13 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.0359"
+measured = "0.0494"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.13 s to 1.16 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.312"
+measured = "0.319"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.16 s to 1.19 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.574"
+measured = "0.598"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.19 s to 1.22 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.760"
+measured = "0.715"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.22 s to 1.25 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.830"
+measured = "0.832"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.25 s to 1.28 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.842"
+measured = "0.922"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.28 s to 1.31 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.982"
+measured = "1.00"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.31 s to 1.34 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "1.05"
+measured = "1.07"
 
 [[expect]]
 what     = "pitch PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "12.3"
+measured = "22.5"
 
 [[expect]]
 what     = "roll PID sum, highest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.158"
+measured = "0.161"
 
 [[expect]]
 what     = "roll PID sum, lowest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-0.0371"
+measured = "-0.0560"
 
 [[expect]]
 what     = "roll PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "71.2"
+measured = "92.9"
 
 [[expect]]
 what     = "roll PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-130"
+measured = "-128"
 
 [[expect]]
 what     = "roll PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "13.0"
+measured = "26.4"
 
 [[expect]]
 what     = "roll PID sum, lowest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "2.08"
+measured = "5.04"
 
 [[expect]]
 what     = "yaw PID sum, highest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.159"
+measured = "0.165"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "0.0263"
+measured = "-0.00577"
 
 [[expect]]
 what     = "yaw PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "121"
+measured = "119"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-5.83"
+measured = "-11.7"
 
 [[expect]]
 what     = "yaw PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "39.1"
+measured = "106"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-15.5"
+measured = "10.0"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -197,18 +197,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "8eef3761485a76f7"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
+quad = "fda8e1e1b63e4b4e"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "d0aa48653def9025"   # the whole state after each of 24000 steps at 8000 Hz, in order
+run  = "14cd1059bd772769"   # the whole state after each of 24000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.3 s" = "5c7b2336dbfe142f"
-"0.6 s" = "8ff8e24a6e0f8769"
-"0.9 s" = "b98e65d6438df72d"
-"1.2 s" = "2b251fe145bffe57"
-"1.5 s" = "e54626d658f17c07"
-"1.8 s" = "f1b065de3d908717"
-"2.1 s" = "cb1551df8a0b52a8"
-"2.4 s" = "f70670e6faed3f84"
-"2.7 s" = "0b19f319911b7112"
-"3 s" = "bbbe4b655caad4c4"
+"0.3 s" = "4c1badf6a2e69688"
+"0.6 s" = "411dc805a33cd16b"
+"0.9 s" = "8988b46a59709d76"
+"1.2 s" = "f065fe45ce1184d3"
+"1.5 s" = "24d612a1968440a7"
+"1.8 s" = "8273d366d0885afa"
+"2.1 s" = "9aff4ae80a896a33"
+"2.4 s" = "8ee6485aa24e50d3"
+"2.7 s" = "bbdccfc5d02c1cfb"
+"3 s" = "d53b3f7838c74ab3"

@@ -31,8 +31,8 @@ measured = "1680"
 [[expect]]
 what     = "yaw spin recovery starts, first over 0.8 s to 0.9 s"
 basis    = "Source"
-expected = "0.000125 s ± 0.000001 s"
-measured = "0.000125 s"
+expected = "0.000875 s ± 0.000001 s"
+measured = "0.000875 s"
 
 [[expect]]
 what     = "yaw P term at 0.85 s"
@@ -54,6 +54,18 @@ measured = "0"
 
 [[expect]]
 what     = "roll P term at 0.85 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll F term, highest over 0.8 s to 0.95 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll F term, lowest over 0.8 s to 0.95 s"
 basis    = "Source"
 expected = "0 ± 0"
 measured = "0"
@@ -85,8 +97,8 @@ measured = "never"
 [[expect]]
 what     = "yaw spin recovery ends, first over 1.1 s to 1.2 s"
 basis    = "Source"
-expected = "0.020125 s ± 0.000001 s"
-measured = "0.0201 s"
+expected = "0.02075 s ± 0.000001 s"
+measured = "0.0208 s"
 
 [[expect]]
 what     = "roll P term at 1.15 s"
@@ -101,18 +113,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "930ed539d6c22485"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "2e903599175e4249"   # the whole state after each of 9600 steps at 8000 Hz, in order
+run  = "a2a0e4d79f810735"   # the whole state after each of 9600 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.12 s" = "e45c9d3eb96e3b0d"
-"0.24 s" = "6a112ad91d3c5802"
-"0.36 s" = "0ede8ceda77a98e1"
-"0.48 s" = "571b67085d3b4378"
-"0.6 s" = "cd62b8d2607ffce6"
-"0.72 s" = "bcb843e6be2f2af4"
-"0.84 s" = "060ff72375299e73"
-"0.96 s" = "9c88d892318e058f"
-"1.08 s" = "2f6d43ed2f6b516e"
-"1.2 s" = "66a273f3f88aeac1"
+"0.12 s" = "e94f6625ac8aeb2c"
+"0.24 s" = "3595900790ad5165"
+"0.36 s" = "a275d4ae26f541b9"
+"0.48 s" = "d5b29909fe363b11"
+"0.6 s" = "96c7656225254064"
+"0.72 s" = "f29a665a9bd984ca"
+"0.84 s" = "a0bb5d54f3adb2fe"
+"0.96 s" = "e009c85d961d06c0"
+"1.08 s" = "05001b60ff6e098f"
+"1.2 s" = "ec298a41d072462e"

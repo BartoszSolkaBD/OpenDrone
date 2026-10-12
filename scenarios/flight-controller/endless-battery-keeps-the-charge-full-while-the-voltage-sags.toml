@@ -55,14 +55,14 @@ basis  = "rule: Endless Battery tops the charge up, so it never reads below full
 [[expect]]
 what    = "battery current"
 over    = "5 s to 7 s"
-highest = "18.4 A ± 0.5 A"
-basis   = "observed: the punch's peak draw"
+highest = "13.3 A ± 0.5 A"
+basis   = "observed: the punch's peak draw; RC smoothing brings the throttle in over a few milliseconds (a PT3 at 93 Hz at 250 Hz), so the motors gather speed as the drive rises: with rc_smoothing OFF the peak would be 18.4 A"
 
 [[expect]]
 what    = "battery sag"
 over    = "5 s to 7 s"
-highest = "0.72 V ± 0.02 V"
-basis   = "rule: the voltage sags by the current times the pack's resistance, 29 mΩ + 10 mΩ = 39 mΩ: the punch's peak of 18.4 A gives 0.72 V"
+highest = "0.52 V ± 0.02 V"
+basis   = "rule: the voltage sags by the current times the pack's resistance, 29 mΩ + 10 mΩ = 39 mΩ: the punch's peak of 13.3 A gives 0.52 V"
 
 [[expect]]
 what  = "battery charge used"

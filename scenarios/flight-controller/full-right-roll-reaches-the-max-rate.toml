@@ -98,8 +98,8 @@ basis   = "observed: full right roll asks for nothing in yaw, and the PID loop h
 [[expect]]
 what    = "roll rate"
 over    = "1 s to 1.5 s"
-highest = "869 °/s ± 2%"
-basis   = "observed: the roll overshoots the max rate: the I term winds up while the roll spins up, as Betaflight's would without I-term relax and feedforward, which come with #50 and #49"
+highest = "830 °/s ± 2%"
+basis   = "observed: the roll overshoots the max rate: the I term winds up while the roll spins up, as Betaflight's would without I-term relax, which comes with #50. With the filters, RC smoothing and feedforward (#49) it peaks at 830 °/s; before them it reached 869 °/s"
 
 [[expect]]
 what  = "roll rate"

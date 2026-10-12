@@ -1,0 +1,40 @@
+# Results of feedforward-transition.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Feedforward's transition fades feedforward in from centre stick"
+
+[[expect]]
+what     = "roll F term, mean over 0.6 s to 0.7 s"
+basis    = "Source"
+expected = "1.2847 ± 0.0001"
+measured = "1.28"
+
+[[expect]]
+what     = "roll F term at 0.65 s"
+basis    = "Source"
+expected = "1.3643 ± 0.0001"
+measured = "1.36"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "7a9ee7eb77622fd8"   # test/freestyle-5-feedforward-transition: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "5ad41ffd0676e117"   # the whole state after each of 5600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.07 s" = "82905e5b38698a13"
+"0.14 s" = "d60e9e4e4bcba38c"
+"0.21 s" = "1bea40721abeb4b9"
+"0.28 s" = "492d321c91a721d3"
+"0.35 s" = "4b319426b6f6c2f1"
+"0.42 s" = "ae10e51823d3c9ae"
+"0.49 s" = "8d4f5c75b55d8280"
+"0.56 s" = "47f8edc59960ddf9"
+"0.63 s" = "6f660435947827b4"
+"0.7 s" = "b9434c4eec3f9f17"

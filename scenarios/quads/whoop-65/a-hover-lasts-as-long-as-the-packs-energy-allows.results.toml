@@ -26,19 +26,19 @@ measured = "19.9 m"
 what     = "average motor command at 50 s"
 basis    = "Rule"
 expected = "between 40% and 60%"
-measured = "49.6%"
+measured = "49.7%"
 
 [[expect]]
 what     = "average motor command at 70 s"
 basis    = "Rule"
 expected = "between 90% and 100%"
-measured = "94.1%"
+measured = "94.0%"
 
 [[expect]]
 what     = "battery voltage at 50 s"
 basis    = "Observed"
 expected = "3.23 V ± 0.05 V"
-measured = "3.23 V"
+measured = "3.22 V"
 
 [[expect]]
 what     = "battery voltage at 75 s"
@@ -56,7 +56,7 @@ measured = "12.0 m"
 what     = "vertical speed at 75 s"
 basis    = "Rule"
 expected = "between -30 m/s and -1 m/s"
-measured = "-5.15 m/s"
+measured = "-5.16 m/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -67,16 +67,16 @@ measured = "none broken"
 [fingerprints]
 quad = "fe3edc8d0daeb081"   # test/whoop-65-small-pack: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "63c4f0a210dd3c91"   # the whole state after each of 600000 steps at 8000 Hz, in order
+run  = "3190253d8a2f4933"   # the whole state after each of 600000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"7.5 s" = "13023bac288d262b"
-"15 s" = "7680ed520aa90298"
-"22.5 s" = "117f5960321eb968"
-"30 s" = "4d1ba93c54996449"
-"37.5 s" = "f377e371382456d1"
-"45 s" = "f228b5e756c20799"
-"52.5 s" = "94e204aabb2ce2d0"
-"60 s" = "6ae1fa713492e2cc"
-"67.5 s" = "f0e64ac3346520c2"
-"75 s" = "9421c87fb97b7bcb"
+"7.5 s" = "b48ded35b0212bb8"
+"15 s" = "a57d0a6345813e10"
+"22.5 s" = "c2e15e8ef4ef3968"
+"30 s" = "b70b20af6b6e7bca"
+"37.5 s" = "2162e59eed6233bc"
+"45 s" = "4e0ca6ac7f4b4056"
+"52.5 s" = "2a5e377bbc4ddab2"
+"60 s" = "3f3648044936151f"
+"67.5 s" = "254a5c81f35e8008"
+"75 s" = "ce0b5bfaad28bf43"

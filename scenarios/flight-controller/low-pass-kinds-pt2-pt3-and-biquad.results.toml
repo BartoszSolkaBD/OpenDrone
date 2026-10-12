@@ -1,0 +1,82 @@
+# Results of low-pass-kinds-pt2-pt3-and-biquad.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The PT2, PT3 and BIQUAD low-passes follow Betaflight's in the gyro's and the D term's filters"
+
+[[expect]]
+what     = "filtered gyro roll rate at 0.500125 s"
+basis    = "Source"
+expected = "0.077297 °/s ± 0.000001 °/s"
+measured = "0.0773 °/s"
+
+[[expect]]
+what     = "filtered gyro roll rate at 0.5005 s"
+basis    = "Source"
+expected = "3.4935 °/s ± 0.0001 °/s"
+measured = "3.49 °/s"
+
+[[expect]]
+what     = "filtered gyro roll rate at 0.501 s"
+basis    = "Source"
+expected = "21.6027 °/s ± 0.0001 °/s"
+measured = "21.6 °/s"
+
+[[expect]]
+what     = "filtered gyro roll rate at 0.502 s"
+basis    = "Source"
+expected = "71.8690 °/s ± 0.0001 °/s"
+measured = "71.9 °/s"
+
+[[expect]]
+what     = "filtered gyro roll rate at 0.6 s"
+basis    = "Source"
+expected = "100 °/s ± 0.0001 °/s"
+measured = "100 °/s"
+
+[[expect]]
+what     = "roll D term at 0.500125 s"
+basis    = "Source"
+expected = "-0.002460 ± 0.000001"
+measured = "-0.00246"
+
+[[expect]]
+what     = "roll D term at 0.501 s"
+basis    = "Source"
+expected = "-5.8537 ± 0.0001"
+measured = "-5.85"
+
+[[expect]]
+what     = "roll D term at 0.502 s"
+basis    = "Source"
+expected = "-82.5130 ± 0.0001"
+measured = "-82.5"
+
+[[expect]]
+what     = "roll D term at 0.504 s"
+basis    = "Source"
+expected = "-331.7467 ± 0.0001"
+measured = "-332"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "6d36821cbd21ae3b"   # test/freestyle-5-other-low-pass-kinds: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "fd718902b48d5c62"   # the whole state after each of 4800 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.06 s" = "3fe6441e94766def"
+"0.12 s" = "ab1d87ac9acefa9e"
+"0.18 s" = "f7758dfd7de3dac3"
+"0.24 s" = "cf6ffafcadb31c87"
+"0.3 s" = "51ba2702a9b09dd1"
+"0.36 s" = "afbd16dd3f7333da"
+"0.42 s" = "7954eb6ea9e1c8db"
+"0.48 s" = "8a8b8d6706c8728e"
+"0.54 s" = "1927d185d148a071"
+"0.6 s" = "23efcf6c75d14913"

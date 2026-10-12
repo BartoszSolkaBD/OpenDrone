@@ -15,11 +15,13 @@
 # It starts 1 m up on test/flat-floor, level, armed, its motors "settled",
 # the sticks centred. At 0.7 s, about 1.7 m up, full roll right turns it
 # over; at 0.95 s the sticks centre and the throttle drops to 0, and it falls
-# onto the floor upside down at about 1.45 s. There it lies, armed, the Arm
-# switch on: the PID loop keeps fighting, its pitch I winds up to its limit
-# (80% of `pidsum_limit` 500 = 400) and holds there, and the front motors
-# push hard against the floor, until it settles flat on its duct rings by
-# about 6 s and lies there pushing.
+# onto the floor upside down at about 1.5 s. It bounces, and by about 1.8 s
+# it lies flat on its duct rings, still. There it lies, armed, the Arm
+# switch on: Airmode keeps the PID loop working, the I terms keep what they
+# wound up in the landing (roll's near -300), and the motors keep pushing it
+# into the floor, well above idle. Lying still, the I terms move only by
+# what the centred sticks ask, 0.11 °/s: 0.244381 × 64 × 0.10966 = 1.7 a
+# second.
 format = 2
 name   = "A Whoop 65 crashed upside down with Airmode stays armed and keeps pushing"
 
@@ -82,10 +84,10 @@ first = "never"
 basis = "observed: pushing as it does, it never rights itself"
 
 [[expect]]
-what    = "pitch I term"
-over    = "2 s to 12 s"
-highest = "400 ± 0.5"
-basis   = "source: pidController and the static I clamp (Betaflight research §4.1): lying armed, with Airmode on, the I term winds up to its limit, iterm_windup 80% of pidsum_limit 500 = 400"
+what  = "roll I term"
+at    = "6 s"
+value = "-293 ± 10"
+basis = "observed: lying armed, with Airmode on, the roll I term keeps what it wound up in the landing, unwinding only by the centred stick's 0.11 °/s"
 
 [[expect]]
 what   = "motor 1 DShot"
@@ -114,5 +116,5 @@ basis  = "source: mixTable: armed with Airmode on, no motor drops below idle"
 [[expect]]
 what  = "motor 2 DShot"
 over  = "6 s to 12 s"
-mean  = "1950 ± 100"
-basis = "observed: lying still, the front right motor keeps pushing hard, near full power, for the whole 6 s, its pitch I held near its limit"
+mean  = "1370 ± 100"
+basis = "observed: lying still, the front right motor keeps pushing hard, well above idle, for the whole 6 s"
