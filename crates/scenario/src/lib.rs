@@ -21,7 +21,10 @@
 //!    whole-number Channels, and steps it at the physics rate up to the last
 //!    moment the file mentions,
 //!    measuring every Expectation at its moment or over its stretch, plus the
-//!    automatic "no broken numbers" check ([`run()`]); an Expectation that
+//!    automatic "no broken numbers" check ([`run()`]), and, for a Scenario
+//!    with an `[osd]` section, working the OSD out beside the run from each
+//!    Flight Controller loop and reading its elements (ADR-0022); an
+//!    Expectation that
 //!    compares with another run gets that run too, the same Scenario with a
 //!    starting-state item or two changed;
 //! 3. runs it a second time, and checks the whole state's fingerprint agrees
@@ -42,6 +45,7 @@
 pub mod agreement;
 mod format;
 mod measure;
+mod osd;
 mod rates;
 mod read;
 mod results;
@@ -56,6 +60,7 @@ use opendrone_pack::{Packs, Problems};
 pub use format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 pub use measure::{Axis, Event, Measure, Sample, Stick as ChannelStick, Term};
 pub use opendrone_sim::StartingMotors;
+pub use osd::{OsdExpectation, OsdExpected, OsdSection, OsdWhen};
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
     Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, Expecting, FlightMode,

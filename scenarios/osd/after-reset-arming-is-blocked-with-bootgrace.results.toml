@@ -1,0 +1,82 @@
+# Results of after-reset-arming-is-blocked-with-bootgrace.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "After Reset, arming is blocked with BOOTGRACE, and the timers start again from zero"
+
+[[expect]]
+what     = "the Quad arms, first over 2 s to 2.5 s"
+basis    = "Source"
+expected = "0.204125 s ± 0.000001 s"
+measured = "0.204 s"
+
+[[expect]]
+what     = "warnings at 1 s"
+basis    = "Source"
+expected = "BOOTGRACE"
+measured = "BOOTGRACE"
+
+[[expect]]
+what     = "warnings at 1.9 s"
+basis    = "Source"
+expected = "ARM_SWITCH"
+measured = "ARM_SWITCH"
+
+[[expect]]
+what     = "timer 1 at 3.4 s"
+basis    = "Rule"
+expected = "00:03"
+measured = "00:03"
+
+[[expect]]
+what     = "timer 2 at 3.4 s"
+basis    = "Rule"
+expected = "00:01"
+measured = "00:01"
+
+[[expect]]
+what     = "timer 1 at 3.7 s"
+basis    = "Rule"
+expected = "00:00"
+measured = "00:00"
+
+[[expect]]
+what     = "timer 2 at 3.7 s"
+basis    = "Rule"
+expected = "00:00"
+measured = "00:00"
+
+[[expect]]
+what     = "warnings at 3.7 s"
+basis    = "Rule"
+expected = "BOOTGRACE"
+measured = "BOOTGRACE"
+
+[[expect]]
+what     = "statistics page at 3.7 s"
+basis    = "Rule"
+expected = "(blank)"
+measured = "(blank)"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "943169a834404ac3"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "8ff45fb5fd21d304"   # the whole state after each of 29600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.37 s" = "2c0ec534cdf5aa79"
+"0.74 s" = "7171fc3670ffeb8b"
+"1.11 s" = "113c06b0fb63b2df"
+"1.48 s" = "cd1db79381f89792"
+"1.85 s" = "610065517d7f5f87"
+"2.22 s" = "766b07d5c05ab793"
+"2.59 s" = "7c2978682b5c59be"
+"2.96 s" = "4e72d46df190d11b"
+"3.33 s" = "69acf36126c132f1"
+"3.7 s" = "90ea4da245163132"

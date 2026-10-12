@@ -53,18 +53,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "930ed539d6c22485"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "943169a834404ac3"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "8cc99ab0b6848ee7"   # the whole state after each of 72000 steps at 8000 Hz, in order
+run  = "2114c8a8884338d9"   # the whole state after each of 72000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.9 s" = "8ad8116eb0c8b126"
-"1.8 s" = "1515ca158d5a6968"
-"2.7 s" = "98f7c96cd4c5b89a"
-"3.6 s" = "2a1cf070639b54f8"
-"4.5 s" = "da2e95b2eb634571"
-"5.4 s" = "015ff375e3c777a1"
-"6.3 s" = "a418c2a27066c474"
-"7.2 s" = "5a2d87014fc58981"
-"8.1 s" = "de3d806112857949"
-"9 s" = "967b5892ef5edd76"
+"0.9 s" = "c4ca0542bb3bf139"
+"1.8 s" = "f83459b851b48867"
+"2.7 s" = "9bbdf0edcf6f6c44"
+"3.6 s" = "6ebdd9d872f870f3"
+"4.5 s" = "54dd3bbedc0a03e4"
+"5.4 s" = "6f97283f9999f48f"
+"6.3 s" = "eada781b6ec12944"
+"7.2 s" = "ca5922ca27973858"
+"8.1 s" = "783dd998d3c88706"
+"9 s" = "e51427ed06da4b97"

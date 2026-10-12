@@ -241,7 +241,9 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     // for the crashflip_* settings; src/main/flight/pid.h and pid.c
     // resetPidProfile for the F gains, feedforward, the D-term low-passes and
     // the yaw P low-pass; src/main/sensors/gyro.h and gyro.c for the gyro
-    // low-passes; src/main/pg/rx.c for RC smoothing).
+    // low-passes; src/main/pg/rx.c for RC smoothing; src/main/sensors/battery.c
+    // for the battery's settings; src/main/pg/motor.c for dshot_bidir and
+    // motor_poles).
     const DEFAULTS: &[(&str, &str)] = &[
         ("small_angle", "25"),
         ("yaw_spin_recovery", "AUTO"),
@@ -249,6 +251,19 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("runaway_takeoff_prevention", "ON"),
         ("runaway_takeoff_deactivate_delay", "500"),
         ("runaway_takeoff_deactivate_throttle_percent", "20"),
+        ("current_meter", "ADC"),
+        ("vbat_min_cell_voltage", "330"),
+        ("vbat_max_cell_voltage", "430"),
+        ("vbat_warning_cell_voltage", "350"),
+        ("vbat_full_cell_voltage", "410"),
+        ("force_battery_cell_count", "0"),
+        ("vbat_hysteresis", "1"),
+        ("vbat_detect_cell_voltage", "300"),
+        ("use_vbat_alerts", "ON"),
+        ("vbat_display_lpf_period", "30"),
+        ("ibat_lpf_period", "10"),
+        ("vbat_duration_for_warning", "0"),
+        ("vbat_duration_for_critical", "0"),
         ("rx_min_usec", "885"),
         ("rx_max_usec", "2115"),
         ("failsafe_delay", "15"),
@@ -307,7 +322,9 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("yaw_control_reversed", "OFF"),
         ("airmode_start_throttle_percent", "25"),
         ("motor_pwm_protocol", "DSHOT600"),
+        ("dshot_bidir", "OFF"),
         ("motor_idle", "550"),
+        ("motor_poles", "14"),
         ("yaw_motors_reversed", "OFF"),
         ("mixer_type", "LEGACY"),
         ("crashflip_motor_percent", "0"),
@@ -334,7 +351,14 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     for (name, value) in DEFAULTS {
         let setting = &five.tune.settings[*name];
         assert_eq!(setting.value, *value, "{name}");
-        assert!(setting.mark.starts_with("2026.6.2 default"), "{name}");
+        // A typical 5″ stack measures its current, which Betaflight's own
+        // default (VIRTUAL) doesn't (#31 §3).
+        let mark = if *name == "current_meter" {
+            "hand-set"
+        } else {
+            "2026.6.2 default"
+        };
+        assert!(setting.mark.starts_with(mark), "{name}");
     }
     assert!(five.flight_controller.is_ok());
 }
@@ -426,11 +450,14 @@ fn the_whoop_65s_tune_is_the_meteor65_pros_diff_all_imported() {
     // from it, so a change to the importer or to what the Flight Controller
     // reads shows here until the Tune is imported again.
     const EXPORT: &str = "docs/research/quad-settings/meteor65-pro.diff-all.txt";
+    // Importing again keeps the hand-set lines: here `current_meter = ADC`,
+    // the board's default, which the 4.3 diff leaves out (#31 §3).
     let export = fs::read_to_string(repo().join(EXPORT)).unwrap();
-    let imported = opendrone_flight_controller::cli::import_tune(&export).unwrap();
-    assert_eq!(imported.problems, Vec::<String>::new());
+    let mut imported = opendrone_flight_controller::cli::import_tune(&export).unwrap();
     let committed =
         fs::read_to_string(repo().join("packs/opendrone/quads/whoop-65/tune.txt")).unwrap();
+    assert_eq!(imported.keep_hand_set(&committed), ["current_meter"]);
+    assert_eq!(imported.problems, Vec::<String>::new());
     assert!(
         committed == imported.tune_txt("Whoop 65", EXPORT),
         "packs/opendrone/quads/whoop-65/tune.txt isn't the importer's output: run `cargo xtask import-tune {EXPORT} packs/opendrone/quads/whoop-65`"

@@ -13,6 +13,10 @@
 //! cargo xtask import-tune docs/research/quad-settings/meteor65-pro.diff-all.txt packs/opendrone/quads/whoop-65
 //! ```
 //!
+//! Importing again keeps the Tune's `hand-set` lines, value and reason, so a
+//! change made by hand survives: the Whoop 65's `current_meter = ADC`, its
+//! board's default, which a 4.3 `diff` leaves out.
+//!
 //! [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
 //! [ADR-0015]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0015-tune-is-betaflight-cli-text-spelling-out-every-setting.md
 
@@ -69,9 +73,23 @@ fn import(export: &Path, target: &str) -> Result<ExitCode, String> {
     let quad = read_quad_file(&shown(&root, &quad_toml), &quad_text)
         .map_err(|problems| format!("{} can't be read:\n{problems}", quad_toml.display()))?;
     let tune = folder.join("tune.txt");
+    let mut imported = imported;
+    let kept = match fs::read_to_string(&tune) {
+        Ok(previous) => imported.keep_hand_set(&previous),
+        Err(_) => Vec::new(),
+    };
     fs::write(&tune, imported.tune_txt(&quad.name, &source))
         .map_err(|e| format!("Can't write {}: {e}", tune.display()))?;
     println!("Wrote {}.", shown(&root, &tune));
+    if !kept.is_empty() {
+        println!(
+            "Kept the hand-set {} from the Tune it replaced.",
+            kept.iter()
+                .map(|name| format!("`{name}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
     print!("{}", imported.report());
     if imported.problems.is_empty() {
         Ok(ExitCode::SUCCESS)

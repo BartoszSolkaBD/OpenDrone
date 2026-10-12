@@ -89,18 +89,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "937963da768627e3"   # test/freestyle-5-crash-flip-settings: what the Simulation receives from it
+quad = "95d4435bb8a0732d"   # test/freestyle-5-crash-flip-settings: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "f6df9f2a34ce80b1"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "f68ff6a21df5a77b"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "47ca41af068fd433"
-"0.2 s" = "6f4c60dd8f715572"
-"0.3 s" = "6f316bf99f143f6e"
-"0.4 s" = "e241264a7000676d"
-"0.5 s" = "9dc615a9949bdc29"
-"0.6 s" = "92f8dd84436e3775"
-"0.7 s" = "21585aadfc66c4a7"
-"0.8 s" = "f6276be6c6d9f1b5"
-"0.9 s" = "5ae0a786dc08c74b"
-"1 s" = "cff67688c842eb1f"
+"0.1 s" = "46fe98c3987ce32e"
+"0.2 s" = "953d0e86ec6b506f"
+"0.3 s" = "9d2a7c0dbdd73461"
+"0.4 s" = "e670b5ab006f0aa6"
+"0.5 s" = "c8c61a5ca57707c9"
+"0.6 s" = "93cc1ab6d22b927a"
+"0.7 s" = "10abc0bb2a4b955c"
+"0.8 s" = "b95324fbcbefaf4d"
+"0.9 s" = "a348a40f6df49f7b"
+"1 s" = "187f580b7458b93d"

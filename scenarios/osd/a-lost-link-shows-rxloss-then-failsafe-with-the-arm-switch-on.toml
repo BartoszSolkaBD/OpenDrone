@@ -1,0 +1,96 @@
+# With Betaflight's default warnings, a lost Radio Link with the Arm switch
+# held on shows why arming is refused, ahead of FAIL SAFE: RXLOSS from
+# 0.15 s, then, once Failsafe drops the Quad at 1.5 s, FAILSAFE and RXLOSS
+# in turn, each for just over half a second (src/main/osd/osd_warnings.c,
+# renderOsdWarning: "arming disabled" comes first, whenever the Arm switch is
+# on and any reason stands, armed or not; failsafe.c sets RXLOSS 150 ms
+# after the last frame, "set RXLOSS in OSD and block arming"). The Flight
+# Mode still reads !FS!.
+#
+# This corrects #31's "for the first 1.5 s no warning shows, then FAIL SAFE
+# blinks": that holds only with the Arm switch off, or the arming-disabled
+# warning switched off (fail-safe-shows-1-5-s-after-the-link-is-lost.toml).
+# A lost Input Device leaves the Arm switch on, as a real radio's last
+# frame does.
+#
+# The Flight Controller alone, armed, as failsafe.toml flies it: the last
+# frame at 0.996 s, RXLOSS at 1.146125 s, DROP at 2.497 s. The OSD redraws
+# at the first loop at or after each 83,333 µs.
+format = 2
+name   = "A lost Radio Link with the Arm switch on shows RXLOSS, then FAILSAFE and RXLOSS in turn, and the Flight Mode reads !FS!"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "1 s", input_device = "lost" },
+]
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "warnings"
+over  = "1 s to 2 s"
+reads = "RXLOSS"
+first = "between 0.146 s and 0.2296 s"
+basis = "source: failsafeOnValidDataFailed sets RXLOSS 150 ms after the last frame (1.146125 s), and renderOsdWarning shows it with the Arm switch on, at the next redraw, within 83.3 ms"
+
+[[osd.expect]]
+what  = "warnings blinks"
+at    = "1.5 s"
+value = "no"
+basis = "source: renderOsdWarning: the arming-disabled reasons don't blink"
+
+[[osd.expect]]
+what  = "warnings"
+over  = "1 s to 4 s"
+reads = "FAIL SAFE"
+first = "never"
+basis = "source: renderOsdWarning: the arming-disabled reasons come before FAIL SAFE, and stand while the Arm switch is on"
+
+[[osd.expect]]
+what  = "warnings"
+over  = "2 s to 3 s"
+reads = "FAILSAFE"
+first = "between 0.497 s and 1.0917 s"
+basis = "source: failsafeUpdateState sets FAILSAFE as DROP disarms (2.497 s); renderOsdWarning moves on only at the first redraw more than 0.5 s after it last moved (here RXLOSS again at 2.333 s, so at 2.917 s), to the lowest flag above the one shown, else the lowest: FAILSAFE"
+
+[[osd.expect]]
+what  = "warnings"
+over  = "3 s to 4 s"
+reads = "RXLOSS"
+first = "between 0.417 s and 0.5917 s"
+basis = "source: renderOsdWarning: the next reason in turn, at the first redraw more than 0.5 s after FAILSAFE showed (2.917 s)"
+
+[[osd.expect]]
+what  = "Flight Mode"
+over  = "1 s to 3 s"
+reads = "!FS!"
+first = "between 1.497 s and 1.5917 s"
+basis = "source: osdElementFlymode: FAILSAFE_MODE first, from the drop, at the next redraw"

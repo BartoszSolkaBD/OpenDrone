@@ -44,6 +44,44 @@ pub struct Tune {
     /// percent, a stable flight needs with a stick moved (twice it, up to
     /// 75%, without).
     pub runaway_takeoff_deactivate_throttle_percent: u8,
+    /// `current_meter`: where the battery current comes from. `ADC` and
+    /// `ESC` read the physics' current; `NONE` has none; `VIRTUAL` and `MSP`
+    /// aren't simulated yet, so they read none ([`Tune::not_simulated_values`]).
+    pub current_meter: CurrentMeter,
+    /// `vbat_min_cell_voltage`: below this a cell is critical (` LAND NOW`),
+    /// in hundredths of a volt.
+    pub vbat_min_cell_voltage: u16,
+    /// `vbat_max_cell_voltage`: a full cell, in hundredths of a volt; the
+    /// cell count is worked out against it at power-up.
+    pub vbat_max_cell_voltage: u16,
+    /// `vbat_warning_cell_voltage`: below this a cell is low (`LOW
+    /// BATTERY`), in hundredths of a volt.
+    pub vbat_warning_cell_voltage: u16,
+    /// `vbat_full_cell_voltage`: below this, never armed since power-up, the
+    /// OSD warns `BATT < FULL`, in hundredths of a volt.
+    pub vbat_full_cell_voltage: u16,
+    /// `force_battery_cell_count`: the cell count, or 0 to work it out.
+    pub force_battery_cell_count: u8,
+    /// `vbat_hysteresis`: how far below a threshold the voltage must fall
+    /// before its state starts, in hundredths of a volt.
+    pub vbat_hysteresis: u8,
+    /// `vbat_detect_cell_voltage`: below this a reading counts as no battery,
+    /// in hundredths of a volt.
+    pub vbat_detect_cell_voltage: u16,
+    /// `use_vbat_alerts`: whether a low or critical battery sounds the
+    /// beeper.
+    pub use_vbat_alerts: bool,
+    /// `vbat_display_lpf_period`: the battery voltage's low-pass, as its
+    /// period in tenths of a second.
+    pub vbat_display_lpf_period: u8,
+    /// `ibat_lpf_period`: the battery current's low-pass, as its period in
+    /// tenths of a second (0: off).
+    pub ibat_lpf_period: u8,
+    /// `vbat_duration_for_warning`: how long the voltage must stay low
+    /// before the battery counts as low, in tenths of a second.
+    pub vbat_duration_for_warning: u8,
+    /// `vbat_duration_for_critical`: the same for critical.
+    pub vbat_duration_for_critical: u8,
     /// `rx_min_usec`: a Channel below this, in µs, is invalid. It is also
     /// the throttle Failsafe's stage 1 sets.
     pub rx_min_usec: u16,
@@ -162,10 +200,16 @@ pub struct Tune {
     pub airmode_start_throttle_percent: u8,
     /// `mixer_type`: only Legacy is simulated.
     pub mixer_type: MixerType,
+    /// `motor_poles`: the motors' magnet poles, which turn the ESCs'
+    /// electrical RPM into RPM.
+    pub motor_poles: u8,
     /// `yaw_motors_reversed`: props out.
     pub yaw_motors_reversed: bool,
     /// `motor_pwm_protocol`: one of the DShot speeds.
     pub motor_pwm_protocol: MotorProtocol,
+    /// `dshot_bidir`: bidirectional DShot, which brings each motor's RPM
+    /// back from its ESC.
+    pub dshot_bidir: bool,
     /// `motor_idle`: the motors' idle, in hundredths of a percent (550 is
     /// 5.5%).
     pub motor_idle: u16,
@@ -250,6 +294,41 @@ impl FailsafeProcedure {
     }
 }
 
+/// `current_meter`, in Betaflight's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CurrentMeter {
+    None,
+    /// The board's current sensor: the battery current the physics gives.
+    Adc,
+    /// Worked out from the throttle: not simulated yet, so no current.
+    Virtual,
+    /// The ESCs' telemetry: the battery current the physics gives.
+    Esc,
+    /// From MSP: not simulated yet, so no current.
+    Msp,
+}
+
+impl CurrentMeter {
+    /// Betaflight's words for it, in its order.
+    pub const WORDS: [&'static str; 5] = ["NONE", "ADC", "VIRTUAL", "ESC", "MSP"];
+
+    /// Whether the Flight Controller reads a current: the meter is one the
+    /// sim simulates.
+    pub fn measures(self) -> bool {
+        matches!(self, CurrentMeter::Adc | CurrentMeter::Esc)
+    }
+
+    fn place(self) -> u64 {
+        match self {
+            CurrentMeter::None => 0,
+            CurrentMeter::Adc => 1,
+            CurrentMeter::Virtual => 2,
+            CurrentMeter::Esc => 3,
+            CurrentMeter::Msp => 4,
+        }
+    }
+}
+
 /// `mixer_type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MixerType {
@@ -311,6 +390,19 @@ const SPECS: &[(&str, Kind)] = &[
         "runaway_takeoff_deactivate_throttle_percent",
         Kind::Number(0, 100),
     ),
+    ("current_meter", Kind::Word(&CurrentMeter::WORDS)),
+    ("vbat_min_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_max_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_warning_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_full_cell_voltage", Kind::Number(100, 500)),
+    ("force_battery_cell_count", Kind::Number(0, 24)),
+    ("vbat_hysteresis", Kind::Number(0, 250)),
+    ("vbat_detect_cell_voltage", Kind::Number(0, 2000)),
+    ("use_vbat_alerts", Kind::OffOn),
+    ("vbat_display_lpf_period", Kind::Number(1, 255)),
+    ("ibat_lpf_period", Kind::Number(0, 255)),
+    ("vbat_duration_for_warning", Kind::Number(0, 150)),
+    ("vbat_duration_for_critical", Kind::Number(0, 150)),
     ("rx_min_usec", Kind::Number(750, 2250)),
     ("rx_max_usec", Kind::Number(750, 2250)),
     ("failsafe_delay", Kind::Number(1, 200)),
@@ -381,7 +473,9 @@ const SPECS: &[(&str, Kind)] = &[
             "the simulated ESCs run Bluejay, which reads DShot: DSHOT150, DSHOT300 or DSHOT600",
         ),
     ),
+    ("dshot_bidir", Kind::OffOn),
     ("motor_idle", Kind::Number(0, 2000)),
+    ("motor_poles", Kind::Number(4, 255)),
     ("yaw_motors_reversed", Kind::OffOn),
     (
         "mixer_type",
@@ -536,6 +630,25 @@ impl Tune {
             runaway_takeoff_deactivate_throttle_percent: small(
                 "runaway_takeoff_deactivate_throttle_percent",
             ),
+            current_meter: match n("current_meter") {
+                0 => CurrentMeter::None,
+                1 => CurrentMeter::Adc,
+                2 => CurrentMeter::Virtual,
+                3 => CurrentMeter::Esc,
+                _ => CurrentMeter::Msp,
+            },
+            vbat_min_cell_voltage: n("vbat_min_cell_voltage") as u16,
+            vbat_max_cell_voltage: n("vbat_max_cell_voltage") as u16,
+            vbat_warning_cell_voltage: n("vbat_warning_cell_voltage") as u16,
+            vbat_full_cell_voltage: n("vbat_full_cell_voltage") as u16,
+            force_battery_cell_count: small("force_battery_cell_count"),
+            vbat_hysteresis: small("vbat_hysteresis"),
+            vbat_detect_cell_voltage: n("vbat_detect_cell_voltage") as u16,
+            use_vbat_alerts: n("use_vbat_alerts") == 1,
+            vbat_display_lpf_period: small("vbat_display_lpf_period"),
+            ibat_lpf_period: small("ibat_lpf_period"),
+            vbat_duration_for_warning: small("vbat_duration_for_warning"),
+            vbat_duration_for_critical: small("vbat_duration_for_critical"),
             rx_min_usec: n("rx_min_usec") as u16,
             rx_max_usec: n("rx_max_usec") as u16,
             failsafe_delay: small("failsafe_delay"),
@@ -592,12 +705,14 @@ impl Tune {
             yaw_control_reversed: n("yaw_control_reversed") == 1,
             airmode_start_throttle_percent: small("airmode_start_throttle_percent"),
             mixer_type: MixerType::Legacy,
+            motor_poles: small("motor_poles"),
             yaw_motors_reversed: n("yaw_motors_reversed") == 1,
             motor_pwm_protocol: match n("motor_pwm_protocol") {
                 0 => MotorProtocol::Dshot150,
                 1 => MotorProtocol::Dshot300,
                 _ => MotorProtocol::Dshot600,
             },
+            dshot_bidir: n("dshot_bidir") == 1,
             motor_idle: n("motor_idle") as u16,
             crashflip_motor_percent: small("crashflip_motor_percent"),
             crashflip_rate: small("crashflip_rate"),
@@ -606,19 +721,41 @@ impl Tune {
     }
 
     /// The settings whose value this Flight Controller reads but doesn't
-    /// simulate yet, each with a plain sentence saying what flies instead:
-    /// so far, a `failsafe_procedure` of AUTO-LAND or GPS-RESCUE, which flies
-    /// DROP (#21).
+    /// simulate yet, each with a plain sentence saying what flies instead: a
+    /// `failsafe_procedure` of AUTO-LAND or GPS-RESCUE, which flies DROP
+    /// (#21), and a `current_meter` of VIRTUAL or MSP, which reads no current
+    /// (#31 §3).
     pub fn not_simulated_values(&self) -> Vec<(&'static str, String)> {
-        match self.failsafe_procedure {
-            FailsafeProcedure::Drop => Vec::new(),
-            other => vec![(
+        let mut values = Vec::new();
+        if self.failsafe_procedure != FailsafeProcedure::Drop {
+            values.push((
                 "failsafe_procedure",
                 format!(
                     "`failsafe_procedure` is {}, which isn't simulated yet: the Quad flies DROP, disarming as Failsafe's stage 2 starts",
-                    other.word()
+                    self.failsafe_procedure.word()
                 ),
-            )],
+            ));
+        }
+        if matches!(
+            self.current_meter,
+            CurrentMeter::Virtual | CurrentMeter::Msp
+        ) {
+            values.push((
+                "current_meter",
+                format!(
+                    "`current_meter` is {}, which isn't simulated yet: the Flight Controller reads no current, so the OSD's current and mAh read blank",
+                    CurrentMeter::WORDS[self.current_meter.place() as usize]
+                ),
+            ));
+        }
+        values
+    }
+
+    /// The ticket that brings a value [`Tune::not_simulated_values`] names.
+    pub fn not_simulated_ticket(name: &str) -> &'static str {
+        match name {
+            "current_meter" => "#31",
+            _ => "#21",
         }
     }
 
@@ -635,6 +772,19 @@ impl Tune {
             u64::from(self.runaway_takeoff_prevention),
             u64::from(self.runaway_takeoff_deactivate_delay),
             u64::from(self.runaway_takeoff_deactivate_throttle_percent),
+            self.current_meter.place(),
+            u64::from(self.vbat_min_cell_voltage),
+            u64::from(self.vbat_max_cell_voltage),
+            u64::from(self.vbat_warning_cell_voltage),
+            u64::from(self.vbat_full_cell_voltage),
+            u64::from(self.force_battery_cell_count),
+            u64::from(self.vbat_hysteresis),
+            u64::from(self.vbat_detect_cell_voltage),
+            u64::from(self.use_vbat_alerts),
+            u64::from(self.vbat_display_lpf_period),
+            u64::from(self.ibat_lpf_period),
+            u64::from(self.vbat_duration_for_warning),
+            u64::from(self.vbat_duration_for_critical),
             u64::from(self.rx_min_usec),
             u64::from(self.rx_max_usec),
             u64::from(self.failsafe_delay),
@@ -700,7 +850,9 @@ impl Tune {
                 MotorProtocol::Dshot300 => 1,
                 MotorProtocol::Dshot600 => 2,
             },
+            u64::from(self.dshot_bidir),
             u64::from(self.motor_idle),
+            u64::from(self.motor_poles),
             u64::from(self.yaw_motors_reversed),
             match self.mixer_type {
                 MixerType::Legacy => 0,

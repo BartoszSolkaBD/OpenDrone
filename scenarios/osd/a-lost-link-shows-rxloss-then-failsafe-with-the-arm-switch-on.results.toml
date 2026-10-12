@@ -1,0 +1,64 @@
+# Results of a-lost-link-shows-rxloss-then-failsafe-with-the-arm-switch-on.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A lost Radio Link with the Arm switch on shows RXLOSS, then FAILSAFE and RXLOSS in turn, and the Flight Mode reads !FS!"
+
+[[expect]]
+what     = "warnings reads RXLOSS, first over 1 s to 2 s"
+basis    = "Source"
+expected = "between 0.146 s and 0.2296 s"
+measured = "0.167 s"
+
+[[expect]]
+what     = "warnings blinks at 1.5 s"
+basis    = "Source"
+expected = "no"
+measured = "no"
+
+[[expect]]
+what     = "warnings reads FAIL SAFE, first over 1 s to 4 s"
+basis    = "Source"
+expected = "never"
+measured = "never"
+
+[[expect]]
+what     = "warnings reads FAILSAFE, first over 2 s to 3 s"
+basis    = "Source"
+expected = "between 0.497 s and 1.0917 s"
+measured = "0.917 s"
+
+[[expect]]
+what     = "warnings reads RXLOSS, first over 3 s to 4 s"
+basis    = "Source"
+expected = "between 0.417 s and 0.5917 s"
+measured = "0.500 s"
+
+[[expect]]
+what     = "Flight Mode reads !FS!, first over 1 s to 3 s"
+basis    = "Source"
+expected = "between 1.497 s and 1.5917 s"
+measured = "1.50 s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "943169a834404ac3"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "3d027541506ce60a"   # the whole state after each of 32000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.4 s" = "ccf2533f6a46d20b"
+"0.8 s" = "752e9921a8153b3c"
+"1.2 s" = "3f5124562c758816"
+"1.6 s" = "784fce437a7eab34"
+"2 s" = "d331919495a95f6c"
+"2.4 s" = "8970e7e1d08e6339"
+"2.8 s" = "e0a17c80af2b0e03"
+"3.2 s" = "dab33c814d9d5f4b"
+"3.6 s" = "5197f75c68be31f6"
+"4 s" = "247f7e44d77f7569"

@@ -1,0 +1,103 @@
+# What the OSD shows of the Crash Flip switch and of arming, as Betaflight
+# 2026.6.2's OSD shows them (src/main/osd/osd_warnings.c and osd.c, #31 §1):
+#
+# - Disarmed with the Crash Flip switch on: CRASHFLIP SW, which doesn't
+#   blink, and DISARMED.
+# - Arming: ARMED alone in the middle of the screen for 0.5 s
+#   (osdShowArmed), here with >CRASH FLIP< under it, since the Quad armed
+#   with the Crash Flip switch on.
+# - Then, armed in Crash Flip, the warnings read >CRASH FLIP<.
+#
+# The Flight Controller alone, level and disarmed at the start (crash-flip-
+# switch.toml): it arms on the frame after the Arm switch goes on, here at
+# 1.004 s. The OSD redraws at the first loop at or after each 83,333 µs: the
+# one at 1.083375 s shows ARMED, until the first redraw at or after
+# 1.583375 s.
+format = 2
+name   = "Disarmed with the Crash Flip switch on reads CRASHFLIP SW, and arming reads ARMED for 0.5 s"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
+  { at = "0.2 s", crash_flip = "on" },
+  { at = "1 s",   arm = "on" },
+]
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "warnings"
+at    = "0.9 s"
+value = "CRASHFLIP SW"
+basis = "source: renderOsdWarning: the Crash Flip switch on while disarmed reads CRASHFLIP SW"
+
+[[osd.expect]]
+what  = "warnings blinks"
+at    = "0.9 s"
+value = "no"
+basis = "source: renderOsdWarning: CRASHFLIP SW doesn't blink"
+
+[[osd.expect]]
+what  = "disarmed"
+at    = "0.9 s"
+value = "DISARMED"
+basis = "source: osdElementDisarmed: DISARMED while disarmed"
+
+[[osd.expect]]
+what  = "message"
+over  = "1 s to 1.2 s"
+reads = "ARMED / >CRASH FLIP<"
+first = "between 0.004125 s and 0.0876 s"
+basis = "source: osdProcessStats1 and osdShowArmed: the first redraw that finds the Quad armed (from 1.004125 s) clears the screen and writes ARMED, with >CRASH FLIP< under it in Crash Flip"
+
+[[osd.expect]]
+what  = "message"
+at    = "1.5 s"
+value = "ARMED / >CRASH FLIP<"
+basis = "source: osdShowArmed holds the screen for 0.5 s (REFRESH_1S / 2)"
+
+[[osd.expect]]
+what  = "message"
+over  = "1.5 s to 1.7 s"
+reads = "(blank)"
+first = "between 0.0834 s and 0.1677 s"
+basis = "source: osdProcessStats2: the first redraw at or after 0.5 s past ARMED's (1.083375 s) brings the elements back"
+
+[[osd.expect]]
+what  = "warnings"
+at    = "1.7 s"
+value = ">CRASH FLIP<"
+basis = "source: renderOsdWarning: armed in Crash Flip with its switch on reads >CRASH FLIP< (CRASHFLIP_WARNING)"
+
+[[osd.expect]]
+what  = "disarmed"
+at    = "1.7 s"
+value = "(blank)"
+basis = "source: osdElementDisarmed: nothing while armed"
