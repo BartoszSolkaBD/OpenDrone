@@ -25,6 +25,12 @@
 //!   going off before it can arm again) ([ADR-0017], [`arming`]);
 //! - the Radio Link's loss and Failsafe, flying DROP ([`failsafe`]);
 //! - the PID loop with Betaflight's scaling, I limit and PID-sum limits;
+//! - the gyro's, the D term's and yaw P's low-pass filters, static or
+//!   following the throttle (`gyro_filter`, `pid`, `filter`);
+//! - Betaflight's detection of the Packet Rate from the frames' timing, and
+//!   RC smoothing tuned to it (`rc_smoothing`);
+//! - feedforward, with boost, averaging, jitter attenuation, the max-rate
+//!   limit, transition and yaw hold (`feedforward`);
 //! - the Legacy mixer with Airmode always on, motor idle and the motor output
 //!   limit;
 //! - Crash Flip, which spins the motors backwards straight from the sticks
@@ -36,9 +42,8 @@
 //! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
 //!   a 2026.6 Tune, and the pilot's pasted Rates and `aux` switches.
 //!
-//! The filters, RC smoothing and feedforward (#49), the rest of the loop
-//! shaping (#50), Angle and Horizon (#51), the OSD paste and the OSD logic
-//! (#59) arrive with their tickets.
+//! The rest of the loop shaping (#50), Angle and Horizon (#51), the OSD
+//! paste and the OSD logic (#59) arrive with their tickets.
 //!
 //! # Power-up
 //!
@@ -46,7 +51,9 @@
 //! the link settled, and Betaflight's own waits skipped (its 1.25 s gyro
 //! calibration, its 5 s arming grace and its 5 s wait before Failsafe
 //! watches the link). In their place, arming waits for the ESCs' ready beep
-//! (`BOOTGRACE`, #32 §4).
+//! (`BOOTGRACE`, #32 §4). Its filters are settled too: the detected Packet
+//! Rate is the Radio Link's, with RC smoothing and feedforward tuned to it,
+//! and each low-pass starts as if its first input had held since power-up.
 //!
 //! # One loop
 //!
@@ -67,13 +74,21 @@
 //!    it arms; the sticks become commands, and the Rates turn them into each
 //!    axis's setpoint; the arming checks run, and the Crash Flip switch going
 //!    off disarms.
-//! 4. Yaw spin recovery watches the gyro's yaw rate.
-//! 5. The PID loop compares each setpoint with the gyro; then runaway
-//!    takeoff prevention checks the PID sums.
-//! 6. The mixer turns the PID sums and the throttle into four motor
+//!    With the Channels, the frame's gap is timed for the detected Packet
+//!    Rate.
+//! 4. The gyro reading passes through its low-passes.
+//! 5. If the Channels were worked out again, the detected Packet Rate moves
+//!    on (retuning RC smoothing and feedforward every third frame that
+//!    counts) and feedforward is worked out for the frame. Then RC smoothing
+//!    takes a step on the setpoints, the throttle and feedforward.
+//! 6. Yaw spin recovery watches the filtered gyro's yaw rate.
+//! 7. The PID loop compares each smoothed setpoint with the filtered gyro;
+//!    then runaway takeoff prevention checks the PID sums.
+//! 8. The mixer turns the PID sums and the smoothed throttle into four motor
 //!    commands, or in Crash Flip the sticks do; a spin direction command
 //!    queued by arming or disarming goes out in their place
-//!    ([`dshot_command`]).
+//!    ([`dshot_command`]). Outside Crash Flip, the mixer's throttle then
+//!    moves the dynamic low-passes for the next loop.
 //!
 //! # Directions
 //!
@@ -112,9 +127,13 @@ mod channels;
 pub mod cli;
 pub mod dshot_command;
 pub mod failsafe;
+mod feedforward;
+mod filter;
+mod gyro_filter;
 mod mixer;
 mod pid;
 pub mod rates;
+mod rc_smoothing;
 mod receiver;
 mod runaway;
 pub mod tune;
@@ -125,8 +144,11 @@ use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotRates, Vec3};
 use arming::Arming;
 use dshot_command::DshotCommands;
 use failsafe::{Failsafe, Receiver};
+use feedforward::{Feedforward, FeedforwardFrame};
+use gyro_filter::{DynamicThrottle, GyroFilters};
 use mixer::CrashFlipInputs;
 use pid::Pid;
+use rc_smoothing::{PacketRate, RcSmoothing};
 use receiver::RcCommand;
 use runaway::Runaway;
 use yaw_spin::YawSpin;
@@ -138,7 +160,8 @@ pub use mixer::{DSHOT_HIGHEST, DSHOT_LOWEST};
 pub use pid::Terms;
 pub use rates::{Axis, AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use tune::{
-    FailsafeProcedure, Gains, MixerType, MotorProtocol, Tune, TuneProblems, YawSpinRecovery,
+    FailsafeProcedure, FeedforwardAveraging, Gains, LowpassType, MixerType, MotorProtocol, Tune,
+    TuneProblems, YawSpinRecovery,
 };
 
 /// What a real board's sensors read, which is all the Flight Controller
@@ -202,14 +225,30 @@ pub struct DebugRecord {
     pub arming_blocks: ArmingBlocks,
     pub failsafe: FailsafeReadings,
     /// Each axis's setpoint, in Betaflight's axes and °/s: roll right, pitch
-    /// nose down, yaw nose left positive.
+    /// nose down, yaw nose left positive. This is the newest frame's, before
+    /// any smoothing (Betaflight's `rawSetpoint`).
     pub setpoint: [f64; 3],
-    /// The gyro, in Betaflight's axes and °/s.
+    /// Each axis's setpoint as the PID loop uses it: after RC smoothing,
+    /// when it's on (`getSetpointRate`). In the same axes and °/s.
+    pub smoothed_setpoint: [f64; 3],
+    /// The gyro as the sensor reads it, in Betaflight's axes and °/s
+    /// (Blackbox's `gyroUnfilt`).
     pub gyro: [f64; 3],
+    /// The gyro after its low-passes, which every part of the Flight
+    /// Controller reads, in the same axes and °/s (Blackbox's `gyroADC`).
+    pub filtered_gyro: [f64; 3],
+    /// The Packet Rate the Flight Controller has detected from the frames'
+    /// timing, in Hz (Betaflight's `rc_smoothing_info`, "Detected Rx
+    /// frequency").
+    pub detected_packet_rate: f64,
+    /// RC smoothing's cutoffs in use, in whole Hz: the setpoints' and
+    /// feedforward's, then the throttle's (`rc_smoothing_info`); `None` with
+    /// RC smoothing off.
+    pub rc_smoothing_cutoffs: Option<[u16; 2]>,
     /// Each axis's P, I, D and F terms and their sum, on Betaflight's scale
     /// (1000 is the whole motor range). I is the one the sum used.
     pub terms: [Terms; 3],
-    /// The mixer's throttle, from 0 to 1.
+    /// The mixer's throttle, from 0 to 1, after RC smoothing.
     pub throttle: f64,
     /// The four motor commands, in Betaflight's motor order.
     pub motors: [MotorCommand; 4],
@@ -251,7 +290,15 @@ pub struct FlightController {
     /// The stick commands, or `None` before the Channels were first worked
     /// out.
     command: Option<RcCommand>,
+    /// Each axis's setpoint from the newest frame, before smoothing.
     setpoint: [f64; 3],
+    /// The detected Packet Rate, RC smoothing and feedforward.
+    packet_rate: PacketRate,
+    rc_smoothing: RcSmoothing,
+    feedforward: Feedforward,
+    /// The gyro's low-passes, and when the dynamic ones last moved.
+    gyro_filters: GyroFilters,
+    dynamic_throttle: DynamicThrottle,
     arming: Arming,
     /// Airmode's start: the throttle passed its threshold since arming.
     throttle_raised: bool,
@@ -273,18 +320,25 @@ impl FlightController {
     /// A "fresh" Flight Controller, as right after power-up with Betaflight's
     /// own waits skipped: I empty, no frame yet but the link settled, and the
     /// D term's memory starting from the current sensor readings. `loop_hz`
-    /// is how many loops a second it runs, one per physics step. `armed`
-    /// starts it armed, as a mid-air start does; disarmed, `BOOTGRACE` holds
-    /// until the sensor readings say the ESCs are ready.
+    /// is how many loops a second it runs, one per physics step;
+    /// `packet_rate_hz` is the Radio Link's Packet Rate, which it has
+    /// detected and tuned RC smoothing and feedforward to. `armed` starts it
+    /// armed, as a mid-air start does; disarmed, `BOOTGRACE` holds until the
+    /// sensor readings say the ESCs are ready.
     pub fn new(
         tune: Tune,
         rates: Rates,
         loop_hz: u32,
+        packet_rate_hz: u32,
         armed: bool,
         readings: &SensorReadings,
     ) -> FlightController {
         let gyro = degrees(readings.gyro);
         let pid = Pid::new(&tune, loop_hz, gyro);
+        let packet_rate = PacketRate::settled(packet_rate_hz);
+        let rc_smoothing = RcSmoothing::new(&tune, loop_hz, packet_rate.detected_hz);
+        let feedforward = Feedforward::new(&tune, &rates, packet_rate.detected_hz);
+        let gyro_filters = GyroFilters::new(&tune, loop_hz);
         let throttle_lookup = receiver::throttle_lookup(&rates);
         let arming = Arming::new(armed);
         let receiver = Receiver::at_power_up(&tune);
@@ -296,7 +350,11 @@ impl FlightController {
                 arming_blocks: arming.blocks,
                 failsafe: failsafe_readings(&failsafe, &receiver),
                 setpoint: [0.0; 3],
+                smoothed_setpoint: [0.0; 3],
                 gyro,
+                filtered_gyro: gyro,
+                detected_packet_rate: packet_rate.detected_hz,
+                rc_smoothing_cutoffs: cutoffs(&rc_smoothing),
                 terms: [Terms::default(); 3],
                 throttle: 0.0,
                 motors: [stopped(); 4],
@@ -313,6 +371,11 @@ impl FlightController {
             failsafe,
             command: None,
             setpoint: [0.0; 3],
+            packet_rate,
+            rc_smoothing,
+            feedforward,
+            gyro_filters,
+            dynamic_throttle: DynamicThrottle::new(),
             arming,
             throttle_raised: false,
             stabilising: false,
@@ -365,11 +428,16 @@ impl FlightController {
         if changed {
             self.receive(now_us, readings);
         }
-        let gyro = degrees(readings.gyro);
+        let unfiltered = degrees(readings.gyro);
+        let gyro = self.gyro_filters.apply(unfiltered);
+        self.process_sticks(changed);
+        let smoothed = self.rc_smoothing.smoothed;
+        let smoothed_setpoint = [smoothed[0], smoothed[1], smoothed[2]];
         self.yaw_spin.check(gyro[2], now_us);
         self.pid.step(
-            self.setpoint,
+            smoothed_setpoint,
             gyro,
+            self.rc_smoothing.feedforward_smoothed,
             self.stabilising,
             self.reset_iterm,
             self.yaw_spin.active,
@@ -395,12 +463,11 @@ impl FlightController {
             }
             _ => {}
         }
-        let throttle_command = self.command.map_or(receiver::RANGE_MIN, |c| c.throttle);
         let mixed = mixer::mix(
             &self.tune,
             &self.rates,
             sums,
-            throttle_command,
+            smoothed[3],
             self.arming.armed,
             self.yaw_spin.active,
         );
@@ -416,6 +483,14 @@ impl FlightController {
             mixer::crash_flip(&self.tune, inputs, &mut self.tilt_at_start)
         } else {
             self.tilt_at_start = None;
+            // Betaflight's mixer moves the dynamic low-passes, except in
+            // Crash Flip, which skips the rest of the mixer.
+            if let Some(throttle) =
+                self.dynamic_throttle
+                    .after_mixing(now_us, mixed.throttle, &mut self.gyro_filters)
+            {
+                self.pid.follow(throttle);
+            }
             mixed.dshot
         };
         let (sent, direction) = self.dshot.output(dshot);
@@ -425,7 +500,11 @@ impl FlightController {
             arming_blocks: self.arming.blocks,
             failsafe: failsafe_readings(&self.failsafe, &self.receiver),
             setpoint: self.setpoint,
-            gyro,
+            smoothed_setpoint,
+            gyro: unfiltered,
+            filtered_gyro: gyro,
+            detected_packet_rate: self.packet_rate.detected_hz,
+            rc_smoothing_cutoffs: cutoffs(&self.rc_smoothing),
             terms: self.pid.terms,
             throttle: mixed.throttle,
             motors,
@@ -453,6 +532,7 @@ impl FlightController {
         } else {
             self.failsafe.bad_channels(now_ms, &mut self.arming.blocks);
         }
+        self.packet_rate.frame_check(now_us, self.receiver.signal);
         let rc = self.receiver.data;
         let throttle_active = !rc.throttle_low(&self.tune);
         let airmode_active = if self.arming.armed {
@@ -509,6 +589,38 @@ impl FlightController {
         self.command = Some(command);
     }
 
+    /// Betaflight's work on the sticks each loop (`processRcCommand`): when
+    /// the Channels were worked out again, the detected Packet Rate moves on,
+    /// retuning RC smoothing and feedforward every third frame that counts,
+    /// and feedforward is worked out for the frame; then RC smoothing takes a
+    /// step.
+    fn process_sticks(&mut self, changed: bool) {
+        let newest = match (changed, self.command) {
+            (true, Some(command)) => {
+                if self.packet_rate.retune(self.receiver.signal) {
+                    let detected = self.packet_rate.detected_hz;
+                    self.feedforward.retune(detected);
+                    self.rc_smoothing.set_cutoffs(detected);
+                }
+                self.feedforward.frame(&FeedforwardFrame {
+                    sticks: command.sticks,
+                    setpoints: self.setpoint,
+                    deflections: Axis::ALL.map(|axis| command.deflection(&self.tune, axis).abs()),
+                    gap: self.packet_rate.gap_us as f64 * 1e-6,
+                    rate_hz: self.packet_rate.rate_hz,
+                });
+                Some([
+                    self.setpoint[0],
+                    self.setpoint[1],
+                    self.setpoint[2],
+                    command.throttle as f64,
+                ])
+            }
+            _ => None,
+        };
+        self.rc_smoothing.apply(newest, self.feedforward.raw);
+    }
+
     /// Where runaway takeoff prevention finds the Flight Controller now.
     fn runaway_moment(&self, now_us: u64) -> runaway::Moment {
         runaway::Moment {
@@ -531,6 +643,11 @@ impl FlightController {
             f.write_u64(command.throttle as u64);
         }
         f.write_f64s(&self.setpoint);
+        self.packet_rate.write_fingerprint(f);
+        self.rc_smoothing.write_fingerprint(f);
+        self.feedforward.write_fingerprint(f);
+        self.gyro_filters.write_fingerprint(f);
+        self.dynamic_throttle.write_fingerprint(f);
         self.arming.write_fingerprint(f);
         for flag in [self.throttle_raised, self.stabilising, self.reset_iterm] {
             f.write_u64(u64::from(flag));
@@ -554,6 +671,14 @@ impl FlightController {
             });
         }
     }
+}
+
+/// RC smoothing's cutoffs for the [`DebugRecord`].
+fn cutoffs(rc_smoothing: &RcSmoothing) -> Option<[u16; 2]> {
+    rc_smoothing.on().then_some([
+        rc_smoothing.setpoint_cutoff_hz,
+        rc_smoothing.throttle_cutoff_hz,
+    ])
 }
 
 fn failsafe_readings(failsafe: &Failsafe, receiver: &Receiver) -> FailsafeReadings {

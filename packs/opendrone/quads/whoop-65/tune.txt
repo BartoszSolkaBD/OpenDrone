@@ -40,24 +40,58 @@ set failsafe_recovery_delay = 10       # 4.3 default; tenths of a second
 set p_roll = 40                        # diff
 set i_roll = 64                        # diff
 set d_roll = 45                        # diff (was d_min_roll)
+set f_roll = 125                       # diff
 set p_pitch = 39                       # diff
 set i_pitch = 64                       # diff
 set d_pitch = 49                       # diff (was d_min_pitch)
+set f_pitch = 124                      # diff
 set p_yaw = 35                         # diff
 set i_yaw = 50                         # diff
 set d_yaw = 0                          # 4.3 default
+set f_yaw = 100                        # diff
+set feedforward_transition = 0         # 4.3 default
+set feedforward_averaging = 2_POINT    # diff
+set feedforward_smooth_factor = 25     # 4.3 default
+set feedforward_jitter_factor = 9      # diff
+set feedforward_boost = 15             # 4.3 default
+set feedforward_max_rate_limit = 90    # 4.3 default
 set motor_output_limit = 100           # 4.3 default; percent
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 4.3 default
 set iterm_windup = 80                  # ADR-0008; 4.3's iterm_limit 400 is 80% of pidsum_limit 500 (yaw's I limit becomes 320, was 400); the I limit, in percent of the PID-sum limit
 set pid_at_min_throttle = ON           # 4.3 default
+set feedforward_yaw_hold_gain = 0      # ADR-0008
+set feedforward_yaw_hold_time = 100    # 2026.6 default; ms
+
+# PID Tuning, filters
+set gyro_lpf1_type = PT1               # 4.3 default
+set gyro_lpf1_static_hz = 0            # diff; Hz; 0 is off
+set gyro_lpf1_dyn_min_hz = 287         # diff; Hz, at zero throttle; 0 is static
+set gyro_lpf1_dyn_max_hz = 575         # diff; Hz, at full throttle
+set gyro_lpf2_type = PT1               # 4.3 default
+set gyro_lpf2_static_hz = 575          # diff; Hz; 0 is off
+set dterm_lpf1_type = PT1              # 4.3 default
+set dterm_lpf1_static_hz = 82          # diff; Hz; 0 is off
+set dterm_lpf1_dyn_min_hz = 82         # diff; Hz, at zero throttle; 0 is static
+set dterm_lpf1_dyn_max_hz = 165        # diff; Hz, at full throttle
+set dterm_lpf2_type = PT1              # 4.3 default
+set dterm_lpf2_static_hz = 165         # diff; Hz; 0 is off
+# PID Tuning, filters, CLI only
+set gyro_lpf1_dyn_expo = 5             # 4.3 default
+set dterm_lpf1_dyn_expo = 5            # 4.3 default
+set yaw_lowpass_hz = 100               # 4.3 default; Hz; 0 is off
 
 # Receiver
 set min_check = 1050                   # 4.3 default; µs
 set mid_rc = 1500                      # 4.3 default; µs
 set deadband = 0                       # 4.3 default; µs
 set yaw_deadband = 0                   # 4.3 default; µs
+set rc_smoothing = ON                  # 4.3 default
+set rc_smoothing_auto_factor = 30      # 4.3 default
+set rc_smoothing_auto_factor_throttle = 30 # 4.3 default
+set rc_smoothing_setpoint_cutoff = 0   # 4.3 default; Hz; 0 is automatic
+set rc_smoothing_throttle_cutoff = 0   # 4.3 default; Hz; 0 is automatic
 # Receiver, CLI only
 set yaw_control_reversed = OFF         # 4.3 default
 set airmode_start_throttle_percent = 25 # 4.3 default
@@ -76,9 +110,6 @@ set crashflip_auto_rearm = OFF         # 2026.6 default
 # Not simulated yet. The Flight Controller checks these values but flies as
 # if each were off until its ticket lands (ADR-0015).
 # PID Tuning
-set f_roll = 125                       # diff; not simulated yet (#49)
-set f_pitch = 124                      # diff; not simulated yet (#49)
-set f_yaw = 100                        # diff; not simulated yet (#49)
 set d_max_roll = 48                    # diff (was d_roll); not simulated yet (#50)
 set d_max_pitch = 52                   # diff (was d_pitch); not simulated yet (#50)
 set d_max_yaw = 0                      # 4.3 default (was d_min_yaw); not simulated yet (#50)
@@ -88,16 +119,7 @@ set tpa_rate = 70                      # diff; not simulated yet (#50)
 set tpa_low_rate = 0                   # ADR-0008; not simulated yet (#50)
 set throttle_boost = 5                 # 4.3 default; not simulated yet (#50)
 # PID Tuning, filters
-set gyro_lpf1_static_hz = 0            # diff; not simulated yet (#49)
-set gyro_lpf1_dyn_min_hz = 287         # diff; not simulated yet (#49)
-set gyro_lpf2_static_hz = 575          # diff; not simulated yet (#49)
 set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)
-set dterm_lpf1_static_hz = 82          # diff; not simulated yet (#49)
-set dterm_lpf1_dyn_min_hz = 82         # diff; not simulated yet (#49)
-set dterm_lpf2_static_hz = 165         # diff; not simulated yet (#49)
-set yaw_lowpass_hz = 100               # 4.3 default; not simulated yet (#49)
-# Receiver
-set rc_smoothing = ON                  # 4.3 default; not simulated yet (#49)
 
 # Not simulated yet either: settings the Flight Controller doesn't know
 # yet, which later tickets read or the alpha leaves out.
@@ -106,12 +128,6 @@ set failsafe_switch_mode = STAGE1      # 4.3 default
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
 set failsafe_stick_threshold = 30      # 4.3 default; percent
 # PID Tuning
-set feedforward_transition = 0         # 4.3 default
-set feedforward_averaging = 2_POINT    # diff
-set feedforward_smooth_factor = 25     # 4.3 default
-set feedforward_jitter_factor = 9      # diff
-set feedforward_boost = 15             # 4.3 default
-set feedforward_max_rate_limit = 90    # 4.3 default
 set d_max_gain = 37                    # 4.3 default
 set d_max_advance = 7                  # ADR-0008; 4.3's stick boost: d_max_gain 37 × d_max_advance 20 ÷ 100
 set iterm_relax_type = SETPOINT        # 4.3 default
@@ -121,8 +137,6 @@ set tpa_breakpoint = 1350              # 4.3 default; µs
 set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
 set angle_limit = 55                   # 4.3 default (was level_limit); degrees
 set horizon_level_strength = 50        # 4.3 default
-set feedforward_yaw_hold_gain = 0      # ADR-0008
-set feedforward_yaw_hold_time = 100    # 2026.6 default; ms
 set anti_gravity_cutoff_hz = 5         # 2026.6 default; Hz
 set anti_gravity_p_gain = 100          # 2026.6 default
 set tpa_low_breakpoint = 1050          # 2026.6 default; µs
@@ -136,22 +150,9 @@ set horizon_limit_degrees = 135        # 2026.6 default; degrees
 set horizon_ignore_sticks = OFF        # 2026.6 default
 set horizon_delay_ms = 500             # 2026.6 default; ms
 # PID Tuning, filters
-set gyro_lpf1_type = PT1               # 4.3 default
-set gyro_lpf1_dyn_max_hz = 575         # diff; Hz
-set gyro_lpf2_type = PT1               # 4.3 default
 set dyn_notch_q = 350                  # diff
 set dyn_notch_min_hz = 130             # diff; Hz
 set dyn_notch_max_hz = 600             # 4.3 default; Hz
-set dterm_lpf1_type = PT1              # 4.3 default
-set dterm_lpf1_dyn_max_hz = 165        # diff; Hz
-set dterm_lpf2_type = PT1              # 4.3 default
-set gyro_lpf1_dyn_expo = 5             # 4.3 default
-set dterm_lpf1_dyn_expo = 5            # 4.3 default
-# Receiver
-set rc_smoothing_auto_factor = 30      # 4.3 default
-set rc_smoothing_auto_factor_throttle = 30 # 4.3 default
-set rc_smoothing_setpoint_cutoff = 0   # 4.3 default; Hz; 0 is automatic
-set rc_smoothing_throttle_cutoff = 0   # 4.3 default; Hz; 0 is automatic
 # Blackbox
 set blackbox_sample_rate = 1/2         # diff
 

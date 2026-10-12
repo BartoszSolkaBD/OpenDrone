@@ -86,20 +86,21 @@ fn endpoints(tune: &Tune) -> (f64, f64) {
     (output_low, output_high)
 }
 
-/// Mixes one loop's PID sums and throttle command into four DShot values.
-/// `yaw_spin` is true during yaw spin recovery.
+/// Mixes one loop's PID sums and throttle command (in µs, from 1000 to 2000,
+/// after RC smoothing) into four DShot values. `yaw_spin` is true during yaw
+/// spin recovery.
 pub(crate) fn mix(
     tune: &Tune,
     rates: &Rates,
     pid_sums: [f64; 3],
-    throttle_command: i64,
+    throttle_command: f64,
     armed: bool,
     yaw_spin: bool,
 ) -> Mixed {
     let (output_low, output_high) = endpoints(tune);
 
     // The throttle, from 0 to 1, then the pilot's throttle limit.
-    let mut throttle = ((throttle_command - 1000) as f64 / 1000.0).clamp(0.0, 1.0);
+    let mut throttle = constrain((throttle_command - 1000.0) / 1000.0, 0.0, 1.0);
     if rates.throttle_limit_type != ThrottleLimitType::Off && rates.throttle_limit_percent < 100 {
         let factor = f64::from(rates.throttle_limit_percent) / 100.0;
         throttle = match rates.throttle_limit_type {

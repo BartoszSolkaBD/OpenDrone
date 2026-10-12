@@ -16,8 +16,7 @@
 //! - `ON`: the Tune's `yaw_spin_threshold`.
 //! - `OFF`: never.
 //!
-//! Betaflight watches its filtered gyro; until the filters arrive (#49) this
-//! one watches the gyro as the sensor reads it. A hit is the only thing that
+//! It watches the filtered gyro, as Betaflight does. A hit is the only thing that
 //! spins a Quad this fast: the gyro reads up to ±2000 °/s, and Betaflight's
 //! check for a gyro overflowing its range is off on the gyros both alpha
 //! Quads carry (`gyroHasOverflowProtection`, `gyro_init.c`).

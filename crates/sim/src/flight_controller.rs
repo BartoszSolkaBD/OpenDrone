@@ -9,7 +9,7 @@ use opendrone_maths::Fingerprinter;
 use opendrone_physics::{MotorCommand, MotorCommands, QuadState, SpinDirection, gyro_reading};
 
 use crate::auto_arm::AutoArm;
-use crate::{FlightControllerSeam, PhysicsRate, SimulationTime};
+use crate::{FlightControllerSeam, PacketRate, PhysicsRate, SimulationTime};
 
 /// What the sensors read from a Quad's state: the gyro (its true rotation,
 /// with no noise, each axis clipped at the board's range, `gyro_range` in
@@ -31,22 +31,26 @@ pub fn sensor_readings(state: &QuadState, escs_ready: bool, gyro_range: f64) -> 
 pub struct OurFlightController {
     flight_controller: FlightController,
     loop_hz: u32,
+    /// The Radio Link's Packet Rate, which a fresh Flight Controller has
+    /// settled to.
+    packet_rate: PacketRate,
     /// Auto-arm, when the pilot has it on.
     auto_arm: Option<AutoArm>,
 }
 
 impl OurFlightController {
-    /// A "fresh" Flight Controller for a Quad starting in `start`, looping
-    /// once per physics step, armed or not, with Auto-arm on or off; its
-    /// board's gyro reads up to ± `gyro_range` (rad/s).
+    /// A "fresh" Flight Controller for a Quad whose sensors read `start`
+    /// ([`sensor_readings`]), looping once per physics step, its RC smoothing
+    /// and feedforward settled to the Radio Link's `packet_rate`, armed or
+    /// not, with Auto-arm on or off.
     pub fn new(
         tune: Tune,
         rates: Rates,
         physics_rate: PhysicsRate,
+        packet_rate: PacketRate,
         armed: bool,
         auto_arm: bool,
-        start: &QuadState,
-        gyro_range: f64,
+        start: &SensorReadings,
     ) -> OurFlightController {
         // Only the gyro is read here, for the D term's memory: the ESCs are
         // read every loop.
@@ -55,10 +59,12 @@ impl OurFlightController {
                 tune,
                 rates,
                 physics_rate.hz(),
+                packet_rate.hz(),
                 armed,
-                &sensor_readings(start, false, gyro_range),
+                start,
             ),
             loop_hz: physics_rate.hz(),
+            packet_rate,
             auto_arm: auto_arm.then(|| AutoArm::new(armed)),
         }
     }
@@ -87,13 +93,15 @@ impl FlightControllerSeam for OurFlightController {
         }))
     }
 
-    /// A fresh Flight Controller, disarmed, with the same Tune and Rates;
-    /// Auto-arm waits for a raise from low again.
+    /// A fresh Flight Controller, disarmed, with the same Tune and Rates,
+    /// settled to the same Packet Rate; Auto-arm waits for a raise from low
+    /// again.
     fn power_up(&mut self, readings: &SensorReadings) {
         self.flight_controller = FlightController::new(
             self.flight_controller.tune().clone(),
             self.flight_controller.rates().clone(),
             self.loop_hz,
+            self.packet_rate.hz(),
             false,
             readings,
         );

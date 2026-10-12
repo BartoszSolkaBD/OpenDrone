@@ -29,12 +29,10 @@
 //! A row is written into a Tune under its [`Place`] once the Flight
 //! Controller reads it ([`crate::Tune::settings`]); until then the importer
 //! keeps it under "Not simulated yet" when the export sets it. The table also
-//! holds rows for the settings the next Flight Controller tickets read (#49
-//! filters, RC smoothing and feedforward; #50 anti-gravity, I-term relax, TPA,
-//! Dynamic D and throttle boost; #51 Angle and Horizon; #52 Failsafe; #54
-//! Crash Flip and yaw spin recovery), so their Tunes come out of the importer
-//! as soon as the Flight Controller reads them; those tickets check their
-//! rows.
+//! holds rows for the settings the next Flight Controller tickets read (#50
+//! anti-gravity, I-term relax, TPA, Dynamic D and throttle boost; #51 Angle
+//! and Horizon; #52 Failsafe), so their Tunes come out of the importer as soon
+//! as the Flight Controller reads them; those tickets check their rows.
 //!
 //! [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
 
@@ -336,8 +334,8 @@ pub const SETTINGS: &[Setting] = &[
     // PID Tuning, filters
     all("gyro_lpf1_type", Filters, "", "PT1"),
     all("gyro_lpf1_static_hz", Filters, "Hz; 0 is off", "250"),
-    all("gyro_lpf1_dyn_min_hz", Filters, "Hz; 0 is off", "250"),
-    all("gyro_lpf1_dyn_max_hz", Filters, "Hz", "500"),
+    all("gyro_lpf1_dyn_min_hz", Filters, "Hz, at zero throttle; 0 is static", "250"),
+    all("gyro_lpf1_dyn_max_hz", Filters, "Hz, at full throttle", "500"),
     all("gyro_lpf2_type", Filters, "", "PT1"),
     all("gyro_lpf2_static_hz", Filters, "Hz; 0 is off", "500"),
     // The dynamic notch isn't in the alpha: it waits for gyro noise (#21).
@@ -348,8 +346,8 @@ pub const SETTINGS: &[Setting] = &[
     all("dyn_notch_max_hz", Filters, "Hz", "600"),
     all("dterm_lpf1_type", Filters, "", "PT1"),
     all("dterm_lpf1_static_hz", Filters, "Hz; 0 is off", "75"),
-    all("dterm_lpf1_dyn_min_hz", Filters, "Hz; 0 is off", "75"),
-    all("dterm_lpf1_dyn_max_hz", Filters, "Hz", "150"),
+    all("dterm_lpf1_dyn_min_hz", Filters, "Hz, at zero throttle; 0 is static", "75"),
+    all("dterm_lpf1_dyn_max_hz", Filters, "Hz, at full throttle", "150"),
     all("dterm_lpf2_type", Filters, "", "PT1"),
     all("dterm_lpf2_static_hz", Filters, "Hz; 0 is off", "150"),
     all("gyro_lpf1_dyn_expo", FiltersCli, "", "5"),

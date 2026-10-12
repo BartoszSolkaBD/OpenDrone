@@ -50,10 +50,13 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
         [
             "test/freestyle-5-bench-supply",
             "test/freestyle-5-crash-flip-settings",
+            "test/freestyle-5-feedforward-transition",
             "test/freestyle-5-filters-and-shaping-off",
+            "test/freestyle-5-loop-shaping-off",
             "test/freestyle-5-no-drag",
             "test/freestyle-5-no-prop-wash",
             "test/freestyle-5-no-runaway-takeoff-prevention",
+            "test/freestyle-5-other-low-pass-kinds",
             "test/freestyle-5-output-limit-80",
             "test/whoop-65-bench-supply",
             "test/whoop-65-body-drag-only",
@@ -235,7 +238,10 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     // failsafe_throttle and failsafe_recovery_delay; src/main/sensors/gyro.c
     // for yaw_spin_recovery and yaw_spin_threshold; src/main/flight/pid.c
     // pidConfig for runaway takeoff prevention; src/main/flight/mixer_init.c
-    // for the crashflip_* settings).
+    // for the crashflip_* settings; src/main/flight/pid.h and pid.c
+    // resetPidProfile for the F gains, feedforward, the D-term low-passes and
+    // the yaw P low-pass; src/main/sensors/gyro.h and gyro.c for the gyro
+    // low-passes; src/main/pg/rx.c for RC smoothing).
     const DEFAULTS: &[(&str, &str)] = &[
         ("small_angle", "25"),
         ("yaw_spin_recovery", "AUTO"),
@@ -252,21 +258,52 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("p_roll", "45"),
         ("i_roll", "80"),
         ("d_roll", "30"),
+        ("f_roll", "120"),
         ("p_pitch", "47"),
         ("i_pitch", "84"),
         ("d_pitch", "34"),
+        ("f_pitch", "125"),
         ("p_yaw", "45"),
         ("i_yaw", "80"),
         ("d_yaw", "0"),
+        ("f_yaw", "120"),
+        ("feedforward_transition", "0"),
+        ("feedforward_averaging", "2_POINT"),
+        ("feedforward_smooth_factor", "65"),
+        ("feedforward_jitter_factor", "7"),
+        ("feedforward_boost", "15"),
+        ("feedforward_max_rate_limit", "90"),
         ("motor_output_limit", "100"),
         ("pidsum_limit", "500"),
         ("pidsum_limit_yaw", "400"),
         ("iterm_windup", "80"),
         ("pid_at_min_throttle", "ON"),
+        ("feedforward_yaw_hold_gain", "15"),
+        ("feedforward_yaw_hold_time", "100"),
+        ("gyro_lpf1_type", "PT1"),
+        ("gyro_lpf1_static_hz", "250"),
+        ("gyro_lpf1_dyn_min_hz", "250"),
+        ("gyro_lpf1_dyn_max_hz", "500"),
+        ("gyro_lpf2_type", "PT1"),
+        ("gyro_lpf2_static_hz", "500"),
+        ("dterm_lpf1_type", "PT1"),
+        ("dterm_lpf1_static_hz", "75"),
+        ("dterm_lpf1_dyn_min_hz", "75"),
+        ("dterm_lpf1_dyn_max_hz", "150"),
+        ("dterm_lpf2_type", "PT1"),
+        ("dterm_lpf2_static_hz", "150"),
+        ("gyro_lpf1_dyn_expo", "5"),
+        ("dterm_lpf1_dyn_expo", "5"),
+        ("yaw_lowpass_hz", "100"),
         ("min_check", "1050"),
         ("mid_rc", "1500"),
         ("deadband", "0"),
         ("yaw_deadband", "0"),
+        ("rc_smoothing", "ON"),
+        ("rc_smoothing_auto_factor", "30"),
+        ("rc_smoothing_auto_factor_throttle", "30"),
+        ("rc_smoothing_setpoint_cutoff", "0"),
+        ("rc_smoothing_throttle_cutoff", "0"),
         ("yaw_control_reversed", "OFF"),
         ("airmode_start_throttle_percent", "25"),
         ("motor_pwm_protocol", "DSHOT600"),
@@ -305,15 +342,9 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
 #[test]
 fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
     // Basis: Source (Betaflight 2026.6.2's defaults: src/main/flight/pid.h and
-    // pid.c resetPidProfile for the F gains, D max, I-term relax,
-    // anti-gravity, TPA, throttle boost, the D-term low-passes and the yaw P
-    // low-pass; src/main/sensors/gyro.h and gyro.c for the gyro low-passes;
-    // src/main/pg/dyn_notch.c for the dynamic notch; src/main/pg/rx.c for RC
-    // smoothing).
+    // pid.c resetPidProfile for D max, I-term relax, anti-gravity, TPA and
+    // throttle boost; src/main/pg/dyn_notch.c for the dynamic notch).
     const DEFAULTS: &[(&str, &str)] = &[
-        ("f_roll", "120"),
-        ("f_pitch", "125"),
-        ("f_yaw", "120"),
         ("d_max_roll", "40"),
         ("d_max_pitch", "46"),
         ("d_max_yaw", "0"),
@@ -322,15 +353,7 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
         ("tpa_rate", "65"),
         ("tpa_low_rate", "20"),
         ("throttle_boost", "5"),
-        ("gyro_lpf1_static_hz", "250"),
-        ("gyro_lpf1_dyn_min_hz", "250"),
-        ("gyro_lpf2_static_hz", "500"),
         ("dyn_notch_count", "3"),
-        ("dterm_lpf1_static_hz", "75"),
-        ("dterm_lpf1_dyn_min_hz", "75"),
-        ("dterm_lpf2_static_hz", "150"),
-        ("yaw_lowpass_hz", "100"),
-        ("rc_smoothing", "ON"),
     ];
     let five = quad("opendrone/freestyle-5");
     let later = opendrone_flight_controller::Tune::not_simulated_yet();
@@ -356,6 +379,9 @@ fn the_freestyle_5_test_quads_for_the_flight_controller_switch_off_what_isnt_sim
     for id in [
         "test/freestyle-5-filters-and-shaping-off",
         "test/freestyle-5-output-limit-80",
+        "test/freestyle-5-loop-shaping-off",
+        "test/freestyle-5-other-low-pass-kinds",
+        "test/freestyle-5-feedforward-transition",
     ] {
         let test_quad = quad(id);
         for (name, _) in opendrone_flight_controller::Tune::not_simulated_yet() {
@@ -369,6 +395,27 @@ fn the_freestyle_5_test_quads_for_the_flight_controller_switch_off_what_isnt_sim
     }
     let limited = quad("test/freestyle-5-output-limit-80");
     assert_eq!(limited.tune.settings["motor_output_limit"].value, "80");
+    // Both also switch off the filters, RC smoothing and feedforward (#49),
+    // so their Scenarios check the PID loop and the mixer on their own.
+    for id in [
+        "test/freestyle-5-filters-and-shaping-off",
+        "test/freestyle-5-output-limit-80",
+    ] {
+        let tune = quad(id).flight_controller.unwrap();
+        assert_eq!(tune.pid.map(|gains| gains.f), [0, 0, 0], "{id}");
+        assert!(!tune.rc_smoothing, "{id}");
+        for (name, hz) in [
+            ("gyro_lpf1_static_hz", tune.gyro_lpf1_static_hz),
+            ("gyro_lpf1_dyn_min_hz", tune.gyro_lpf1_dyn_min_hz),
+            ("gyro_lpf2_static_hz", tune.gyro_lpf2_static_hz),
+            ("dterm_lpf1_static_hz", tune.dterm_lpf1_static_hz),
+            ("dterm_lpf1_dyn_min_hz", tune.dterm_lpf1_dyn_min_hz),
+            ("dterm_lpf2_static_hz", tune.dterm_lpf2_static_hz),
+            ("yaw_lowpass_hz", tune.yaw_lowpass_hz),
+        ] {
+            assert_eq!(hz, 0, "{id}: {name}");
+        }
+    }
 }
 
 #[test]
@@ -411,13 +458,19 @@ fn the_whoop_65s_tune_spells_out_every_setting_the_flight_controller_reads() {
         )
     );
     assert_eq!(mark("small_angle").0, "180");
+    // The filters, RC smoothing and feedforward, from the diff, 4.3's
+    // defaults or ADR-0008 (#49).
+    assert_eq!(mark("f_roll"), ("125", "diff"));
+    assert_eq!(mark("feedforward_smooth_factor"), ("25", "4.3 default"));
+    assert_eq!(mark("feedforward_yaw_hold_gain"), ("0", "ADR-0008"));
+    assert_eq!(
+        mark("gyro_lpf1_dyn_min_hz"),
+        ("287", "diff; Hz, at zero throttle; 0 is static")
+    );
+    assert_eq!(mark("rc_smoothing"), ("ON", "4.3 default"));
     // What the Flight Controller knows but doesn't simulate yet is spelled
     // out too, from the diff or 4.3's defaults, flown as off for now.
-    assert_eq!(mark("f_roll"), ("125", "diff; not simulated yet (#49)"));
-    assert_eq!(
-        mark("rc_smoothing"),
-        ("ON", "4.3 default; not simulated yet (#49)")
-    );
+    assert_eq!(mark("tpa_rate"), ("70", "diff; not simulated yet (#50)"));
     assert_eq!(
         mark("dyn_notch_count"),
         ("2", "diff; not simulated yet (waits for gyro noise, #21)")
