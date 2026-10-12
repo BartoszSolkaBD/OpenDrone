@@ -19,6 +19,10 @@ core = [
 # is decided here.
 edition = "2024"
 
+# The game crate, the only one that builds Bevy (ADR-0003). While it has Bevy
+# among its dependencies, the shared-glam lists below apply.
+game = "opendrone"
+
 # Who may use whom. Every crate in the workspace is listed here with the
 # OpenDrone crates it may declare as dependencies (of any kind), and the rule
 # behind that. A crate missing from this list fails the check.
@@ -158,16 +162,19 @@ wide = "SIMD number types simba keeps compiled; parry3d's 64-bit queries never c
 #
 # Once std is anywhere among a library's dependencies, Rust resolves its
 # `x.acos()` on a number to std's own maths method, ahead of the libm-forced
-# maths trait it imports. glamx works out eigenvalues that way, and parry3d
-# builds every convex Map shape through them, so each feature below, which
-# would put std among glamx's dependencies, would send that maths to the
-# operating system (ADR-0001). glam's own maths stays on libm through its libm
-# feature, but glam/std still puts std among glamx's dependencies.
-# `cargo xtask core-maths` checks the compiled code too, so a way round this
-# list still fails CI.
+# maths trait it imports. glamx works out eigenvalues that way, and parry3d's
+# convex-hull builders run them, so each feature below, which would put std
+# among glamx's dependencies, would send that maths to the operating system
+# (ADR-0001). The physics calls none of those builders (every convex Map shape
+# goes through SharedShape::convex_mesh, #141) and the core crates'
+# clippy.toml bans them (#142), so that maths never runs in the Simulation:
+# [shared-glam-features] below relies on it. glam's own maths stays on libm
+# through its libm feature, but glam/std still puts std among glamx's
+# dependencies. `cargo xtask core-maths` checks the compiled code too, so a
+# way round this list still fails CI.
 [never-in-core-features]
 "parry3d-f64/std" = "it turns on glamx's std feature (see glamx/std)"
-"glamx/std" = "glamx then works out eigenvalues with std's acos, cos and powi, which differ from one operating system to another, instead of libm; parry3d builds every convex Map shape through them (ADR-0001)"
+"glamx/std" = "glamx then works out eigenvalues with std's acos, cos and powi, which differ from one operating system to another, instead of libm; parry3d's convex-hull builders run them (ADR-0001)"
 "glam/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
 "simba/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
 "approx/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
@@ -175,6 +182,42 @@ wide = "SIMD number types simba keeps compiled; parry3d's 64-bit queries never c
 "num-complex/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
 "wide/std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
 "bytemuck/extern_crate_std" = "it puts std among glamx's dependencies, so glamx's eigenvalues use std's maths (see glamx/std)"
+
+# Bevy 0.20 and parry3d share one copy of glam (ADR-0021), so with Bevy in the
+# game, Bevy's glam features reach the core crates as well, and nothing can
+# switch them off. The two lists below name what that brings in, each with why
+# it is harmless there. They apply only while the `game` crate above has Bevy
+# among its dependencies, so a build without Bevy stays as strict as the lists
+# above say. A library counts only when a library brings it in, not when a core
+# crate uses it itself, and a feature only when it is on this list: anything
+# else still fails the check.
+# What keeps the Simulation free of the operating system's maths is `cargo
+# xtask core-maths`, which reads the compiled code, and the core crates'
+# clippy.toml, which bans parry3d's convex-hull builders (#142).
+#
+# Features, written "library/feature".
+[shared-glam-features]
+"glam/std" = "Bevy's rendering needs it. It puts std among glamx's dependencies, so glamx's eigenvalues use std's maths, but only parry3d's convex-hull builders run them, and the core crates' clippy.toml bans those"
+"approx/std" = "Bevy's maths turns it on. Same reach as glam/std: it only changes which maths glamx's eigenvalues use, and no code in the Simulation runs them"
+"num-traits/std" = "Bevy's maths turns it on. Same reach as glam/std: it only changes which maths glamx's eigenvalues use, and no code in the Simulation runs them"
+"glam/rand" = "Bevy's maths turns it on. It only adds ways to draw random vectors from a generator; nothing in the core draws from it, because the core's randomness is its own and seeded (ADR-0001)"
+"glam/encase" = "Bevy's rendering turns it on. It only adds ways to lay glam's types out as shader data; nothing in the core does"
+
+# Libraries that Bevy's features bring into the core, most of them through the
+# shared glam, written by name.
+[shared-glam-libraries]
+rand = "glam's `rand` feature brings it in for random vectors; the core draws none (see glam/rand)"
+rand_core = "rand's traits for random number generators (see rand)"
+getrandom = "rand's source of operating-system randomness, reached only by drawing from rand's own operating-system generator, which nothing in the core does; its operating-system calls are not part of the Simulation (see glam/rand)"
+libc = "getrandom's calls into the operating system's C library, reached only through getrandom (see getrandom)"
+cfg-if = "chooses code by platform while getrandom builds"
+r-efi = "getrandom's UEFI bindings, compiled for UEFI targets only"
+encase = "glam's `encase` feature brings it in to lay types out as shader data; the core does not (see glam/encase)"
+encase_derive = "writes encase's layout code while building; never part of the running program"
+encase_derive_impl = "writes encase's layout code while building; never part of the running program"
+const_panic = "compile-time panics for encase's checks"
+typewit = "type-level helpers for const_panic"
+bytemuck_derive = "bytemuck's `derive` feature, which Bevy turns on, brings it in: it writes bytemuck's byte-reading code while building and is never part of the running program"
 
 # Calls to the operating system's maths library (`cos`, `acos`, `log2` and the
 # rest) that the core's compiled code may keep, written "library/function",
@@ -185,6 +228,39 @@ wide = "SIMD number types simba keeps compiled; parry3d's 64-bit queries never c
 [core-platform-maths]
 "parry3d-f64/acos" = { from = ["<parry3d_f64::shape::trimesh::TriMesh>::compute_pseudo_normals"], reason = "it runs only once a mesh has the ORIENTED or FIX_INTERNAL_EDGES flag (parry3d's TriMesh::set_flags), or to redo pseudo-normals a mesh already has; opendrone-physics builds every mesh with TriMesh::new and no flags and never changes one (map.rs, whose test checks every Map mesh has no flags and no pseudo-normals), and the core crates' clippy.toml bans every public way to give a mesh flags or to redo its pseudo-normals: TriMesh::set_flags, TriMesh::with_flags, TriMesh::update_vertices, TriMesh::set_vertices, TriMesh::append, TriMesh::connected_component_meshes, TriMeshConnectedComponents::to_meshes, SharedShape::trimesh_with_flags and transformation::volume_mesh" }
 "parry3d-f64/log2" = { from = ["<parry3d_f64::partitioning::bvh::bvh_tree::Bvh>::optimize_incremental"], reason = "it rebalances a tree whose shapes move; nothing in parry3d's own code calls it (only its tests do), and the core crates' clippy.toml bans it, so opendrone-physics never does" }
+
+# glamx works out the eigenvalues of a 3 x 3 symmetric matrix with `acos` and
+# `cos`. Only parry3d's convex-hull builders reach it (they start from a
+# point cloud's covariance), the physics calls none of them (every convex Map
+# shape goes through SharedShape::convex_mesh, #141), and the core crates'
+# clippy.toml bans them all (#142). The 32-bit versions are the same code.
+"glamx/acos" = { from = ["<glamx::eigen3::DSymmetricEigen3>::eigenvalues"], reason = "never runs in the Simulation: only parry3d's convex-hull builders reach it, and Clippy bans them in the core (clippy.toml)" }
+"glamx/cos" = { from = ["<glamx::eigen3::DSymmetricEigen3>::eigenvalues"], reason = "never runs in the Simulation: only parry3d's convex-hull builders reach it, and Clippy bans them in the core (clippy.toml)" }
+"glamx/acosf" = { from = ["<glamx::eigen3::SymmetricEigen3>::eigenvalues", "<glamx::eigen3::SymmetricEigen3A>::eigenvalues"], reason = "never runs in the Simulation: the 32-bit version of the same eigenvalue code, which only parry3d's convex-hull builders reach, and Clippy bans them in the core (clippy.toml)" }
+"glamx/cosf" = { from = ["<glamx::eigen3::SymmetricEigen3>::eigenvalues", "<glamx::eigen3::SymmetricEigen3A>::eigenvalues"], reason = "never runs in the Simulation: the 32-bit version of the same eigenvalue code, which only parry3d's convex-hull builders reach, and Clippy bans them in the core (clippy.toml)" }
+
+# With Bevy in the game, `num-traits` (which Bevy turns on the `std` feature
+# of) has its maths compiled into Bevy's shader compilers and into rand_distr.
+# None of it runs in the Simulation.
+"num-traits/exp" = { from = ["<f64 as num_traits::float::Float>::exp"], reason = "compiled into rand_distr, which glam's `rand` feature brings in for random vectors; the core draws none, so nothing in the Simulation runs it" }
+"num-traits/acosf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::acos"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/acoshf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::acosh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/asinf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::asin"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/asinhf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::asinh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/atan2f" = { from = ["<half::binary16::f16 as num_traits::real::Real>::atan2"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/atanf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::atan"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/cosf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::cos"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/coshf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::cosh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/exp2f" = { from = ["<half::binary16::f16 as num_traits::real::Real>::exp2"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/expf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::exp"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/log1pf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::atanh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/log2f" = { from = ["<half::binary16::f16 as num_traits::real::Real>::log2"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/logf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::ln"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/powf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::powf"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/sinf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::sin"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/sinhf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::sinh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/tanf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::tan"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
+"num-traits/tanhf" = { from = ["<half::binary16::f16 as num_traits::real::Real>::tanh"], reason = "half::f16 maths that shader compilers use to fold constants in shaders, compiled into naga and wgsl-types, which only the game's rendering uses; the Simulation never runs a shader compiler" }
 
 # Outside libraries the core must never reach, with why. A name ending in `*`
 # covers every library whose name starts that way. None of these may be added

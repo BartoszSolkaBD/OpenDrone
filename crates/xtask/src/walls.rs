@@ -12,6 +12,10 @@
 //!   the core-libraries list;
 //! - no library the core reaches has a feature on the never-in-core-features
 //!   list turned on;
+//! - in a build that has Bevy in the game, the glam that Bevy and parry3d share
+//!   may bring the features and libraries `walls.toml` lists under
+//!   `shared-glam-features` and `shared-glam-libraries` into the core, each
+//!   with its reason, and anything else still fails ([ADR-0021]);
 //! - no core crate has a `.clippy.toml`, which Clippy would read instead of
 //!   the `clippy.toml` that holds the house rules ([ADR-0001]);
 //! - every crate, and each of its targets, is on the Rust edition `walls.toml`
@@ -19,6 +23,7 @@
 //!
 //! [ADR-0001]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0001-bit-exact-determinism-with-ordinary-floats.md
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
+//! [ADR-0021]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0021-alpha-starts-on-bevy-0-20.md
 
 use std::collections::{BTreeMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -137,22 +142,33 @@ fn check(workspace: &Workspace, rules: &Rules) -> Vec<String> {
         }
     }
 
+    // Bevy and parry3d share one glam, so with Bevy in the game, Bevy's glam
+    // features reach the core too (ADR-0021). The shared-glam lists apply only
+    // then: a build without Bevy stays as strict as the other lists say.
+    let shared_glam = workspace.game_reaches_bevy(rules);
+
     for (id, chain) in reached_from_core(workspace, rules) {
         if workspace.is_member(&id) {
             continue;
         }
         let library = workspace.name(&id);
+        // A core crate that uses a library itself isn't a shared-glam arrival.
+        let through_a_library = chain.len() > 2;
         let chain = chain.join(" → ");
         for feature in workspace.features(&id) {
-            if let Some(reason) = rules
-                .never_in_core_features
-                .get(&format!("{library}/{feature}"))
-            {
+            let key = format!("{library}/{feature}");
+            if shared_glam && rules.shared_glam_features.contains_key(&key) {
+                continue;
+            }
+            if let Some(reason) = rules.never_in_core_features.get(&key) {
                 problems.push(format!(
                     "The core reaches `{library}` with its `{feature}` feature turned on, which \
                      it must never have: {reason}. It gets there through {chain}."
                 ));
             }
+        }
+        if shared_glam && through_a_library && rules.shared_glam_libraries.contains_key(library) {
+            continue;
         }
         if let Some(reason) = rules.never_reason(library) {
             problems.push(format!(
@@ -240,6 +256,13 @@ pub(crate) struct Rules {
     never_in_core: BTreeMap<String, String>,
     /// By "library/feature".
     never_in_core_features: BTreeMap<String, String>,
+    /// The crate that is the game, which builds Bevy in.
+    game: String,
+    /// Features the glam that Bevy and parry3d share turns on in the core
+    /// when the game has Bevy, by "library/feature".
+    shared_glam_features: BTreeMap<String, String>,
+    /// Libraries that glam brings into the core when the game has Bevy.
+    shared_glam_libraries: BTreeMap<String, String>,
     /// Calls to the operating system's maths the core may keep, by
     /// "library/function" (`cargo xtask core-maths`).
     core_platform_maths: BTreeMap<String, PlatformMathsAllowance>,
@@ -310,6 +333,13 @@ impl Rules {
             core_libraries: reasons(&table, "core-libraries")?,
             never_in_core: reasons(&table, "never-in-core")?,
             never_in_core_features: reasons(&table, "never-in-core-features")?,
+            game: table
+                .get("game")
+                .and_then(toml::Value::as_str)
+                .ok_or(format!("{RULES_FILE} names no `game` crate"))?
+                .to_owned(),
+            shared_glam_features: reasons(&table, "shared-glam-features")?,
+            shared_glam_libraries: reasons(&table, "shared-glam-libraries")?,
             core_platform_maths: platform_maths_allowances(&table)?,
         })
     }
@@ -495,6 +525,28 @@ impl Workspace {
             features,
             editions,
         })
+    }
+
+    /// The game crate reaches `bevy` through the dependencies it is built with.
+    fn game_reaches_bevy(&self, rules: &Rules) -> bool {
+        let Some(game) = self.member_named(&rules.game) else {
+            return false;
+        };
+        let mut seen: Vec<&str> = vec![game];
+        let mut queue: VecDeque<&str> = VecDeque::from([game]);
+        while let Some(id) = queue.pop_front() {
+            for dependency in self.dependencies(id) {
+                if !dependency.built_with || seen.contains(&dependency.id.as_str()) {
+                    continue;
+                }
+                if self.name(&dependency.id) == "bevy" {
+                    return true;
+                }
+                seen.push(&dependency.id);
+                queue.push_back(&dependency.id);
+            }
+        }
+        false
     }
 
     /// A package's Rust edition, and each of its targets'.

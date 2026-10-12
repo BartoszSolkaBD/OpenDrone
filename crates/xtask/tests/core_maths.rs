@@ -388,6 +388,30 @@ fn the_acos_allowance_names_every_clippy_ban_that_keeps_it_unreachable() {
 }
 
 #[test]
+fn glamxs_eigenvalue_maths_is_allowed_only_from_the_eigenvalue_functions_with_a_reason() {
+    // Bevy turns glam's `std` on, so glamx's `acos` and `cos` become the
+    // operating system's. Only parry3d's convex-hull builders run them, and
+    // the core crates' clippy.toml bans those (#142).
+    let walls = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("walls.toml"))
+        .expect("can read walls.toml");
+    for function in ["acos", "cos", "acosf", "cosf"] {
+        let line = walls
+            .lines()
+            .find(|line| line.starts_with(&format!("\"glamx/{function}\"")))
+            .unwrap_or_else(|| panic!("walls.toml doesn't allow glamx's {function}"));
+        assert!(
+            line.contains("::eigenvalues"),
+            "glamx's {function} must be allowed from the eigenvalue functions only"
+        );
+        assert!(
+            line.contains("never runs in the Simulation")
+                && line.contains("Clippy bans them in the core"),
+            "glamx's {function} needs the reason that Clippy bans the convex-hull builders"
+        );
+    }
+}
+
+#[test]
 fn a_generic_core_function_calling_acos_compiled_into_the_games_program_fails() {
     // A generic function is compiled into the crate that uses it: here the
     // physics' and glamx's, into the game's program. The core's own compiled
