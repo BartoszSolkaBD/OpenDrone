@@ -197,18 +197,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "37d00ee423b35d15"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
+quad = "5cc3ed1a743d6f6f"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "3256d8c4d5732350"   # the whole state after each of 24000 steps at 8000 Hz, in order
+run  = "222a41be9896117a"   # the whole state after each of 24000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.3 s" = "9854b86de10ddc37"
-"0.6 s" = "aaa84496339939f7"
-"0.9 s" = "0ea514d418a4fddc"
-"1.2 s" = "247974c1470101e6"
-"1.5 s" = "740b3309310bb2e2"
-"1.8 s" = "c3650b5dd8021710"
-"2.1 s" = "c3792132a1c75c81"
-"2.4 s" = "3a48217f27251722"
-"2.7 s" = "ae3bfd0399b90fc7"
-"3 s" = "68b99f6de30a58ec"
+"0.3 s" = "b6f079c9ed795638"
+"0.6 s" = "9680d2fb26816fcf"
+"0.9 s" = "c971c8284528790d"
+"1.2 s" = "ed4bc1ef5bfcb388"
+"1.5 s" = "2c84ed5ad7a50240"
+"1.8 s" = "6e8e40bf60dfe8aa"
+"2.1 s" = "375dbd6669558a47"
+"2.4 s" = "7b04e438773d8340"
+"2.7 s" = "44cb2e0858e17b88"
+"3 s" = "fe18fbd645793393"
