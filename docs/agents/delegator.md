@@ -34,7 +34,7 @@ At the start of a session, check what each `model` value runs in this Claude Cod
 
 | Job | Tier |
 |---|---|
-| **The Delegator** itself | Standard. Following this page is its whole job. Planning work, such as a spec, tickets or a grilling, runs on Strongest in its own session. |
+| **The Delegator** itself | On trial: the maintainer is comparing Strongest and Standard, so it runs on whichever model its session was started on. Following this page is its whole job. Planning work, such as a spec, tickets or a grilling, runs on Strongest in its own session. |
 | **Author** of a tracer (the title starts "Tracer:") | Strongest. A tracer sets the interfaces that later tickets build on. |
 | **Author** of a ticket that copies Betaflight or Bluejay behaviour from their source | Strongest. A misreading of the C code still passes tests written from the same misreading. |
 | **Author** of a change to the review path: `.github/`, the review scripts, the Review Report, the Red Flag gate or the Review check | Strongest. In Phase 1 that path is the only guard. |
@@ -51,7 +51,7 @@ At the start of a session, check what each `model` value runs in this Claude Cod
 
 ## Lanes
 
-A **Lane** is a group of Areas whose PRs collide when they run side by side. Each Lane has at most **one PR in review** at a time. A PR is in review from the moment its first Reviewer starts until it merges.
+A **Lane** is a group of Areas whose PRs collide when they run side by side. Each Lane has at most **one PR in review** at a time. A PR is in review from the moment its first Reviewer starts until it merges, or until it steps out of its Lane to wait for the maintainer ([When a PR waits for the maintainer](#when-a-pr-waits-for-the-maintainer)).
 
 | Lane | What's in it | Why its PRs collide |
 |---|---|---|
@@ -68,12 +68,14 @@ The Lanes and the Areas in CODEOWNERS group the same files, with two differences
 
 Place a ticket by the files its "What to build" will change. A ticket that spans two Lanes takes both.
 
-- **One PR in review per Lane.**
+**Lane labels.** A ticket carries one `lane: <Lane>` label for each Lane it takes, such as `lane: Flight` or `lane: Repo rules`. Whoever files the ticket adds them: a planning session, or the Delegator for an issue it files. Before you start a ticket, check its labels against the files its "What to build" will change. If one is missing or wrong, fix it, and list the fix in your end-of-batch report.
+
+- **One PR in review per Lane.** A PR that waits for the maintainer doesn't count: it steps out of its Lane ([below](#when-a-pr-waits-for-the-maintainer)).
 - **Building ahead:**
   - While a Lane's PR is in review, one more ticket may build in that Lane. Its code must be in a different crate, for example a Flight Controller ticket beside a physics one.
   - It doesn't open its PR for review until the PR ahead has merged. Before then, it merges main and runs its Scenarios again.
 - **A ticket starts only when all its blockers are closed,** which means merged. Never build on top of an unmerged branch.
-- **A workflow-changing PR** (it changes `.github/workflows/` or `.github/actions/`) holds the Repo rules Lane like any other PR: it counts as in review from its first Reviewer until the maintainer merges it, so no other Repo rules PR starts review meanwhile.
+- **A workflow-changing PR** (it changes `.github/workflows/` or `.github/actions/`) holds the Repo rules Lane while it's being reviewed. Once it passes, it waits for the maintainer to merge it by hand, so it steps out of the Lane like any PR that waits for them.
 - **Some files every Lane touches:** `Cargo.lock`, `CONTEXT.md`, `docs/SUMMARY.md` and the deep dives.
   - Authors add to these files rather than rewrite them.
   - Clashes there are small, and the merge-only update check handles them.
@@ -95,16 +97,18 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
    gh pr checks <P> -R BartoszSolkaBD/OpenDrone
    gh pr view <P> -R BartoszSolkaBD/OpenDrone --json comments --jq '[.comments[] | select(.author.login == "BartoszSolkaBD" and (.body | startswith("Reviewed commit")))] | last // empty | [.body | splits("\r?\n") | select(length > 0)] | "\(first) / \(last)"'
    ```
-4. Find the ready tickets. A ticket is ready when it's open and labelled `ready-for-agent`, has no assignee, and has no open blocker. The spec, #37, isn't a ticket: skip any issue whose title starts "Spec".
+4. Find the ready tickets. A ticket is ready when it's open and labelled `ready-for-agent`, has no assignee, has no open blocker, and doesn't wait for the maintainer (no `needs-maintainer` label). The spec, #37, isn't a ticket: skip any issue whose title starts "Spec". The command prints each ready ticket's number, its Lanes from its Lane labels, how many tickets it blocks, and its title:
 
    ```sh
    gh issue list -R BartoszSolkaBD/OpenDrone --label ready-for-agent --state open --limit 300 \
-     --json number,title,assignees --jq '.[] | select((.assignees | length == 0) and (.title | startswith("Spec") | not)) | "\(.number)\t\(.title)"' |
-   while IFS=$'\t' read -r n t; do
+     --json number,title,assignees,labels --jq '.[] | select((.assignees | length == 0) and (.title | startswith("Spec") | not) and (any(.labels[]; .name == "needs-maintainer") | not)) | "\(.number)\t\([.labels[].name | select(startswith("lane: ")) | ltrimstr("lane: ")] | join(" + ") | if . == "" then "no Lane label" else . end)\t\(.title)"' |
+   while IFS=$'\t' read -r n l t; do
      gh api repos/BartoszSolkaBD/OpenDrone/issues/$n \
-       --jq "select(.issue_dependencies_summary.blocked_by == 0) | \"$n\tblocks \(.issue_dependencies_summary.blocking)\t$t\""
+       --jq "select(.issue_dependencies_summary.blocked_by == 0) | \"$n\t$l\tblocks \(.issue_dependencies_summary.blocking)\t$t\""
    done
    ```
+
+   A ticket that shows "no Lane label" needs one before it starts ([Lane labels](#lanes)).
 
    A ticket claimed by a session that has ended is an **abandoned claim**. It stays assigned and drops out of this list. To release one, look for an open PR or a pushed branch:
 
@@ -120,7 +124,7 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
 
 1. **Main's CI is red:** fix that first. Start a Standard author with the failing run, and start nothing else.
 2. **Finish before you start:**
-   - First, a PR that passed and waits to merge.
+   - First, a PR that passed and waits to merge, or one the maintainer has just answered.
    - Then a Verdict to act on.
    - Then a PR that waits for its review.
 3. **Then start tickets,** in a free Lane. The ticket that blocks the most others goes first, for example a tracer. Ties go to the lower number.
@@ -174,7 +178,7 @@ Everything else the author needs is on the ticket and in the brief. That way a f
 Merge when all of these hold:
 
 - CI is green on the PR's latest commit.
-- The Review check and the Red Flag gate both pass.
+- The Review check and the Red Flag gate both pass. The one exception: the maintainer has cleared what the Red Flag gate holds ([When a PR waits for the maintainer](#when-a-pr-waits-for-the-maintainer)).
 - The PR has no `needs-maintainer` label.
 - The PR changes no file under `.github/workflows/` or `.github/actions/`. This command lists the PR's changed files there, including a file's old name when it was moved. It must print nothing:
 
@@ -183,6 +187,20 @@ Merge when all of these hold:
   ```
 
   If it lists any file, don't merge. Such a PR can set the Review check and the Red Flag gate itself, so the maintainer merges it by hand, as [the Reviewer page](reviewer.md) and [the Review Report's limits](../review-report.md#limits) say. Leave it to them: label it `needs-maintainer`, tell the maintainer, and carry on in the other Lanes.
+
+**Wait for the Review check after a pass.** The Review check turns green a minute or two after a pass Verdict, once the Review workflow has run on the comment. So after a pass, check the conditions with this background command (`run_in_background`) rather than at once. It waits up to 10 minutes for every check, the Review check included, to stop pending. Then it lists every check that didn't pass or skip. It prints nothing when the PR may merge:
+
+```sh
+for i in $(seq 20); do
+  gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json bucket \
+    --jq '[.[] | select(.bucket == "pending")] | length' | grep -qx 0 && break
+  sleep 30
+done
+gh pr checks <P> -R BartoszSolkaBD/OpenDrone --json name,bucket,link \
+  --jq '.[] | select(.bucket != "pass" and .bucket != "skipping") | "\(.bucket)\t\(.name)\t\(.link)"'
+```
+
+If the Review check is still pending after that, the Verdict doesn't cover the latest commit: compare its first line with `gh pr view <P> -R BartoszSolkaBD/OpenDrone --json headRefOid`.
 
 How you merge depends on what main has done since the PR's base:
 
@@ -215,7 +233,7 @@ How you merge depends on what main has done since the PR's base:
 
 A Verdict may list "Follow-ups (not blocking)". After the PR merges:
 
-- **File them together:** one issue per Verdict that has any, titled "Follow-ups from PR #P", with a link to the Verdict.
+- **File them together:** one issue per PR that has any, titled "Follow-ups from PR #P". Link every Verdict the items come from. A later round often repeats an earlier round's items: list each item once.
 - **Label it `needs-triage`, not `ready-for-agent`,** so the maintainer decides. Create the label the first time if it's missing.
 - **One exception:** an item that is a wrong result a pilot would meet gets its own `ready-for-agent` issue, blocked by what it needs.
 - **Never mark a follow-up `ready-for-agent`** if it came from reviewing another follow-up. That's how review spirals start.
@@ -254,7 +272,28 @@ Here's how to raise one:
 
 1. **Ask where it belongs,** on the PR or the ticket, in one comment. Start it with "Question for the maintainer:". Then say what was found, the choices, and your recommendation. The prefix matters: agents work under the maintainer's account, so a later agent must not read your recommendation as an instruction.
 2. **Label it** `needs-maintainer`.
-3. **Move on** to other Lanes. Don't wait.
+3. **Move on.** Don't wait, and don't let the question hold a Lane: see below.
+
+When the maintainer answers, in the session or on GitHub:
+
+1. **Record the decision** where the question is, in one comment starting "Maintainer's decision (<date>):", with the choice and anything it leads to.
+2. **Act on it.** Take `needs-maintainer` off, file any ticket the decision leads to, and set its blockers.
+
+## When a PR waits for the maintainer
+
+A PR that waits for the maintainer doesn't hold its Lane. Development carries on without it. A PR waits when the Red Flag gate holds something for the maintainer, or when a "Question for the maintainer:" on it is open.
+
+- **A question about the ticket doesn't stop the PR.** The author has done the closest faithful thing and said so in the PR ([Building a ticket](author.md)). Move the question to its own issue, labelled `needs-maintainer` and linked from the PR. The PR then goes on through review and merge. If the maintainer later wants it done differently, that becomes a new ticket.
+- **When only part of the PR waits, split it off.** Start a fix round that takes that part out, if the rest stands on its own. Examples are an edit to an existing ADR, or a Source Expectation the ticket doesn't need changed. File what came out as its own `ready-for-agent` issue, labelled `needs-maintainer`, with the question moved there. The rest goes on through review and merge.
+- **When the whole PR waits,** for example on Red Flags it can't do without, it steps out of its Lane. Leave it open with `needs-maintainer`, and let the Lane's next PR go into review.
+  - When the maintainer answers, it takes the Lane again as soon as the Lane is free, ahead of any new ticket.
+  - You then bring main in, as under [Merging](#merging): `gh pr update-branch` and the Light merge-only update check, or a fix round and a fresh Reviewer when Results must be written again or code moved.
+  - If the Red Flags after that are the same ones the maintainer cleared, the clearance still holds.
+- **Clearing the Red Flag gate.** Nothing in the repo clears the gate: it keeps failing until the PR merges. The maintainer can merge the PR by hand, or tell you to. When they tell you, in the session or on the PR, that they clear what it holds:
+  1. Record the decision on the PR.
+  2. Take `needs-maintainer` off.
+  3. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared. The wait command there lists the failing gate: that row is expected.
+  4. CI then gives the PR the `skipped-a-check` label and a comment naming each check that hadn't passed ([the Review Report](../review-report.md#merges-that-skipped-a-check)). Check that the comment names only the Red Flag gate. Leave the label for the maintainer to take off, and list the PR in your end-of-batch report. If the comment names any other check, tell the maintainer at once.
 
 ## Usage limits
 
@@ -266,9 +305,11 @@ Here's how to raise one:
 Report to the maintainer:
 
 - what merged, as ticket and PR;
-- what waits for them, and why;
+- what waits for them, and why, including each PR that stepped out of its Lane, and each PR merged past a cleared Red Flag gate whose `skipped-a-check` label they should take off;
 - the follow-up issues you filed, and each issue you triaged a PR to;
-- for each PR, the author's model and its number of review rounds.
+- for each PR, the author's model and its number of review rounds;
+- the model the Delegator itself ran on, for the trial;
+- any Lane labels you added or fixed.
 
 ## Reference sources
 

@@ -87,7 +87,8 @@ If your change moves a flight, run `cargo scenarios run` and commit the Results 
 ## Commits and the PR
 
 - **Commits:** end each message with `Co-Authored-By: Claude <your model> <noreply@anthropic.com>`, naming the model you run on, for example `Claude Sonnet 5.5`.
-- **Opening the PR:** run `git push -u origin <branch>`, then `gh pr create -R BartoszSolkaBD/OpenDrone --base main --title "<title>" --body-file <file>`.
+- **Scratch files carry the ticket number.** Other agents share your scratchpad, so a plain `pr-body.md` can be overwritten by another session's, and your PR would show their text. Name every scratch file after your ticket, such as `pr-body-<N>.md`, or keep them in a `ticket-<N>/` folder.
+- **Opening the PR:** run `git push -u origin <branch>`, then `gh pr create -R BartoszSolkaBD/OpenDrone --base main --title "<title>" --body-file pr-body-<N>.md`.
 - **The PR:**
   - The title is a plain-language summary of what changes.
   - The body follows the PR template, with `Closes #<N>`.

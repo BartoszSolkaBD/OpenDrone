@@ -39,7 +39,7 @@ A named part of the repo, such as Physics, Scenarios or Repo rules, with its fol
 _Avoid_: Module, component, team
 
 **Lane**:
-A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time.
+A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time; a PR that waits for the maintainer steps out of its Lane so it holds nothing up. Each ticket carries a `lane: <Lane>` label for each Lane it takes.
 _Avoid_: Track, queue, stream
 
 **Work Count**:
@@ -61,7 +61,7 @@ _Avoid_: FPS test, perf test
   - A later commit needs a fresh Verdict as usual. A further failed round needs a triage of its own.
   - The Red Flag gate is separate: what it holds still waits for the maintainer.
 - Main merged into a PR that already passed needs only the short [merge-only update check](../agents/merge-update.md), not a full review, when nothing but main's own changes, clashes in `Cargo.lock` or docs text, and Results fingerprints changed. Anything more needs a fresh Reviewer.
-- Agents never merge past a failing check. The next Review Report names any merge that did.
+- Agents never merge past a failing check. The one exception is the Red Flag gate, once the maintainer has cleared what it holds and asked for the merge. The next Review Report names any merge that went past a check.
 - Red Flags:
   - **Wait for the maintainer:** a changed Source or Rule Expectation, including a loosened tolerance, an edited ADR, and a change of Bevy or wgpu version. The version flag fires only when Bevy moves to a new 0.N version, together with its major wgpu version; patch releases and the move from a release candidate to the final don't trigger it.
   - **The Reviewer decides:**
