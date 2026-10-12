@@ -148,6 +148,10 @@ fn the_house_rules_ban_every_other_public_way_into_glamxs_eigenvalue_maths() {
         "glamx::SymmetricEigen3::eigenvalues",
         "glamx::SymmetricEigen3A::new",
         "glamx::SymmetricEigen3A::eigenvalues",
+        "glamx::DSymmetricEigen2::new",
+        "glamx::DSymmetricEigen2::eigenvalues",
+        "glamx::SymmetricEigen2::new",
+        "glamx::SymmetricEigen2::eigenvalues",
     ] {
         assert_banned_with_reason(methods, path);
     }
@@ -159,6 +163,8 @@ fn the_house_rules_ban_every_other_public_way_into_glamxs_eigenvalue_maths() {
         "glamx::DSymmetricEigen3",
         "glamx::SymmetricEigen3",
         "glamx::SymmetricEigen3A",
+        "glamx::DSymmetricEigen2",
+        "glamx::SymmetricEigen2",
     ] {
         assert_banned_with_reason(types, path);
     }
