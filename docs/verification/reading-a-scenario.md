@@ -135,9 +135,9 @@ timeline = [
 ]
 ```
 
-A Timeline: what happens when. Each value holds until it changes. A Physics or Thrust Stand Scenario scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
+A Timeline: what happens when. Each value holds until it changes. A Physics Scenario, or a Thrust Stand Scenario that scripts its motors, scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
 
-A Flight or Flight Controller Scenario scripts the pilot's sticks and switches instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
+A Flight or Flight Controller Scenario, or a Thrust Stand Scenario that flies our Flight Controller, scripts the pilot's sticks and switches instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
 
 ```toml
 timeline = [
