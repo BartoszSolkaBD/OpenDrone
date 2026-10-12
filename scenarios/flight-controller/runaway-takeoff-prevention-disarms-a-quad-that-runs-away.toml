@@ -112,5 +112,5 @@ basis = "source: tryArm: with the throttle low and nothing blocking, the frame a
 [[expect]]
 what  = "the Quad disarms"
 over  = "0.8 s to 1 s"
-first = "0.0805 s ± 0.000001 s"
-basis = "source: tryArm starts runaway takeoff prevention's timers afresh, and the flight hasn't counted as stable, so a PID sum past 600 with the gyro moving disarms it 75 ms on again. The frame at 0.8 s asks for 670 °/s at once, but RC smoothing's PT3 at 93 Hz brings the setpoint in over several loops while the D term pushes against the gyro's rise, so the roll PID sum first reaches 600 (614.8) in the loop at 0.80525 s; the first loop more than 75 ms later, at 0.880375 s, disarms"
+first = "0.080625 s ± 0.000001 s"
+basis = "source: tryArm starts runaway takeoff prevention's timers afresh, and the flight hasn't counted as stable, so a PID sum past 600 with the gyro moving disarms it 75 ms on again. The frame at 0.8 s asks for 670 °/s at once, but RC smoothing's PT3 at 93 Hz brings the setpoint in over several loops while the D term pushes against the gyro's rise, and I-term relax (applyItermRelax) keeps I from growing while the setpoint climbs that fast, so the roll PID sum first reaches 600 (608.64) in the loop at 0.8055 s; the first loop more than 75 ms later, at 0.880625 s, disarms"

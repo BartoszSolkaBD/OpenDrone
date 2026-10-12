@@ -4,12 +4,12 @@
 # yaw P's low-passes, RC smoothing and feedforward (#49) work their numbers
 # out from Betaflight's maths with those in place, and nothing else in
 # between. On the 5″'s own Tune, Betaflight 2026.6.2 also puts Dynamic D,
-# I-term relax, anti-gravity, TPA and throttle boost in the loop, which the
-# Flight Controller doesn't simulate yet (#50): low-throttle TPA alone would
-# cut the D term by up to 20% at zero throttle. This Test Quad switches each
-# of them off in the Tune, the way Betaflight reads "off", so those
-# Scenarios' numbers are what Betaflight 2026.6.2 gives on this Tune today,
-# and still will once #50 lands. It switches off the dynamic notch too (it
+# I-term relax, anti-gravity, TPA and throttle boost in the loop (#50):
+# low-throttle TPA alone would cut the D term by up to 20% at zero throttle.
+# This Test Quad switches each of them off in the Tune, the way Betaflight
+# reads "off", so those Scenarios' numbers are what Betaflight 2026.6.2 gives
+# on this Tune with the filters, RC smoothing and feedforward alone. It
+# switches off the dynamic notch too (it
 # waits for gyro noise, #21), and runaway takeoff prevention, which would
 # disarm a fresh Flight Controller holding a PID sum of 600 or more, with
 # the gyro moving, for 75 ms. The filters, RC smoothing and feedforward are

@@ -1,0 +1,127 @@
+# Dynamic D raises D towards D max on fast stick moves and fast gyro moves,
+# as Betaflight 2026.6.2's does (`pidController`, src/main/flight/pid.c; the
+# gains in `pidInitConfig` and the low-passes in `pidInitFilters`,
+# pid_init.c; the Betaflight research §3):
+#
+# - With `d_max_roll` 40 above `d_roll` 30, roll's D may be multiplied by up
+#   to 40 ÷ 30 = 1.3333. Yaw's D max, 0, is not above its D, so yaw has no
+#   Dynamic D.
+# - Each loop the boost is the larger of the gyro's speed for the D term (in
+#   °/s², through a second-order low-pass, PT2, at 85 Hz) times
+#   0.00008 × `d_max_gain` ÷ 35, and the stick's speed, feedforward (in
+#   °/s²), times 0.00008 × `d_max_advance` ÷ 35.
+# - D's multiplier is 1 + (1.3333 − 1) × the boost, through a PT2 at 35 Hz,
+#   and never more than 1.3333. Each PT2 stage moves k = ω ÷ (ω + 1) of the
+#   way a loop, with ω = 2π × the cutoff × 1.553774 ÷ 8000: k = 0.040962 at
+#   35 Hz and 0.093980 at 85 Hz.
+#
+# The Flight Controller alone, armed, the throttle at 50% (TPA 0.877,
+# tpa-at-each-throttle.toml), the sticks centred. At 0.5 s the roll stick
+# jumps to 50%, from 0.10966 °/s to 193.543 °/s (rc-smoothing-at-250-hz.toml),
+# all in the frame at 0.5 s: feedforward's stick speed is 193.434 °/s × the
+# 250 Hz Packet Rate = 48358 °/s² for that frame's 4 ms, then 0. At 0.503 s
+# the gyro starts reading a roll left at 1 °/s, and at 1 s jolts to 101 °/s
+# in one loop: 800000 °/s² for that loop.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only, whose
+# feedforward is simply the stick's speed, and whose `d_max_gain` is 37, so
+# the gyro drives Dynamic D too (Betaflight 2026.6.2's own default is 0:
+# only the sticks do). Its `d_max_advance`, 35, and D max are the 5″'s.
+format = 2
+name   = "Dynamic D raises D towards D max on fast stick and gyro moves"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",     roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s",   roll = "50%" },
+  { at = "0.503 s", rotation = "roll -1 °/s, pitch 0 °/s, yaw 0 °/s" },
+  { at = "1 s",     rotation = "roll -101 °/s, pitch 0 °/s, yaw 0 °/s" },
+]
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "0.5 s"
+value = "1 ± 0"
+basis = "source: pidController: with the sticks and the gyro still there is nothing to boost"
+
+# The stick's speed: 48358 °/s² × 0.00008 × 35 ÷ 35 = 3.869, so the
+# multiplier heads for 1 + 0.3333 × 3.869 = 2.290 through the PT2.
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "0.501 s"
+value = "1.064304 ± 0.000001"
+basis = "source: pidController, loop by loop: eight loops into the stick move the PT2 at 35 Hz has brought the multiplier from 1 to 1.064304 on its way towards 2.290"
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "0.503 s"
+value = "1.333333 ± 0.000001"
+basis = "source: pidController: by 0.503 s the PT2 has passed 1.3333, so the multiplier is held at D max ÷ D = 40 ÷ 30"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.503125 s"
+value = "148.459 ± 0.001"
+basis = "source: pidController: the gyro reading drops by 1 °/s, so D is 0.000529 × 30 × 1 × 8000 = 126.96, times Dynamic D's 1.3333 and TPA's 0.877: 148.459, where with no stick move it would be 111.344 (tpa-cuts-the-d-term.toml)"
+
+[[expect]]
+what  = "yaw Dynamic D factor"
+at    = "0.503 s"
+value = "1 ± 0"
+basis = "source: pidInitConfig: d_max_yaw 0 is not above d_yaw 0, so yaw has no Dynamic D"
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "0.51 s"
+value = "1.321777 ± 0.000001"
+basis = "source: pidController, loop by loop: from the frame at 0.504 s the stick is still and feedforward is 0, so the PT2 falls back towards 1, below 1.3333 by 0.51 s"
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "0.55 s"
+value = "1 ± 0.00001"
+basis = "source: pidController: 50 ms after the stick stopped, the boost has all but gone"
+
+# The gyro's speed: one loop of 800000 °/s² through the PT2 at 85 Hz, then
+# times 0.00008 × 37 ÷ 35.
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "1.001 s"
+value = "1.024678 ± 0.000001"
+basis = "source: pidController, loop by loop: eight loops after the jolt the gyro's boost, through both PT2s, has raised the multiplier to 1.024678"
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "1.005 s"
+value = "1.282968 ± 0.000001"
+basis = "source: pidController, loop by loop: 40 loops on, near its peak"
+
+[[expect]]
+what  = "roll Dynamic D factor"
+at    = "1.02 s"
+value = "1.017806 ± 0.000001"
+basis = "source: pidController, loop by loop: with the gyro steady at 101 °/s, the boost dies away"

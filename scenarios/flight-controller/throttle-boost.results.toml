@@ -1,0 +1,76 @@
+# Results of throttle-boost.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Throttle boost pushes a fast throttle move further for a moment"
+
+[[expect]]
+what     = "mixer throttle at 0.5 s"
+basis    = "Source"
+expected = "25.7% ± 0.0001%"
+measured = "25.7%"
+
+[[expect]]
+what     = "mixer throttle at 0.500125 s"
+basis    = "Source"
+expected = "98.1676% ± 0.0001%"
+measured = "98.2%"
+
+[[expect]]
+what     = "mixer throttle at 0.501 s"
+basis    = "Source"
+expected = "96.2810% ± 0.0001%"
+measured = "96.3%"
+
+[[expect]]
+what     = "mixer throttle at 0.51 s"
+basis    = "Source"
+expected = "83.7015% ± 0.0001%"
+measured = "83.7%"
+
+[[expect]]
+what     = "mixer throttle at 0.6 s"
+basis    = "Source"
+expected = "74.2021% ± 0.0001%"
+measured = "74.2%"
+
+[[expect]]
+what     = "mixer throttle at 1.000125 s"
+basis    = "Source"
+expected = "1.7324% ± 0.0001%"
+measured = "1.73%"
+
+[[expect]]
+what     = "mixer throttle at 1.01 s"
+basis    = "Source"
+expected = "16.1985% ± 0.0001%"
+measured = "16.2%"
+
+[[expect]]
+what     = "mixer throttle at 1.500125 s"
+basis    = "Source"
+expected = "100% ± 0%"
+measured = "100%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "62b9cebc0c969b9d"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "e6a0338566875ba4"   # the whole state after each of 12001 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.15 s" = "b0531ced340f0df0"
+"0.3 s" = "375aafc5c5a4b780"
+"0.45 s" = "06b41e790df99a24"
+"0.6 s" = "bfc048e90463cbc7"
+"0.75 s" = "ff8df91267c2060c"
+"0.9 s" = "258b45266595064e"
+"1.05 s" = "b430b1ea8fe644fb"
+"1.2 s" = "e5e06005ec9977df"
+"1.35 s" = "104686c14f319cb5"
+"1.500125 s" = "74f3c63304de4290"

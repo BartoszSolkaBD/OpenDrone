@@ -62,7 +62,7 @@ measured = "37.4%"
 what     = "battery power, lowest over 5 s to 30 s"
 basis    = "Rule"
 expected = "between 1.74 W and 20 W"
-measured = "5.50 W"
+measured = "5.51 W"
 
 [[expect]]
 what     = "battery power, mean over 5 s to 30 s"
@@ -79,16 +79,16 @@ measured = "none broken"
 [fingerprints]
 quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "40c5c8763e12d647"   # the whole state after each of 240000 steps at 8000 Hz, in order
+run  = "293ce7179e59f2cf"   # the whole state after each of 240000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"3 s" = "bf9052adb8e95a1f"
-"6 s" = "f1492d622dbf821d"
-"9 s" = "f4735298292d6113"
-"12 s" = "1de6a2160df792ee"
-"15 s" = "a431a12684827c81"
-"18 s" = "3a25a2ed75a6406e"
-"21 s" = "6e713b6ddc9ac0b9"
-"24 s" = "6727defd452e0b66"
-"27 s" = "e108ad866b84db5d"
-"30 s" = "3035793568d227dc"
+"3 s" = "8d067dcc114fc02e"
+"6 s" = "3e62042bd10a0aa0"
+"9 s" = "aa891d88ab6484a5"
+"12 s" = "5d948fc544d8ca81"
+"15 s" = "26a6999bf4d51c77"
+"18 s" = "7e28c42a181e3902"
+"21 s" = "c4530f0456410b18"
+"24 s" = "fad9213318079941"
+"27 s" = "eae530a00e3a6753"
+"30 s" = "c68c5d864d9553f9"

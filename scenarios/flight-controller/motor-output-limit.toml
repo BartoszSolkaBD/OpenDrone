@@ -5,7 +5,7 @@
 # `motor_output_limit` at 80%, and with the Flight Controller's filters and
 # loop shaping off, as in mixer-and-airmode.toml, so throttle boost (#50)
 # can't change a case's first frame: every number here is what Betaflight
-# 2026.6.2 gives on that Tune, and stays so when #50 lands. Each case is a fresh, armed Flight Controller, one Radio Link frame and
+# 2026.6.2 gives on that Tune. Each case is a fresh, armed Flight Controller, one Radio Link frame and
 # one loop, with nothing to correct but the centre stick's 0.11 °/s.
 format = 2
 name   = "A motor output limit of 80% cuts the top of the motors' range"

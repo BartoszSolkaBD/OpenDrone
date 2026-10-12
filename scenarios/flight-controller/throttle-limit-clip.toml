@@ -1,0 +1,88 @@
+# The pilot's throttle limit, CLIP, cuts the throttle off at
+# `throttle_limit_percent` and leaves it alone below, as Betaflight
+# 2026.6.2's mixer does (`applyThrottleLimit`, src/main/flight/mixer.c; the
+# Betaflight research §1). throttle-limit-scale.toml shows SCALE. The limit
+# belongs to the pilot's Rates, in `[start.rates]`: here CLIP at 60%.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop,
+# and measures the mixer's throttle after the limit: on a fresh Flight
+# Controller RC smoothing and throttle boost start settled on the first
+# frame. Through Betaflight's straight throttle curve the sticks give 0.257
+# at 30%, 0.473 at 50%, 0.742 at 75% and 1 at 100% (throttle-boost.toml). It
+# flies the Freestyle 5″ on its own Tune.
+format = 2
+name   = "The pilot's throttle limit, CLIP, cuts the throttle off at the limit"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit clip 60%"
+quickrates_rc_expo = "off"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "30%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "25.7% ± 0.0001%"
+basis = "source: applyThrottleLimit: CLIP, below 0.60 the throttle is left alone: 0.257"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "47.3% ± 0.0001%"
+basis = "source: applyThrottleLimit: CLIP, below 0.60 the throttle is left alone: 0.473"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "75%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "60% ± 0.0001%"
+basis = "source: applyThrottleLimit: CLIP, 0.742 is cut off at 0.60"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "100%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "60% ± 0.0001%"
+basis = "source: applyThrottleLimit: CLIP, full stick is cut off at 0.60"
