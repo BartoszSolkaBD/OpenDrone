@@ -1,0 +1,109 @@
+# Betaflight 2026.6.2's other kinds of low-pass, PT2, PT3 and BIQUAD
+# (src/main/common/filter.c), in the gyro's and the D term's filters
+# (`gyroInitLowpassFilterLpf`, src/main/sensors/gyro_init.c;
+# `pidInitFilters`, src/main/flight/pid_init.c):
+#
+# - A PT2 or PT3 is two or three PT1 stages in a row, each with the same
+#   `k`, worked out for the cutoff moved up by 1.553774 (PT2) or 1.961459
+#   (PT3), so the whole filter is 3 dB down at the cutoff (`pt2FilterGain`,
+#   `pt3FilterGain`): k = 0.196184 for the PT2 at 200 Hz and 0.133488 for
+#   the PT3 at 100 Hz, at 8 kHz.
+# - The BIQUAD is a second-order Butterworth low-pass in state-variable form
+#   (`svfLowpassFilterApply`), with f = tan(π × 400 Hz ÷ 8000) = 0.158384.
+#   From rest, its first output after a step is f² ÷ (1 + f × (f + √2)) =
+#   0.020083 of the step. Betaflight works the tangent out with a fast sine
+#   and cosine; OpenDrone uses the exact one, about a millionth apart.
+#
+# It flies the Test Quad test/freestyle-5-other-low-pass-kinds: gyro
+# low-pass 2 a BIQUAD at 400 Hz, gyro low-pass 1 a PT2 at 200 Hz, D-term
+# low-pass 1 a PT3 at 100 Hz and D-term low-pass 2 the Freestyle 5″'s PT1 at
+# 150 Hz (k = 0.105393), with the loop shaping #50 brings off.
+#
+# The Flight Controller alone, armed, the sticks centred and the throttle at
+# 0%, every filter settled on a still gyro. At 0.5 s the gyro reads 100 °/s,
+# rolling right. Each value is the filters' step response, worked out loop
+# by loop from Betaflight's formulas.
+format = 2
+name   = "The PT2, PT3 and BIQUAD low-passes follow Betaflight's in the gyro's and the D term's filters"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-other-low-pass-kinds"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 0 °/s" },
+]
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.500125 s"
+value = "0.077297 °/s ± 0.000001 °/s"
+basis = "source: the first loop after the step, the BIQUAD passes 0.020083 of it and the PT2's two stages 0.196184 each: 100 °/s × 0.020083 × 0.196184² = 0.077297 °/s"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.5005 s"
+value = "3.4935 °/s ± 0.0001 °/s"
+basis = "source: the BIQUAD then the PT2, four loops after the step, loop by loop"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.501 s"
+value = "21.6027 °/s ± 0.0001 °/s"
+basis = "source: the BIQUAD then the PT2, eight loops after the step"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.502 s"
+value = "71.8690 °/s ± 0.0001 °/s"
+basis = "source: the BIQUAD then the PT2, 16 loops after the step"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.6 s"
+value = "100 °/s ± 0.0001 °/s"
+basis = "source: every kind of low-pass settles on its input"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.500125 s"
+value = "-0.002460 ± 0.000001"
+basis = "source: pidController: the first loop, the D term's PT3 (three stages of 0.133488) and PT1 (0.105393) pass 0.133488³ × 0.105393 of the filtered gyro's 0.077297 °/s: D = −0.000529 × 30 × 8000 × 0.077297 × 0.133488³ × 0.105393 = −0.002460"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.501 s"
+value = "-5.8537 ± 0.0001"
+basis = "source: the BIQUAD, the PT2, the PT3 and the PT1, eight loops after the step: D = −0.000529 × 30 × 8000 × the loop's rise"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.502 s"
+value = "-82.5130 ± 0.0001"
+basis = "source: the same filters, 16 loops after the step"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.504 s"
+value = "-331.7467 ± 0.0001"
+basis = "source: the same filters, 32 loops after the step"

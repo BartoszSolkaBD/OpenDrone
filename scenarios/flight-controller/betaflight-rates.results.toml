@@ -65,17 +65,17 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "0c4f9e5d0678cca4"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "930ed539d6c22485"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "37dc99246ca843cd"   # the Flight Controller's whole state after each of 9 cases, in order
+run  = "4cfb963a3a43f8f6"   # the Flight Controller's whole state after each of 9 cases, in order
 
 [fingerprints.checkpoints]   # the Flight Controller's whole state after each case
-"case 1" = "58ce15b917ee1e7e"
-"case 2" = "f3769154cc250953"
-"case 3" = "70fb42afd195c6fc"
-"case 4" = "2f2e02bf0832a8c1"
-"case 5" = "f18aa1307e9fe7f2"
-"case 6" = "891f2a91fd715283"
-"case 7" = "353610dcf56b7f6f"
-"case 8" = "01bfcf05354cb6eb"
-"case 9" = "e63096f5165ccbda"
+"case 1" = "f1419919444d43b6"
+"case 2" = "39a2101c6e0f261c"
+"case 3" = "f50236e2cc7ff7c1"
+"case 4" = "091d5e69b7e4c29e"
+"case 5" = "e6f03d2e42861583"
+"case 6" = "5bc7e1aa52525222"
+"case 7" = "3ac9b4546ac05d40"
+"case 8" = "689ab6d3f0ad25e4"
+"case 9" = "4921f203d298f4bf"

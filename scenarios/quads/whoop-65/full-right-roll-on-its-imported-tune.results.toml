@@ -20,49 +20,49 @@ measured = "669 °/s"
 what     = "roll rate at 0.9 s"
 basis    = "Observed"
 expected = "0 °/s ± 0.5 °/s"
-measured = "0.148 °/s"
+measured = "0.0936 °/s"
 
 [[expect]]
 what     = "roll rate, highest over 1.5 s to 3 s"
 basis    = "Observed"
 expected = "829 °/s ± 3%"
-measured = "837 °/s"
+measured = "836 °/s"
 
 [[expect]]
 what     = "roll rate, lowest over 1.5 s to 3 s"
 basis    = "Observed"
 expected = "491 °/s ± 3%"
-measured = "493 °/s"
+measured = "495 °/s"
 
 [[expect]]
 what     = "pitch rate, lowest over 1 s to 3 s"
 basis    = "Observed"
 expected = "-27.1 °/s ± 3 °/s"
-measured = "-27.1 °/s"
+measured = "-28.2 °/s"
 
 [[expect]]
 what     = "pitch rate, highest over 1 s to 3 s"
 basis    = "Observed"
 expected = "14.7 °/s ± 3 °/s"
-measured = "15.7 °/s"
+measured = "14.5 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 3 s"
 basis    = "Observed"
 expected = "-9.35 °/s ± 1.5 °/s"
-measured = "-9.35 °/s"
+measured = "-9.97 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 3 s"
 basis    = "Observed"
 expected = "10.6 °/s ± 1.5 °/s"
-measured = "10.6 °/s"
+measured = "10.5 °/s"
 
 [[expect]]
 what     = "roll rate at 3.5 s"
 basis    = "Observed"
 expected = "5.22 °/s ± 5 °/s"
-measured = "5.22 °/s"
+measured = "4.87 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -73,16 +73,16 @@ measured = "none broken"
 [fingerprints]
 quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "75dddd76aea83824"   # the whole state after each of 28000 steps at 8000 Hz, in order
+run  = "825f73299061b04d"   # the whole state after each of 28000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.35 s" = "17f6c566bc13c96e"
-"0.7 s" = "383202d071093cca"
-"1.05 s" = "5c5e14e09fb8719a"
-"1.4 s" = "f3222d7d0f89c847"
-"1.75 s" = "3eb5fd0feed388a2"
-"2.1 s" = "d820a72a87e16988"
-"2.45 s" = "d510dade6cefadbe"
-"2.8 s" = "9f880fc802c26888"
-"3.15 s" = "8c6b1c230d6e79a1"
-"3.5 s" = "752084ef04e7e1b6"
+"0.35 s" = "628a4afb73876451"
+"0.7 s" = "fcb6a53daa8296e8"
+"1.05 s" = "a59f98ef071cf7ae"
+"1.4 s" = "f91b2ba5776a89a4"
+"1.75 s" = "546ab4913823cb97"
+"2.1 s" = "8844f54cf6a12cf7"
+"2.45 s" = "67365a9b83aac198"
+"2.8 s" = "392883d55975b70d"
+"3.15 s" = "f0dd4b9d07e72931"
+"3.5 s" = "060ee3d2f8ebeccd"

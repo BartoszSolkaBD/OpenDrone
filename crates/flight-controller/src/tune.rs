@@ -8,9 +8,8 @@
 //! code ([ADR-0015]).
 //!
 //! Some settings it knows but doesn't simulate yet ([`Tune::not_simulated_yet`]):
-//! the low-pass filters, RC smoothing and feedforward (#49), Dynamic D, I-term
-//! relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch,
-//! which waits for gyro noise (#21). A Tune may set them,
+//! Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and
+//! the dynamic notch, which waits for gyro noise (#21). A Tune may set them,
 //! and their values are checked, but the Flight Controller flies as if each
 //! were off until its ticket lands; a Test Quad sets them off to fly exactly
 //! as Betaflight does. Settings it doesn't know at all are left alone; later
@@ -21,6 +20,8 @@
 use std::collections::BTreeMap;
 
 use opendrone_maths::Fingerprinter;
+
+pub use crate::filter::LowpassType;
 
 /// The Tune's settings this Flight Controller reads.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,8 +60,26 @@ pub struct Tune {
     /// `failsafe_recovery_delay`: how long frames must arrive again before
     /// the link counts as back, in tenths of a second.
     pub failsafe_recovery_delay: u8,
-    /// `p_roll`, `i_roll`, `d_roll`, then pitch and yaw.
+    /// `p_roll`, `i_roll`, `d_roll`, `f_roll`, then pitch and yaw.
     pub pid: [Gains; 3],
+    /// `feedforward_transition`: below this stick deflection, in hundredths,
+    /// roll and pitch's feedforward fades towards centre (0: no fade).
+    pub feedforward_transition: u8,
+    /// `feedforward_averaging`: how many frames' feedforward is averaged.
+    pub feedforward_averaging: FeedforwardAveraging,
+    /// `feedforward_smooth_factor`: how strongly the stick's speed is
+    /// smoothed, in percent, at a 250 Hz Packet Rate.
+    pub feedforward_smooth_factor: u8,
+    /// `feedforward_jitter_factor`: feedforward is cut while the stick moves
+    /// less than about this many µs a frame.
+    pub feedforward_jitter_factor: u8,
+    /// `feedforward_boost`: how much of the stick's acceleration is added, in
+    /// tenths of a percent.
+    pub feedforward_boost: u8,
+    /// `feedforward_max_rate_limit`: near full stick, roll and pitch's
+    /// feedforward is held back so it fades as the setpoint nears the max
+    /// rate (0: off).
+    pub feedforward_max_rate_limit: u8,
     /// `motor_output_limit`: the top of the motors' range, in percent.
     pub motor_output_limit: u8,
     /// `pidsum_limit`: the most roll or pitch may ask of the motors, where
@@ -73,6 +92,47 @@ pub struct Tune {
     /// `pid_at_min_throttle`: whether P and D keep working at low throttle
     /// before Airmode starts.
     pub pid_at_min_throttle: bool,
+    /// `feedforward_yaw_hold_gain`: how strongly yaw's feedforward keeps
+    /// pushing while the yaw stick holds after a move (0: off).
+    pub feedforward_yaw_hold_gain: u8,
+    /// `feedforward_yaw_hold_time`: how long yaw's hold lasts: its time
+    /// constant, in ms.
+    pub feedforward_yaw_hold_time: u8,
+    /// `gyro_lpf1_type`: the gyro's first low-pass.
+    pub gyro_lpf1_type: LowpassType,
+    /// `gyro_lpf1_static_hz`: its cutoff when it isn't dynamic, in Hz (0:
+    /// off, unless it's dynamic).
+    pub gyro_lpf1_static_hz: u16,
+    /// `gyro_lpf1_dyn_min_hz`: its lowest cutoff, at zero throttle, in Hz (0:
+    /// not dynamic).
+    pub gyro_lpf1_dyn_min_hz: u16,
+    /// `gyro_lpf1_dyn_max_hz`: its highest cutoff, at full throttle, in Hz.
+    pub gyro_lpf1_dyn_max_hz: u16,
+    /// `gyro_lpf2_type`: the gyro's second low-pass.
+    pub gyro_lpf2_type: LowpassType,
+    /// `gyro_lpf2_static_hz`: its cutoff, in Hz (0: off).
+    pub gyro_lpf2_static_hz: u16,
+    /// `dterm_lpf1_type`: the D term's first low-pass.
+    pub dterm_lpf1_type: LowpassType,
+    /// `dterm_lpf1_static_hz`: its cutoff when it isn't dynamic, in Hz (0:
+    /// off, unless it's dynamic).
+    pub dterm_lpf1_static_hz: u16,
+    /// `dterm_lpf1_dyn_min_hz`: its lowest cutoff, in Hz (0: not dynamic).
+    pub dterm_lpf1_dyn_min_hz: u16,
+    /// `dterm_lpf1_dyn_max_hz`: its highest cutoff, in Hz.
+    pub dterm_lpf1_dyn_max_hz: u16,
+    /// `dterm_lpf2_type`: the D term's second low-pass.
+    pub dterm_lpf2_type: LowpassType,
+    /// `dterm_lpf2_static_hz`: its cutoff, in Hz (0: off).
+    pub dterm_lpf2_static_hz: u16,
+    /// `gyro_lpf1_dyn_expo`: the curve of the gyro's dynamic low-pass from
+    /// its lowest cutoff to its highest (0: Betaflight's older curve).
+    pub gyro_lpf1_dyn_expo: u8,
+    /// `dterm_lpf1_dyn_expo`: the same for the D term's.
+    pub dterm_lpf1_dyn_expo: u8,
+    /// `yaw_lowpass_hz`: the cutoff of the low-pass on yaw's P term, in Hz
+    /// (0: off).
+    pub yaw_lowpass_hz: u16,
     /// `min_check`: below this, in µs, the throttle counts as low.
     pub min_check: u16,
     /// `mid_rc`: the sticks' centre, in µs.
@@ -81,6 +141,20 @@ pub struct Tune {
     pub deadband: u8,
     /// `yaw_deadband`: yaw's deadband, in µs.
     pub yaw_deadband: u8,
+    /// `rc_smoothing`: whether the setpoints, the throttle and feedforward
+    /// are smoothed between Radio Link frames.
+    pub rc_smoothing: bool,
+    /// `rc_smoothing_auto_factor`: how smooth the setpoints' automatic
+    /// cutoff is; higher is smoother.
+    pub rc_smoothing_auto_factor: u8,
+    /// `rc_smoothing_auto_factor_throttle`: the same for the throttle.
+    pub rc_smoothing_auto_factor_throttle: u8,
+    /// `rc_smoothing_setpoint_cutoff`: the setpoints' cutoff, in Hz (0:
+    /// worked out from the Packet Rate).
+    pub rc_smoothing_setpoint_cutoff: u8,
+    /// `rc_smoothing_throttle_cutoff`: the throttle's cutoff, in Hz (0:
+    /// worked out from the Packet Rate).
+    pub rc_smoothing_throttle_cutoff: u8,
     /// `yaw_control_reversed`.
     pub yaw_control_reversed: bool,
     /// `airmode_start_throttle_percent`: Airmode starts once the throttle
@@ -125,6 +199,33 @@ pub struct Gains {
     pub p: u8,
     pub i: u8,
     pub d: u8,
+    /// Feedforward, from 0 to 1000.
+    pub f: u16,
+}
+
+/// `feedforward_averaging`, in Betaflight's order: feedforward averaged over
+/// this many frames.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FeedforwardAveraging {
+    Off,
+    TwoPoint,
+    ThreePoint,
+    FourPoint,
+}
+
+impl FeedforwardAveraging {
+    /// Betaflight's words for it, in its order.
+    pub const WORDS: [&'static str; 4] = ["OFF", "2_POINT", "3_POINT", "4_POINT"];
+
+    /// How many frames it averages: 1 when off.
+    pub fn frames(self) -> usize {
+        match self {
+            FeedforwardAveraging::Off => 1,
+            FeedforwardAveraging::TwoPoint => 2,
+            FeedforwardAveraging::ThreePoint => 3,
+            FeedforwardAveraging::FourPoint => 4,
+        }
+    }
 }
 
 /// `failsafe_procedure`, in Betaflight's order.
@@ -196,9 +297,9 @@ enum Kind {
 }
 
 /// Every setting this Flight Controller reads, grouped as Betaflight's App
-/// shows them, tab by tab (Configuration, Failsafe, PID Tuning, Receiver,
-/// Motors), with each tab's settings that only the CLI holds after the ones
-/// it shows. The ranges are Betaflight 2026.6.2's
+/// shows them, tab by tab (Configuration, Failsafe, PID Tuning, its filters,
+/// Receiver, Motors), with each tab's settings that only the CLI holds after
+/// the ones it shows. The ranges are Betaflight 2026.6.2's
 /// (`src/main/cli/settings.c`).
 const SPECS: &[(&str, Kind)] = &[
     ("small_angle", Kind::Number(0, 180)),
@@ -222,21 +323,55 @@ const SPECS: &[(&str, Kind)] = &[
     ("p_roll", Kind::Number(0, 250)),
     ("i_roll", Kind::Number(0, 250)),
     ("d_roll", Kind::Number(0, 250)),
+    ("f_roll", Kind::Number(0, 1000)),
     ("p_pitch", Kind::Number(0, 250)),
     ("i_pitch", Kind::Number(0, 250)),
     ("d_pitch", Kind::Number(0, 250)),
+    ("f_pitch", Kind::Number(0, 1000)),
     ("p_yaw", Kind::Number(0, 250)),
     ("i_yaw", Kind::Number(0, 250)),
     ("d_yaw", Kind::Number(0, 250)),
+    ("f_yaw", Kind::Number(0, 1000)),
+    ("feedforward_transition", Kind::Number(0, 100)),
+    (
+        "feedforward_averaging",
+        Kind::Word(&FeedforwardAveraging::WORDS),
+    ),
+    ("feedforward_smooth_factor", Kind::Number(0, 95)),
+    ("feedforward_jitter_factor", Kind::Number(0, 20)),
+    ("feedforward_boost", Kind::Number(0, 50)),
+    ("feedforward_max_rate_limit", Kind::Number(0, 200)),
     ("motor_output_limit", Kind::Number(1, 100)),
     ("pidsum_limit", Kind::Number(100, 1000)),
     ("pidsum_limit_yaw", Kind::Number(100, 1000)),
     ("iterm_windup", Kind::Number(20, 100)),
     ("pid_at_min_throttle", Kind::OffOn),
+    ("feedforward_yaw_hold_gain", Kind::Number(0, 100)),
+    ("feedforward_yaw_hold_time", Kind::Number(10, 250)),
+    ("gyro_lpf1_type", Kind::Word(&LowpassType::WORDS)),
+    ("gyro_lpf1_static_hz", Kind::Number(0, 1000)),
+    ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000)),
+    ("gyro_lpf1_dyn_max_hz", Kind::Number(0, 1000)),
+    ("gyro_lpf2_type", Kind::Word(&LowpassType::WORDS)),
+    ("gyro_lpf2_static_hz", Kind::Number(0, 1000)),
+    ("dterm_lpf1_type", Kind::Word(&LowpassType::WORDS)),
+    ("dterm_lpf1_static_hz", Kind::Number(0, 1000)),
+    ("dterm_lpf1_dyn_min_hz", Kind::Number(0, 1000)),
+    ("dterm_lpf1_dyn_max_hz", Kind::Number(0, 1000)),
+    ("dterm_lpf2_type", Kind::Word(&LowpassType::WORDS)),
+    ("dterm_lpf2_static_hz", Kind::Number(0, 1000)),
+    ("gyro_lpf1_dyn_expo", Kind::Number(0, 10)),
+    ("dterm_lpf1_dyn_expo", Kind::Number(0, 10)),
+    ("yaw_lowpass_hz", Kind::Number(0, 500)),
     ("min_check", Kind::Number(750, 2250)),
     ("mid_rc", Kind::Number(1200, 1700)),
     ("deadband", Kind::Number(0, 32)),
     ("yaw_deadband", Kind::Number(0, 100)),
+    ("rc_smoothing", Kind::OffOn),
+    ("rc_smoothing_auto_factor", Kind::Number(0, 250)),
+    ("rc_smoothing_auto_factor_throttle", Kind::Number(0, 250)),
+    ("rc_smoothing_setpoint_cutoff", Kind::Number(0, 255)),
+    ("rc_smoothing_throttle_cutoff", Kind::Number(0, 255)),
     ("yaw_control_reversed", Kind::OffOn),
     ("airmode_start_throttle_percent", Kind::Number(0, 100)),
     (
@@ -268,11 +403,8 @@ const SPECS: &[(&str, Kind)] = &[
 /// Betaflight does now, and stays so once their tickets land. Grouped as the
 /// Betaflight App shows them.
 const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
-    // PID Tuning: feedforward, Dynamic D, I-term relax, anti-gravity, TPA and
-    // throttle boost.
-    ("f_roll", Kind::Number(0, 1000), "#49"),
-    ("f_pitch", Kind::Number(0, 1000), "#49"),
-    ("f_yaw", Kind::Number(0, 1000), "#49"),
+    // PID Tuning: Dynamic D, I-term relax, anti-gravity, TPA and throttle
+    // boost.
     ("d_max_roll", Kind::Number(0, 250), "#50"),
     ("d_max_pitch", Kind::Number(0, 250), "#50"),
     ("d_max_yaw", Kind::Number(0, 250), "#50"),
@@ -285,23 +417,13 @@ const NOT_SIMULATED_YET: &[(&str, Kind, &str)] = &[
     ("tpa_rate", Kind::Number(0, 100), "#50"),
     ("tpa_low_rate", Kind::Number(0, 100), "#50"),
     ("throttle_boost", Kind::Number(0, 100), "#50"),
-    // PID Tuning, filters: the gyro and D-term low-passes, the dynamic notch
-    // and the yaw P low-pass. The dynamic notch isn't in the alpha: like the
+    // PID Tuning, filters: the dynamic notch isn't in the alpha. Like the
     // RPM filter, it comes only once gyro noise is simulated (#21, #37).
-    ("gyro_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
-    ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
-    ("gyro_lpf2_static_hz", Kind::Number(0, 1000), "#49"),
     (
         "dyn_notch_count",
         Kind::Number(0, 7),
         "waits for gyro noise, #21",
     ),
-    ("dterm_lpf1_static_hz", Kind::Number(0, 1000), "#49"),
-    ("dterm_lpf1_dyn_min_hz", Kind::Number(0, 1000), "#49"),
-    ("dterm_lpf2_static_hz", Kind::Number(0, 1000), "#49"),
-    ("yaw_lowpass_hz", Kind::Number(0, 500), "#49"),
-    // Receiver: RC smoothing.
-    ("rc_smoothing", Kind::OffOn, "#49"),
 ];
 
 /// Betaflight's words for every value of the two lookups read here, so a
@@ -394,10 +516,12 @@ impl Tune {
         }
         let n = |name: &str| values[name];
         let small = |name: &str| n(name) as u8;
+        let hz = |name: &str| n(name) as u16;
         let gains = |axis: &str| Gains {
             p: small(&format!("p_{axis}")),
             i: small(&format!("i_{axis}")),
             d: small(&format!("d_{axis}")),
+            f: hz(&format!("f_{axis}")),
         };
         Ok(Tune {
             small_angle: small("small_angle"),
@@ -423,15 +547,48 @@ impl Tune {
             failsafe_throttle: n("failsafe_throttle") as u16,
             failsafe_recovery_delay: small("failsafe_recovery_delay"),
             pid: [gains("roll"), gains("pitch"), gains("yaw")],
+            feedforward_transition: small("feedforward_transition"),
+            feedforward_averaging: match n("feedforward_averaging") {
+                0 => FeedforwardAveraging::Off,
+                1 => FeedforwardAveraging::TwoPoint,
+                2 => FeedforwardAveraging::ThreePoint,
+                _ => FeedforwardAveraging::FourPoint,
+            },
+            feedforward_smooth_factor: small("feedforward_smooth_factor"),
+            feedforward_jitter_factor: small("feedforward_jitter_factor"),
+            feedforward_boost: small("feedforward_boost"),
+            feedforward_max_rate_limit: small("feedforward_max_rate_limit"),
             motor_output_limit: small("motor_output_limit"),
             pidsum_limit: n("pidsum_limit") as u16,
             pidsum_limit_yaw: n("pidsum_limit_yaw") as u16,
             iterm_windup: small("iterm_windup"),
             pid_at_min_throttle: n("pid_at_min_throttle") == 1,
+            feedforward_yaw_hold_gain: small("feedforward_yaw_hold_gain"),
+            feedforward_yaw_hold_time: small("feedforward_yaw_hold_time"),
+            gyro_lpf1_type: LowpassType::from_place(n("gyro_lpf1_type")),
+            gyro_lpf1_static_hz: hz("gyro_lpf1_static_hz"),
+            gyro_lpf1_dyn_min_hz: hz("gyro_lpf1_dyn_min_hz"),
+            gyro_lpf1_dyn_max_hz: hz("gyro_lpf1_dyn_max_hz"),
+            gyro_lpf2_type: LowpassType::from_place(n("gyro_lpf2_type")),
+            gyro_lpf2_static_hz: hz("gyro_lpf2_static_hz"),
+            dterm_lpf1_type: LowpassType::from_place(n("dterm_lpf1_type")),
+            dterm_lpf1_static_hz: hz("dterm_lpf1_static_hz"),
+            dterm_lpf1_dyn_min_hz: hz("dterm_lpf1_dyn_min_hz"),
+            dterm_lpf1_dyn_max_hz: hz("dterm_lpf1_dyn_max_hz"),
+            dterm_lpf2_type: LowpassType::from_place(n("dterm_lpf2_type")),
+            dterm_lpf2_static_hz: hz("dterm_lpf2_static_hz"),
+            gyro_lpf1_dyn_expo: small("gyro_lpf1_dyn_expo"),
+            dterm_lpf1_dyn_expo: small("dterm_lpf1_dyn_expo"),
+            yaw_lowpass_hz: hz("yaw_lowpass_hz"),
             min_check: n("min_check") as u16,
             mid_rc: n("mid_rc") as u16,
             deadband: small("deadband"),
             yaw_deadband: small("yaw_deadband"),
+            rc_smoothing: n("rc_smoothing") == 1,
+            rc_smoothing_auto_factor: small("rc_smoothing_auto_factor"),
+            rc_smoothing_auto_factor_throttle: small("rc_smoothing_auto_factor_throttle"),
+            rc_smoothing_setpoint_cutoff: small("rc_smoothing_setpoint_cutoff"),
+            rc_smoothing_throttle_cutoff: small("rc_smoothing_throttle_cutoff"),
             yaw_control_reversed: n("yaw_control_reversed") == 1,
             airmode_start_throttle_percent: small("airmode_start_throttle_percent"),
             mixer_type: MixerType::Legacy,
@@ -491,17 +648,51 @@ impl Tune {
         ];
         for gains in self.pid {
             numbers.extend([gains.p, gains.i, gains.d].map(u64::from));
+            numbers.push(u64::from(gains.f));
         }
         numbers.extend([
+            u64::from(self.feedforward_transition),
+            match self.feedforward_averaging {
+                FeedforwardAveraging::Off => 0,
+                FeedforwardAveraging::TwoPoint => 1,
+                FeedforwardAveraging::ThreePoint => 2,
+                FeedforwardAveraging::FourPoint => 3,
+            },
+            u64::from(self.feedforward_smooth_factor),
+            u64::from(self.feedforward_jitter_factor),
+            u64::from(self.feedforward_boost),
+            u64::from(self.feedforward_max_rate_limit),
             u64::from(self.motor_output_limit),
             u64::from(self.pidsum_limit),
             u64::from(self.pidsum_limit_yaw),
             u64::from(self.iterm_windup),
             u64::from(self.pid_at_min_throttle),
+            u64::from(self.feedforward_yaw_hold_gain),
+            u64::from(self.feedforward_yaw_hold_time),
+            self.gyro_lpf1_type.place(),
+            u64::from(self.gyro_lpf1_static_hz),
+            u64::from(self.gyro_lpf1_dyn_min_hz),
+            u64::from(self.gyro_lpf1_dyn_max_hz),
+            self.gyro_lpf2_type.place(),
+            u64::from(self.gyro_lpf2_static_hz),
+            self.dterm_lpf1_type.place(),
+            u64::from(self.dterm_lpf1_static_hz),
+            u64::from(self.dterm_lpf1_dyn_min_hz),
+            u64::from(self.dterm_lpf1_dyn_max_hz),
+            self.dterm_lpf2_type.place(),
+            u64::from(self.dterm_lpf2_static_hz),
+            u64::from(self.gyro_lpf1_dyn_expo),
+            u64::from(self.dterm_lpf1_dyn_expo),
+            u64::from(self.yaw_lowpass_hz),
             u64::from(self.min_check),
             u64::from(self.mid_rc),
             u64::from(self.deadband),
             u64::from(self.yaw_deadband),
+            u64::from(self.rc_smoothing),
+            u64::from(self.rc_smoothing_auto_factor),
+            u64::from(self.rc_smoothing_auto_factor_throttle),
+            u64::from(self.rc_smoothing_setpoint_cutoff),
+            u64::from(self.rc_smoothing_throttle_cutoff),
             u64::from(self.yaw_control_reversed),
             u64::from(self.airmode_start_throttle_percent),
             match self.motor_pwm_protocol {

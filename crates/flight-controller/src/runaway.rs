@@ -25,8 +25,7 @@
 //!
 //! The PID sums are the last loop's, unclamped; the sticks are as the frame
 //! before this one left them, and the throttle this frame's, as Betaflight
-//! has them when it checks. Betaflight reads its filtered gyro; until the
-//! filters arrive (#49) this reads the gyro as the sensor reads it.
+//! has them when it checks. It reads the filtered gyro, as Betaflight does.
 
 use opendrone_maths::Fingerprinter;
 

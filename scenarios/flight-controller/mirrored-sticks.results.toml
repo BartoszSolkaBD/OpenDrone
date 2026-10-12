@@ -32,13 +32,13 @@ measured = "-100%"
 what     = "distance north at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "0.00000000000000866 m"
+measured = "-0.00000000000000866 m"
 
 [[expect]]
 what     = "height at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "0.00000000000000711 m"
+measured = "-0.00000000000000711 m"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -47,18 +47,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "21bc9b2a7cf782fd"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
+quad = "fa9e617f4e1323e8"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "dc3bdde0d544f96e"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "00b21ce948eabded"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "685b40a48cc08087"
-"0.2 s" = "8196d81357b1b7ed"
-"0.3 s" = "711abc8a770c4d55"
-"0.4 s" = "bb9cc010ff548b23"
-"0.5 s" = "64eaa4e93a8b551a"
-"0.6 s" = "40c57ff87f85be95"
-"0.7 s" = "ab3e13b439decef8"
-"0.8 s" = "07931a9710f07d13"
-"0.9 s" = "8b50a85fcaa24861"
-"1 s" = "eeb405cbe2599951"
+"0.1 s" = "87c103b91ca4e04c"
+"0.2 s" = "b23dc0a2409630bd"
+"0.3 s" = "5357283349226aa6"
+"0.4 s" = "dd8408602c4c7d12"
+"0.5 s" = "bbd7df5edf7c8d09"
+"0.6 s" = "b4c1e686e84a715a"
+"0.7 s" = "af95dd6a9b6577b1"
+"0.8 s" = "585d16445fbc368d"
+"0.9 s" = "33e29a2623eff591"
+"1 s" = "ab3375cff25f87b5"

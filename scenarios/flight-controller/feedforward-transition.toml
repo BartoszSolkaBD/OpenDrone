@@ -1,0 +1,56 @@
+# Feedforward's transition follows Betaflight 2026.6.2
+# (`calculateFeedforward`, src/main/fc/rc.c): with `feedforward_transition`
+# 50, roll and pitch's feedforward is scaled by the stick's deflection ÷ 0.5
+# while the stick is less than halfway out, so it fades in from centre
+# stick.
+#
+# The same ramp as feedforward-at-250-hz.toml's, on the Test Quad
+# test/freestyle-5-feedforward-transition: its feedforward_transition is 50,
+# and everything else is as test/freestyle-5-loop-shaping-off. The Flight
+# Controller alone, armed, the sticks centred, the throttle at 0%, a 250 Hz
+# Radio Link. From 0.5 s to 0.7 s the roll stick ramps from 0% to 20%; the
+# Rates are Actual 670/670, a straight line. Each value is worked out frame
+# by frame and loop by loop from Betaflight's formulas.
+format = 2
+name   = "Feedforward's transition fades feedforward in from centre stick"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-feedforward-transition"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 670 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "0%" },
+  { at = "0.7 s", roll = "ramp to 20%" },
+]
+
+[[expect]]
+what  = "roll F term"
+over  = "0.6 s to 0.7 s"
+mean  = "1.2847 ± 0.0001"
+basis = "source: calculateFeedforward: the stick is 10% to 20% out, so feedforward is scaled by about 0.15 ÷ 0.5 = 0.3: about 0.3 of the 4.3377 the same ramp gives with no transition (feedforward-at-250-hz.toml); frame by frame the mean is 1.2847"
+
+[[expect]]
+what  = "roll F term"
+at    = "0.65 s"
+value = "1.3643 ± 0.0001"
+basis = "source: calculateFeedforward: 15% out, the transition scales feedforward by about 0.3"

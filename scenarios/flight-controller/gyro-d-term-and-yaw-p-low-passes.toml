@@ -1,0 +1,175 @@
+# The gyro's low-passes, the D term's low-passes and yaw P's low-pass follow
+# Betaflight 2026.6.2 (`gyroInitFilters`, src/main/sensors/gyro_init.c; the
+# gyro's filtering, src/main/sensors/gyro.c and gyro_filter_impl.c;
+# `pidInitFilters`, src/main/flight/pid_init.c; `pidController` and
+# `dynLpfDTermUpdate`, src/main/flight/pid.c; `dynLpfGyroUpdate`, gyro.c;
+# `updateDynLpfCutoffs`, src/main/flight/mixer.c; the Betaflight research §5).
+#
+# The Freestyle 5″'s Tune keeps Betaflight's defaults, every filter a PT1
+# low-pass, `k = ω ÷ (ω + 1)` with `ω = 2π × cutoff ÷ 8000` at one loop
+# every 1/8000 s:
+#
+# | Filter                   | Cutoff                                  | k at 8 kHz          |
+# |--------------------------|-----------------------------------------|---------------------|
+# | gyro low-pass 2          | 500 Hz                                  | 0.281970            |
+# | gyro low-pass 1          | 250 Hz at zero throttle, 500 Hz at full | 0.164124 / 0.281970 |
+# | D-term low-pass 1        | 75 Hz at zero throttle, 150 Hz at full  | 0.055628 / 0.105393 |
+# | D-term low-pass 2        | 150 Hz                                  | 0.105393            |
+# | yaw P low-pass           | 100 Hz                                  | 0.072821            |
+#
+# The gyro reading passes through low-pass 2, then low-pass 1. The D term
+# reads that filtered gyro through its own two, D = 0.000529 × 30 × how fast
+# the twice-filtered reading falls, per second. Yaw's P = 0.032029 × 45 ×
+# the error, then its low-pass. The two dynamic low-passes follow the
+# mixer's throttle: with `*_dyn_expo` 5, the cutoff is lowest + (highest −
+# lowest) × (t + 0.5 × t × (1 − t)), at the throttle t rounded to whole
+# percent.
+#
+# The Flight Controller alone, armed, the sticks centred (0.11 °/s on each
+# axis, see actual-rates.toml), the throttle at 0%, so every filter starts
+# settled on a still gyro. At 0.5 s the gyro reads 100 °/s, rolling right and
+# yawing right, at once. At 1 s the throttle goes to 100%, and the dynamic
+# cutoffs follow it up; at 1.5 s the gyro reads still again.
+#
+# Each value is the filters' step response, worked out loop by loop from
+# Betaflight's formulas: a PT1 stage moves its state k of the way to its
+# input each loop. The first loop after a step, a chain of PT1 stages has
+# moved the product of their k: 0.281970 × 0.164124 × 100 °/s = 4.628 °/s
+# for the gyro at zero throttle.
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-off: the Freestyle 5″
+# with Dynamic D, I-term relax, anti-gravity, TPA and throttle boost off
+# (#50), so the D term is Betaflight's with these filters and nothing else.
+format = 2
+name   = "The gyro's, the D term's and yaw P's low-passes follow Betaflight's, moving with the throttle"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-off"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 100 °/s" },
+  { at = "1 s",   throttle = "100%" },
+  { at = "1.5 s", rotation = "0 °/s" },
+]
+
+# Zero throttle: gyro low-pass 1 at its lowest, 250 Hz.
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.500125 s"
+value = "4.628 °/s ± 0.001 °/s"
+basis = "source: gyro low-pass 2 (500 Hz) then low-pass 1 (250 Hz at zero throttle), PT1 each: the first loop after the step, 100 °/s × 0.281970 × 0.164124 = 4.628 °/s"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.5005 s"
+value = "28.948 °/s ± 0.001 °/s"
+basis = "source: the same two PT1 stages, four loops after the step, loop by loop"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.501 s"
+value = "59.404 °/s ± 0.001 °/s"
+basis = "source: the same two PT1 stages, eight loops (1 ms) after the step: about a 0.6 ms delay at 250 Hz and 0.3 ms at 500 Hz together"
+
+[[expect]]
+what  = "filtered gyro yaw rate"
+at    = "0.501 s"
+value = "59.404 °/s ± 0.001 °/s"
+basis = "source: every axis's gyro passes through the same two low-passes"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "0.6 s"
+value = "100 °/s ± 0.001 °/s"
+basis = "source: a low-pass's output settles on its input"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.500125 s"
+value = "-3.4447 ± 0.0001"
+basis = "source: pidController: D reads the filtered gyro through D-term low-pass 1 (75 Hz at zero throttle) and 2 (150 Hz), so the first loop after the step the twice-filtered gyro has risen 100 °/s × 0.281970 × 0.164124 × 0.055628 × 0.105393 = 0.027132 °/s, and D = −0.000529 × 30 × 0.027132 × 8000 = −3.4447"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.501 s"
+value = "-135.912 ± 0.001"
+basis = "source: the four PT1 stages, eight loops after the step, loop by loop: D = −0.000529 × 30 × 8000 × the loop's rise"
+
+[[expect]]
+what  = "roll D term"
+at    = "0.502 s"
+value = "-287.094 ± 0.001"
+basis = "source: the four PT1 stages, 16 loops after the step"
+
+[[expect]]
+what  = "yaw P term"
+at    = "0.500125 s"
+value = "-0.3277 ± 0.0001"
+basis = "source: pidController: before the step yaw's P was 0.032029 × 45 × 0.10966 = 0.1581, pushing the nose right as the centred stick asks; the first loop after the step the error has moved by the 4.628 °/s the gyro's low-passes let through, of which yaw P's 100 Hz low-pass passes 0.072821: 0.1581 − 0.032029 × 45 × 4.628 × 0.072821 = −0.3277"
+
+[[expect]]
+what  = "yaw P term"
+at    = "0.501 s"
+value = "-23.230 ± 0.001"
+basis = "source: the two gyro low-passes, then yaw P's, eight loops after the step"
+
+[[expect]]
+what  = "yaw P term"
+at    = "0.6 s"
+value = "-143.972 ± 0.001"
+basis = "source: settled: P = 0.032029 × 45 × (100 + 0.10966) = 143.972, pushing the nose left"
+
+# Full throttle: by 1.5 s gyro low-pass 1 is at its highest, 500 Hz, and
+# D-term low-pass 1 at 150 Hz.
+
+[[expect]]
+what  = "mixer throttle"
+at    = "1.1 s"
+value = "100% ± 0.0001%"
+basis = "source: full throttle, through RC smoothing's low-pass, is 1 at the mixer, which moves both dynamic low-passes to their highest cutoff: 250 + 250 × (1 + 0.5 × 1 × 0) = 500 Hz, and 75 + 75 × 1 = 150 Hz"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "1.500125 s"
+value = "92.049 °/s ± 0.001 °/s"
+basis = "source: gyro low-pass 2 then low-pass 1, both at 500 Hz now: the first loop after the step down, 100 °/s × (1 − 0.281970 × 0.281970) = 92.049 °/s"
+
+[[expect]]
+what  = "filtered gyro roll rate"
+at    = "1.501 s"
+value = "23.003 °/s ± 0.001 °/s"
+basis = "source: the two PT1 stages at 500 Hz, eight loops after the step: faster than at zero throttle, which had covered only 59% by then"
+
+[[expect]]
+what  = "roll D term"
+at    = "1.500125 s"
+value = "11.2124 ± 0.0001"
+basis = "source: the twice-filtered gyro falls 100 °/s × 0.281970 × 0.281970 × 0.105393 × 0.105393 = 0.088312 °/s the first loop, with both D-term low-passes at 150 Hz: D = 0.000529 × 30 × 0.088312 × 8000 = 11.2124"
+
+[[expect]]
+what  = "roll D term"
+at    = "1.502 s"
+value = "459.676 ± 0.001"
+basis = "source: the four PT1 stages at full throttle's cutoffs, 16 loops after the step"

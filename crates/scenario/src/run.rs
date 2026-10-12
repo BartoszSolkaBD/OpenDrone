@@ -10,6 +10,7 @@ use opendrone_sim::{
     Channel, Channels, FlightControllerSeam, FlightInput, InputDeviceFacts, MapShapeProblem, Mount,
     OurFlightController, PacketRate, PhysicsRate, QuadSetUp, QuadState, RadioLink, RadioLinkOutput,
     ScriptedMotors, SensorReadings, SetUp, SetUpError, SetUpProblem, Simulation, SimulationTime,
+    sensor_readings,
 };
 use opendrone_test_pilot::{Jobs, TestPilot};
 
@@ -268,10 +269,10 @@ fn simulate(
             tune.clone(),
             start.rates.clone(),
             plan.physics_rate,
+            packet_rate(start),
             start.armed,
             start.assists.auto_arm,
-            &state,
-            quad.parameters.gyro_range,
+            &sensor_readings(&state, false, quad.parameters.gyro_range),
         )),
         (Inputs::Pilot(_) | Inputs::Track(_), None) => {
             unreachable!("a pilot's inputs fly our Flight Controller")
@@ -482,6 +483,7 @@ fn loop_alone(
         tune.clone(),
         start.rates.clone(),
         rate.hz(),
+        packet_rate(start).hz(),
         start.armed,
         &feed.readings(0),
     );

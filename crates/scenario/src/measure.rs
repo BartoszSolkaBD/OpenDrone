@@ -38,6 +38,7 @@ pub enum Term {
     P,
     I,
     D,
+    F,
     Sum,
 }
 
@@ -131,8 +132,23 @@ pub enum Measure {
     BatterySag,
     /// The rotation speed the Rates ask for: our Flight Controller's
     /// setpoint, in the pilot's directions (rolling right, pitching nose up,
-    /// yawing nose right positive).
+    /// yawing nose right positive), from the newest frame, before any
+    /// smoothing.
     Setpoint(Axis),
+    /// The setpoint as our Flight Controller's PID loop uses it: after RC
+    /// smoothing, when that's on. In the pilot's directions.
+    SmoothedSetpoint(Axis),
+    /// The gyro after our Flight Controller's low-passes, as every part of it
+    /// reads the gyro, in the pilot's directions.
+    FilteredGyro(Axis),
+    /// The Packet Rate our Flight Controller has detected from the frames'
+    /// timing (Betaflight's "Detected Rx frequency").
+    DetectedPacketRate,
+    /// RC smoothing's cutoff in use for the setpoints and feedforward, and
+    /// for the throttle, in whole Hz; nothing to measure with RC smoothing
+    /// off.
+    SetpointSmoothingCutoff,
+    ThrottleSmoothingCutoff,
     /// One of the PID loop's terms on Betaflight's scale (1000 is the whole
     /// motor range), in the pilot's directions: a positive pitch term pushes
     /// the nose up.
@@ -438,7 +454,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 87] = [
+const ALL: [(&str, Measure); 99] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -499,17 +515,47 @@ const ALL: [(&str, Measure); 87] = [
     ("roll setpoint", Measure::Setpoint(Axis::Roll)),
     ("pitch setpoint", Measure::Setpoint(Axis::Pitch)),
     ("yaw setpoint", Measure::Setpoint(Axis::Yaw)),
+    (
+        "roll smoothed setpoint",
+        Measure::SmoothedSetpoint(Axis::Roll),
+    ),
+    (
+        "pitch smoothed setpoint",
+        Measure::SmoothedSetpoint(Axis::Pitch),
+    ),
+    (
+        "yaw smoothed setpoint",
+        Measure::SmoothedSetpoint(Axis::Yaw),
+    ),
+    ("filtered gyro roll rate", Measure::FilteredGyro(Axis::Roll)),
+    (
+        "filtered gyro pitch rate",
+        Measure::FilteredGyro(Axis::Pitch),
+    ),
+    ("filtered gyro yaw rate", Measure::FilteredGyro(Axis::Yaw)),
+    ("detected Packet Rate", Measure::DetectedPacketRate),
+    (
+        "setpoint smoothing cutoff",
+        Measure::SetpointSmoothingCutoff,
+    ),
+    (
+        "throttle smoothing cutoff",
+        Measure::ThrottleSmoothingCutoff,
+    ),
     ("roll P term", Measure::PidTerm(Axis::Roll, Term::P)),
     ("roll I term", Measure::PidTerm(Axis::Roll, Term::I)),
     ("roll D term", Measure::PidTerm(Axis::Roll, Term::D)),
+    ("roll F term", Measure::PidTerm(Axis::Roll, Term::F)),
     ("roll PID sum", Measure::PidTerm(Axis::Roll, Term::Sum)),
     ("pitch P term", Measure::PidTerm(Axis::Pitch, Term::P)),
     ("pitch I term", Measure::PidTerm(Axis::Pitch, Term::I)),
     ("pitch D term", Measure::PidTerm(Axis::Pitch, Term::D)),
+    ("pitch F term", Measure::PidTerm(Axis::Pitch, Term::F)),
     ("pitch PID sum", Measure::PidTerm(Axis::Pitch, Term::Sum)),
     ("yaw P term", Measure::PidTerm(Axis::Yaw, Term::P)),
     ("yaw I term", Measure::PidTerm(Axis::Yaw, Term::I)),
     ("yaw D term", Measure::PidTerm(Axis::Yaw, Term::D)),
+    ("yaw F term", Measure::PidTerm(Axis::Yaw, Term::F)),
     ("yaw PID sum", Measure::PidTerm(Axis::Yaw, Term::Sum)),
     ("motor 1 DShot", Measure::MotorDshot(0)),
     ("motor 2 DShot", Measure::MotorDshot(1)),
@@ -628,7 +674,12 @@ impl Measure {
             Measure::MotorRestarts(_) => Dimension::NONE,
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
-            Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
+            Measure::Setpoint(_) | Measure::SmoothedSetpoint(_) | Measure::FilteredGyro(_) => {
+                Dimension::ROTATION_SPEED
+            }
+            Measure::DetectedPacketRate
+            | Measure::SetpointSmoothingCutoff
+            | Measure::ThrottleSmoothingCutoff => Dimension::PER_SECOND,
             Measure::PidTerm(..) | Measure::MotorDshot(_) | Measure::MotorDirection(_) => {
                 Dimension::NONE
             }
@@ -646,6 +697,11 @@ impl Measure {
     pub fn of_the_flight_controller(self) -> bool {
         match self {
             Measure::Setpoint(_)
+            | Measure::SmoothedSetpoint(_)
+            | Measure::FilteredGyro(_)
+            | Measure::DetectedPacketRate
+            | Measure::SetpointSmoothingCutoff
+            | Measure::ThrottleSmoothingCutoff
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)
             | Measure::MotorDirection(_)
@@ -770,6 +826,11 @@ impl Measure {
                 now.commands.0.iter().map(|c| c.throttle).sum::<f64>() / 4.0
             }
             Measure::Setpoint(_)
+            | Measure::SmoothedSetpoint(_)
+            | Measure::FilteredGyro(_)
+            | Measure::DetectedPacketRate
+            | Measure::SetpointSmoothingCutoff
+            | Measure::ThrottleSmoothingCutoff
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)
             | Measure::MotorDirection(_)
@@ -794,6 +855,13 @@ impl Measure {
         };
         Some(match self {
             Measure::Setpoint(axis) => pilot(axis, record.setpoint[index(axis)]) * DEGREE,
+            Measure::SmoothedSetpoint(axis) => {
+                pilot(axis, record.smoothed_setpoint[index(axis)]) * DEGREE
+            }
+            Measure::FilteredGyro(axis) => pilot(axis, record.filtered_gyro[index(axis)]) * DEGREE,
+            Measure::DetectedPacketRate => record.detected_packet_rate,
+            Measure::SetpointSmoothingCutoff => f64::from(record.rc_smoothing_cutoffs?[0]),
+            Measure::ThrottleSmoothingCutoff => f64::from(record.rc_smoothing_cutoffs?[1]),
             Measure::PidTerm(axis, term) => {
                 let terms = record.terms[index(axis)];
                 pilot(
@@ -802,6 +870,7 @@ impl Measure {
                         Term::P => terms.p,
                         Term::I => terms.i,
                         Term::D => terms.d,
+                        Term::F => terms.f,
                         Term::Sum => terms.sum,
                     },
                 )

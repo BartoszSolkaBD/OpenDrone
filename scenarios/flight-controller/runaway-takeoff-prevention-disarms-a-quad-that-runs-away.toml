@@ -14,6 +14,12 @@
 # Full right roll asks for 670 °/s, so with the gyro reading next to nothing
 # the roll PID sum is 0.032029 × 45 × (670 - 15) = 944 plus I, far past 600:
 # a quad that doesn't turn as it's told, as with a motor wired backwards.
+#
+# It watches the filtered gyro, as every part of the Flight Controller does:
+# gyro low-pass 2 (a PT1 at 500 Hz) and low-pass 1 (a PT1 at 339 Hz at this
+# throttle), so a change in the reading reaches it over a few loops
+# (gyro-d-term-and-yaw-p-low-passes.toml). The step from 15 °/s to 17 °/s
+# passes 16 °/s, more than 15 once cut to a whole number, on the sixth loop.
 format = 2
 name   = "Runaway takeoff prevention disarms a Quad whose PID sum stays at 600 with the gyro moving for 75 ms"
 
@@ -45,8 +51,8 @@ timeline = [
   # A PID sum far past 600, but the gyro at 15 °/s isn't moving, as on a
   # bench without props.
   { at = "0.1 s", roll = "100%", rotation = "roll 15 °/s, pitch 0 °/s, yaw 0 °/s" },
-  # At 16 °/s it is.
-  { at = "0.3 s", rotation = "roll 16 °/s, pitch 0 °/s, yaw 0 °/s" },
+  # At 17 °/s it is.
+  { at = "0.3 s", rotation = "roll 17 °/s, pitch 0 °/s, yaw 0 °/s" },
   # Disarmed: the sticks back, and the Arm switch must go off.
   { at = "0.5 s", roll = "0%", throttle = "0%", rotation = "0 °/s" },
   { at = "0.6 s", arm = "off" },
@@ -70,13 +76,13 @@ basis = "source: pidController: P is 0.032029 × 45 × (670 - 15) = 944.05, and 
 [[expect]]
 what  = "the Quad disarms"
 over  = "0.3 s to 0.5 s"
-first = "0.07525 s ± 0.000001 s"
-basis = "source: subTaskPidController: at 16 °/s the gyro is moving, so the loop at 0.3 s sets the disarm for 75 ms later, 0.375 s, and the first loop after that, at 0.375125 s, disarms"
+first = "0.075875 s ± 0.000001 s"
+basis = "source: subTaskPidController: through the gyro's low-passes the filtered reading goes 15.12, 15.30, 15.50, 15.70, 15.90 and then 16.07 °/s in the loops from 0.3 s: 16, more than 15, so the loop at 0.300625 s finds the gyro moving and sets the disarm for 75 ms later, 0.375625 s; the first loop after that, at 0.37575 s, disarms"
 
 [[expect]]
 what  = "RUNAWAY blocks arming"
 over  = "0.3 s to 0.5 s"
-first = "0.07525 s ± 0.000001 s"
+first = "0.075875 s ± 0.000001 s"
 basis = "source: subTaskPidController: the same loop sets ARMING_DISABLED_RUNAWAY_TAKEOFF, which Betaflight names RUNAWAY (src/main/fc/runtime_config.c)"
 
 [[expect]]
@@ -106,5 +112,5 @@ basis = "source: tryArm: with the throttle low and nothing blocking, the frame a
 [[expect]]
 what  = "the Quad disarms"
 over  = "0.8 s to 1 s"
-first = "0.07525 s ± 0.000001 s"
-basis = "source: tryArm starts runaway takeoff prevention's timers afresh, and the flight hasn't counted as stable, so a PID sum past 600 with the gyro moving disarms it 75 ms on again"
+first = "0.0805 s ± 0.000001 s"
+basis = "source: tryArm starts runaway takeoff prevention's timers afresh, and the flight hasn't counted as stable, so a PID sum past 600 with the gyro moving disarms it 75 ms on again. The frame at 0.8 s asks for 670 °/s at once, but RC smoothing's PT3 at 93 Hz brings the setpoint in over several loops while the D term pushes against the gyro's rise, so the roll PID sum first reaches 600 (614.8) in the loop at 0.80525 s; the first loop more than 75 ms later, at 0.880375 s, disarms"

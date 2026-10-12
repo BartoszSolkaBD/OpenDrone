@@ -21,9 +21,9 @@
 # random seed.
 #
 # The Flight Controller flies the Tune's "Not simulated yet" settings as off
-# until their tickets land: feedforward and the filters (#49), Dynamic D and
-# I-term relax (#50). So the roll spins up on P, I and D, without
-# feedforward. The Source Expectations hold either way; the Observed swings
+# until their tickets land: Dynamic D and I-term relax (#50). So the roll
+# spins up on P, I, D and feedforward, through the Tune's filters and RC
+# smoothing (#49), without Dynamic D or I-term relax. The Source Expectations hold either way; the Observed swings
 # will move when those land.
 format = 2
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
@@ -85,13 +85,13 @@ basis = "observed: with the sticks centred the whoop holds still; a centred stic
 what    = "roll rate"
 over    = "1.5 s to 3 s"
 highest = "829 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); feedforward (#49) and I-term relax (#50) will change how far"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); I-term relax (#50) will change how far"
 
 [[expect]]
 what    = "roll rate"
 over    = "1.5 s to 3 s"
 lowest  = "491 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108) and Prop Wash shaking it (#46: was 530 °/s without it); feedforward (#49) and I-term relax (#50) will change how far"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108) and Prop Wash shaking it (#46: was 530 °/s without it); I-term relax (#50) will change how far"
 
 [[expect]]
 what    = "pitch rate"

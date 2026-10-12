@@ -32,24 +32,58 @@ set failsafe_recovery_delay = 5        # 2026.6.2 default; tenths of a second of
 set p_roll = 45                        # 2026.6.2 default
 set i_roll = 80                        # 2026.6.2 default
 set d_roll = 30                        # 2026.6.2 default
+set f_roll = 120                       # 2026.6.2 default
 set p_pitch = 47                       # 2026.6.2 default
 set i_pitch = 84                       # 2026.6.2 default
 set d_pitch = 34                       # 2026.6.2 default
+set f_pitch = 125                      # 2026.6.2 default
 set p_yaw = 45                         # 2026.6.2 default
 set i_yaw = 80                         # 2026.6.2 default
 set d_yaw = 0                          # 2026.6.2 default
+set f_yaw = 120                        # 2026.6.2 default
+set feedforward_transition = 0         # 2026.6.2 default; hundredths of stick; 0 is off
+set feedforward_averaging = 2_POINT    # 2026.6.2 default
+set feedforward_smooth_factor = 65     # 2026.6.2 default; percent, at a 250 Hz Packet Rate
+set feedforward_jitter_factor = 7      # 2026.6.2 default; µs of stick a frame
+set feedforward_boost = 15             # 2026.6.2 default
+set feedforward_max_rate_limit = 90    # 2026.6.2 default; 0 is off
 set motor_output_limit = 100           # 2026.6.2 default; percent
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 2026.6.2 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 2026.6.2 default
 set iterm_windup = 80                  # 2026.6.2 default; the I limit, in percent of the PID-sum limit
 set pid_at_min_throttle = ON           # 2026.6.2 default
+set feedforward_yaw_hold_gain = 15     # 2026.6.2 default; 0 is off
+set feedforward_yaw_hold_time = 100    # 2026.6.2 default; ms
+
+# PID Tuning, filters
+set gyro_lpf1_type = PT1               # 2026.6.2 default
+set gyro_lpf1_static_hz = 250          # 2026.6.2 default; Hz; 0 is off
+set gyro_lpf1_dyn_min_hz = 250         # 2026.6.2 default; Hz, at zero throttle; 0 is static
+set gyro_lpf1_dyn_max_hz = 500         # 2026.6.2 default; Hz, at full throttle
+set gyro_lpf2_type = PT1               # 2026.6.2 default
+set gyro_lpf2_static_hz = 500          # 2026.6.2 default; Hz; 0 is off
+set dterm_lpf1_type = PT1              # 2026.6.2 default
+set dterm_lpf1_static_hz = 75          # 2026.6.2 default; Hz; 0 is off
+set dterm_lpf1_dyn_min_hz = 75         # 2026.6.2 default; Hz, at zero throttle; 0 is static
+set dterm_lpf1_dyn_max_hz = 150        # 2026.6.2 default; Hz, at full throttle
+set dterm_lpf2_type = PT1              # 2026.6.2 default
+set dterm_lpf2_static_hz = 150         # 2026.6.2 default; Hz; 0 is off
+# PID Tuning, filters, CLI only
+set gyro_lpf1_dyn_expo = 5             # 2026.6.2 default
+set dterm_lpf1_dyn_expo = 5            # 2026.6.2 default
+set yaw_lowpass_hz = 100               # 2026.6.2 default; Hz; 0 is off
 
 # Receiver
 set min_check = 1050                   # 2026.6.2 default; µs
 set mid_rc = 1500                      # 2026.6.2 default; µs
 set deadband = 0                       # 2026.6.2 default; µs
 set yaw_deadband = 0                   # 2026.6.2 default; µs
+set rc_smoothing = ON                  # 2026.6.2 default
+set rc_smoothing_auto_factor = 30      # 2026.6.2 default
+set rc_smoothing_auto_factor_throttle = 30 # 2026.6.2 default
+set rc_smoothing_setpoint_cutoff = 0   # 2026.6.2 default; Hz; 0 is automatic
+set rc_smoothing_throttle_cutoff = 0   # 2026.6.2 default; Hz; 0 is automatic
 # Receiver, CLI only
 set yaw_control_reversed = OFF         # 2026.6.2 default
 set airmode_start_throttle_percent = 25 # 2026.6.2 default
@@ -66,14 +100,10 @@ set crashflip_rate = 0                 # 2026.6.2 default; tens of °/s; 0 is of
 set crashflip_auto_rearm = OFF         # 2026.6.2 default
 
 # Not simulated yet. The Flight Controller checks these values but flies as
-# if each were off until its ticket lands: the low-pass filters, RC smoothing
-# and feedforward come with #49; Dynamic D, I-term relax, anti-gravity, TPA
-# and throttle boost with #50; the dynamic notch waits for gyro noise (#21)
-# (ADR-0015).
+# if each were off until its ticket lands: Dynamic D, I-term relax,
+# anti-gravity, TPA and throttle boost come with #50; the dynamic notch waits
+# for gyro noise (#21) (ADR-0015).
 # PID Tuning
-set f_roll = 120                       # 2026.6.2 default; not simulated yet (#49)
-set f_pitch = 125                      # 2026.6.2 default; not simulated yet (#49)
-set f_yaw = 120                        # 2026.6.2 default; not simulated yet (#49)
 set d_max_roll = 40                    # 2026.6.2 default; not simulated yet (#50)
 set d_max_pitch = 46                   # 2026.6.2 default; not simulated yet (#50)
 set d_max_yaw = 0                      # 2026.6.2 default; not simulated yet (#50)
@@ -83,13 +113,4 @@ set tpa_rate = 65                      # 2026.6.2 default; not simulated yet (#5
 set tpa_low_rate = 20                  # 2026.6.2 default; not simulated yet (#50)
 set throttle_boost = 5                 # 2026.6.2 default; not simulated yet (#50)
 # PID Tuning, filters
-set gyro_lpf1_static_hz = 250          # 2026.6.2 default; not simulated yet (#49)
-set gyro_lpf1_dyn_min_hz = 250         # 2026.6.2 default; not simulated yet (#49)
-set gyro_lpf2_static_hz = 500          # 2026.6.2 default; not simulated yet (#49)
 set dyn_notch_count = 3                # 2026.6.2 default; not simulated yet (waits for gyro noise, #21)
-set dterm_lpf1_static_hz = 75          # 2026.6.2 default; not simulated yet (#49)
-set dterm_lpf1_dyn_min_hz = 75         # 2026.6.2 default; not simulated yet (#49)
-set dterm_lpf2_static_hz = 150         # 2026.6.2 default; not simulated yet (#49)
-set yaw_lowpass_hz = 100               # 2026.6.2 default; not simulated yet (#49)
-# Receiver
-set rc_smoothing = ON                  # 2026.6.2 default; not simulated yet (#49)

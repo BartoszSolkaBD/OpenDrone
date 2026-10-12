@@ -8,11 +8,17 @@
 #   plus 200 °/s (or a quarter of it, if that's more), so 670 + 200 = 870 °/s
 #   on these Rates.
 # - While it's on, the yaw setpoint is 0 and I is emptied on every axis;
-#   roll and pitch's P and D are 0, so only yaw's P works, braking the spin,
+#   roll and pitch's P, D and F are 0, so only yaw's P works, braking the spin,
 #   and the yaw PID sum may use the whole motor range (1000, not
 #   pidsum_limit_yaw's 400).
 # - It ends once the yaw rate has stayed 100 °/s below the threshold, under
 #   770 °/s, for more than 20 ms.
+# - It watches the filtered gyro, as every part of the Flight Controller
+#   does: the reading passes through gyro low-pass 2 (a PT1 at 500 Hz, k =
+#   0.281970 a loop) and low-pass 1 (a PT1 that follows the throttle: at 30%
+#   throttle the mixer's throttle is 25.7%, rounded to 26%, so 250 + 250 ×
+#   (0.26 + 0.5 × 0.26 × 0.74) = 339.05 Hz, k = 0.210291), so a jump in the
+#   yaw rate reaches it over a few loops (gyro-d-term-and-yaw-p-low-passes.toml).
 #
 # The Flight Controller alone, armed, the sticks centred. It first flies at
 # 80% throttle, so the flight counts as stable and runaway takeoff
@@ -55,7 +61,10 @@ timeline = [
   { at = "0.6 s", throttle = "30%" },
   # Just under the threshold, then past it, rolling too.
   { at = "0.7 s", rotation = "roll 0 °/s, pitch 0 °/s, yaw 860 °/s" },
-  { at = "0.8 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 880 °/s" },
+  { at = "0.8 s", roll = "0%", rotation = "roll 100 °/s, pitch 0 °/s, yaw 880 °/s" },
+  # The roll stick moves during recovery, then centres again.
+  { at = "0.9 s", roll = "ramp to 30%" },
+  { at = "0.95 s", roll = "0%" },
   # Slowing, but not 100 °/s below; then below.
   { at = "1 s",   rotation = "roll 100 °/s, pitch 0 °/s, yaw 780 °/s" },
   { at = "1.1 s", rotation = "roll 100 °/s, pitch 0 °/s, yaw 760 °/s" },
@@ -88,8 +97,8 @@ basis = "source: mixTable: the yaw PID sum is held at pidsum_limit_yaw, 400, a m
 [[expect]]
 what  = "yaw spin recovery starts"
 over  = "0.8 s to 0.9 s"
-first = "0.000125 s ± 0.000001 s"
-basis = "source: checkForYawSpin: 880 °/s is past 870 °/s, so it starts with the first loop that reads it"
+first = "0.000875 s ± 0.000001 s"
+basis = "source: checkForYawSpin: 880 °/s is past 870 °/s; through the gyro's low-passes the filtered reading goes 861.2, 863.0, 865.0, 867.0, 869.0, 870.7 and 872.2 °/s in the loops from 0.8 s, and only 872, cut to a whole number, is past 870: it starts with the seventh loop, at 0.80075 s"
 
 [[expect]]
 what  = "yaw P term"
@@ -114,6 +123,18 @@ what  = "roll P term"
 at    = "0.85 s"
 value = "0 ± 0"
 basis = "source: pidController: in yaw spin recovery roll and pitch's P, D and F are 0, so the 100 °/s roll gets no correction"
+
+[[expect]]
+what    = "roll F term"
+over    = "0.8 s to 0.95 s"
+highest = "0 ± 0"
+basis   = "source: pidController: in yaw spin recovery roll and pitch's F is 0 too, so the roll stick moving from 0.8 s to 0.9 s and jumping back at 0.95 s brings no feedforward"
+
+[[expect]]
+what   = "roll F term"
+over   = "0.8 s to 0.95 s"
+lowest = "0 ± 0"
+basis  = "source: pidController: in yaw spin recovery roll and pitch's F is 0"
 
 [[expect]]
 what  = "roll PID sum"
@@ -142,8 +163,8 @@ basis = "source: handleYawSpin: 780 °/s isn't below 870 - 100 = 770 °/s, so re
 [[expect]]
 what  = "yaw spin recovery ends"
 over  = "1.1 s to 1.2 s"
-first = "0.020125 s ± 0.000001 s"
-basis = "source: handleYawSpin: from 1.1 s the yaw rate, 760 °/s, is below 770 °/s; it ends on the first loop more than 20 ms after the last one at or above it (1.099875 s), the loop at 1.12 s"
+first = "0.02075 s ± 0.000001 s"
+basis = "source: handleYawSpin: from 1.1 s the yaw rate is 760 °/s; through the gyro's low-passes the filtered reading falls 778.8, 777.0, 775.0, 773.0, 771.0 and then 769.3 °/s, below 770 °/s, at 1.100625 s; it ends on the first loop more than 20 ms after the last one at or above it (1.1005 s), the loop at 1.120625 s"
 
 [[expect]]
 what  = "roll P term"
