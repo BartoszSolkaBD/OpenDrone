@@ -103,7 +103,7 @@ OUTSIDE WORLD (devices, clock, files, screen)  |  CORE: no clock, no files, no B
 
 - **In flight:** through Flight Inputs.
 - **Physics alone:** `sim` with the scripted-motors stand-in.
-- **Thrust stand:** `sim` with scripted motors and the Quad held in place. _Update: since [#54](https://github.com/BartoszSolkaBD/OpenDrone/issues/54) ([PR #133](https://github.com/BartoszSolkaBD/OpenDrone/pull/133)), as the maintainer decided there on 2026-10-12, a Thrust Stand Scenario either scripts its motors, or our Flight Controller drives them from the pilot's sticks and switches. The Quad is held still in both cases._
+- **Thrust stand:** `sim` with scripted motors and the Quad held in place. _Update (2026-10-12): since [#54](https://github.com/BartoszSolkaBD/OpenDrone/issues/54) ([PR #133](https://github.com/BartoszSolkaBD/OpenDrone/pull/133)), as the maintainer decided there, a Thrust Stand Scenario either scripts its motors, or our Flight Controller drives them from the pilot's sticks and switches. The Quad is held still in both cases._
 - **Flight Controller alone:** straight into `flight-controller`.
 - **Sticks in Scenario files:** `scenario` converts the sticks-in-percent values into whole-number Channels.
 - **Mid-air starts:** `sim` can build one with the motors "settled" and the Flight Controller "fresh".
