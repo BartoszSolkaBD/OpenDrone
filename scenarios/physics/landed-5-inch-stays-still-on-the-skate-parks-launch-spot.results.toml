@@ -89,7 +89,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "cb23db054824ceca"   # test/freestyle-5-no-drag: what the Simulation receives from it
+quad = "b68078223408d1bd"   # test/freestyle-5-no-drag: what the Simulation receives from it
 map  = "3db1e58f39f1291c"   # opendrone/skate-park
 run  = "443a1b0f7020e61c"   # the whole state after each of 80000 steps at 8000 Hz, in order
 
