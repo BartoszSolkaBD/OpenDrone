@@ -17,7 +17,7 @@
 //! - [`drawing`]: the Map and the Quad drawn from their solid parts, a grid
 //!   on a Test Map's floor, and a placeholder camera on the Quad's frame;
 //! - [`status`]: what the pilot needs to know, in the window's title;
-//! - [`reference`]: the reference check, a Scenario flown through the game's
+//! - [`reference`](mod@reference): the reference check, a Scenario flown through the game's
 //!   stepping, which must match the headless runner's fingerprint.
 //!
 //! Rendering isn't pipelined and VSync is off, for the least delay from the

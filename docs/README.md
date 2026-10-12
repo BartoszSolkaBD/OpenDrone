@@ -12,4 +12,4 @@ This book explains OpenDrone to pilots, to its maintainer and to the agents that
 6. **[Working on OpenDrone](book/working-on-opendrone.md):** how a change reaches the main branch, setting up, CI, and what data may enter the repo.
 7. **[The code](book/the-code.md):** the reference for every crate, made by rustdoc.
 
-OpenDrone is being built towards its first playable version, the 0.1.0 alpha, planned in [the spec](https://github.com/BartoszSolkaBD/OpenDrone/issues/37). There's nothing to fly yet.
+OpenDrone is being built towards its first playable version, the 0.1.0 alpha, planned in [the spec](https://github.com/BartoszSolkaBD/OpenDrone/issues/37). So far there's a first test flight over a grid floor: [Your first flight](pilot-guide.md#your-first-flight) says how to fly it.
