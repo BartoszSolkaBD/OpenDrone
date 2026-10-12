@@ -115,6 +115,38 @@ pub fn builds_parry3ds_convex_hulls(
     let _ = voxels.compute_exact_convex_hull(&corners, &triangles);
 }
 
+pub fn works_out_eigenvalues(
+    shape: &dyn parry3d_f64::shape::Shape,
+    mesh: &parry3d_f64::shape::TriMesh,
+    voxels: &parry3d_f64::shape::Voxels,
+    shapes: &[(parry3d_f64::math::Pose, parry3d_f64::shape::SharedShape)],
+    matrix: parry3d_f64::math::Matrix,
+) {
+    use parry3d_f64::mass_properties::MassProperties;
+    use parry3d_f64::math::MatExt;
+    use parry3d_f64::shape::Shape;
+    let corners = mesh.vertices().to_vec();
+    let triangles = mesh.indices().to_vec();
+    let _ = shape.mass_properties(1.0);
+    let _ = MassProperties::with_inertia_matrix(corners[0], 1.0, matrix);
+    let _ = MassProperties::from_trimesh(1.0, &corners, &triangles);
+    let _ = MassProperties::from_convex_polyhedron(1.0, &corners, &triangles);
+    let _ = MassProperties::from_compound(1.0, shapes);
+    let _ = MassProperties::from_voxels(1.0, voxels);
+    let _ = parry3d_f64::utils::obb(&corners);
+    let _ = matrix.symmetric_eigen();
+    let _ = matrix.symmetric_eigenvalues();
+    let _ = parry3d_f64::utils::SymmetricEigen3::new(matrix);
+    let _ = parry3d_f64::utils::SymmetricEigen3::eigenvalues(matrix);
+    // glamx's 32-bit eigen types, which parry3d's 64-bit build doesn't use.
+    let single = parry3d_f64::glamx::Mat3::ZERO;
+    let _ = parry3d_f64::glamx::SymmetricEigen3::new(single);
+    let _ = parry3d_f64::glamx::SymmetricEigen3::eigenvalues(single);
+    let wide = parry3d_f64::glamx::Mat3A::ZERO;
+    let _ = parry3d_f64::glamx::SymmetricEigen3A::new(wide);
+    let _ = parry3d_f64::glamx::SymmetricEigen3A::eigenvalues(wide);
+}
+
 pub fn order_changes_from_run_to_run() -> usize {
     let map: HashMap<u8, u8> = HashMap::new();
     let set: HashSet<u8> = HashSet::new();

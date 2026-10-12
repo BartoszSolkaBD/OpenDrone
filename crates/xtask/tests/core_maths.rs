@@ -390,10 +390,27 @@ fn the_acos_allowance_names_every_clippy_ban_that_keeps_it_unreachable() {
 #[test]
 fn glamxs_eigenvalue_maths_is_allowed_only_from_the_eigenvalue_functions_with_a_reason() {
     // Bevy turns glam's `std` on, so glamx's `acos` and `cos` become the
-    // operating system's. Only parry3d's convex-hull builders run them, and
-    // the core crates' clippy.toml bans those (#142).
+    // operating system's. parry3d's convex-hull builders, its mass properties
+    // and utils::obb run them, and the core crates' clippy.toml bans every
+    // public way in (#142).
     let walls = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("walls.toml"))
         .expect("can read walls.toml");
+    let clippy =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../maths/clippy.toml"))
+            .expect("can read clippy.toml");
+    for ban in [
+        "parry3d_f64::shape::SharedShape::convex_hull",
+        "parry3d_f64::shape::Shape::mass_properties",
+        "parry3d_f64::mass_properties::MassProperties",
+        "parry3d_f64::utils::obb",
+        "glamx::MatExt::symmetric_eigen",
+        "glamx::DSymmetricEigen3::eigenvalues",
+    ] {
+        assert!(
+            clippy.contains(&format!("path = \"{ban}\"")),
+            "clippy.toml doesn't ban {ban}, which reaches glamx's eigenvalue maths"
+        );
+    }
     for function in ["acos", "cos", "acosf", "cosf"] {
         let line = walls
             .lines()
@@ -405,8 +422,8 @@ fn glamxs_eigenvalue_maths_is_allowed_only_from_the_eigenvalue_functions_with_a_
         );
         assert!(
             line.contains("never runs in the Simulation")
-                && line.contains("Clippy bans them in the core"),
-            "glamx's {function} needs the reason that Clippy bans the convex-hull builders"
+                && line.contains("Clippy bans every public way in for the core"),
+            "glamx's {function} needs the reason that Clippy bans every public way in"
         );
     }
 }

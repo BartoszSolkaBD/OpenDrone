@@ -104,14 +104,18 @@ disallowed-methods = [
     { path = "parry3d_f64::transformation::volume_mesh", reason = "it builds an oriented mesh, working out pseudo-normals with the operating system's acos, which differs between platforms (ADR-0001)" },
     { path = "parry3d_f64::partitioning::Bvh::optimize_incremental", reason = "it rebalances the tree with the operating system's log2, which differs between platforms; the Map's solid parts never move, so the tree is built once (ADR-0001)" },
 
-    # parry3d's convex-hull builders work out eigenvalues with glamx's `acos`
+    # glamx works out the eigenvalues of a 3 x 3 symmetric matrix with `acos`
     # and `cos`, which are the operating system's whenever Bevy's glam
     # features reach the core in the game build ([shared-glam-features] in
-    # crates/xtask/walls.toml, ADR-0021). Every convex Map shape arrives with
-    # its triangles and goes through SharedShape::convex_mesh (#141), so
-    # nothing in the Simulation builds a hull. These are every public way into
-    # them in parry3d 0.31.1.
-    { path = "parry3d_f64::transformation::convex_hull",reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
+    # crates/xtask/walls.toml, ADR-0021). `cargo xtask core-maths` allows
+    # those calls only because the Simulation never runs them, so these ban
+    # every public way into that code in parry3d 0.31.1 and glamx 0.3.1: the
+    # convex-hull builders (every convex Map shape arrives with its triangles
+    # and goes through SharedShape::convex_mesh, #141), the mass-properties
+    # code (the type, its constructors and Shape::mass_properties; the
+    # physics works out its own inertia), utils::obb, and the eigen types and
+    # functions themselves, further down.
+    { path = "parry3d_f64::transformation::convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::transformation::try_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::shape::ConvexPolyhedron::from_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::shape::SharedShape::convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
@@ -128,6 +132,21 @@ disallowed-methods = [
     { path = "parry3d_f64::transformation::vhacd::VHACD::compute_exact_convex_hulls", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::transformation::voxelization::VoxelSet::compute_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
     { path = "parry3d_f64::transformation::voxelization::VoxelSet::compute_exact_convex_hull", reason = "it builds a convex hull, working out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; give SharedShape::convex_mesh the finished corners and triangles instead (ADR-0001)" },
+    { path = "parry3d_f64::shape::Shape::mass_properties", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::mass_properties::MassProperties::with_inertia_matrix", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::mass_properties::MassProperties::from_trimesh", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::mass_properties::MassProperties::from_convex_polyhedron", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::mass_properties::MassProperties::from_compound", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::mass_properties::MassProperties::from_voxels", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "parry3d_f64::utils::obb", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::MatExt::symmetric_eigen", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::MatExt::symmetric_eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen3::new", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen3::eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3::new", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3::eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3A::new", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3A::eigenvalues", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
 
     # std's min and max may return either zero when given +0 and -0, and the
     # two kinds of processor pick differently. Use opendrone-maths' own, which
@@ -170,6 +189,14 @@ disallowed-methods = [
 ]
 
 disallowed-types = [
+    # The types that hold glamx's eigenvalue maths (`acos` and `cos`, which
+    # may be the operating system's in the game build, ADR-0021), and parry3d's
+    # mass properties, which work out eigenvalues. See the methods above.
+    { path = "parry3d_f64::mass_properties::MassProperties", reason = "adding or building mass properties works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms; the physics works out its own inertia (ADR-0001)" },
+    { path = "glamx::DSymmetricEigen3", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
+    { path = "glamx::SymmetricEigen3A", reason = "it works out eigenvalues with acos and cos that may be the operating system's, which differs between platforms (ADR-0001)" },
+
     # Their order changes from run to run (ADR-0001).
     { path = "std::collections::HashMap", reason = "its order changes from run to run; use BTreeMap or a Vec (ADR-0001)" },
     { path = "std::collections::HashSet", reason = "its order changes from run to run; use BTreeSet or a Vec (ADR-0001)" },
