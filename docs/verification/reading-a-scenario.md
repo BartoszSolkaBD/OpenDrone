@@ -4,7 +4,7 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 ## Where they live
 
-- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios, and `recorded/` for those that play back a real Input Device's recording.
+- `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios, `recorded/` for those that play back a real Input Device's recording, and `osd/` for what the OSD shows (see [What the pilot sees](#what-the-pilot-sees-osd) below).
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
 - `<plain words>.csv`, beside the Scenarios that play it: an Input Track, recorded Flight Inputs (see [An Input Track](#an-input-track) below).
 - `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, `whoop-65-rotor-drag-only.toml`, the Whoop 65 with rotor drag as its only drag (and no Prop Wash), `whoop-65-no-prop-wash.toml` and `freestyle-5-no-prop-wash.toml`, each Quad with Prop Wash off and everything else its own, `whoop-65-no-ceiling-effect.toml`, the Whoop 65 with its ceiling effect set to zero, `freestyle-5-filters-and-shaping-off.toml`, the Freestyle 5″ with the Flight Controller's filters, RC smoothing, feedforward and loop shaping off in its Tune, so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own, and `freestyle-5-loop-shaping-off.toml`, the Freestyle 5″ with only the loop shaping the Flight Controller doesn't simulate yet off (#50), so Flight Controller Scenarios can check the filters, RC smoothing and feedforward (#49) on their own. `whoop-65-small-pack.toml`, the Whoop 65 with a 20 mAh pack in place of its 320 mAh, so a pack that runs flat takes seconds, not minutes. Each says at its top what it changes and why.
@@ -340,6 +340,52 @@ basis = "source: ..."
 Times are Simulation Time, counted in whole physics steps: at 8 kHz, `"1 s"` is the state after step 8000, and a moment between two steps is refused. The run lasts until the last moment the file mentions.
 
 Every Scenario also gets one automatic check: **no broken numbers**. After every step, every number in the state must be a real number, never "not a number" or endless.
+
+### What the pilot sees, `[osd]`
+
+A Scenario that expects OSD text adds an `[osd]` section ([ADR-0022](../adr/0022-osd-worked-out-beside-the-simulation.md)). The runner works Betaflight's OSD out beside the run, 12 times a second on the Flight Controller's clock, as the game does, and reads its elements by name, never by grid cell. So only Scenarios that fly our Flight Controller can have one, from a Timeline, not a table of cases. The OSD isn't part of the Simulation, so it never changes a flight, and the starting state never mentions it. The Scenarios in `scenarios/osd/` are the examples, such as [`fail-safe-shows-1-5-s-after-the-link-is-lost.toml`](../../scenarios/osd/fail-safe-shows-1-5-s-after-the-link-is-lost.toml).
+
+The section spells out the OSD options its Expectations depend on:
+
+```toml
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+```
+
+- **The timers:** what each counts (on time, total armed time, last armed time, on or armed time, or launch time), how finely (whole seconds, tenths or hundredths), and its alarm, "alarm at 10 min" or "no alarm". The lines above are Betaflight's defaults.
+- **The warnings and statistics that are on.** The lists above are Betaflight's defaults; one left out is off.
+- **The alarms** for RSSI, Link Quality, RSSI dBm and RSNR, and the capacity in mAh. These are Betaflight's defaults too.
+
+Each `[[osd.expect]]` reads one thing, `at` a moment, with the `value` it reads, or `over` a stretch, with what it `reads` and `first`, how long after the stretch's start it first reads that (or `"never"`):
+
+```toml
+[[osd.expect]]
+what  = "warnings"
+over  = "1 s to 3 s"
+reads = "FAIL SAFE"
+first = "between 1.497 s and 1.5917 s"
+basis = "source: ..."
+
+[[osd.expect]]
+what  = "Flight Mode"
+at    = "3.5 s"
+value = "!FS!"
+basis = "source: ..."
+```
+
+- **`what`** is:
+  - **an element,** by its name: warnings, Flight Mode, throttle, Link Quality, average cell voltage, battery voltage, Quad name, timer 1, timer 2, crosshairs, disarmed, current, mAh drawn, motor RPM, Blackbox log status, RSSI, RSSI dBm, RSNR, artificial horizon, horizon sidebars or flip arrow (or Betaflight's name, such as `flymode`). It reads its text as a pilot reads it out: the unit symbols as `V`, `A` and `mAh`, the other symbols (the battery, throttle, Link Quality and timer glyphs) left out, spaces at either end trimmed. So the average cell voltage reads `3.72V`, Link Quality `7:100` and timer 2 `00:01`. An element that blinks keeps reading its text while it blinks off.
+  - **`<element> blinks`**, such as "warnings blinks": `yes` or `no`.
+  - **`message`**: what the screen says in its middle while `ARMED` covers it, such as `ARMED / >CRASH FLIP<`.
+  - **`statistics page`**: the page after disarming, its rows as "LABEL : VALUE", joined with " / ", or **`statistic <label>`**, one row's value, such as "statistic TOTAL ARM" reading `00:04`.
+- **Blank** is written `"(blank)"`: an element with nothing to show, or any element while `ARMED` or the statistics page covers the screen.
+- The OSD redraws 12 times a second, at the first loop at or after each 83,333 µs of the Flight Controller's clock, and holds in between. So a change shows within 83.3 ms of happening, and a `first` usually needs that much room. An element that has nothing to show in the sim, such as RSSI, always reads blank.
+
+A Scenario that expects only OSD text needs no top-level `[[expect]]`. Its Results list the OSD Expectations with the others, the text it read as the measured value.
 
 ## The Results file
 

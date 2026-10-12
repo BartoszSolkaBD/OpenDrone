@@ -16,7 +16,7 @@ The Whoop 65's Tune is made this way, from the maintainer's Meteor65 Pro.
    It writes the folder's `tune.txt` and lists what it did: the renames, the settings kept as "not simulated yet", and every line it left out, with the reason. To see a Tune without writing it, put `--print` in place of the folder.
 3. Run `cargo xtask packs`. The Pack checker reads the new Tune and compares `motor_poles` and `yaw_motors_reversed` with the Quad definition.
 
-Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is imported again in that ticket's PR. A readable check holds the committed file to exactly what the importer writes, so the Tune is never edited by hand. A real `hand-set` change would need that check changed too.
+Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is imported again in that ticket's PR. A readable check holds the committed file to exactly what the importer writes, with one exception: importing again keeps the Tune's `hand-set` lines, value and reason. The Whoop 65 has one, `current_meter = ADC`: its board, the BETAFPVF411, defaults to ADC, which a 4.3 `diff` leaves out, so the importer would write Betaflight's own default, VIRTUAL (#31 §3).
 
 ## What it accepts
 
@@ -43,7 +43,7 @@ Every `set` line ends with a mark saying where its value came from, then perhaps
 | `ADR-0008` | the old version had no such setting, or it meant something else; set to behave like the old version |
 | `2026.6 default` | the old version had no such setting, and no value behaves like it: Betaflight 2026.6.2's default |
 | `(was …)` | the setting's old name, after one of the marks above |
-| `hand-set: <reason>` | changed by hand (the importer never writes it) |
+| `hand-set: <reason>` | changed by hand (the importer writes it only to keep a hand-set line when it imports again) |
 
 ## What it translates
 

@@ -77,6 +77,7 @@ Pick the Video Look and the picture's shape when you start the game: `cargo run 
 - The Flight Controller has Betaflight's filters, RC smoothing and feedforward, from each Quad's Tune. The filters' small delays are part of how a Quad handles Prop Wash, as on a real quad. RC smoothing and feedforward tune themselves to your Packet Rate, as Betaflight does: the same stick move gives a little less feedforward at 500 Hz than at 250 Hz, so pick the Packet Rate your real radio link uses.
 - Prop Wash comes from the Quad descending into its own air, never from an artificial shake or a slider.
 - A tired pack sags and fades until the Quad can't hover, with no hard cutoff.
+- **Betaflight's OSD**, once the goggles show it, tells you only what a real quad could: the battery, the timers, Link Quality, the Flight Mode and Betaflight's warnings, in Betaflight's order. A punch-out on a tired pack warns LOW BATTERY. Lose the link with the Arm switch on and it shows RXLOSS at once, then FAILSAFE when the Quad drops at 1.5 s, as Betaflight does; FAIL SAFE itself shows only if you've switched the arming warnings off. Your own OSD layout will paste straight from the Betaflight CLI.
 - No setting changes the physics. Every Preset flies the same physics.
 
 ## Following along

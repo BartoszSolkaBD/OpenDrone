@@ -78,6 +78,7 @@ The Cetus X's `osd_canvas_width = 30` and `osd_canvas_height = 13` appear in its
 - The arming-block names are at BF26/src/main/fc/runtime_config.c#L38-L69.
 - `FLIP_SWITCH` is set when the Crash Flip switch is turned off mid-flip with automatic re-arm off, and is cleared by a manual disarm (BF26/src/main/fc/core.c#L296-L355).
 - **There is no in-flight `RXLOSS` warning.** `RXLOSS` is only an arming-block reason.
+  - Correction (#59): the arming-block reasons show whenever the Arm switch is on and any reason stands, armed or not (`renderOsdWarning` checks `IS_RC_MODE_ACTIVE(BOXARM) && isArmingDisabled()`, never `ARMED`), and Failsafe sets `RXLOSS` 150 ms after the last frame while armed (`failsafeOnValidDataFailed`: "set RXLOSS in OSD"). The AUX channels hold during a loss, so with the Arm switch on, `RXLOSS` shows in flight from 0.15 s, then `FAILSAFE` and `RXLOSS` in turn after the drop, ahead of `FAIL SAFE`.
 - 4.3 and 4.4 spell the Crash Flip texts `> CRASH FLIP <` and `CRASH FLIP SWITCH` (BF44/src/main/osd/osd_warnings.c#L67-L148).
 - The warning switches are 4.3's separate `osd_warn_*` settings, then `osd_warn_bitmask` from 4.4. The bit order differs between 4.4 and 2026.6 (BF44/src/main/osd/osd.h#L258-L277 against BF26 #L312-L334).
 
