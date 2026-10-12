@@ -19,6 +19,7 @@ opendrone-pack.workspace = true
 opendrone-scenario.workspace = true
 opendrone-blackbox.workspace = true
 opendrone-sound.workspace = true
+bevy.workspace = true
 
 # No `[lints] workspace = true` here: this crate may use `unsafe`, because
 # it talks to Bevy, SDL and the operating system (#15 §4). Every other crate forbids it.

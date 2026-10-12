@@ -50,6 +50,40 @@ ra-ap-rustc_lexer = "=0.174.0"
 # SDL 3.4, built from source and statically linked with only its joystick and
 # HIDAPI parts (ADR-0018). Zlib licence. Only opendrone-input uses it.
 sdl3-sys = { version = "=0.7.2", default-features = false }
+# The game engine, 0.20.0 final (ADR-0021). Only the game uses it (ADR-0003).
+# No default features: only what the game draws with, its window and its
+# keyboard. Not Bevy's audio (the sound is Firewheel's, ADR-0023), nor its
+# gamepads (Input Devices go through SDL, ADR-0018). `tonemapping_luts` gives
+# the default tonemapping its look-up tables, which need `ktx2` and
+# `zstd_rust` to read. On Linux it draws on X11 and Wayland, as Bevy's own
+# default does.
+bevy = { version = "=0.20.0", default-features = false, features = [
+    "std",
+    "multi_threaded",
+    "async_executor",
+    "bevy_asset",
+    "bevy_log",
+    "bevy_window",
+    "bevy_winit",
+    "x11",
+    "wayland",
+    "keyboard",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_camera",
+    "bevy_light",
+    "bevy_mesh",
+    "bevy_pbr",
+    "bevy_color",
+    "bevy_image",
+    "bevy_shader",
+    "bevy_material",
+    "bevy_gizmos",
+    "bevy_gizmos_render",
+    "tonemapping_luts",
+    "ktx2",
+    "zstd_rust",
+] }
 serde_json = "=1.0.151"
 toml = "=1.1.6"
 # The format migration steps rewrite Scenario and Pack files with it, keeping
