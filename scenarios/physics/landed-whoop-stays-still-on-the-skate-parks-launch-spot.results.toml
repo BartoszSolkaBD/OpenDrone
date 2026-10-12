@@ -1,0 +1,106 @@
+# Results of landed-whoop-stays-still-on-the-skate-parks-launch-spot.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A landed whoop stays still on the Skate Park's Launch Spot"
+
+[[expect]]
+what     = "height, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "distance east, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "-1.8 m ± 0.000001 m"
+measured = "-1.80 m"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "-1.8 m ± 0.000001 m"
+measured = "-1.80 m"
+
+[[expect]]
+what     = "distance north, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "6 m ± 0.000001 m"
+measured = "6.00 m"
+
+[[expect]]
+what     = "distance north, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "6 m ± 0.000001 m"
+measured = "6.00 m"
+
+[[expect]]
+what     = "speed, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "roll, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "roll, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "270° ± 0.001°"
+measured = "270°"
+
+[[expect]]
+what     = "heading, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "270° ± 0.001°"
+measured = "270°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "f1a5f2dd0ba73c53"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "3db1e58f39f1291c"   # opendrone/skate-park
+run  = "1f15d6ef399732fe"   # the whole state after each of 80000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1 s" = "11e344a2f7d887ee"
+"2 s" = "0a7efc3264933411"
+"3 s" = "ea56c35cc7a55e98"
+"4 s" = "1a0b92337a21442b"
+"5 s" = "b4bce0b1f0a3798c"
+"6 s" = "3c37c8b27f3fad13"
+"7 s" = "a1d6705bc72f1318"
+"8 s" = "84060d7022e0e7db"
+"9 s" = "5413f3968466c008"
+"10 s" = "100864b4f4a06882"

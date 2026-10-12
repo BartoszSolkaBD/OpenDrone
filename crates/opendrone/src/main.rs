@@ -10,15 +10,17 @@ use opendrone::camera::look::VideoLook;
 use opendrone::drawing::View;
 use opendrone::pilot::Pilot;
 use opendrone::set_up::{FlightPlan, open_packs, repo_folder};
-use opendrone::settings::{QUADS, Settings};
+use opendrone::settings::{MAPS, QUADS, Settings};
 use opendrone::{game, headless, measure_camera_cost, reference, screenshot_after};
 
 const HELP: &str = "\
-OpenDrone, the first flight: fly a Quad over the grid floor, through its FPV
-Camera.
+OpenDrone, the first flight: fly a Quad through its FPV Camera, from the
+Launch Spot of the Skate Park.
 
-  opendrone                       fly the Whoop 65
+  opendrone                       fly the Whoop 65 on the Skate Park
   opendrone --quad freestyle-5    fly the Freestyle 5\u{2033} (or --quad whoop-65)
+  opendrone --map flat-floor      fly over a grid floor with nothing to hit
+                                  instead (or --map skate-park, the default)
   opendrone --look digital        see the Digital Video Look (or analog, the
                                   default)
   opendrone --aspect 16:9         a 16:9 picture that crops the top and bottom
@@ -64,6 +66,7 @@ enum Mode {
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let mut quad = QUADS[0].to_string();
+    let mut map = MAPS[0].1.to_string();
     let mut mode = Mode::Game;
     let mut view = View::Fpv;
     let mut camera = CameraSettings::default();
@@ -78,6 +81,16 @@ fn main() -> ExitCode {
             "--quad" => match args.next() {
                 Some(name) if QUADS.contains(&name.as_str()) => quad = name,
                 _ => return usage(&format!("--quad takes one of {}", QUADS.join(", "))),
+            },
+            "--map" => match args
+                .next()
+                .and_then(|name| MAPS.iter().find(|(n, _)| *n == name))
+            {
+                Some((_, id)) => map = (*id).to_string(),
+                None => {
+                    let names: Vec<&str> = MAPS.iter().map(|(n, _)| *n).collect();
+                    return usage(&format!("--map takes one of {}", names.join(", ")));
+                }
             },
             "--headless" => mode = Mode::Headless { seconds: 3.0 },
             "--screenshot" => match args.next() {
@@ -142,7 +155,7 @@ fn main() -> ExitCode {
         Ok(packs) => packs,
         Err(problems) => return fail(&format!("the Packs can't be read:\n{problems}")),
     };
-    let plan = match FlightPlan::from_packs(&packs, Settings::tracer(&quad)) {
+    let plan = match FlightPlan::from_packs(&packs, Settings::tracer(&quad).on_map(&map)) {
         Ok(plan) => plan,
         Err(problem) => return fail(&problem),
     };

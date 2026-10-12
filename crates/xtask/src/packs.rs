@@ -78,7 +78,7 @@ pub fn run_packs(args: &[String]) -> ExitCode {
                 .join(", ")
         };
         println!(
-            "Every Pack passes the Pack checker: {} Pack(s) ({}), the Quads {}, the Test Quads {}, and the Input Device profiles {}.",
+            "Every Pack passes the Pack checker: {} Pack(s) ({}), the Quads {}, the Maps {}, the Test Quads {}, and the Input Device profiles {}.",
             packs.manifests().len(),
             packs
                 .manifests()
@@ -87,6 +87,12 @@ pub fn run_packs(args: &[String]) -> ExitCode {
                 .collect::<Vec<_>>()
                 .join(", "),
             ids(packs.quads()),
+            packs
+                .maps()
+                .iter()
+                .map(|m| m.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", "),
             ids(packs.test_quads()),
             packs
                 .input_devices()
