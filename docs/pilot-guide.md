@@ -2,7 +2,45 @@
 
 OpenDrone is a free FPV simulator for pilots who want to practise, or who can't fly their real quads right now. It aims to fly like the real thing: the props, the battery, the crashes and the Flight Controller behave as they do on a real quad, so what you practise here carries over.
 
-**There's nothing to fly yet.** OpenDrone is being built towards its first playable version, the 0.1.0 alpha, for macOS, Windows and Linux. This guide grows with it. For now, it says what the alpha will have.
+**There's a first test flight, and not much more yet.** OpenDrone is being built towards its first playable version, the 0.1.0 alpha, for macOS, Windows and Linux. This guide grows with it. [Your first flight](#your-first-flight) says how to fly what there is; the rest says what the alpha will have.
+
+## Your first flight
+
+The first flight is a test: either Quad over a flat floor with a grid, through a plain camera on the Quad's frame. There are no menus, no sound, no OSD and no fisheye yet, and the settings are fixed.
+
+**Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
+
+```sh
+cargo run --release -p opendrone                        # the Whoop 65
+cargo run --release -p opendrone -- --quad freestyle-5  # the Freestyle 5″
+```
+
+The first build takes a few minutes. `--release` matters: without it the picture is slow.
+
+**Picking your Input Device.** Plug it in before or after starting. Then move a stick on the device you want to fly with: it becomes the Flying Input Device, and the flight starts afresh, with the Quad landed in the middle of the floor. The window's title says which device flies, whether the Quad is armed or what stops it arming, Failsafe, and Pause.
+
+**Arming.** Wait about 2 s after the flight starts: the ESCs play their start-up tones first, as on a real quad, and the title says `BOOTGRACE` until they're ready. Then, with the throttle at the bottom, flip Arm.
+
+**On the Radiomaster Pocket** (over USB, in EdgeTX's Classic USB joystick mode, with the RF module off and the sim model's ADC filter Off):
+
+- CH1 to CH4 are roll, pitch, throttle and yaw.
+- CH5 high arms. CH6 is the Flight Mode: low Acro, middle Horizon, high Angle. CH7 high is Crash Flip.
+- SE (CH9) resets the Quad.
+
+**On the DualSense** (over USB):
+
+- Mode 2: the left stick is throttle and yaw, the right stick pitch and roll. The throttle is zero with the left stick at rest in the middle, and rises as you push it up.
+- R1 arms and disarms. It turns itself off whenever the Quad disarms, so the next press always arms. Hold L1 for Crash Flip.
+- Options pauses, and Create resets the Quad.
+- It has no Flight Mode switch, so it flies Acro.
+
+**On the keyboard:** R resets the Quad, and Esc pauses and goes on.
+
+**The fixed settings, for now:** a 250 Hz Packet Rate, Betaflight 2026.6's default Rates (Actual, 70 °/s at centre and 670 °/s at full stick), Acro for a device with no Flight Mode switch, every Assist off (so the battery runs down: Reset gives a fresh one), and your device uncalibrated, on its profile's starting values.
+
+**What's a placeholder:** the camera is a plain wide lens, 90° top to bottom, at the Quad's Camera Tilt. The Quad's own fisheye Lens, its Video Look and the OSD come later. On the Whoop 65 you see the front ducts at the sides.
+
+**If something's wrong:** the terminal you started it from lists the devices it finds and why one might not fly. `cargo run -p opendrone -- --help` lists the other ways to start it.
 
 ## What the alpha will have
 

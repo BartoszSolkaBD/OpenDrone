@@ -70,10 +70,11 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
-      - name: Install the Linux packages SDL's source build needs
+      - name: Install the Linux packages SDL's source build and Bevy's window need
         # rustdoc builds opendrone-input, which builds SDL 3.4 from source
-        # (ADR-0018), as CI's Rust job does.
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+        # (ADR-0018), and the game, whose window links Wayland's client
+        # library (#62), as CI's Rust job does.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev pkg-config
 
       - name: Reuse the build cache
         uses: Swatinem/rust-cache@v2
