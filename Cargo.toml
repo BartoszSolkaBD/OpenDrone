@@ -84,6 +84,19 @@ bevy = { version = "=0.20.0", default-features = false, features = [
     "ktx2",
     "zstd_rust",
 ] }
+# The sound engine, used directly with no Bevy add-on (ADR-0023). Only
+# opendrone-sound uses it. Its API still changes often, so it moves on
+# purpose. No default features: only its graph, its stock nodes and cpal, its
+# backend for the sound device; not its tracing, nor its sample player
+# (symphonium) until clips arrive (#75). It borrows bevy_platform 0.19, which
+# needn't match the game's Bevy.
+firewheel = { version = "=0.14.0", default-features = false, features = ["std", "cpal"] }
+# The latest Quad state, handed to the sound's own thread with no waiting
+# (MPL-2.0). Firewheel itself uses it.
+triple_buffer = "=9.0.0"
+# Firewheel's buffer views, so the Quad's sound can be made with no sound
+# device, in tests (ADR-0023).
+audioadapter-buffers = { version = "=5.2.0", default-features = false, features = ["std"] }
 serde_json = "=1.0.151"
 toml = "=1.1.6"
 # The format migration steps rewrite Scenario and Pack files with it, keeping
@@ -110,4 +123,19 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.opendrone-maths]
+opt-level = 3
+
+# The Quad's sound is made sample by sample, 48,000 times a second, on the
+# sound device's own thread (ADR-0023). Unoptimised, it can fall behind and
+# break up, so it is optimised in development builds too, Firewheel with it.
+[profile.dev.package.opendrone-sound]
+opt-level = 3
+
+[profile.dev.package.firewheel-core]
+opt-level = 3
+
+[profile.dev.package.firewheel-graph]
+opt-level = 3
+
+[profile.dev.package.firewheel-cpal]
 opt-level = 3
