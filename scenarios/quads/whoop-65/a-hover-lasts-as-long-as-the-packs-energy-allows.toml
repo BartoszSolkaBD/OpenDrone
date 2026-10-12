@@ -26,7 +26,7 @@
 # memory of the real whoop is about 4-6 minutes, so the Whoop 65's hover is
 # about 2.5 times too economical: a question for the maintainer and a Feel
 # Test, not something this Scenario can settle (#57).
-format = 1
+format = 2
 name   = "A hover lasts as long as the pack's energy allows, then a flat pack fades and the Whoop 65 sinks"
 
 [start]
@@ -59,7 +59,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
   { at = "75 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
 ]
 

@@ -9,7 +9,7 @@
 # The pack's sag is its current times its resistance, 29 mΩ plus the
 # connector's 10 mΩ, and the Whoop 65 adds no slow sag on top
 # (scenarios/quads/whoop-65/battery-counts-and-sags.toml).
-format = 1
+format = 2
 name   = "With Endless Battery off, the same punch draws the charge down and the voltage sags the same"
 
 [start]
@@ -41,7 +41,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
   { at = "5 s", throttle = "100%", test_pilot = "hold level, hold heading 0°" },
   { at = "7 s", throttle = "40%" },
 ]

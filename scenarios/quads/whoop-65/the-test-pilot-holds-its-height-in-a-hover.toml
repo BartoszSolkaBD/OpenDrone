@@ -22,7 +22,7 @@
 #   the four 35 mm props' disc area A = 4 × π × (17.5 mm)² = 38.5 cm²: 1.74 W.
 #   The Whoop 65 draws about three times that, as a real rotor's losses and a
 #   motor's and an ESC's efficiency make it.
-format = 1
+format = 2
 name   = "The Test Pilot holds the Whoop 65's height, with its motors at about 40% and its power above the physical minimum"
 
 [start]
@@ -55,7 +55,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
   { at = "30 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
 ]
 
