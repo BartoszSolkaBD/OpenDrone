@@ -35,7 +35,7 @@ The **Red Flag gate** is a required check. It fails when a Red Flag waits for yo
 | A new outside library | Listed | A library in the PR's `Cargo.lock` whose name main's lacks, with its licence as crates.io gives it (at most 30 are looked up). cargo-deny checks the licence. |
 | A new ADR, or a new glossary term | Listed | A new file in `docs/adr/`, or a new `**Term**:` line in a deep dive. |
 
-**When a Red Flag waits for you:** read it, then either merge the PR by hand or ask for changes. A merge by hand goes past a failing check, so the Review Reports after it name that merge (see below).
+**When a Red Flag waits for you:** read it, then either merge the PR by hand, tell the Delegator to merge it, or ask for changes. Either merge goes past a failing check, so the Review Reports after it name that merge until you take its `skipped-a-check` label off (see below).
 
 ## What moved
 
@@ -65,7 +65,7 @@ Running out of rounds never adds `needs-maintainer`. The Red Flag gate is separa
 
 ## Merges that skipped a check
 
-After every merge into main, CI checks that the merged PR's last commit had passed every check main requires. A check missing from its last commit counts as skipped. If one hadn't passed, the PR gets the `skipped-a-check` label and a comment naming each one. Every Review Report then warns about it, under its Verdict, until you take that label off. Agents never merge past a failing check, but in Phase 1 they hold your rights, so this is how a slip shows ([ADR-0010](adr/0010-phase-1-agent-prs-merge-automatically.md)).
+After every merge into main, CI checks that the merged PR's last commit had passed every check main requires. A check missing from its last commit counts as skipped. If one hadn't passed, the PR gets the `skipped-a-check` label and a comment naming each one. Every Review Report then warns about it, under its Verdict, until you take that label off. Agents never merge past a failing check, except the Red Flag gate once you've cleared what it holds and asked them to merge ([The Delegator](agents/delegator.md#when-a-pr-waits-for-the-maintainer)). In Phase 1 they hold your rights, so this label is how a slip shows ([ADR-0010](adr/0010-phase-1-agent-prs-merge-automatically.md)).
 
 ## How it's built, and why it's safe
 

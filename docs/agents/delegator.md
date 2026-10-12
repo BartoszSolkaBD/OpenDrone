@@ -287,12 +287,13 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
 - **When only part of the PR waits, split it off.** Start a fix round that takes that part out, if the rest stands on its own. Examples are an edit to an existing ADR, or a Source Expectation the ticket doesn't need changed. File what came out as its own `ready-for-agent` issue, labelled `needs-maintainer`, with the question moved there. The rest goes on through review and merge.
 - **When the whole PR waits,** for example on Red Flags it can't do without, it steps out of its Lane. Leave it open with `needs-maintainer`, and let the Lane's next PR go into review.
   - When the maintainer answers, it takes the Lane again as soon as the Lane is free, ahead of any new ticket.
-  - It then brings main in, as under [Merging](#merging).
+  - You then bring main in, as under [Merging](#merging): `gh pr update-branch` and the Light merge-only update check, or a fix round and a fresh Reviewer when Results must be written again or code moved.
   - If the Red Flags after that are the same ones the maintainer cleared, the clearance still holds.
-- **Clearing the Red Flag gate.** Nothing in the repo clears the gate: it keeps failing, and the maintainer merges by hand. When they tell you, in the session or on the PR, that they clear what it holds:
+- **Clearing the Red Flag gate.** Nothing in the repo clears the gate: it keeps failing until the PR merges. The maintainer can merge the PR by hand, or tell you to. When they tell you, in the session or on the PR, that they clear what it holds:
   1. Record the decision on the PR.
   2. Take `needs-maintainer` off.
-  3. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared.
+  3. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared. The wait command there lists the failing gate: that row is expected.
+  4. CI then gives the PR the `skipped-a-check` label and a comment naming each check that hadn't passed ([the Review Report](../review-report.md#merges-that-skipped-a-check)). Check that the comment names only the Red Flag gate. Leave the label for the maintainer to take off, and list the PR in your end-of-batch report. If the comment names any other check, tell the maintainer at once.
 
 ## Usage limits
 
@@ -304,7 +305,7 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
 Report to the maintainer:
 
 - what merged, as ticket and PR;
-- what waits for them, and why, including each PR that stepped out of its Lane;
+- what waits for them, and why, including each PR that stepped out of its Lane, and each PR merged past a cleared Red Flag gate whose `skipped-a-check` label they should take off;
 - the follow-up issues you filed, and each issue you triaged a PR to;
 - for each PR, the author's model and its number of review rounds;
 - the model the Delegator itself ran on, for the trial;

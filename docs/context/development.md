@@ -61,7 +61,7 @@ _Avoid_: FPS test, perf test
   - A later commit needs a fresh Verdict as usual. A further failed round needs a triage of its own.
   - The Red Flag gate is separate: what it holds still waits for the maintainer.
 - Main merged into a PR that already passed needs only the short [merge-only update check](../agents/merge-update.md), not a full review, when nothing but main's own changes, clashes in `Cargo.lock` or docs text, and Results fingerprints changed. Anything more needs a fresh Reviewer.
-- Agents never merge past a failing check. The next Review Report names any merge that did.
+- Agents never merge past a failing check. The one exception is the Red Flag gate, once the maintainer has cleared what it holds and asked for the merge. The next Review Report names any merge that went past a check.
 - Red Flags:
   - **Wait for the maintainer:** a changed Source or Rule Expectation, including a loosened tolerance, an edited ADR, and a change of Bevy or wgpu version. The version flag fires only when Bevy moves to a new 0.N version, together with its major wgpu version; patch releases and the move from a release candidate to the final don't trigger it.
   - **The Reviewer decides:**
