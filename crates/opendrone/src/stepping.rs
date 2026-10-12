@@ -15,7 +15,7 @@
 use bevy::prelude::*;
 use opendrone_maths::{Fingerprint, Fingerprinter};
 use opendrone_scenario::ScenarioInputs;
-use opendrone_sim::{FlightInput, QuadState, Simulation, SimulationTime};
+use opendrone_sim::{FlightInput, InputDeviceFacts, QuadState, Simulation, SimulationTime};
 
 /// Bevy's fixed timestep: 1,000 ticks a second.
 pub const TICK_HZ: u32 = 1000;
@@ -32,6 +32,10 @@ pub struct Flight {
     script: Option<ScenarioInputs>,
     /// The fingerprint at the start and after every step, when asked for.
     fingerprints: Option<Vec<Fingerprint>>,
+    /// What Save Flight writes out: the Flight Inputs the Simulation took,
+    /// and the run's fingerprint so far. Only a flight the pilot flies keeps
+    /// it.
+    kept: Option<Kept>,
     /// The Quad's state after the tick before the last, and after the last.
     before: QuadState,
     after: QuadState,
@@ -59,6 +63,7 @@ impl Flight {
             simulation,
             script: None,
             fingerprints: None,
+            kept: None,
             before: state,
             after: state,
             reset_in_last_tick: false,
@@ -76,6 +81,45 @@ impl Flight {
         Ok(flight)
     }
 
+    /// A flight the pilot flies with the Input Device whose facts are given,
+    /// keeping what Save Flight needs to write it out as a Scenario: every
+    /// Flight Input it takes. That costs next to nothing.
+    pub fn keeping(simulation: Simulation, device: InputDeviceFacts) -> Result<Flight, String> {
+        let mut flight = Flight::new(simulation)?;
+        flight.kept = Some(Kept {
+            device,
+            inputs: Vec::new(),
+            run: None,
+        });
+        Ok(flight)
+    }
+
+    /// Also keeps the fingerprint of the whole run, from the start and after
+    /// every step, as the Scenario runner works it out. Checks use it to show
+    /// a saved flight gives the runner's run fingerprint. The game never
+    /// does: fingerprinting each step costs more than taking it.
+    pub fn checking_every_step(mut self) -> Flight {
+        if let Some(kept) = &mut self.kept {
+            let mut run = Fingerprinter::new();
+            run.write_fingerprint(self.simulation.fingerprint());
+            kept.run = Some(run);
+        }
+        self
+    }
+
+    /// What Save Flight writes out, or `None` for a flight that isn't the
+    /// pilot's, or that hasn't started (no Flying Input Device yet).
+    pub fn kept(&self) -> Option<KeptFlight<'_>> {
+        let kept = self.kept.as_ref()?;
+        Some(KeptFlight {
+            device: kept.device,
+            inputs: &kept.inputs,
+            steps: self.simulation.time().ticks(),
+            state_fingerprint: self.simulation.fingerprint(),
+            run_fingerprint: kept.run.as_ref().map(Fingerprinter::finish),
+        })
+    }
+
     pub fn simulation(&self) -> &Simulation {
         &self.simulation
     }
@@ -90,6 +134,12 @@ impl Flight {
     /// change: an input stamped earlier arrives at the next step.
     pub fn input(&mut self, at: SimulationTime, input: FlightInput) {
         let at = at.max(self.simulation.time());
+        if let Some(kept) = &mut self.kept {
+            // In the order the Simulation takes them: by moment, and in the
+            // order given within one.
+            let place = kept.inputs.partition_point(|(time, _)| *time <= at);
+            kept.inputs.insert(place, (at, input));
+        }
         self.reset_in_last_tick |= input == FlightInput::Reset;
         self.simulation.flight_input(0, at, input);
     }
@@ -111,8 +161,15 @@ impl Flight {
                 }
             }
             self.simulation.step();
-            if let Some(fingerprints) = &mut self.fingerprints {
-                fingerprints.push(self.simulation.fingerprint());
+            let run = self.kept.as_mut().and_then(|kept| kept.run.as_mut());
+            if self.fingerprints.is_some() || run.is_some() {
+                let fingerprint = self.simulation.fingerprint();
+                if let Some(fingerprints) = &mut self.fingerprints {
+                    fingerprints.push(fingerprint);
+                }
+                if let Some(run) = run {
+                    run.write_fingerprint(fingerprint);
+                }
             }
         }
         self.after = *self.simulation.quad_state(0);
@@ -159,6 +216,36 @@ impl Flight {
     pub fn drawn_between(&self) -> (&QuadState, &QuadState) {
         (&self.before, &self.after)
     }
+}
+
+/// A pilot's flight, kept for Save Flight.
+struct Kept {
+    device: InputDeviceFacts,
+    inputs: Vec<(SimulationTime, FlightInput)>,
+    /// The run's fingerprint so far, when asked for
+    /// ([`Flight::checking_every_step`]).
+    run: Option<Fingerprinter>,
+}
+
+/// What a pilot's flight has been, so far, for Save Flight to write out as a
+/// Scenario and its Input Track.
+#[derive(Clone, Copy, Debug)]
+pub struct KeptFlight<'f> {
+    /// The facts of the Flying Input Device the flight was set up with.
+    pub device: InputDeviceFacts,
+    /// Every Flight Input the Simulation was handed, in the order it takes
+    /// them, each stamped with the Simulation Time it arrives at. The ones
+    /// stamped at or after [`KeptFlight::steps`] haven't arrived yet.
+    pub inputs: &'f [(SimulationTime, FlightInput)],
+    /// How many steps the Simulation has taken.
+    pub steps: u64,
+    /// The fingerprint of the Simulation's whole state now, after
+    /// [`KeptFlight::steps`] steps.
+    pub state_fingerprint: Fingerprint,
+    /// The fingerprint of the whole run so far, from the start and after
+    /// every step, for a flight that asked for it
+    /// ([`Flight::checking_every_step`]).
+    pub run_fingerprint: Option<Fingerprint>,
 }
 
 /// Bevy's fixed timestep at 1 kHz, running the flight's steps in one system.
