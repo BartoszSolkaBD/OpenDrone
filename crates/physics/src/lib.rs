@@ -704,6 +704,13 @@ impl QuadBody {
         rubs
     }
 
+    /// Tops the battery up to full: the Endless Battery Assist, which acts on
+    /// session state and never on how the battery behaves. The charge counted
+    /// as drawn stays counted, and the voltage still sags under load.
+    pub fn top_up_battery(&mut self) {
+        self.battery.top_up(&self.parameters.battery);
+    }
+
     /// What the battery reports after the last step.
     pub fn battery(&self) -> BatteryOutput {
         self.battery.output(&self.parameters.battery)

@@ -41,7 +41,7 @@ An optional aid layered on top of faithful physics, such as the Angle Flight Mod
 _Avoid_: Arcade mode, easy mode, simplified physics
 
 **Endless Battery**:
-An Assist that keeps the battery charge topped up. Voltage still sags under load, but the pack never runs flat.
+An Assist that keeps the battery charge topped up. Voltage still sags under load, but the pack never runs flat. It acts on session state: the Simulation tops the charge up to full after every step, and the battery's behaviour is untouched.
 _Avoid_: Infinite battery, battery off
 
 **Preset**:

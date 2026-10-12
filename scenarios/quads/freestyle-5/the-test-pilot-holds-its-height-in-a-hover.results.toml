@@ -1,0 +1,94 @@
+# Results of the-test-pilot-holds-its-height-in-a-hover.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The Test Pilot holds the Freestyle 5″'s height, with its motors at about 25% and its power above the physical minimum"
+
+[[expect]]
+what     = "height at 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "height, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "height, highest over 5 s to 30 s"
+basis    = "Rule"
+expected = "20 m ± 0.5 m"
+measured = "20.0 m"
+
+[[expect]]
+what     = "roll, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.118°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "-0.118°"
+
+[[expect]]
+what     = "heading at 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.116°"
+
+[[expect]]
+what     = "total thrust, mean over 10 s to 30 s"
+basis    = "Rule"
+expected = "652 gf ± 10 gf"
+measured = "652 gf"
+
+[[expect]]
+what     = "average motor command, mean over 10 s to 30 s"
+basis    = "Rule"
+expected = "between 15% and 30%"
+measured = "24.8%"
+
+[[expect]]
+what     = "average motor command, mean over 10 s to 30 s"
+basis    = "Observed"
+expected = "24.8% ± 0.5%"
+measured = "24.8%"
+
+[[expect]]
+what     = "battery power, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "between 45.0 W and 400 W"
+measured = "97.1 W"
+
+[[expect]]
+what     = "battery power, mean over 5 s to 30 s"
+basis    = "Observed"
+expected = "100 W ± 1 W"
+measured = "100 W"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "59c46e1cf781ecbe"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "e697fc3f8325ed4c"   # the whole state after each of 240000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"3 s" = "1e18535725e17a35"
+"6 s" = "a68293581c5eba9c"
+"9 s" = "9604c04807f87997"
+"12 s" = "10d0cf0a47521eca"
+"15 s" = "b101d35b80620846"
+"18 s" = "ebff8ff3274d5abe"
+"21 s" = "23b92875cab27076"
+"24 s" = "b0c67a45c98ce501"
+"27 s" = "5e2c3a00928f305e"
+"30 s" = "04eeeff4fe6a8ebe"

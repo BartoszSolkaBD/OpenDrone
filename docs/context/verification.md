@@ -44,7 +44,7 @@ A separate file of recorded inputs that a Scenario plays back, such as a flight 
 _Avoid_: recording, replay
 
 **Test Pilot**:
-A helper, used only in Scenarios, that moves the sticks in reaction to the Quad. It has named jobs such as hold height, hold level and hold heading.
+A helper, used only in Scenarios, that moves the sticks in reaction to the Quad. It has named jobs such as hold height, hold level and hold heading. Hold height moves the throttle, hold level roll and pitch, and hold heading yaw; it never touches the Arm switch or a stick it has no job for, and it finds the throttle that hovers by watching the Quad climb or sink, so it needs no knowledge of the Quad.
 _Avoid_: autopilot, altitude hold
 
 **Test Map**:

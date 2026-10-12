@@ -37,6 +37,8 @@
 //!   charge, a fresh Flight Controller, and ESCs playing their start-up
 //!   tones, so arming waits for their ready beep, about 1.7 s. The Radio Link
 //!   belongs to the pilot's radio, so it keeps its beat.
+//! - Endless Battery, the Assist that keeps the charge topped up, set with
+//!   [`QuadSetUp::endless_battery`].
 //! - Auto-arm, the sim-only Assist that arms on the first throttle raise
 //!   ([`auto_arm`]), set with [`OurFlightController::new`].
 //! - [`FlightControllerSeam`]: what turns sensor readings and Radio Link
@@ -72,8 +74,10 @@
 //! A crash never disarms or resets the Quad on its own: only the pilot's
 //! Arm switch, Failsafe or Reset do.
 //!
-//! Endless Battery (#57) and the rest of the session state arrive with their
-//! tickets.
+//! Endless Battery, the Assist on session state: with it on, every tick ends
+//! with the battery's charge topped up to full ([`QuadSetUp::endless_battery`]).
+//! The battery still behaves as always, so its voltage sags under load. The
+//! rest of the session state arrives with its tickets.
 //!
 //! # House rules
 //!
@@ -168,6 +172,9 @@ pub struct QuadSetUp {
     pub input_device: Option<InputDeviceFacts>,
     /// Input smoothing, the Assist, on or off.
     pub input_smoothing: bool,
+    /// Endless Battery, the Assist, on or off: on session state, it tops the
+    /// battery's charge up to full after every tick.
+    pub endless_battery: bool,
     /// What plugs into the Flight Controller seam for this Quad.
     pub flight_controller: Box<dyn FlightControllerSeam>,
 }
@@ -260,6 +267,8 @@ struct SimulatedQuad {
     radio_link: RadioLink,
     /// Input smoothing, when the pilot has it on.
     input_smoothing: Option<InputSmoothing>,
+    /// Endless Battery, when the pilot has it on.
+    endless_battery: bool,
     /// What the Radio Link did on the last tick.
     radio_link_output: RadioLinkOutput,
     /// Flight Inputs not yet arrived, in the order of their moments.
@@ -330,6 +339,7 @@ impl Simulation {
                 input_smoothing: quad
                     .input_smoothing
                     .then(|| InputSmoothing::new(set_up.physics_rate)),
+                endless_battery: quad.endless_battery,
                 radio_link_output: RadioLinkOutput::default(),
                 inputs: Vec::new(),
                 stepped: false,
@@ -401,6 +411,9 @@ impl Simulation {
             quad.stepped = true;
             quad.body
                 .step(&self.world, &self.map, &quad.motor_commands, dt);
+            if quad.endless_battery {
+                quad.body.top_up_battery();
+            }
         }
         self.time = self.time.next();
     }

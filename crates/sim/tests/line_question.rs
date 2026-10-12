@@ -149,6 +149,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
         packet_rate: PacketRate::from_hz(250).unwrap(),
         input_device: None,
         input_smoothing: false,
+        endless_battery: false,
         flight_controller: Box::new(ScriptedMotors::new(Vec::new())),
     }
 }

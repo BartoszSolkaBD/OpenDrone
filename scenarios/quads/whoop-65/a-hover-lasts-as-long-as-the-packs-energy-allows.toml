@@ -1,0 +1,118 @@
+# A hover lasts as long as the pack's energy allows, and then a flat pack fades
+# and the Quad sinks (the whole-Quad row and E13 and E14 in #10): the Test Pilot
+# holds the Whoop 65 at 20 m, level and on heading 0° from a full pack until
+# the pack runs out, and goes on holding while it fades.
+#
+# It flies the Test Quad test/whoop-65-small-pack, the Whoop 65 with a pack of
+# 20 mAh in place of its 320 mAh, along the same voltage curve and with the
+# same resistance and sag, so the hover that empties it takes under a minute.
+# The real pack's hover is the same, current for current, and lasts 16 times
+# as long (see below).
+#
+# What it checks:
+#
+# - Hovering lasts as long as the pack's energy allows: the pack counts every
+#   bit of current that leaves it, so it is empty after its capacity divided by
+#   the current, 20 mAh ÷ 1.44 A = 50 s, and the Test Pilot holds the height
+#   until then.
+# - A flat pack fades, with no cutoff. Past empty the pack's resting voltage,
+#   and so its voltage under load, keep falling, the motors give less thrust
+#   for the same command, and the Test Pilot asks for more and more of the
+#   throttle (nearly all of it by 70 s). Then the Quad can no longer lift its
+#   weight, and it sinks: from 20 m at 70 s to 12 m, falling 5 m/s, at 75 s.
+#
+# The current this hover draws, 1.44 A, is also the real Whoop 65's: a full
+# 320 mAh pack would last 320 mAh ÷ 1.44 A, about 13 minutes. The maintainer's
+# memory of the real whoop is about 4-6 minutes, so the Whoop 65's hover is
+# about 2.5 times too economical: a question for the maintainer and a Feel
+# Test, not something this Scenario can settle (#57).
+format = 1
+name   = "A hover lasts as long as the pack's energy allows, then a flat pack fades and the Whoop 65 sinks"
+
+[start]
+kind              = "flight"
+quad              = "test/whoop-65-small-pack"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 20 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight's default rate profile, which the Meteor65 Pro's diff all keeps.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+  { at = "75 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
+]
+
+[[expect]]
+what  = "battery current"
+over  = "0 s to 49 s"
+mean  = "1.44 A ± 0.02 A"
+basis = "observed: the hover's current on a pack with no more than 20 mAh"
+
+[[expect]]
+what  = "the pack is empty"
+over  = "0 s to 75 s"
+first = "between 49 s and 51 s"
+basis = "rule: the pack counts the current that leaves it, so it is empty after its capacity over its current: 20 mAh ÷ 1.44 A = 50 s"
+
+[[expect]]
+what   = "height"
+over   = "5 s to 50 s"
+lowest = "20 m ± 1 m"
+basis  = "rule: hovering lasts as long as the pack's energy allows: the Test Pilot holds the height, to within a metre, until the pack is empty"
+
+[[expect]]
+what  = "average motor command"
+at    = "50 s"
+value = "between 40% and 60%"
+basis = "rule: the Test Pilot's hold height job asks for the command that holds the height; just empty, at 3.2 V, it takes about half of the throttle"
+
+[[expect]]
+what  = "average motor command"
+at    = "70 s"
+value = "between 90% and 100%"
+basis = "rule: a flat pack fades: with the voltage down, the thrust per command falls, so the Test Pilot asks for nearly all of the throttle to hold the height"
+
+[[expect]]
+what  = "battery voltage"
+at    = "50 s"
+value = "3.23 V ± 0.05 V"
+basis = "observed: the pack just empty, at its hover current"
+
+[[expect]]
+what  = "battery voltage"
+at    = "75 s"
+value = "1.27 V ± 0.05 V"
+basis = "observed: 25 s past empty, at nearly full throttle"
+
+[[expect]]
+what  = "height"
+at    = "75 s"
+value = "between 0 m and 19 m"
+basis = "rule: a flat pack gives too little thrust to carry the Quad's weight, and nothing cuts the motors off, so the Quad sinks"
+
+[[expect]]
+what  = "vertical speed"
+at    = "75 s"
+value = "between -30 m/s and -1 m/s"
+basis = "rule: a flat pack gives too little thrust to carry the Quad's weight, so it sinks"

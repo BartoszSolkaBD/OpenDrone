@@ -108,12 +108,21 @@ pub enum Measure {
     PropRub(usize),
     /// All four motors' thrust.
     TotalThrust,
+    /// What the Flight Controller tells the ESCs, averaged over the four
+    /// motors: the share of the battery's voltage each puts across its motor.
+    AverageMotorCommand,
     /// At the battery's terminals, past its connector.
     BatteryVoltage,
     /// Drawn from the battery.
     BatteryCurrent,
     /// Drawn from the battery since the start.
     BatteryChargeUsed,
+    /// What the pack has left, as a share of its capacity: below 0% past
+    /// empty.
+    BatteryCharge,
+    /// What the pack gives: its voltage at the terminals times the current
+    /// drawn.
+    BatteryPower,
     /// How far the battery's voltage sits below its resting voltage at its
     /// charge.
     BatterySag,
@@ -172,10 +181,12 @@ pub enum Event {
     InputDeviceLost,
     /// The Radio Link counts the Flying Input Device as back.
     InputDeviceBack,
+    /// The pack's charge reaches 0%: empty, though nothing cuts the motors off.
+    PackEmpty,
 }
 
 /// Every event's words, as a Scenario's `what` names it.
-const EVENTS: [(&str, Event); 21] = [
+const EVENTS: [(&str, Event); 22] = [
     ("the Quad arms", Event::Arms),
     ("the Quad disarms", Event::Disarms),
     ("Failsafe's stage 2 starts", Event::FailsafeStarts),
@@ -281,6 +292,7 @@ const EVENTS: [(&str, Event); 21] = [
     ),
     ("the Flying Input Device is lost", Event::InputDeviceLost),
     ("the Flying Input Device is back", Event::InputDeviceBack),
+    ("the pack is empty", Event::PackEmpty),
 ];
 
 impl Event {
@@ -297,7 +309,7 @@ impl Event {
     fn of_the_flight_controller(self) -> bool {
         !matches!(
             self,
-            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack
+            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack | Event::PackEmpty
         )
     }
 
@@ -320,6 +332,10 @@ impl Event {
             };
             return Some(!ready(before)? && ready(now)?);
         }
+        if self == Event::PackEmpty {
+            let charge = |sample: &Sample| sample.quad.map(|quad| quad.battery.charge);
+            return Some(charge(before)? > 0.0 && charge(now)? <= 0.0);
+        }
         if self.of_the_radio_link() {
             let lost = |sample: &Sample| sample.radio_link.map(|link| link.lost);
             let (was, is) = (lost(before)?, lost(now)?);
@@ -339,12 +355,15 @@ impl Event {
                 let is = now.arming_blocks.flags()[flag];
                 was != raised && is == raised
             }
-            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack => false,
+            Event::EscsReady
+            | Event::InputDeviceLost
+            | Event::InputDeviceBack
+            | Event::PackEmpty => false,
         })
     }
 }
 
-const ALL: [(&str, Measure); 79] = [
+const ALL: [(&str, Measure); 82] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -394,9 +413,12 @@ const ALL: [(&str, Measure); 79] = [
     ("prop 3 rub", Measure::PropRub(2)),
     ("prop 4 rub", Measure::PropRub(3)),
     ("total thrust", Measure::TotalThrust),
+    ("average motor command", Measure::AverageMotorCommand),
     ("battery voltage", Measure::BatteryVoltage),
     ("battery current", Measure::BatteryCurrent),
     ("battery charge used", Measure::BatteryChargeUsed),
+    ("battery charge", Measure::BatteryCharge),
+    ("battery power", Measure::BatteryPower),
     ("battery sag", Measure::BatterySag),
     ("roll setpoint", Measure::Setpoint(Axis::Roll)),
     ("pitch setpoint", Measure::Setpoint(Axis::Pitch)),
@@ -518,7 +540,10 @@ impl Measure {
             }
             Measure::MotorTorque(_) => Dimension::TORQUE,
             Measure::MotorCurrent(_) | Measure::BatteryCurrent => Dimension::CURRENT,
-            Measure::MotorDrive(_) => Dimension::PERCENT,
+            Measure::MotorDrive(_) | Measure::AverageMotorCommand | Measure::BatteryCharge => {
+                Dimension::PERCENT
+            }
+            Measure::BatteryPower => Dimension::POWER,
             Measure::MotorRestarts(_) => Dimension::NONE,
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
@@ -654,6 +679,11 @@ impl Measure {
             Measure::BatteryCurrent => now.battery.current,
             Measure::BatteryChargeUsed => now.battery.charge_used,
             Measure::BatterySag => now.battery.sag,
+            Measure::BatteryCharge => now.battery.charge,
+            Measure::BatteryPower => now.battery.voltage * now.battery.current,
+            Measure::AverageMotorCommand => {
+                now.commands.0.iter().map(|c| c.throttle).sum::<f64>() / 4.0
+            }
             Measure::Setpoint(_)
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)

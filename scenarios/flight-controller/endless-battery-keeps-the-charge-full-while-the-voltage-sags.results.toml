@@ -1,0 +1,52 @@
+# Results of endless-battery-keeps-the-charge-full-while-the-voltage-sags.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "With Endless Battery on, the charge stays full while the voltage sags under a punch"
+
+[[expect]]
+what     = "battery charge, lowest over 0 s to 8 s"
+basis    = "Rule"
+expected = "100% ± 0.0001%"
+measured = "100%"
+
+[[expect]]
+what     = "battery current, highest over 5 s to 7 s"
+basis    = "Observed"
+expected = "18.4 A ± 0.5 A"
+measured = "18.4 A"
+
+[[expect]]
+what     = "battery sag, highest over 5 s to 7 s"
+basis    = "Rule"
+expected = "0.72 V ± 0.02 V"
+measured = "0.716 V"
+
+[[expect]]
+what     = "battery charge used at 8 s"
+basis    = "Observed"
+expected = "9.24 mAh ± 0.3 mAh"
+measured = "9.24 mAh"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "9c08ee377f648787"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "cbe5e1987ac812d8"   # the whole state after each of 64000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.8 s" = "d4a3d2ec2802499a"
+"1.6 s" = "6187113a5816140e"
+"2.4 s" = "ce8cd974111bd38d"
+"3.2 s" = "3edc67d2e230fa3d"
+"4 s" = "ddbec8e862e4e68c"
+"4.8 s" = "36859806d8cb7901"
+"5.6 s" = "920c0bb319ac278c"
+"6.4 s" = "289d63f29a69bb2f"
+"7.2 s" = "36e698e52b571cf5"
+"8 s" = "5e85e7557e18c6de"
