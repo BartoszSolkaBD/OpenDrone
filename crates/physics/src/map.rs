@@ -1,8 +1,11 @@
 //! The Map's solid parts, and the read-only line question.
 
+use std::collections::BTreeSet;
+
+use opendrone_maths::functions::max;
 use opendrone_maths::{Attitude, Fingerprinter, Vec3};
 use parry3d_f64::bounding_volume::{Aabb, BoundingVolume};
-use parry3d_f64::math::{Pose, Vector};
+use parry3d_f64::math::Pose;
 use parry3d_f64::query::{Ray, RayCast};
 use parry3d_f64::shape::{SharedShape, TriMesh};
 
@@ -23,8 +26,16 @@ pub enum MapShape {
         /// into world directions, as a Quad's attitude turns its body axes).
         attitude: Attitude,
     },
-    /// The smallest convex solid round these corners.
-    Convex { corners: Vec<Vec3> },
+    /// A convex solid, as a finished mesh: triangles between corners, each
+    /// listed by the index of its three corners, anticlockwise when seen from
+    /// outside the solid. The triangles must close the solid with every
+    /// corner used, and no corner may stand outside any triangle's plane.
+    /// The physics never works out a solid's outline itself: a shape that
+    /// isn't convex is refused.
+    Convex {
+        corners: Vec<Vec3>,
+        triangles: Vec<[u32; 3]>,
+    },
     /// Triangles between corners, each listed by the index of its three
     /// corners, anticlockwise when seen from the side its surface faces. A
     /// closed mesh is a solid; an open one, such as a sheet of ground, is a
@@ -52,11 +63,17 @@ impl MapShape {
                 point(f, *size);
                 f.write_f64s(&attitude.quaternion());
             }
-            MapShape::Convex { corners } => {
+            MapShape::Convex { corners, triangles } => {
                 f.write_u64(2);
                 f.write_u64(corners.len() as u64);
                 for corner in corners {
                     point(f, *corner);
+                }
+                f.write_u64(triangles.len() as u64);
+                for triangle in triangles {
+                    for corner in triangle {
+                        f.write_u64(u64::from(*corner));
+                    }
                 }
             }
             MapShape::TriangleMesh { corners, triangles } => {
@@ -83,9 +100,16 @@ pub enum MapShapeProblem {
     NotARealNumber,
     /// A box's size must be above zero along all three of its axes.
     BoxHasNoSize,
-    /// A convex shape needs at least four corners that aren't all in one
-    /// plane.
+    /// A convex shape needs at least four triangles, enclosing some volume
+    /// (not all in one plane).
     ConvexHasNoVolume,
+    /// A convex shape's triangles must close it: every edge shared by
+    /// exactly two triangles that run along it in opposite directions, and
+    /// every corner used by a triangle.
+    ConvexIsNotClosed,
+    /// A convex shape's triangles must face outward, with every corner
+    /// behind (or on) the plane of every triangle.
+    ConvexIsNotConvex,
     /// A triangle mesh needs at least one triangle.
     MeshHasNoTriangles,
     /// A triangle names a corner the mesh doesn't have.
@@ -253,19 +277,16 @@ impl Solid {
                     false,
                 )
             }
-            MapShape::Convex { corners } => {
+            MapShape::Convex { corners, triangles } => {
                 if !real(corners) {
                     return Err(MapShapeProblem::NotARealNumber);
                 }
-                let points: Vec<Vector> = corners.iter().map(|c| to_parry(*c)).collect();
-                let hull =
-                    SharedShape::convex_hull(&points).ok_or(MapShapeProblem::ConvexHasNoVolume)?;
-                // A hull flat in one plane has no inside to collide with.
-                let local = hull.compute_local_aabb();
-                let extent = local.maxs - local.mins;
-                if !(extent.x > 0.0 && extent.y > 0.0 && extent.z > 0.0) {
-                    return Err(MapShapeProblem::ConvexHasNoVolume);
-                }
+                check_convex_mesh(corners, triangles)?;
+                let hull = SharedShape::convex_mesh(
+                    corners.iter().map(|c| to_parry(*c)).collect(),
+                    triangles,
+                )
+                .ok_or(MapShapeProblem::ConvexIsNotClosed)?;
                 (hull, Pose::IDENTITY, false)
             }
             MapShape::TriangleMesh { corners, triangles } => {
@@ -307,6 +328,70 @@ impl Solid {
             is_mesh,
         })
     }
+}
+
+/// Checks that triangles make a closed, convex solid facing outward, with
+/// plain arithmetic, so the result is the same on every computer.
+fn check_convex_mesh(corners: &[Vec3], triangles: &[[u32; 3]]) -> Result<(), MapShapeProblem> {
+    let count = corners.len();
+    if triangles
+        .iter()
+        .flatten()
+        .any(|corner| *corner as usize >= count)
+    {
+        return Err(MapShapeProblem::MeshCornerMissing);
+    }
+    if triangles.len() < 4 {
+        return Err(MapShapeProblem::ConvexHasNoVolume);
+    }
+    // Every corner used, every edge once each way.
+    let mut used = vec![false; count];
+    let mut edges = BTreeSet::new();
+    for triangle in triangles {
+        for k in 0..3 {
+            let (from, to) = (triangle[k], triangle[(k + 1) % 3]);
+            if from == to || !edges.insert((from, to)) {
+                return Err(MapShapeProblem::ConvexIsNotClosed);
+            }
+            used[from as usize] = true;
+        }
+    }
+    if used.contains(&false)
+        || edges
+            .iter()
+            .any(|(from, to)| !edges.contains(&(*to, *from)))
+    {
+        return Err(MapShapeProblem::ConvexIsNotClosed);
+    }
+    // How far the corners spread, to judge "on the plane" by.
+    let mut reach = 1e-3;
+    for corner in corners {
+        for number in [corner.x, corner.y, corner.z] {
+            reach = max(reach, number.abs());
+        }
+    }
+    let tolerance = 1e-9 * reach;
+    let mut some_depth = false;
+    for triangle in triangles {
+        let [a, b, c] = triangle.map(|i| corners[i as usize]);
+        let normal = (b - a).cross(c - a);
+        let length = normal.length();
+        if length <= 0.0 {
+            return Err(MapShapeProblem::ConvexIsNotConvex);
+        }
+        for corner in corners {
+            // Positive: in front of the triangle, outside the solid.
+            let height = normal.dot(*corner - a) / length;
+            if height > tolerance {
+                return Err(MapShapeProblem::ConvexIsNotConvex);
+            }
+            some_depth |= height < -tolerance;
+        }
+    }
+    if !some_depth {
+        return Err(MapShapeProblem::ConvexHasNoVolume);
+    }
+    Ok(())
 }
 
 /// Where a line crosses a convex solid: in from the start, and out from the

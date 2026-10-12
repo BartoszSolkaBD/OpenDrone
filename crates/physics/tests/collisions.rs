@@ -120,7 +120,25 @@ fn rail(start: Vec3, end: Vec3, diameter: f64) -> MapShape {
         corners.push(start + around);
         corners.push(end + around);
     }
-    MapShape::Convex { corners }
+    let mut triangles = Vec::new();
+    for k in 0..16u32 {
+        let next = (k + 1) % 16;
+        triangles.push([2 * k, 2 * next, 2 * next + 1]);
+        triangles.push([2 * k, 2 * next + 1, 2 * k + 1]);
+        if k >= 1 && k + 1 < 16 {
+            triangles.push([0, 2 * next, 2 * k]);
+            triangles.push([1, 2 * k + 1, 2 * next + 1]);
+        }
+    }
+    // Face them outward, whichever way round the rail runs.
+    let middle = (start + end) / 2.0;
+    let [a, b, c] = triangles[0].map(|i| corners[i as usize]);
+    if (b - a).cross(c - a).dot(a - middle) < 0.0 {
+        for triangle in &mut triangles {
+            triangle.swap(1, 2);
+        }
+    }
+    MapShape::Convex { corners, triangles }
 }
 
 fn state(position: Vec3, velocity: Vec3, attitude: Attitude) -> QuadState {

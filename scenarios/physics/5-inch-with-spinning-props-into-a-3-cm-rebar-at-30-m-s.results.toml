@@ -14,7 +14,7 @@ measured = "2.94 m"
 what     = "prop 2 rub, highest over 0.03 s to 0.04 s"
 basis    = "Rule"
 expected = "between 1 N and 100000 N"
-measured = "3190 N"
+measured = "2300 N"
 
 [[expect]]
 what     = "prop 4 rub, highest over 0.03 s to 0.04 s"
@@ -50,7 +50,7 @@ measured = "0%"
 what     = "speed east at 0.1 s"
 basis    = "Observed"
 expected = "-1.74 m/s ± 0.3 m/s"
-measured = "-1.57 m/s"
+measured = "-1.79 m/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -60,17 +60,17 @@ measured = "none broken"
 
 [fingerprints]
 quad = "0e03ecbfcd1ce5e7"   # test/freestyle-5-no-drag: what the Simulation receives from it
-map  = "61249da54cc5d1fa"   # test/thin-rail
-run  = "40971285c999035a"   # the whole state after each of 800 steps at 8000 Hz, in order
+map  = "a0fe03c0f9d79a5a"   # test/thin-rail
+run  = "908f5145c4f0554a"   # the whole state after each of 800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.01 s" = "9b6f232f7b1f140e"
 "0.02 s" = "b110f218c4729ec1"
 "0.03 s" = "fd6d6a88e3626b6b"
-"0.04 s" = "2e2d41e7f17548cd"
-"0.05 s" = "07541681ef55bb67"
-"0.06 s" = "bd0a415295e2fe81"
-"0.07 s" = "7e9ac6ac457edc88"
-"0.08 s" = "f7d38abba50e594d"
-"0.09 s" = "946e01ae9369eea0"
-"0.1 s" = "838bea526d047882"
+"0.04 s" = "29e219772be42f0b"
+"0.05 s" = "c47e51495afbb15c"
+"0.06 s" = "526b655baec33934"
+"0.07 s" = "bcf9b2b87f5e279f"
+"0.08 s" = "3f9456c310b43ccd"
+"0.09 s" = "1e138e94f74f67fc"
+"0.1 s" = "876684aca36fc577"
