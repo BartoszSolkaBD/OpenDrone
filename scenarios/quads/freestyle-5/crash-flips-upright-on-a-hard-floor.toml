@@ -1,0 +1,107 @@
+# An upside-down Freestyle 5″ on a hard floor Crash Flips itself upright, at
+# full roll stick and at full pitch stick (#26 §3 and §6): how it goes is
+# what the Simulation does today, the counterpart of the Whoop 65's
+# crash-flips-upright-on-a-hard-floor.toml.
+#
+# It lies upside down on test/flat-floor, on its pack, whose top is 46 mm
+# above its centre of mass (26 mm up to the pack's middle, plus half its
+# 40 mm), with its props clear of the floor. It starts as Reset leaves it:
+# disarmed, the ESCs powering up, ready at 1.662 s. The Crash Flip switch is
+# on; the Arm switch goes on at 2 s, so it arms in Crash Flip at 2.004 s, and
+# after "spin direction reversed" and the ESCs' 0.1 s start wait, thrust
+# starts at about 2.125 s.
+#
+# Full roll right spins the right pair backwards, 48% of forward thrust
+# (Measured): far more than the 5″ needs, so it springs off the floor as it
+# turns. The pilot centres the stick at 2.45 s, as it comes over; it tumbles
+# once more in the air and lands right side up. The Crash Flip switch then
+# goes off, which disarms it. Then Reset puts it back upside down, and it
+# does the same on full pitch forward: the front pair lifts its nose, it
+# flips over its tail, and it rocks down onto its feet.
+format = 2
+name   = "An upside-down Freestyle 5″ on a hard floor Crash Flips upright on roll and on pitch"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.046 m up"
+attitude          = "roll 180°, pitch 0°, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",    roll = "100%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
+  { at = "2 s",    arm = "on" },
+  { at = "2.45 s", roll = "0%" },
+  { at = "3.2 s",  crash_flip = "off" },
+  { at = "3.5 s",  arm = "off" },
+  # Back upside down, then on pitch.
+  { at = "4 s",    reset = true, pitch = "100%", crash_flip = "on" },
+  { at = "6 s",    arm = "on" },
+  { at = "6.45 s", pitch = "0%" },
+  { at = "7.2 s",  crash_flip = "off" },
+  { at = "7.5 s",  arm = "off" },
+  { at = "9 s",    arm = "off" },
+]
+
+[[expect]]
+what  = "tilt"
+at    = "1.9 s"
+value = "180° ± 1°"
+basis = "rule: it starts upside down and lies still on its pack until it's armed"
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "2 s to 2.1 s"
+first = "0.004125 s ± 0.000001 s"
+basis = "source: tryArm (Betaflight 2026.6.2's core.c): upside down, the tilt check is skipped with the Crash Flip switch on, so the frame at 2.004 s arms in Crash Flip"
+
+[[expect]]
+what  = "the Quad turns right side up"
+over  = "2 s to 3 s"
+first = "0.476 s ± 0.05 s"
+basis = "observed: the roll flip, from the Arm switch going on until it first comes past its side"
+
+[[expect]]
+what  = "tilt"
+at    = "3.6 s"
+value = "0° ± 1°"
+basis = "observed: after a tumble in the air it lands right side up and is at rest on the floor by 3.4 s"
+
+[[expect]]
+what  = "tilt"
+at    = "5.9 s"
+value = "180° ± 1°"
+basis = "rule: Reset put it back upside down on its Launch Spot"
+
+[[expect]]
+what  = "the Quad turns right side up"
+over  = "6 s to 7 s"
+first = "0.473 s ± 0.05 s"
+basis = "observed: the pitch flip, from the Arm switch going on until it first comes past its side"
+
+[[expect]]
+what  = "tilt"
+at    = "8.5 s"
+value = "0° ± 1°"
+basis = "observed: it comes down tilted on a prop and its pack, and rocks down onto its feet, at rest by 8.25 s"

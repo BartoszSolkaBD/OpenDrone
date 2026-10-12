@@ -1,0 +1,135 @@
+# The Freestyle 5″ on the thrust stand, armed in Crash Flip: a motor spun
+# backwards gives the Quad definition's reverse shares of thrust and torque
+# (#26 §3 and §6), and its thrust starts about 0.12 s after arming.
+#
+# The bench supply of the thrust table (thrust-table.toml,
+# test/freestyle-5-bench-supply: 24.0 V behind 14.5 mΩ of leads) and the
+# Flight Controller flying from the sticks. Roll and pitch both full, on the
+# diagonal, drive motor 2 (front right) alone, at full power (DShot 2047,
+# Bluejay's full drive), backwards: so one motor runs at full drive, as in the
+# thrust table's 100% row, but the other way.
+#
+# The timing, from Betaflight 2026.6.2 and Bluejay v0.21.0:
+#
+#   0.104 s   the frame after the Arm switch goes on arms, in Crash Flip
+#             (tryArm, src/main/fc/core.c)
+#   0.114 s   after 10 ms with no DShot frames, the first of ten DShot
+#             commands 21, "spin direction reversed", 1 ms apart
+#             (dshot_command.c); Bluejay takes it on the seventh
+#   0.125 s   1 ms after the tenth, the motors' commands go out again
+#             (21.25 ms after arming at 8 kHz, each wait rounded up to whole
+#             loops)
+#   0.225 s   after its 0.1 s start wait, the ESC starts the motor, its
+#             drive capped at the start-up power limit for 15 electrical
+#             turns (Bluejay.asm L726–768)
+#
+# so thrust starts 0.121 s after arming.
+#
+# The reverse shares are the Quad definition's: thrust 48% of forward at the
+# same speed (Measured on a similar 5.1″ 3-blade prop), torque 100%
+# (Estimate). With the same drag torque backwards, the motor model holds the
+# same speed at the same drive (crates/physics/src/motor.rs), so motor 2 turns
+# as fast as the thrust table's 100% row, 29,500 RPM there, draws the same
+# 35.0 A, and so sees the same 23.5 V.
+format = 2
+name   = "A reversed motor gives the Quad's reverse share of thrust and torque, from 0.12 s after arming"
+
+[start]
+kind              = "thrust stand"
+quad              = "test/freestyle-5-bench-supply"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 0 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# The ESCs are ready; the Flight Controller is fresh, so it can arm at once.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "100%", pitch = "100%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
+  { at = "0.1 s", arm = "on" },
+]
+
+[[expect]]
+what  = "Crash Flip starts"
+over  = "0 s to 0.2 s"
+first = "0.104125 s ± 0.000001 s"
+basis = "source: tryArm (src/main/fc/core.c): the frame at 0.104 s arms with the Crash Flip switch on"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.12 s"
+value = "21 ± 0"
+basis = "source: dshot_command.c: from 0.114 s the ESCs get DShot command 21, spin direction reversed, ten times, 1 ms apart, and nothing in between"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.13 s"
+value = "2047 ± 0"
+basis = "source: dshot_command.c: 1 ms after the tenth command, at 0.125 s, the motors' own commands go out again: motor 2 at full power"
+
+[[expect]]
+what  = "motor 2 speed"
+over  = "0 s to 0.225 s"
+highest = "0 RPM ± 0 RPM"
+basis = "source: until 0.125 s the ESC gets no throttle (DShot commands count as none in Bluejay), then waits 0.1 s before it starts a stopped motor (Bluejay.asm L726–730, the Quad's start_wait)"
+
+[[expect]]
+what  = "motor 2 drive"
+at    = "0.2255 s"
+value = "1.96% ± 0.001%"
+basis = "source: Bluejay.asm L726–768: once its start wait is over the ESC starts the motor, its drive capped at Startup Power Max, 1.96%: thrust starts 0.121 s after arming"
+
+[[expect]]
+what  = "motor 2 direction"
+at    = "0.2255 s"
+value = "-1 ± 0"
+basis = "source: tryArm sends spin direction reversed, and Bluejay takes it on the seventh of the ten commands (DShot.asm), before the motor starts"
+
+[[expect]]
+what  = "motor 2 speed"
+at    = "1.5 s"
+value = "-29500 RPM ± 0.5%"
+basis = "rule: the same drag torque backwards (reverse torque 100%) holds the same speed at the same drive and voltage, so the speed of the thrust table's 100% row, 29,500 RPM, but backwards"
+
+[[expect]]
+what  = "motor 2 thrust"
+at    = "1.5 s"
+value = "-762 gf ± 1%"
+basis = "rule: 48% (reverse_thrust) of the forward thrust at the same speed, pushing the other way. Forward, the thrust is k_f·ω², k_f = C_T·ρ·D⁴ ÷ 4π² = 0.187 × 1.225 kg/m³ × (0.1295 m)⁴ ÷ 4π² = 1.632 × 10⁻⁶ N·s², at 29,500 RPM (3,089 rad/s) 15.57 N (1,588 gf); 48% of it is 7.48 N, 762 gf. The 1% leaves room for the speed's 0.5%"
+
+[[expect]]
+what  = "motor 2 torque"
+at    = "1.5 s"
+value = "-0.1802 N·m ± 1%"
+basis = "rule: reverse torque 100%: the prop's drag torque is k_m·ω², as forward, k_m = C_P·ρ·D⁵ ÷ 8π³ = 0.105 × 1.225 kg/m³ × (0.1295 m)⁵ ÷ 8π³ = 1.889 × 10⁻⁸ N·m·s², at 29,500 RPM (3,089 rad/s) 0.1802 N·m, against the backwards spin"
+
+[[expect]]
+what  = "battery current"
+at    = "1.5 s"
+value = "35.0 A ± 1%"
+basis = "rule: the same torque at the same speed takes the same current as the thrust table's 100% row, 35.0 A"
+
+[[expect]]
+what  = "motor 1 thrust"
+at    = "1.5 s"
+value = "0 gf ± 0 gf"
+basis = "source: applyCrashFlipModeToMotors: on the diagonal, motor 1 gets nothing"

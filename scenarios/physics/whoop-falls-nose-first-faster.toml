@@ -6,7 +6,7 @@
 # The working (crates/physics/src/air.rs, "Body drag"): v_t = √(2·m·g /
 # (ρ·A)) = √(2 × 0.0312 kg × 9.81 m/s² / (1.225 kg/m³ × 0.0015 m²)) =
 # 18.252 m/s, and the speed is v_t·tanh(g·t / v_t).
-format = 1
+format = 2
 name   = "A Whoop 65 falling nose first reaches a faster terminal speed, 18.3 m/s"
 
 [start]

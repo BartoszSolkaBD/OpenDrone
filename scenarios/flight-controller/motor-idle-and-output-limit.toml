@@ -19,7 +19,7 @@
 # those tickets land. On the 5″'s own
 # Tune they would come out otherwise: on a case's first frame RC smoothing
 # would hold the throttle back, and throttle boost would push it.
-format = 1
+format = 2
 name   = "Motor idle and the output limit set the motors' range, as Betaflight does"
 
 [start]
@@ -51,6 +51,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"
@@ -64,6 +65,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "50%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"
@@ -77,6 +79,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "100%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 3 DShot"

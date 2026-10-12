@@ -11,7 +11,7 @@
 # (1295 - 1050) × 1000 ÷ 950 = 257, which the throttle curve's table (its
 # points rounded to whole µs, 1182 and 1273 either side) makes 1257 µs, so the
 # mixer's throttle is 25.7%.
-format = 1
+format = 2
 name   = "Losing the Input Device drops the Quad"
 
 [start]
@@ -43,7 +43,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "1 s", input_device = "lost" },
 ]
 
@@ -75,7 +75,7 @@ basis = "source: failsafeCheckDataFailurePeriod and failsafeUpdateState: more th
 what  = "motor 1 DShot"
 at    = "2.6 s"
 value = "0 ± 0"
-basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, about 21 ms (dshot_command.c; not sent yet, #54)"
+basis = "source: disarmed, Betaflight sends DShot 0, stop, once the spin-direction command it sends on disarming is over, 21.25 ms (dshot_command.c)"
 
 [[expect]]
 what  = "motor 1 speed"

@@ -13,6 +13,10 @@
 //!   on the measurement, so a stick move doesn't kick it.
 //! - The sum is P + I + D (+ F, feedforward, which arrives with #49).
 //!
+//! During yaw spin recovery the yaw setpoint is 0, I is emptied on every
+//! axis, and roll and pitch's P, D and F are 0, so only yaw's P and D work,
+//! braking the spin.
+//!
 //! Not here yet: the gyro, D-term and yaw P low-pass filters, RC smoothing
 //! and feedforward (#49), and anti-gravity, I-term relax, TPA and Dynamic D
 //! (#50). With those missing, D works on the clean gyro straight from the
@@ -93,26 +97,40 @@ impl Pid {
 
     /// One loop. `stabilising` false zeroes every term, as Betaflight does
     /// with stabilisation off; `reset_iterm` empties I after the sum, as
-    /// before Airmode starts at low throttle.
+    /// before Airmode starts at low throttle; `yaw_spin` is true during yaw
+    /// spin recovery.
     pub fn step(
         &mut self,
         setpoint: [f64; 3],
         gyro: [f64; 3],
         stabilising: bool,
         reset_iterm: bool,
+        yaw_spin: bool,
     ) {
         for axis in 0..3 {
-            let error = setpoint[axis] - gyro[axis];
-            let p = self.kp[axis] * error;
+            let target = if axis == 2 && yaw_spin {
+                0.0
+            } else {
+                setpoint[axis]
+            };
+            let error = target - gyro[axis];
+            let mut p = self.kp[axis] * error;
             let limit = self.iterm_limit[axis];
-            let i = (self.iterm[axis] + self.ki[axis] * self.dt * error).clamp(-limit, limit);
-            let d = if self.kd[axis] > 0.0 {
+            let mut i = (self.iterm[axis] + self.ki[axis] * self.dt * error).clamp(-limit, limit);
+            let mut d = if self.kd[axis] > 0.0 {
                 self.kd[axis] * -(gyro[axis] - self.previous_gyro[axis]) * self.frequency
             } else {
                 0.0
             };
             self.previous_gyro[axis] = gyro[axis];
             let f = 0.0;
+            if yaw_spin {
+                i = 0.0;
+                if axis < 2 {
+                    p = 0.0;
+                    d = 0.0;
+                }
+            }
             self.iterm[axis] = i;
             self.terms[axis] = Terms {
                 p,

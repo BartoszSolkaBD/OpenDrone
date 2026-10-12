@@ -25,7 +25,7 @@
 # I-term relax (#50). So the roll spins up on P, I and D, without
 # feedforward. The Source Expectations hold either way; the Observed swings
 # will move when those land.
-format = 1
+format = 2
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
 
 [start]
@@ -58,7 +58,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "30%", arm = "on", crash_flip = "off" },
   { at = "1 s",   roll = "100%" },
   { at = "3 s",   roll = "0%" },
 ]

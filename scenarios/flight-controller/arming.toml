@@ -23,10 +23,9 @@
 # On arming, Betaflight first sends each ESC the DShot command "spin the
 # normal way" (`setMotorSpinDirection`, src/main/fc/core.c): after a 10 ms
 # wait, ten times 1 ms apart (src/main/drivers/dshot_command.c), so the idle
-# throttle reaches the ESCs about 20 ms after the arming frame. The Flight
-# Controller doesn't send DShot commands yet (Crash Flip, #54), so the idle is
-# checked 26 ms after arming, where both agree.
-format = 1
+# throttle reaches the ESCs 21.25 ms after the arming frame at 8 kHz, and the
+# idle is checked 26 ms after arming.
+format = 2
 name   = "The Arm switch arms with the throttle low and the Quad level enough, as in Betaflight"
 
 [start]
@@ -53,7 +52,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
   # Throttle low, level: arms.
   { at = "0.1 s", arm = "on" },
   { at = "0.5 s", arm = "off" },
@@ -84,7 +83,7 @@ basis = "source: processRcStickPositions and updateActivatedModes: the frame at 
 what  = "motor 1 DShot"
 at    = "0.13 s"
 value = "158 ± 0"
-basis = "source: tryArm: with the throttle below min_check (988.46 µs < 1050 µs) and level, the frame at 0.104 s arms, and the motors idle at 158 once the spin-direction command is sent, about 20 ms later (dshot_command.c; #54 sends it)"
+basis = "source: tryArm: with the throttle below min_check (988.46 µs < 1050 µs) and level, the frame at 0.104 s arms, and the motors idle at 158 once the spin-direction command is sent, 21.25 ms later (dshot_command.c)"
 
 [[expect]]
 what  = "motor 1 DShot"
@@ -114,7 +113,7 @@ basis = "source: updateArmingStatus: the throttle came down at 1.3 s, but ARMSWI
 what  = "motor 1 DShot"
 at    = "1.63 s"
 value = "158 ± 0"
-basis = "source: updateArmingStatus and tryArm: the switch went off at 1.5 s, clearing ARMSWITCH; on again at 1.6 s with the throttle low, it arms a frame later, at 1.604 s, and idles once the spin-direction command is sent, about 20 ms later (#54)"
+basis = "source: updateArmingStatus and tryArm: the switch went off at 1.5 s, clearing ARMSWITCH; on again at 1.6 s with the throttle low, it arms a frame later, at 1.604 s, and idles once the spin-direction command is sent, 21.25 ms later"
 
 [[expect]]
 what  = "motor 1 DShot"

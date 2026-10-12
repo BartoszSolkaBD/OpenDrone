@@ -8,7 +8,7 @@
 # A landed start with a "fresh" Flight Controller is exactly Reset, so its
 # motors start "powering up". The body box is 35 mm tall, so the Quad rests
 # with its centre 17.5 mm above the floor.
-format = 1
+format = 2
 name   = "An Arm switch already on at power-up must be flipped off and on again"
 
 [start]
@@ -40,7 +40,7 @@ quickrates_rc_expo = "off"
 
 [inputs]
 timeline = [
-  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on" },
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
   { at = "2.5 s", arm = "off" },
   { at = "2.7 s", arm = "on" },
 ]
@@ -79,4 +79,4 @@ basis = "source: processRcStickPositions and tryArm: the frame at 2.7 s turns Ar
 what  = "motor 1 DShot"
 at    = "2.8 s"
 value = "158 ± 1"
-basis = "source: armed at zero throttle, the motors idle at 48 + 5.5% × 1999 = 157.9, sent as 158, give or take the PID loop's corrections on the floor; 96 ms after arming, past the spin-direction command Betaflight sends on arming, about 21 ms (dshot_command.c; not sent yet, #54)"
+basis = "source: armed at zero throttle, the motors idle at 48 + 5.5% × 1999 = 157.9, sent as 158, give or take the PID loop's corrections on the floor; 96 ms after arming, past the spin-direction command Betaflight sends on arming, 21.25 ms (dshot_command.c)"

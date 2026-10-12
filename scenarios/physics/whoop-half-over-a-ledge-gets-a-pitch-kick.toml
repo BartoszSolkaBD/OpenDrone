@@ -37,7 +37,7 @@
 #
 # The ledge Test Map's platform is a convex shape, 1 m high, its edge
 # running north–south through the origin; the ground round it is a box.
-format = 1
+format = 2
 name   = "Half over a ledge, a Whoop 65 gets a pitch kick away from it"
 
 [start]

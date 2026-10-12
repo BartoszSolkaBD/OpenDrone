@@ -10,7 +10,7 @@
 # `recovery`). Once the motors have stopped after the chop and nothing is
 # drawn, that slow part is all the sag left, and it shrinks to 37% in each
 # 3.3 s.
-format = 1
+format = 2
 name   = "The Freestyle 5″'s pack recovers after a chop"
 
 [start]

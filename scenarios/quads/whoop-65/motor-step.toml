@@ -17,7 +17,7 @@
 #
 # No whoop motor's response has been measured (flight-dynamics research
 # §3.2), so these times are Observed, pinned for the Feel Tests (#10 §6).
-format = 1
+format = 2
 name   = "A Whoop 65 motor stepped 0 → 100 → 0% follows its spin-up and slow-down times"
 
 [start]

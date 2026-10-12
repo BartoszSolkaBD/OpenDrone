@@ -120,6 +120,8 @@ pub struct PilotChanges {
     pub throttle: Option<Stick>,
     /// The Arm switch (AUX1): on is high.
     pub arm: Option<bool>,
+    /// The Crash Flip switch (AUX3): on is high.
+    pub crash_flip: Option<bool>,
     /// A Flight Controller Scenario's gyro reading from now on, in body axes
     /// (forward, left, up), in radians per second.
     pub rotation: Option<Vec3>,
@@ -189,7 +191,8 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// True for the kinds whose motors are scripted.
+    /// True for the kinds whose motors are scripted. A Thrust Stand Scenario
+    /// scripts them too, unless its Timeline flies our Flight Controller.
     fn scripts_motors(self) -> bool {
         matches!(self, Kind::Physics | Kind::ThrustStand)
     }
@@ -453,6 +456,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         moments: Vec::new(),
         other_runs: Vec::new(),
         track: false,
+        scripted: kind.scripts_motors(),
     };
     let has_cases = root.get("case").is_some();
     let inputs = if kind == Kind::FlightController && has_cases {
@@ -1019,6 +1023,10 @@ struct Reader<'p> {
     other_runs: Vec<OtherRun>,
     /// True when the inputs are an Input Track.
     track: bool,
+    /// True when the Timeline scripts the motors: always in a Physics
+    /// Scenario, and in a Thrust Stand Scenario whose Timeline gives
+    /// `motors` rather than a pilot's sticks and switches.
+    scripted: bool,
 }
 
 impl Reader<'_> {
@@ -1084,8 +1092,29 @@ impl Reader<'_> {
                 .timeline_at(self.rate, false)
                 .unwrap_or(Inputs::Motors(Vec::new()));
         };
+        // A Thrust Stand Scenario scripts its motors, or flies our Flight
+        // Controller from a pilot's sticks and switches: its first moment
+        // says which.
+        if self.kind == Kind::ThrustStand {
+            self.scripted = timeline
+                .first()
+                .and_then(|first| first.table(&mut Problems::new()))
+                .is_none_or(|first| first.get("motors").is_some());
+        }
         let known: &[&str] = match self.kind {
-            Kind::Physics | Kind::ThrustStand => &["at", "motors"],
+            Kind::Physics => &["at", "motors"],
+            Kind::ThrustStand if self.scripted => &["at", "motors"],
+            Kind::ThrustStand => &[
+                "at",
+                "roll",
+                "pitch",
+                "yaw",
+                "throttle",
+                "arm",
+                "crash_flip",
+                "input_device",
+                "radio_link",
+            ],
             Kind::Flight => &[
                 "at",
                 "roll",
@@ -1093,6 +1122,7 @@ impl Reader<'_> {
                 "yaw",
                 "throttle",
                 "arm",
+                "crash_flip",
                 "input_device",
                 "radio_link",
                 "reset",
@@ -1104,6 +1134,7 @@ impl Reader<'_> {
                 "yaw",
                 "throttle",
                 "arm",
+                "crash_flip",
                 "rotation",
                 "attitude",
                 "input_device",
@@ -1119,7 +1150,7 @@ impl Reader<'_> {
             let at = entry
                 .text("at", self.problems)
                 .and_then(|(text, item)| self.moment(text, &item));
-            let read = if self.kind.scripts_motors() {
+            let read = if self.scripted {
                 entry
                     .text("motors", self.problems)
                     .and_then(|(text, item)| self.motor_commands(text, &item))
@@ -1168,7 +1199,7 @@ impl Reader<'_> {
                 }
             }
         }
-        if !self.kind.scripts_motors() {
+        if !self.scripted {
             self.check_pilot_timeline(&inputs);
             self.check_flight_inputs();
         }
@@ -1250,14 +1281,14 @@ impl Reader<'_> {
         })
     }
 
-    /// A pilot's Timeline must set every stick and the Arm switch at 0 s, so
+    /// A pilot's Timeline must set every stick and both switches at 0 s, so
     /// the run starts from values the file states (ADR-0002); a ramp needs a
     /// value to ramp from.
     fn check_pilot_timeline(&mut self, inputs: &Table<'_, '_>) {
         // Every moment at 0 s counts, in case the file splits them.
         let at_the_start = || self.moments.iter().filter(|m| m.seconds == 0.0);
         let first: Option<&Moment> = at_the_start().next();
-        let mut given = [false; 5];
+        let mut given = [false; 6];
         for moment in at_the_start() {
             if let Entry::Pilot(changes) = moment.entry {
                 let sets = [
@@ -1266,13 +1297,14 @@ impl Reader<'_> {
                     changes.yaw.is_some(),
                     changes.throttle.is_some(),
                     changes.arm.is_some(),
+                    changes.crash_flip.is_some(),
                 ];
                 for (given, sets) in given.iter_mut().zip(sets) {
                     *given |= sets;
                 }
             }
         }
-        let missing: Vec<&str> = ["roll", "pitch", "yaw", "throttle", "arm"]
+        let missing: Vec<&str> = ["roll", "pitch", "yaw", "throttle", "arm", "crash_flip"]
             .into_iter()
             .zip(given)
             .filter(|(_, given)| !given)
@@ -1284,7 +1316,7 @@ impl Reader<'_> {
         };
         if !missing.is_empty() {
             let found = problem(format!(
-                "the Timeline starts with a moment at 0 s that sets every stick and the Arm switch (ADR-0002); it doesn't set {}",
+                "the Timeline starts with a moment at 0 s that sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); it doesn't set {}",
                 missing
                     .iter()
                     .map(|m| format!("`{m}`"))
@@ -1350,7 +1382,7 @@ impl Reader<'_> {
             return None;
         }
         // In time order; moments at the same time keep the file's order.
-        if self.kind.scripts_motors() {
+        if self.scripted {
             Some(Inputs::Motors(motors))
         } else {
             pilot.sort_by_key(|e| e.at);
@@ -1358,8 +1390,9 @@ impl Reader<'_> {
         }
     }
 
-    /// The sticks, the Arm switch and, for a Flight Controller Scenario, the
-    /// sensor readings a Timeline moment or a case sets.
+    /// The sticks, the Arm and Crash Flip switches and, for a Flight
+    /// Controller Scenario, the sensor readings a Timeline moment or a case
+    /// sets.
     fn pilot_changes(&mut self, entry: &Table<'_, '_>) -> Option<PilotChanges> {
         let mut changes = PilotChanges::default();
         let mut fine = true;
@@ -1386,6 +1419,19 @@ impl Reader<'_> {
                 Some(other) => {
                     self.problems.push(item.problem(format!(
                         "`arm` is the Arm switch on AUX1: \"on\" (high, armed) or \"off\", not \"{other}\""
+                    )));
+                    fine = false;
+                }
+                None => fine = false,
+            }
+        }
+        if let Some(item) = entry.get("crash_flip") {
+            match item.text(self.problems) {
+                Some("on") => changes.crash_flip = Some(true),
+                Some("off") => changes.crash_flip = Some(false),
+                Some(other) => {
+                    self.problems.push(item.problem(format!(
+                        "`crash_flip` is the Crash Flip switch on AUX3: \"on\" (high) or \"off\", not \"{other}\""
                     )));
                     fine = false;
                 }
@@ -1593,27 +1639,37 @@ impl Reader<'_> {
             };
             table.refuse_unknown(
                 &[
-                    "roll", "pitch", "yaw", "throttle", "arm", "rotation", "attitude", "expect",
+                    "roll",
+                    "pitch",
+                    "yaw",
+                    "throttle",
+                    "arm",
+                    "crash_flip",
+                    "rotation",
+                    "attitude",
+                    "expect",
                 ],
                 self.problems,
             );
             let inputs = self.pilot_changes(&table);
             if let Some(inputs) = &inputs {
-                let missing: Vec<String> = ["roll", "pitch", "yaw", "throttle", "arm"]
-                    .into_iter()
-                    .zip([
-                        inputs.roll.is_some(),
-                        inputs.pitch.is_some(),
-                        inputs.yaw.is_some(),
-                        inputs.throttle.is_some(),
-                        inputs.arm.is_some(),
-                    ])
-                    .filter(|(_, given)| !given)
-                    .map(|(name, _)| format!("`{name}`"))
-                    .collect();
+                let missing: Vec<String> =
+                    ["roll", "pitch", "yaw", "throttle", "arm", "crash_flip"]
+                        .into_iter()
+                        .zip([
+                            inputs.roll.is_some(),
+                            inputs.pitch.is_some(),
+                            inputs.yaw.is_some(),
+                            inputs.throttle.is_some(),
+                            inputs.arm.is_some(),
+                            inputs.crash_flip.is_some(),
+                        ])
+                        .filter(|(_, given)| !given)
+                        .map(|(name, _)| format!("`{name}`"))
+                        .collect();
                 if !missing.is_empty() {
                     self.problems.push(table.problem(format!(
-                        "a case sets every stick and the Arm switch (ADR-0002); this one doesn't set {}",
+                        "a case sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); this one doesn't set {}",
                         missing.join(", ")
                     )));
                 }
@@ -1728,12 +1784,10 @@ impl Reader<'_> {
                     "a Flight Controller Scenario runs the Flight Controller alone, so it measures only what the Flight Controller and its Radio Link do, not {text}"
                 ))
             }
-            Kind::Physics | Kind::ThrustStand if measure.of_the_flight_controller() => {
-                Some(format!(
-                    "{text} is our Flight Controller's, but a {scripted} Scenario's motors are scripted"
-                ))
-            }
-            Kind::Physics | Kind::ThrustStand if measure.of_the_radio_link() => Some(format!(
+            _ if self.scripted && measure.of_the_flight_controller() => Some(format!(
+                "{text} is our Flight Controller's, but a {scripted} Scenario's motors are scripted"
+            )),
+            _ if self.scripted && measure.of_the_radio_link() => Some(format!(
                 "{text} is the Radio Link's, but a {scripted} Scenario's motors are scripted, so no sticks reach a Flight Controller"
             )),
             _ => None,
@@ -2311,6 +2365,9 @@ fn case_words(changes: &PilotChanges) -> String {
     }
     if changes.arm == Some(true) {
         words.push("arm on".to_string());
+    }
+    if changes.crash_flip == Some(true) {
+        words.push("crash flip on".to_string());
     }
     if let Some(rotation) = changes.rotation {
         let r = PilotRates::from_body(rotation);

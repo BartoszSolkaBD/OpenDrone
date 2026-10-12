@@ -1,5 +1,5 @@
 # A fixture: the Observed Expectation is gone.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

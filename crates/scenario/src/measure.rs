@@ -1,6 +1,6 @@
 //! What an Expectation can measure: the words a Scenario's `what` may use.
 
-use opendrone_maths::{DEGREE, PilotRates, functions};
+use opendrone_maths::{Attitude, DEGREE, PilotRates, Vec3, functions};
 use opendrone_pack::units::Dimension;
 use opendrone_sim::{Channel, DebugRecord, QuadOutput, RadioLinkOutput};
 
@@ -89,6 +89,9 @@ pub enum Measure {
     /// straight up or down, roll reads 0° and heading carries the whole turn
     /// (see `opendrone_maths::PilotAngles`).
     Heading,
+    /// How far the Quad's up axis leans from straight up, whichever way:
+    /// 0° upright, 90° on its side, 180° upside down.
+    Tilt,
     /// A motor's speed, positive the normal way. Motors count from 0 here
     /// and from 1 in Scenarios, in Betaflight's order.
     MotorSpeed(usize),
@@ -128,6 +131,9 @@ pub enum Measure {
     /// The DShot value our Flight Controller sends a motor: 0 is "stop", 48
     /// to 2047 the throttle.
     MotorDshot(usize),
+    /// Which way our Flight Controller has told a motor's ESC to spin: 1 the
+    /// normal way, -1 backwards (Crash Flip).
+    MotorDirection(usize),
     /// The throttle our Flight Controller's mixer starts from, from 0% to
     /// 100%, before Airmode moves it: what Betaflight's Blackbox logs as the
     /// mixer's throttle.
@@ -159,14 +165,28 @@ pub enum Event {
     /// Our Flight Controller disarms.
     Disarms,
     /// One of Betaflight's arming-disabled flags is raised (`true`) or
-    /// cleared (`false`): its place in `ArmingBlocks::NAMES`.
-    Blocks { flag: usize, raised: bool },
+    /// cleared (`false`): its name in `ArmingBlocks::NAMES`.
+    Blocks { flag: &'static str, raised: bool },
     /// Failsafe's stage 2 starts: with DROP, the Quad disarms.
     FailsafeStarts,
     /// Failsafe ends: the link has been back long enough.
     FailsafeEnds,
     /// Every ESC has played its ready beep.
     EscsReady,
+    /// The Quad comes right side up: its tilt falls below 90°.
+    TurnsRightSideUp,
+    /// Our Flight Controller arms in Crash Flip.
+    CrashFlipStarts,
+    /// Crash Flip ends: the Quad disarms, or with `crashflip_auto_rearm` the
+    /// switch goes off.
+    CrashFlipEnds,
+    /// Yaw spin recovery starts.
+    YawSpinRecoveryStarts,
+    /// Yaw spin recovery ends.
+    YawSpinRecoveryEnds,
+    /// The flight counts as stable, so runaway takeoff prevention switches
+    /// itself off until the next power-up.
+    FlightCountsAsStable,
     /// The Radio Link counts the Flying Input Device as lost: unplugged, or
     /// silent too long.
     InputDeviceLost,
@@ -175,109 +195,146 @@ pub enum Event {
 }
 
 /// Every event's words, as a Scenario's `what` names it.
-const EVENTS: [(&str, Event); 21] = [
+const EVENTS: [(&str, Event); 31] = [
     ("the Quad arms", Event::Arms),
     ("the Quad disarms", Event::Disarms),
     ("Failsafe's stage 2 starts", Event::FailsafeStarts),
     ("Failsafe ends", Event::FailsafeEnds),
     ("the ESCs are ready", Event::EscsReady),
+    ("the Quad turns right side up", Event::TurnsRightSideUp),
     (
         "FAILSAFE blocks arming",
         Event::Blocks {
-            flag: 0,
+            flag: "FAILSAFE",
             raised: true,
         },
     ),
     (
         "FAILSAFE stops blocking arming",
         Event::Blocks {
-            flag: 0,
+            flag: "FAILSAFE",
             raised: false,
         },
     ),
     (
         "RXLOSS blocks arming",
         Event::Blocks {
-            flag: 1,
+            flag: "RXLOSS",
             raised: true,
         },
     ),
     (
         "RXLOSS stops blocking arming",
         Event::Blocks {
-            flag: 1,
+            flag: "RXLOSS",
             raised: false,
         },
     ),
     (
         "NOT_DISARMED blocks arming",
         Event::Blocks {
-            flag: 2,
+            flag: "NOT_DISARMED",
             raised: true,
         },
     ),
     (
         "NOT_DISARMED stops blocking arming",
         Event::Blocks {
-            flag: 2,
+            flag: "NOT_DISARMED",
+            raised: false,
+        },
+    ),
+    (
+        "RUNAWAY blocks arming",
+        Event::Blocks {
+            flag: "RUNAWAY",
+            raised: true,
+        },
+    ),
+    (
+        "RUNAWAY stops blocking arming",
+        Event::Blocks {
+            flag: "RUNAWAY",
             raised: false,
         },
     ),
     (
         "THROTTLE blocks arming",
         Event::Blocks {
-            flag: 3,
+            flag: "THROTTLE",
             raised: true,
         },
     ),
     (
         "THROTTLE stops blocking arming",
         Event::Blocks {
-            flag: 3,
+            flag: "THROTTLE",
             raised: false,
         },
     ),
     (
         "ANGLE blocks arming",
         Event::Blocks {
-            flag: 4,
+            flag: "ANGLE",
             raised: true,
         },
     ),
     (
         "ANGLE stops blocking arming",
         Event::Blocks {
-            flag: 4,
+            flag: "ANGLE",
             raised: false,
         },
     ),
     (
         "BOOTGRACE blocks arming",
         Event::Blocks {
-            flag: 5,
+            flag: "BOOTGRACE",
             raised: true,
         },
     ),
     (
         "BOOTGRACE stops blocking arming",
         Event::Blocks {
-            flag: 5,
+            flag: "BOOTGRACE",
+            raised: false,
+        },
+    ),
+    (
+        "FLIP_SWITCH blocks arming",
+        Event::Blocks {
+            flag: "FLIP_SWITCH",
+            raised: true,
+        },
+    ),
+    (
+        "FLIP_SWITCH stops blocking arming",
+        Event::Blocks {
+            flag: "FLIP_SWITCH",
             raised: false,
         },
     ),
     (
         "ARM_SWITCH blocks arming",
         Event::Blocks {
-            flag: 6,
+            flag: "ARM_SWITCH",
             raised: true,
         },
     ),
     (
         "ARM_SWITCH stops blocking arming",
         Event::Blocks {
-            flag: 6,
+            flag: "ARM_SWITCH",
             raised: false,
         },
+    ),
+    ("Crash Flip starts", Event::CrashFlipStarts),
+    ("Crash Flip ends", Event::CrashFlipEnds),
+    ("yaw spin recovery starts", Event::YawSpinRecoveryStarts),
+    ("yaw spin recovery ends", Event::YawSpinRecoveryEnds),
+    (
+        "runaway takeoff prevention switches off",
+        Event::FlightCountsAsStable,
     ),
     ("the Flying Input Device is lost", Event::InputDeviceLost),
     ("the Flying Input Device is back", Event::InputDeviceBack),
@@ -297,7 +354,10 @@ impl Event {
     fn of_the_flight_controller(self) -> bool {
         !matches!(
             self,
-            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack
+            Event::EscsReady
+                | Event::TurnsRightSideUp
+                | Event::InputDeviceLost
+                | Event::InputDeviceBack
         )
     }
 
@@ -320,6 +380,14 @@ impl Event {
             };
             return Some(!ready(before)? && ready(now)?);
         }
+        if self == Event::TurnsRightSideUp {
+            let upright = |sample: &Sample| {
+                sample
+                    .quad
+                    .map(|quad| tilt(quad.state.attitude) < 90.0 * DEGREE)
+            };
+            return Some(!upright(before)? && upright(now)?);
+        }
         if self.of_the_radio_link() {
             let lost = |sample: &Sample| sample.radio_link.map(|link| link.lost);
             let (was, is) = (lost(before)?, lost(now)?);
@@ -335,16 +403,24 @@ impl Event {
             Event::FailsafeStarts => !before.failsafe.active && now.failsafe.active,
             Event::FailsafeEnds => before.failsafe.active && !now.failsafe.active,
             Event::Blocks { flag, raised } => {
-                let was = before.arming_blocks.flags()[flag];
-                let is = now.arming_blocks.flags()[flag];
+                let was = before.arming_blocks.named(flag)?;
+                let is = now.arming_blocks.named(flag)?;
                 was != raised && is == raised
             }
-            Event::EscsReady | Event::InputDeviceLost | Event::InputDeviceBack => false,
+            Event::CrashFlipStarts => !before.crash_flip && now.crash_flip,
+            Event::CrashFlipEnds => before.crash_flip && !now.crash_flip,
+            Event::YawSpinRecoveryStarts => !before.yaw_spin_recovery && now.yaw_spin_recovery,
+            Event::YawSpinRecoveryEnds => before.yaw_spin_recovery && !now.yaw_spin_recovery,
+            Event::FlightCountsAsStable => !before.flight_stable && now.flight_stable,
+            Event::EscsReady
+            | Event::TurnsRightSideUp
+            | Event::InputDeviceLost
+            | Event::InputDeviceBack => false,
         })
     }
 }
 
-const ALL: [(&str, Measure); 79] = [
+const ALL: [(&str, Measure); 84] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -365,6 +441,7 @@ const ALL: [(&str, Measure); 79] = [
     ("roll", Measure::Roll),
     ("pitch", Measure::Pitch),
     ("heading", Measure::Heading),
+    ("tilt", Measure::Tilt),
     ("motor 1 speed", Measure::MotorSpeed(0)),
     ("motor 2 speed", Measure::MotorSpeed(1)),
     ("motor 3 speed", Measure::MotorSpeed(2)),
@@ -417,6 +494,10 @@ const ALL: [(&str, Measure); 79] = [
     ("motor 2 DShot", Measure::MotorDshot(1)),
     ("motor 3 DShot", Measure::MotorDshot(2)),
     ("motor 4 DShot", Measure::MotorDshot(3)),
+    ("motor 1 direction", Measure::MotorDirection(0)),
+    ("motor 2 direction", Measure::MotorDirection(1)),
+    ("motor 3 direction", Measure::MotorDirection(2)),
+    ("motor 4 direction", Measure::MotorDirection(3)),
     ("mixer throttle", Measure::MixerThrottle),
     ("reports in the frame", Measure::ReportsInTheFrame),
     ("frame age", Measure::FrameAge),
@@ -482,6 +563,7 @@ impl Measure {
             .position(|n| *n == "mixer throttle")
             .map_or(names.len(), |i| i + 1);
         names.insert(at, "motor N DShot");
+        names.insert(at + 1, "motor N direction (1 the normal way, -1 backwards)");
         names
     }
 
@@ -511,7 +593,7 @@ impl Measure {
             | Measure::GyroRollRate
             | Measure::GyroPitchRate
             | Measure::GyroYawRate => Dimension::ROTATION_SPEED,
-            Measure::Roll | Measure::Pitch | Measure::Heading => Dimension::ANGLE,
+            Measure::Roll | Measure::Pitch | Measure::Heading | Measure::Tilt => Dimension::ANGLE,
             Measure::MotorSpeed(_) => Dimension::ROTATION_SPEED,
             Measure::MotorThrust(_) | Measure::TotalThrust | Measure::PropRub(_) => {
                 Dimension::FORCE
@@ -523,7 +605,9 @@ impl Measure {
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
             Measure::Setpoint(_) => Dimension::ROTATION_SPEED,
-            Measure::PidTerm(..) | Measure::MotorDshot(_) => Dimension::NONE,
+            Measure::PidTerm(..) | Measure::MotorDshot(_) | Measure::MotorDirection(_) => {
+                Dimension::NONE
+            }
             Measure::MixerThrottle => Dimension::PERCENT,
             Measure::ReportsInTheFrame => Dimension::NONE,
             Measure::FrameAge => Dimension::TIME,
@@ -540,6 +624,7 @@ impl Measure {
             Measure::Setpoint(_)
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)
+            | Measure::MotorDirection(_)
             | Measure::MixerThrottle => true,
             Measure::Happens(event) => event.of_the_flight_controller(),
             _ => false,
@@ -642,6 +727,7 @@ impl Measure {
             Measure::Roll => angles().roll,
             Measure::Pitch => angles().pitch,
             Measure::Heading => angles().heading,
+            Measure::Tilt => tilt(state.attitude),
             Measure::MotorSpeed(k) => now.motors[k].speed,
             Measure::MotorThrust(k) => now.motors[k].thrust,
             Measure::MotorTorque(k) => now.motors[k].torque,
@@ -657,6 +743,7 @@ impl Measure {
             Measure::Setpoint(_)
             | Measure::PidTerm(..)
             | Measure::MotorDshot(_)
+            | Measure::MotorDirection(_)
             | Measure::MixerThrottle
             | Measure::ReportsInTheFrame
             | Measure::FrameAge
@@ -691,10 +778,21 @@ impl Measure {
                 )
             }
             Measure::MotorDshot(k) => f64::from(record.motors[k].dshot),
+            Measure::MotorDirection(k) => match record.motors[k].direction {
+                opendrone_flight_controller::SpinDirection::Normal => 1.0,
+                opendrone_flight_controller::SpinDirection::Reversed => -1.0,
+            },
             Measure::MixerThrottle => record.throttle,
             _ => return None,
         })
     }
+}
+
+/// How far an attitude's up axis leans from the world's, in radians: 0
+/// upright, π upside down.
+fn tilt(attitude: Attitude) -> f64 {
+    let up = attitude.body_to_world(Vec3::new(0.0, 0.0, 1.0));
+    functions::atan2((up.x * up.x + up.y * up.y).sqrt(), up.z)
 }
 
 /// A Channel in µs as ELRS means it: 988 µs at step 172 (−100%), 1500 µs at

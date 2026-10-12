@@ -1,6 +1,6 @@
 # A fixture: the vertical speed Expectation's Basis became Observed, so it
 # could be updated to whatever the Simulation does.
-format = 1
+format = 2
 name   = "Free fall is exactly g"
 
 [start]

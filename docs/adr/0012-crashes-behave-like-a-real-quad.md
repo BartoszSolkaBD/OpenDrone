@@ -16,6 +16,7 @@ Every commercial sim we checked does it differently. Liftoff, Uncrashed and TRYP
 - **A speed threshold:** a touch faster than a set speed stops the motor, and the kick is a fixed jolt. It's easier to tune, but a graze and a hard hit feel the same, and the kick ignores which way the prop spins. Rejected.
 - **Lasting prop damage now,** as in Liftoff, Uncrashed and TRYP. Our gyro has no vibration in the alpha, so a chipped prop would only feel weaker. The shaking that pilots know from a chipped prop wouldn't be there. Deferred until gyro vibration noise arrives.
 - **Disarm on crash.** That could be Betaflight's `crash_recovery = DISARM`, its `landing_disarm_threshold`, or a sim-only Assist like VelociDrone's auto-arming reset. All of Betaflight's are off by default and on both alpha Tunes. Deferred. A Tune that sets one imports with a "not simulated yet" note.
+  - _Update: one of Betaflight's is on by default, and on both alpha Tunes: runaway takeoff prevention, which disarms a Quad whose PID sum stays high with the gyro moving, from arming until the flight counts as stable, such as one pinned against a wall right after arming. It is simulated from [#54](https://github.com/BartoszSolkaBD/OpenDrone/issues/54), as the maintainer decided in [#126](https://github.com/BartoszSolkaBD/OpenDrone/issues/126). The two off by default stay deferred._
 - **Automatic reset after a crash.** It takes the decision away from the pilot. Not planned.
 
 ## Consequences

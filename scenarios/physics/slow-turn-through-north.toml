@@ -4,7 +4,7 @@
 # lowest, highest, mean and final heading come out right across north.
 # Proves exact attitude maths at a fixed step (E1–E3 in #10), and that
 # Expectations on angles hold across 0° and 360°.
-format = 1
+format = 2
 name   = "A slow free turn through north keeps its rate, measured the short way round"
 
 [start]

@@ -1,6 +1,6 @@
 # A fixture: the same Expectations in another order, written with other
 # spacing and comments, plus one new Rule Expectation. Nothing is weakened.
-format = 1
+format = 2
 name = "Free fall is exactly g"
 
 [start]

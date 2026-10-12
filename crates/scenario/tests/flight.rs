@@ -73,10 +73,10 @@ fn line_of(text: &str, needle: &str) -> usize {
 }
 
 #[test]
-fn a_pilots_timeline_starts_by_setting_every_stick_and_the_arm_switch() {
+fn a_pilots_timeline_starts_by_setting_every_stick_and_both_switches() {
     // ADR-0002: the run starts from values the file states.
     let text = tracer();
-    let old = "{ at = \"0 s\",   roll = \"0%\", pitch = \"0%\", yaw = \"0%\", throttle = \"30%\", arm = \"on\" }";
+    let old = "{ at = \"0 s\",   roll = \"0%\", pitch = \"0%\", yaw = \"0%\", throttle = \"30%\", arm = \"on\", crash_flip = \"off\" }";
     let file = changed(
         "no-arm-at-0",
         &text,
@@ -86,7 +86,7 @@ fn a_pilots_timeline_starts_by_setting_every_stick_and_the_arm_switch() {
     assert_eq!(
         failures(&report(&file)),
         [format!(
-            "scenarios/no-arm-at-0.toml line {}: the Timeline starts with a moment at 0 s that sets every stick and the Arm switch (ADR-0002); it doesn't set `yaw`, `arm`",
+            "scenarios/no-arm-at-0.toml line {}: the Timeline starts with a moment at 0 s that sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); it doesn't set `yaw`, `arm`, `crash_flip`",
             line_of(&text, old)
         )]
     );
@@ -126,8 +126,8 @@ fn a_ramp_needs_an_earlier_value_to_ramp_from() {
     let file = changed(
         "ramp-at-0",
         &text,
-        "throttle = \"0%\", arm = \"off\" }",
-        "throttle = \"ramp to 10%\", arm = \"off\" }",
+        "throttle = \"0%\", arm = \"off\", crash_flip = \"off\" }",
+        "throttle = \"ramp to 10%\", arm = \"off\", crash_flip = \"off\" }",
     );
     let found = failures(&report(&file));
     assert!(
@@ -515,18 +515,18 @@ fn mirrored_sticks_need_a_flight_that_starts_as_its_own_mirror_image() {
 }
 
 #[test]
-fn a_case_sets_every_stick_and_the_arm_switch_and_never_ramps() {
+fn a_case_sets_every_stick_and_both_switches_and_never_ramps() {
     let text = cases();
     let file = changed(
         "case-without-arm",
         &text,
-        "throttle = \"0%\"\narm      = \"on\"\n",
+        "throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\n",
         "throttle = \"ramp to 10%\"\n",
     );
     let found = failures(&report(&file));
     assert_eq!(found.len(), 2, "{found:#?}");
     assert!(found[0].ends_with(
-        "a case sets every stick and the Arm switch (ADR-0002); this one doesn't set `arm`"
+        "a case sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); this one doesn't set `arm`, `crash_flip`"
     ));
     assert!(
         found[1].ends_with("a case is one loop, so `throttle` can't ramp: give the value itself")

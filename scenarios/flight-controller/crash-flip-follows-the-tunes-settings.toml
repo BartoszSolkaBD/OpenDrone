@@ -1,0 +1,141 @@
+# Crash Flip's three settings come from the Tune, as in Betaflight 2026.6.2
+# (`applyCrashFlipModeToMotors`, src/main/flight/mixer.c, and
+# `updateArmingStatus`, src/main/fc/core.c; the Betaflight research §4.1).
+# Both alpha Tunes keep Betaflight's defaults, which show none of them, so
+# this flies test/freestyle-5-crash-flip-settings:
+#
+# - `crashflip_motor_percent` 50: a motor whose mix would push the wrong way
+#   gets half of it.
+# - `crashflip_rate` 35: no power by 350 °/s. Power fades with the roll or
+#   pitch rate, from full up to half that to nothing at it, and with the
+#   tilt: full until the cosine of the tilt has changed by 0.5 since Crash
+#   Flip first drove the motors, nothing once it has changed by 1, a quarter
+#   turn from flat.
+# - `crashflip_auto_rearm` ON: turning the switch off while armed keeps the
+#   Quad armed, and it flies normally.
+#
+# The Flight Controller alone, upside down (the cosine of its tilt is -1),
+# disarmed, the Crash Flip switch on: it arms in Crash Flip at 0.104 s, and
+# the motors' commands reach the ESCs from 0.125 s. Then pitch forward at full
+# stick, with the gyro and the attitude set to show each fade. The motors'
+# range runs from 157.945 (idle) to 2047; a centred roll stick adds a
+# deflection of 0.0015 to the stick's length (see
+# crash-flip-drives-the-motors-from-the-sticks.toml).
+format = 2
+name   = "Crash Flip follows the Tune's motor percent, rate fade and auto re-arm"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-crash-flip-settings"
+attitude          = "roll 180°, pitch 0°, heading 0°"
+rotation          = "0 °/s"
+armed             = false
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
+  { at = "0.1 s", arm = "on" },
+  { at = "0.2 s", pitch = "100%" },
+  # The rate fade.
+  { at = "0.3 s", rotation = "roll 200 °/s, pitch 0 °/s, yaw 0 °/s" },
+  { at = "0.4 s", rotation = "roll 350 °/s, pitch 0 °/s, yaw 0 °/s" },
+  # The tilt fade.
+  { at = "0.5 s", rotation = "0 °/s", attitude = "roll 100°, pitch 0°, heading 0°" },
+  { at = "0.6 s", attitude = "roll 90°, pitch 0°, heading 0°" },
+  # Upright again, the sticks centred, then the switch off: still armed.
+  { at = "0.7 s", pitch = "0%", attitude = "level, heading 0°" },
+  { at = "0.8 s", crash_flip = "off" },
+]
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.25 s"
+value = "2047 ± 0"
+basis = "source: applyCrashFlipModeToMotors: pitch forward drives the front pair at full power; no turn yet, so no fade"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.25 s"
+value = "1102 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the rear pair's mix is -1, so it gets -(-1) × 50% = 0.5 (crashflip_motor_percent): 157.945 + 0.5 × 1889.055 = 1102.47, sent as 1102"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.35 s"
+value = "1777 ± 0"
+basis = "source: applyCrashFlipModeToMotors: rolling at 200 °/s is 0.571 of crashflip_rate's 350 °/s, past half, so power × (1 - 0.571) ÷ 0.5 = 0.857: 157.945 + 0.857 × 1889.055 = 1777.14"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.35 s"
+value = "968 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the rear pair's 0.5 faded the same: 0.429, so 157.945 + 0.429 × 1889.055 = 967.54, sent as 968"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.45 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: at 350 °/s, crashflip_rate, the power has faded to nothing"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.45 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: no power, so every motor stops"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.55 s"
+value = "814 ± 0"
+basis = "source: applyCrashFlipModeToMotors: rolled to 100°, the cosine of the tilt is -0.174, changed by 0.826 from the -1 it started at, so the change still needed is 0.174, below half: power × 0.174 ÷ 0.5 = 0.347, and 157.945 + 0.347 × 1889.055 = 814.01"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.55 s"
+value = "486 ± 0"
+basis = "source: applyCrashFlipModeToMotors: the rear pair's 0.5 faded the same: 0.174, so 157.945 + 0.174 × 1889.055 = 485.98, sent as 486"
+
+[[expect]]
+what  = "motor 2 DShot"
+at    = "0.65 s"
+value = "0 ± 0"
+basis = "source: applyCrashFlipModeToMotors: on its side the cosine of the tilt is 0, changed by 1: no power"
+
+[[expect]]
+what  = "Crash Flip ends"
+over  = "0.8 s to 0.9 s"
+first = "0.000125 s ± 0.000001 s"
+basis = "source: updateArmingStatus: with crashflip_auto_rearm ON, the switch going off ends Crash Flip in the frame at 0.8 s"
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "0.7 s to 1 s"
+first = "never"
+basis = "source: updateArmingStatus: with crashflip_auto_rearm ON, the Quad stays armed"
+
+[[expect]]
+what  = "motor 1 direction"
+at    = "0.85 s"
+value = "1 ± 0"
+basis = "source: updateArmingStatus: ending Crash Flip sends DShot command 20, spin direction normal; with every motor at 0 (the sticks centred) it goes out at once, and Bluejay takes it on its seventh frame, 16.9 ms on (dshot_command.c)"
+
+[[expect]]
+what  = "motor 1 DShot"
+at    = "0.85 s"
+value = "158 ± 1"
+basis = "source: mixTable: armed and out of Crash Flip, the mixer drives the motors again, at idle (48 + 5.5% × 1999 = 157.9) with the throttle low, once the command's 21.25 ms are over"

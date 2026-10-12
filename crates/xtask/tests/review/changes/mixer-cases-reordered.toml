@@ -2,7 +2,7 @@
 # case reordered, a case's fields reordered and spelled another way ("0.0 %"
 # for "0%", "-100.0 °/s" for "-100 °/s"), and a new Rule Expectation added.
 # Every Expectation still measures the same thing in the same case.
-format = 1
+format = 2
 name   = "The mixer spreads corrections over the motors with Airmode"
 
 [start]
@@ -20,6 +20,7 @@ random_seed       = 1
 # Airmode: at zero throttle a roll correction still drives the motors apart.
 [[case]]
 arm      = "on"
+crash_flip = "off"
 throttle = "0.0 %"
 roll     = "0.0 %"
 pitch    = "0 %"
@@ -48,6 +49,7 @@ pitch    = "0%"
 yaw      = "0%"
 throttle = "0%"
 arm      = "on"
+crash_flip = "off"
 
 [[case.expect]]
 what  = "motor 1 DShot"

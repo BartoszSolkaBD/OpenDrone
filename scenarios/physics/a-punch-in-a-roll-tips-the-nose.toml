@@ -16,7 +16,7 @@
 # half, so the nose still goes down. Both inertias are Estimates a Feel Test
 # may move; the nose goes down for any roll inertia above nothing. The
 # props' drag, which also yaws it, builds slower.
-format = 1
+format = 2
 name   = "Rolling, a punch on its anticlockwise pair tips a Whoop 65's nose down"
 
 [start]

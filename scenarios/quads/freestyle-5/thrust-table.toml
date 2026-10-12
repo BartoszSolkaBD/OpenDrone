@@ -23,7 +23,7 @@
 # stand.
 #
 # One motor runs; "gf" is grams of thrust, as the table's "g" means.
-format = 1
+format = 2
 name   = "The Freestyle 5″'s motor and prop meet T-Motor's T5147 thrust table"
 
 [start]

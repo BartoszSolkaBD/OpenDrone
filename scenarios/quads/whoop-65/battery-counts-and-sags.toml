@@ -12,7 +12,7 @@
 #   voltage is back at rest as soon as the motors stop drawing. The Freestyle
 #   5″'s pack, whose resistance is a plain figure, shows the slow part and its
 #   recovery (scenarios/quads/freestyle-5/battery-recovers-after-a-chop.toml).
-format = 1
+format = 2
 name   = "The Whoop 65's pack counts its charge, and sags by its current × resistance"
 
 [start]

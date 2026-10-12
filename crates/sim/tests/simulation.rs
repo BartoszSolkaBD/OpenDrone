@@ -427,6 +427,11 @@ fn while_the_input_device_is_lost_the_radio_link_sends_no_frames() {
 fn tune() -> Tune {
     Tune::read([
         ("small_angle", "25"),
+        ("yaw_spin_recovery", "AUTO"),
+        ("yaw_spin_threshold", "1950"),
+        ("runaway_takeoff_prevention", "ON"),
+        ("runaway_takeoff_deactivate_delay", "500"),
+        ("runaway_takeoff_deactivate_throttle_percent", "20"),
         ("rx_min_usec", "885"),
         ("rx_max_usec", "2115"),
         ("failsafe_delay", "15"),
@@ -457,6 +462,9 @@ fn tune() -> Tune {
         ("motor_idle", "550"),
         ("yaw_motors_reversed", "OFF"),
         ("mixer_type", "LEGACY"),
+        ("crashflip_motor_percent", "0"),
+        ("crashflip_rate", "0"),
+        ("crashflip_auto_rearm", "OFF"),
     ])
     .unwrap()
 }

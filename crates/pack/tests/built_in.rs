@@ -49,6 +49,7 @@ fn the_built_in_pack_and_every_test_quad_pass_the_pack_checker() {
         test_ids,
         [
             "test/freestyle-5-bench-supply",
+            "test/freestyle-5-crash-flip-settings",
             "test/freestyle-5-filters-and-shaping-off",
             "test/freestyle-5-no-drag",
             "test/freestyle-5-no-prop-wash",
@@ -230,9 +231,17 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
     // src/main/flight/mixer_init.c for yaw_motors_reversed and mixer_type;
     // src/main/target/common_defaults_post.h RX_MIN_USEC and RX_MAX_USEC;
     // src/main/flight/failsafe.c for failsafe_delay, failsafe_procedure,
-    // failsafe_throttle and failsafe_recovery_delay).
+    // failsafe_throttle and failsafe_recovery_delay; src/main/sensors/gyro.c
+    // for yaw_spin_recovery and yaw_spin_threshold; src/main/flight/pid.c
+    // pidConfig for runaway takeoff prevention; src/main/flight/mixer_init.c
+    // for the crashflip_* settings).
     const DEFAULTS: &[(&str, &str)] = &[
         ("small_angle", "25"),
+        ("yaw_spin_recovery", "AUTO"),
+        ("yaw_spin_threshold", "1950"),
+        ("runaway_takeoff_prevention", "ON"),
+        ("runaway_takeoff_deactivate_delay", "500"),
+        ("runaway_takeoff_deactivate_throttle_percent", "20"),
         ("rx_min_usec", "885"),
         ("rx_max_usec", "2115"),
         ("failsafe_delay", "15"),
@@ -263,6 +272,9 @@ fn the_freestyle_5s_tune_is_betaflight_2026_6_2s_defaults_spelling_out_every_set
         ("motor_idle", "550"),
         ("yaw_motors_reversed", "OFF"),
         ("mixer_type", "LEGACY"),
+        ("crashflip_motor_percent", "0"),
+        ("crashflip_rate", "0"),
+        ("crashflip_auto_rearm", "OFF"),
     ];
     let five = quad("opendrone/freestyle-5");
     // Every setting the Flight Controller reads, and in the same order: the
@@ -296,8 +308,7 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
     // anti-gravity, TPA, throttle boost, the D-term low-passes and the yaw P
     // low-pass; src/main/sensors/gyro.h and gyro.c for the gyro low-passes;
     // src/main/pg/dyn_notch.c for the dynamic notch; src/main/pg/rx.c for RC
-    // smoothing; src/main/flight/pid.c pidConfig for runaway takeoff
-    // prevention).
+    // smoothing).
     const DEFAULTS: &[(&str, &str)] = &[
         ("f_roll", "120"),
         ("f_pitch", "125"),
@@ -319,7 +330,6 @@ fn the_freestyle_5s_tune_holds_what_isnt_simulated_yet_at_2026_6_2s_defaults() {
         ("dterm_lpf2_static_hz", "150"),
         ("yaw_lowpass_hz", "100"),
         ("rc_smoothing", "ON"),
-        ("runaway_takeoff_prevention", "ON"),
     ];
     let five = quad("opendrone/freestyle-5");
     let later = opendrone_flight_controller::Tune::not_simulated_yet();
