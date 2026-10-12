@@ -6,7 +6,7 @@
 //! no graphics library, so the Simulation and the game see the very same
 //! file. What it holds:
 //!
-//! - **Objects** are the scene's nodes. Each one that has a mesh carries an
+//! - **Objects** are the nodes the file starts from, and their children. Each one that has a mesh carries an
 //!   `od_collider` tag in its `extras` (what Blender writes custom properties
 //!   as): `box`, `convex`, `trimesh` or `none`. `od_collision_only` marks a
 //!   solid part that is never drawn. One node, an empty with no mesh, carries
@@ -244,12 +244,12 @@ impl Reader<'_> {
         launch_spots: &mut Vec<(String, LaunchSpot)>,
     ) {
         let Some(node) = gltf.nodes().get(index) else {
-            self.problem(format!("its scene names node {index}, which doesn't exist"));
+            self.problem(format!("the file starts from node {index}, which doesn't exist"));
             return;
         };
         if std::mem::replace(&mut seen[index], true) {
             self.problem(format!(
-                "node {index} is reached twice, so the scene isn't a tree"
+                "node {index} is reached twice, so the nodes don't make a tree"
             ));
             return;
         }

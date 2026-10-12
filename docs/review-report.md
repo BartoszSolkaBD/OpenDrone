@@ -9,7 +9,7 @@ Every pull request gets one **Review Report**: a comment from CI (`github-action
 | **What moved** | Every Expectation whose measured value moved, biggest move first, before and after, from the Scenarios' Results files. |
 | **Speed** | Work Counts against main. Not measured yet: they arrive with #78 and #79. |
 | **Areas touched** | The Areas whose folders the PR changes, with any new outside library and its licence. |
-| **Renders** | Pictures of every changed Map. None yet: they arrive with #63. |
+| **Renders** | Pictures of the Maps, when `assets-src/` or a Pack's `maps/` changed: a plan, a three-quarter view and what each Quad's camera sees from the Launch Spot and a few places to fly. The Report says where they are: the `map-previews` download of the PR's **Maps** check. |
 | **Downloads** | Blackbox logs and builds. None yet: they arrive with #55 and #81. |
 
 The whole Report is worked out again after every push, and whenever the maintainer's account comments on the PR.

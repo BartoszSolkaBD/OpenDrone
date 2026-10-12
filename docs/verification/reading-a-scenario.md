@@ -26,7 +26,7 @@ It spells out every item that affects the Simulation, every time, with no hidden
 |---|---|---|
 | `kind` | `"physics"` | One of `"flight"`, `"thrust stand"`, `"flight controller"`, `"physics"`: see [The four kinds](#the-four-kinds) below. |
 | `quad` | `"test/whoop-65-no-drag"` | The Quad, by id. Its numbers come from its Quad definition, never from the Scenario. |
-| `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. |
+| `map` | `"test/empty-air"` | The Map, by id. Gravity, air density and everything solid come from the Map. The Test Maps are built into the code: see [Test Maps](#test-maps) below. A Scenario may also fly a built-in Pack's Map, such as `"opendrone/skate-park"`: it starts where it says (spelling out a place, such as the Map's Launch Spot, as every starting state does), and its Results record the Map's fingerprint, which covers its solid parts and its Launch Spot. |
 | `position` | `"0 m east, 0 m north, 0 m up"` | From the Map's origin. |
 | `attitude` | `"level, heading 0°"` or `"roll 0°, pitch 30°, heading 45°"` | Heading is a compass heading (0° north, 90° east). Pitch is nose up, roll is right side down. |
 | `speed` | `"0 m/s"` | East, north and up, such as `"5 m/s north, 0 m/s east, 0 m/s up"`. A single number must be zero. |
@@ -354,7 +354,7 @@ measured = "-4.91 m"
 - Each Expectation's **measured** value, to 3 significant figures, in the unit its expected value uses. The check itself uses the full number: -4.9056 m passes "-4.905 m ± 0.001 m", and the Results show it as -4.91 m.
 - The Results are the same on every computer, so a pull request's diff shows every value that moved, even inside its tolerance.
 - `[fingerprints]`: short codes that change if anything changes by even one bit.
-  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition or its Tune changed; if `map` moved, the Map's world values or its solid shapes did. A Flight Controller Scenario has no Map: `map = "none"`.
+  - `quad` and `map`: what the Simulation received from the Quad and the Map. If `quad` moved, the Quad definition or its Tune changed; if `map` moved, the Map's world values, its solid shapes or its Launch Spot did. A Flight Controller Scenario has no Map: `map = "none"`.
   - `run`: the whole state after every step, in order, the Radio Link and the Flight Controller's memory included. Any change to the flight changes it.
   - `[fingerprints.checkpoints]`: the whole state after each tenth of the run, so you can see how far into the run nothing changed. For a table of cases, the Flight Controller's whole state after each case.
 

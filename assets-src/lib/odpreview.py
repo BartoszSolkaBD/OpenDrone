@@ -10,6 +10,8 @@ Pictures, in the folder it is given:
 
 - `plan.png`: straight down from above;
 - `three-quarter.png`: the whole park from the south-south-west, high up;
+- `preview.png`: the same view, smaller, which `--update-preview` copies into
+  the Pack as the Map's picture;
 - `fpv-<quad>-landed.png`: what each Quad's camera sees landed on the Launch
   Spot, 30 degrees of Camera Tilt;
 - `fpv-<flight>.png`: a few places a pilot will fly through.
@@ -176,6 +178,9 @@ def render(builder, preview, launch, folder):
     cam.rotation_quaternion = (target - cam.location).to_track_quat("-Z", "Y")
     cam.data.clip_end = 3000.0
     _shoot(scene, folder, "three-quarter", (1280, 720))
+    # The same view, smaller, for the Pack's own `preview.png`: the Hub's and
+    # the Map picker's picture, which is committed.
+    _shoot(scene, folder, "preview", (960, 540))
 
     def fpv(name, position, heading, pitch):
         cam = _camera(scene, name)

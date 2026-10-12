@@ -110,7 +110,8 @@ fn an_edge_between_faces_that_lean_far_apart_stays_sharp_and_a_gentle_bend_is_sm
     );
     // And a corner that isn't on the edge keeps its own face's normal.
     assert!((normals[0][1] - 1.0).abs() < 1e-6);
-    assert!(CREASE > 0.8 && CREASE < 0.83);
+    // The crease is 35°.
+    assert!((CREASE - 35f32.to_radians().cos()).abs() < 1e-5);
 }
 
 #[test]

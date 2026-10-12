@@ -131,12 +131,15 @@ jobs:
         # build (the core compiled together with Bevy), must give the run
         # fingerprint its Results file holds, which the headless runner
         # wrote (ADR-0003, "Checks in CI"). One flies our Flight Controller
-        # into a wall; the other a whoop into a rail, a convex Map shape.
+        # into a wall; another a whoop into a rail, a convex Map shape; the
+        # third a whoop landed on the Skate Park's Launch Spot, so the game's
+        # build reads a Map from its .glb to the very same bytes (#63).
         if: steps.changes.outputs.rust == 'true'
         run: >-
           cargo run --locked --quiet --package opendrone -- --reference
           scenarios/flight-controller/a-quad-that-hits-a-wall-stays-armed.toml
           scenarios/physics/whoop-into-a-6-cm-rail-at-30-m-s.toml
+          scenarios/physics/landed-whoop-stays-still-on-the-skate-parks-launch-spot.toml
 
       - name: The game starts and steps headless, with no sound device
         # GitHub's machines have no screen and no sound device. The game runs
@@ -172,6 +175,12 @@ jobs:
         # (#16, ADR-0011).
         if: steps.changes.outputs.rust == 'true'
         run: cargo xtask packs
+
+      - name: CREDITS.md is generated from the material library and up to date
+        # CREDITS.md lists every outside texture with its source, licence and
+        # checksum, generated from assets-src/materials.toml (ADR-0014, #63).
+        if: steps.changes.outputs.rust == 'true'
+        run: cargo xtask credits --check
 
       - name: Feel Test log rules (an Estimate moves with a log row and inside its range; a locked number changes with its source)
         # Compares every Quad definition with this PR's base: HEAD^1 of the
@@ -294,6 +303,88 @@ jobs:
           -p opendrone-flight-controller
           -p opendrone-sim
           -p opendrone-test-pilot
+
+  maps:
+    # The built-in Pack's Maps are build outputs: a Blender script in
+    # assets-src/ makes each `.glb`. When assets-src/ or a Pack's maps/
+    # changes, this rebuilds every Map with the pinned Blender (the version in
+    # assets-src/blender-version.toml, which `cargo xtask maps` reads too) and
+    # requires the very same bytes as the committed `.glb`. It also renders
+    # preview pictures of each Map, for the Review Report (#63).
+    name: Maps
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Decide what to check
+        id: changes
+        shell: bash
+        run: bash .github/scripts/changes.sh
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        if: steps.changes.outputs.maps == 'true'
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install the packages the xtask build and Blender need
+        # xtask builds opendrone-input, which builds SDL from source with
+        # libudev's headers (ADR-0018); Blender loads OpenGL, X11 and
+        # xkbcommon even with no window.
+        if: steps.changes.outputs.maps == 'true'
+        run: >-
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libudev-dev pkg-config libgl1 libegl1 libx11-6 libxi6 libxxf86vm1
+          libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6
+
+      - name: Reuse the build cache
+        if: steps.changes.outputs.maps == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: maps
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Download the pinned Blender and check its SHA-256
+        # The address and checksum are in assets-src/blender-version.toml.
+        if: steps.changes.outputs.maps == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=$(sed -n 's/^linux_url *= *"\(.*\)"/\1/p' assets-src/blender-version.toml)
+          sha=$(sed -n 's/^linux_sha256 *= *"\(.*\)"/\1/p' assets-src/blender-version.toml)
+          test -n "$url" && test -n "$sha"
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/blender.tar.xz" "$url"
+          echo "$sha  $RUNNER_TEMP/blender.tar.xz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/blender"
+          tar --extract --xz --file "$RUNNER_TEMP/blender.tar.xz" --directory "$RUNNER_TEMP/blender" --strip-components=1
+          echo "BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
+
+      - name: Rebuild the Maps with Blender and require the same bytes as the committed .glb
+        if: steps.changes.outputs.maps == 'true'
+        run: cargo xtask maps --check --previews target/map-previews
+
+      - name: Keep the Maps Blender built
+        # Kept even when they differ: a Map built on another computer can
+        # take the one CI built, which is the one this check compares with.
+        if: ${{ !cancelled() && steps.changes.outputs.maps == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: maps
+          path: target/maps-check/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Keep the preview renders for the Review Report
+        # A plan, a three-quarter view and the FPV shots of every Map.
+        if: ${{ !cancelled() && steps.changes.outputs.maps == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: map-previews
+          path: target/map-previews/
+          if-no-files-found: warn
+          retention-days: 30
 
   docs:
     # The docs site: one mdBook from docs/, with rustdoc for every crate

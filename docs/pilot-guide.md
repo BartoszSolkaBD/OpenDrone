@@ -6,18 +6,21 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 ## Your first flight
 
-The first flight is a test: either Quad over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no sound, no OSD and no Breakup yet, and the settings are fixed.
+The first flight is a test: either Quad on the Skate Park, or over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no sound, no OSD and no Breakup yet, and the settings are fixed.
 
 **Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
 
 ```sh
-cargo run --release -p opendrone                        # the Whoop 65
+cargo run --release -p opendrone                        # the Whoop 65 on the Skate Park
 cargo run --release -p opendrone -- --quad freestyle-5  # the Freestyle 5″
+cargo run --release -p opendrone -- --map flat-floor    # the grid floor, with nothing to hit
 ```
 
 The first build takes a few minutes. `--release` matters: without it the picture is slow.
 
-**Picking your Input Device.** Plug it in before or after starting. Then move a stick on the device you want to fly with: it becomes the Flying Input Device, and the flight starts afresh, with the Quad landed in the middle of the floor. The window's title says which device flies, whether the Quad is armed or what stops it arming, Failsafe, and Pause.
+**The Skate Park.** An outdoor concrete park, 62 × 40 m, sunk into the ground: a pool bowl, a round cradle, a snake run that winds along the south side, a full pipe, and on the east a street corner with stairs, handrails, a ring and a pergola with slats to fly between, all at real-world size. The Quad starts on the flat deck between the two bowls, facing the pool. Everything solid is solid: there are no invisible walls, and the ground runs to the horizon. Its surfaces are real concrete, steel, plywood and grass pictures (CC0, from Poly Haven and ambientCG), which `cargo xtask textures` downloads the first time; without them the Map is drawn in flat colours, and flies the same. [Building a Map](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/building-a-map.md) says where they come from.
+
+**Picking your Input Device.** Plug it in before or after starting. Then move a stick on the device you want to fly with: it becomes the Flying Input Device, and the flight starts afresh, with the Quad landed on the Map's Launch Spot. The window's title says which device flies, whether the Quad is armed or what stops it arming, Failsafe, and Pause.
 
 **Arming.** Wait about 2 s after the flight starts: the ESCs play their start-up tones first, as on a real quad, and the title says `BOOTGRACE` until they're ready. Then, with the throttle at the bottom, flip Arm.
 
@@ -38,7 +41,7 @@ The first build takes a few minutes. `--release` matters: without it the picture
 
 **The fixed settings, for now:** a 250 Hz Packet Rate, Betaflight 2026.6's default Rates (Actual, 70 °/s at centre and 670 °/s at full stick), Acro for a device with no Flight Mode switch, every Assist off (so the battery runs down: Reset gives a fresh one), and your device uncalibrated, on its profile's starting values.
 
-**What's a placeholder:** the floor and the light. The Maps bring their own light later. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
+**What's a placeholder:** the light. The Skate Park is lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
 
 ### The camera
 

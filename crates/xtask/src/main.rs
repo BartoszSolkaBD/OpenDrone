@@ -103,8 +103,8 @@ Commands:
       writes packs/opendrone/maps/<id>/<id>.glb. --check builds into
       target/maps-check/ instead and says whether the committed .glb files are
       those bytes (CI does this on Linux). --previews renders pictures of each
-      Map into <folder>, and --update-preview makes the three-quarter view the
-      Map's preview.png.
+      Map into <folder>, and --update-preview copies its preview.png render
+      into the Pack as the Map's picture.
   textures [--pin]
       Download the CC0 textures assets-src/materials.toml lists into
       assets-src/textures/ (git ignores it) and refuse any file whose SHA-256

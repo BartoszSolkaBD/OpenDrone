@@ -2,7 +2,7 @@
 
 A **Pack** is a folder of data and assets, never code: Quads, Maps and Input Device profiles ([ADR-0011](../adr/0011-packs-are-data-only-toml-named-pack-item.md)). The **Pack checker** reads a Pack the way the game will, and refuses anything that breaks the rules on this page. The game's own content, `packs/opendrone/`, goes through the same checker as a Pack a pilot drops in. The terms are in the [World and content](../context/world.md), [Flying](../context/flying.md), [Input](../context/input.md) and [Verification](../context/verification.md) deep dives.
 
-So far the checker reads manifests, Quads and Input Device profiles. Maps arrive with their own ticket.
+The checker reads manifests, Quads, Maps and Input Device profiles.
 
 ## Running it
 
@@ -31,7 +31,10 @@ packs/opendrone/                 the Pack; its id comes from pack.toml
     tune.txt                     its Tune
     picture.png                  for the Quad picker
     feel-tests.md                its Feel Test log
-  maps/…                         Maps (not read yet)
+  maps/skate-park/               one Map: its id is opendrone/skate-park
+    map.toml                     its on-screen text, world values and the files it names
+    skate-park.glb               its shapes, tags and Launch Spot
+    preview.png                  for the Hub and the Map picker
   input-devices/dualsense.toml   one Input Device profile: its id is opendrone/dualsense
 ```
 
@@ -105,6 +108,53 @@ At the top: `format`, the on-screen `name`, `description` and `spec_line`, and t
 | `[sound]` | `buzzer` (`true` or `false`), `esc_melody` (`"Bluejay default"`) | |
 | `[sound_block]` | the motor and prop voice, frame hum, beep levels, Prop Strike ticks, hit level and how loud the Quad is Where you stand; `buzzer_pitch` and `buzzer_level` only on a Quad with a buzzer | Set by ear, with no Confidence ([Sound deep dive](../context/sound.md)). |
 | `[sources]` | one line per source key | |
+
+## A Map, `maps/<id>/`
+
+A Map is a folder with a `map.toml`, a `.glb` and a preview picture. The built-in Pack's [Skate Park](../../packs/opendrone/maps/skate-park/map.toml) is the example. The built-in Pack's `.glb` files aren't written by hand: a Blender script makes each one ([Building a Map](../building-a-map.md)).
+
+```toml
+format      = 1
+name        = "Skate Park"
+description = "Open concrete with bowls, a snake run and a street corner. Room to learn."
+model       = "skate-park.glb"      # the Map's .glb, in this folder
+preview     = "preview.png"         # a PNG, for the Hub and the Map picker
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+[background_sound]                  # optional: the Background Sound slot
+file  = "background.ogg"            # an Ogg loop in this folder
+level = "-12 dB"                    # from -60 dB to 12 dB: 0 plays it as recorded
+```
+
+Every key is required except `[background_sound]`, and nothing else may appear. The world values are the Map's alone: nothing a pilot sets changes them ([the World and content rules](../context/world.md)).
+
+### What the `.glb` holds
+
+It's binary glTF, with every object a node of the file. The checker reads what the Simulation and the game need, and nothing about how it's drawn beyond that. Positions in the file are glTF's (x east, y up, z south); the Map's are east, north and up.
+
+| Tag on an object | Value | Meaning |
+|---|---|---|
+| `od_collider` | `box`, `convex`, `trimesh` or `none` | **Every object with a mesh carries it.** `box`: the mesh is exactly a box (eight corners), found from them with its turn. `convex`: a closed solid with no dents, whose triangles face outward. `trimesh`: any triangles; a closed mesh is a solid and an open one, such as a bowl's ground, a surface. `none`: drawn, and nothing can touch it. |
+| `od_collision_only` | `1` | The object is solid but never drawn, such as a simple shape standing in for a detailed one. A Map has no invisible walls: this is for shapes that stand where something is drawn. |
+| `od_launch_spot` | a heading, 0 up to 360 | **Exactly one empty carries it**, at the Launch Spot on the ground, with the compass heading the Quad faces (0 north, 90 east). It is also where the pilot stands. |
+
+Any other tag that starts with `od_` is refused, so a misspelt one never passes for nothing. Other custom properties are nobody's business.
+
+The checker refuses, listing every problem with the `.glb`'s file and the object's name:
+
+- an object with a mesh and no `od_collider`, or with a value that isn't one of the four;
+- an unknown `od_` tag;
+- no Launch Spot, or more than one (both are named), or a heading that isn't from 0 up to 360;
+- a `box` that isn't a box, a `convex` that is open or dented (the sentence says which), and a part that is `od_collision_only` with a collider of `none`;
+- compressed meshes: Draco, meshopt, quantised (whole-number) corners and GPU instancing, because every program must read the very same corners, and Bevy refuses them too;
+- a file that isn't a binary glTF, one cut short, one with a sparse accessor or a second buffer, and meshes that aren't triangles.
+
+What reaches the Simulation is each solid part, in the file's order and named after its object, and the Launch Spot. They change the Map's fingerprint; the names, the pictures and what is only drawn don't. The game draws every part that isn't `od_collision_only`, with its material's name and flat colour from the file, and gives it its pictures from the material library ([Building a Map](../building-a-map.md)).
+
+`map.toml` names its files, and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
 
 ## The Tune, `tune.txt`
 
@@ -233,7 +283,7 @@ The checker refuses an unknown key, section, kind, button, key name, Action or F
 
 ## Fingerprints
 
-The checker gives each Quad a fingerprint of what the Simulation receives from it: every physics number, count and choice, the ESC melody and the Tune's settings. Its on-screen text, picture, camera, sound block, Confidences, sources, marks and comments don't count, and the same number written two ways ("23.0 g" or "0.023 kg") gives the same fingerprint. Each Scenario's Results file records the fingerprints of the Quad and Map it ran on, so a moved Result can be traced to a changed Quad.
+The checker gives each Quad a fingerprint of what the Simulation receives from it: every physics number, count and choice, the ESC melody and the Tune's settings. Its on-screen text, picture, camera, sound block, Confidences, sources, marks and comments don't count, and the same number written two ways ("23.0 g" or "0.023 kg") gives the same fingerprint. A Map's fingerprint covers its world values, its solid parts in order and its Launch Spot. Each Scenario's Results file records the fingerprints of the Quad and Map it ran on, so a moved Result can be traced to a changed Quad or Map.
 
 ## File formats
 

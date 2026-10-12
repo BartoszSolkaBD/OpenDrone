@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tells a CI job what this run needs to check, as two step outputs:
+# Tells a CI job what this run needs to check, as three step outputs:
 #
 #   rust=true       anything other than Markdown changed, or anything under
 #                   packs/, so the Rust checks run. A PR that only touches
@@ -13,8 +13,12 @@
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
 #                   library, or changes the policy, so known security
 #                   advisories are checked (ADR-0014).
+#   maps=true       Anything under assets-src/ (the Blender scripts, the
+#                   material library, the pinned Blender version) or a Pack's
+#                   maps/ changed, so the Maps are rebuilt with Blender on
+#                   Linux and must match the committed `.glb` (#63).
 #
-# Pushes to main always run the Rust checks. A pull request is checked out as
+# Pushes to main always run the Rust checks and rebuild the Maps. A pull request is checked out as
 # GitHub's merge commit with fetch-depth 2, so HEAD^1 is the base branch and
 # the difference between them is exactly what the PR changes. Renames count as
 # a deletion plus an addition, so renaming code to `.md` still runs the checks.
@@ -26,6 +30,7 @@ if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
   echo "Not a pull request, so every Rust check runs."
   echo "rust=true" >> "$GITHUB_OUTPUT"
   echo "libraries=false" >> "$GITHUB_OUTPUT"
+  echo "maps=true" >> "$GITHUB_OUTPUT"
   exit 0
 fi
 
@@ -63,4 +68,11 @@ if grep -qxE 'Cargo\.lock|deny\.toml' <<< "$changed"; then
   echo "libraries=true" >> "$GITHUB_OUTPUT"
 else
   echo "libraries=false" >> "$GITHUB_OUTPUT"
+fi
+
+if grep -qE '^(assets-src/|packs/[^/]+/maps/)' <<< "$changed"; then
+  echo "assets-src/ or a Pack's maps/ changed, so the Maps are rebuilt with Blender."
+  echo "maps=true" >> "$GITHUB_OUTPUT"
+else
+  echo "maps=false" >> "$GITHUB_OUTPUT"
 fi

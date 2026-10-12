@@ -17,7 +17,7 @@
 //! - **Pictures.** `--previews <folder>` also renders, for each Map, a plan,
 //!   a three-quarter view and what each Quad's camera sees from the Launch
 //!   Spot and from a few places to fly, into `<folder>/<id>/`. With
-//!   `--update-preview` the three-quarter view becomes the Map's
+//!   `--update-preview` the preview picture becomes the Map's
 //!   `preview.png` in the Pack, for the Hub.
 
 use std::fs;
@@ -280,13 +280,13 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
         if let Some(pictures) = &pictures {
             if options.update_preview {
                 let preview = root.join(PACK).join("maps").join(id).join("preview.png");
-                fs::copy(pictures.join("three-quarter.png"), &preview).map_err(|e| {
+                fs::copy(pictures.join("preview.png"), &preview).map_err(|e| {
                     format!(
-                        "can't copy the three-quarter view to {}: {e}",
+                        "can't copy the preview picture to {}: {e}",
                         preview.display()
                     )
                 })?;
-                report.push(format!("{id}: preview.png is the new three-quarter view"));
+                report.push(format!("{id}: preview.png is the new preview picture"));
             }
             report.push(format!("{id}: pictures in {}", pictures.display()));
         }
