@@ -79,17 +79,102 @@ fn the_house_rules_ban_the_parry3d_functions_that_would_run_its_allowed_operatin
         "parry3d_f64::transformation::volume_mesh",
         "parry3d_f64::partitioning::Bvh::optimize_incremental",
     ] {
-        let entry = entries
-            .iter()
-            .find(|entry| entry["path"].as_str() == Some(path))
-            .unwrap_or_else(|| panic!("the house rules don't ban {path}"));
-        let reason = entry["reason"].as_str().unwrap_or_default();
-        assert!(
-            reason.contains("operating system's") && reason.contains("(ADR-0001)"),
-            "the rule banning {path} needs a reason naming the operating system's maths and \
-             ADR-0001, not {reason:?}"
-        );
+        assert_banned_with_reason(entries, path);
     }
+}
+
+#[test]
+fn the_house_rules_ban_parry3ds_convex_hull_builders_so_the_physics_can_never_call_one_again() {
+    // walls.toml lets glamx keep its eigenvalue maths (`acos`, `cos`) only
+    // because the Simulation never runs it, and only parry3d's convex-hull
+    // builders reach it. The physics gives parry3d every convex Map shape
+    // finished, through SharedShape::convex_mesh (#141). These are every
+    // public way into the builders in parry3d 0.31.1; the check further down
+    // proves Clippy flags each one.
+    let settings: toml::Table = read(&crates().join("maths/clippy.toml"))
+        .parse()
+        .expect("clippy.toml is valid TOML");
+    let entries = settings["disallowed-methods"]
+        .as_array()
+        .expect("a list of rules");
+    for path in [
+        "parry3d_f64::transformation::convex_hull",
+        "parry3d_f64::transformation::try_convex_hull",
+        "parry3d_f64::shape::ConvexPolyhedron::from_convex_hull",
+        "parry3d_f64::shape::SharedShape::convex_hull",
+        "parry3d_f64::shape::SharedShape::round_convex_hull",
+        "parry3d_f64::shape::SharedShape::convex_decomposition",
+        "parry3d_f64::shape::SharedShape::convex_decomposition_with_params",
+        "parry3d_f64::shape::SharedShape::round_convex_decomposition",
+        "parry3d_f64::shape::SharedShape::round_convex_decomposition_with_params",
+        "parry3d_f64::shape::SharedShape::voxelized_convex_decomposition",
+        "parry3d_f64::shape::SharedShape::voxelized_convex_decomposition_with_params",
+        "parry3d_f64::transformation::vhacd::VHACD::decompose",
+        "parry3d_f64::transformation::vhacd::VHACD::from_voxels",
+        "parry3d_f64::transformation::vhacd::VHACD::compute_convex_hulls",
+        "parry3d_f64::transformation::vhacd::VHACD::compute_exact_convex_hulls",
+        "parry3d_f64::transformation::voxelization::VoxelSet::compute_convex_hull",
+        "parry3d_f64::transformation::voxelization::VoxelSet::compute_exact_convex_hull",
+    ] {
+        assert_banned_with_reason(entries, path);
+    }
+}
+
+#[test]
+fn the_house_rules_ban_every_other_public_way_into_glamxs_eigenvalue_maths() {
+    // Besides the convex-hull builders, glamx's eigenvalues run from parry3d's
+    // mass properties (`MassProperties::with_inertia_matrix` and everything
+    // that calls it, `+`, `-` and sum included), from `utils::obb`, and from
+    // glamx's own functions. The check further down proves Clippy flags each.
+    let settings: toml::Table = read(&crates().join("maths/clippy.toml"))
+        .parse()
+        .expect("clippy.toml is valid TOML");
+    let methods = settings["disallowed-methods"]
+        .as_array()
+        .expect("a list of rules");
+    for path in [
+        "parry3d_f64::shape::Shape::mass_properties",
+        "parry3d_f64::mass_properties::MassProperties::with_inertia_matrix",
+        "parry3d_f64::mass_properties::MassProperties::from_trimesh",
+        "parry3d_f64::mass_properties::MassProperties::from_convex_polyhedron",
+        "parry3d_f64::mass_properties::MassProperties::from_compound",
+        "parry3d_f64::mass_properties::MassProperties::from_voxels",
+        "parry3d_f64::utils::obb",
+        "glamx::MatExt::symmetric_eigen",
+        "glamx::MatExt::symmetric_eigenvalues",
+        "glamx::DSymmetricEigen3::new",
+        "glamx::DSymmetricEigen3::eigenvalues",
+        "glamx::SymmetricEigen3::new",
+        "glamx::SymmetricEigen3::eigenvalues",
+        "glamx::SymmetricEigen3A::new",
+        "glamx::SymmetricEigen3A::eigenvalues",
+    ] {
+        assert_banned_with_reason(methods, path);
+    }
+    let types = settings["disallowed-types"]
+        .as_array()
+        .expect("a list of rules");
+    for path in [
+        "parry3d_f64::mass_properties::MassProperties",
+        "glamx::DSymmetricEigen3",
+        "glamx::SymmetricEigen3",
+        "glamx::SymmetricEigen3A",
+    ] {
+        assert_banned_with_reason(types, path);
+    }
+}
+
+fn assert_banned_with_reason(entries: &[toml::Value], path: &str) {
+    let entry = entries
+        .iter()
+        .find(|entry| entry["path"].as_str() == Some(path))
+        .unwrap_or_else(|| panic!("the house rules don't ban {path}"));
+    let reason = entry["reason"].as_str().unwrap_or_default();
+    assert!(
+        reason.contains("operating system's") && reason.contains("(ADR-0001)"),
+        "the rule banning {path} needs a reason naming the operating system's maths and \
+         ADR-0001, not {reason:?}"
+    );
 }
 
 #[test]

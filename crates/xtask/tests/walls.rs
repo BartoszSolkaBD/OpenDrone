@@ -155,6 +155,75 @@ fn the_same_core_library_without_that_feature_passes() {
     assert!(outcome.passed, "{}", outcome.output);
 }
 
+/// The game with Bevy in it, and a core whose glam has the features and
+/// libraries Bevy 0.20 and parry3d's shared glam bring in (ADR-0021, #142).
+fn game_with_bevy_and_the_shared_glam(case: &str, game_has_bevy: bool) -> Fixture {
+    let game: &[&str] = if game_has_bevy { &["bevy"] } else { &[] };
+    Fixture::new(case)
+        .outside("bevy", &[])
+        .outside("libc", &[])
+        .outside("getrandom", &["libc"])
+        .outside("rand", &["getrandom"])
+        .outside("glam", &["rand"])
+        .features("glam", &["std", "rand", "encase"])
+        .member("opendrone-maths", &[])
+        .member("opendrone-physics", &["opendrone-maths", "glam/std"])
+        .member("opendrone", game)
+}
+
+#[test]
+fn with_bevy_in_the_game_the_features_and_libraries_its_glam_brings_into_the_core_pass() {
+    let outcome = game_with_bevy_and_the_shared_glam("shared-glam-with-bevy", true).check_walls();
+    assert!(outcome.passed, "{}", outcome.output);
+}
+
+#[test]
+fn without_bevy_in_the_game_the_same_glam_features_and_libraries_still_break_the_walls() {
+    let outcome =
+        game_with_bevy_and_the_shared_glam("shared-glam-without-bevy", false).check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("The core reaches `glam` with its `std` feature turned on");
+    outcome.says("The core reaches `rand`, which isn't on its list of allowed outside libraries");
+    outcome.says("The core must never reach `libc`");
+}
+
+#[test]
+fn a_feature_the_shared_glam_does_not_explain_still_breaks_the_walls_with_bevy_in_the_game() {
+    // simba/std is on the never list, and Bevy doesn't turn it on.
+    let outcome = game_with_bevy_and_the_shared_glam("shared-glam-new-feature", true)
+        .outside("simba", &[])
+        .features("simba", &["std"])
+        .member("opendrone-sim", &["opendrone-maths", "simba/std"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("The core reaches `simba` with its `std` feature turned on");
+}
+
+#[test]
+fn a_library_the_shared_glam_does_not_explain_still_breaks_the_walls_with_bevy_in_the_game() {
+    let outcome = game_with_bevy_and_the_shared_glam("shared-glam-new-library", true)
+        .outside("left-pad", &[])
+        .outside("glamx", &["left-pad", "glam"])
+        .member("opendrone-sim", &["opendrone-maths", "glamx"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome
+        .says("The core reaches `left-pad`, which isn't on its list of allowed outside libraries");
+}
+
+#[test]
+fn a_core_crate_using_a_shared_glam_library_itself_still_breaks_the_walls_with_bevy_in_the_game() {
+    // rand is allowed because glam brings it in, not because the core may use it.
+    let outcome = game_with_bevy_and_the_shared_glam("core-uses-rand-itself", true)
+        .member("opendrone-sim", &["opendrone-maths", "rand"])
+        .check_walls();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "The core reaches `rand`, which isn't on its list of allowed outside libraries. It gets \
+         there through opendrone-sim → rand.",
+    );
+}
+
 #[test]
 fn the_core_may_use_libm() {
     let outcome = Fixture::new("core-uses-libm")
