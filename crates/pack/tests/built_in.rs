@@ -631,11 +631,16 @@ fn each_quads_collision_shape_comes_from_its_definition() {
 }
 
 #[test]
-fn a_map_that_isnt_built_in_yet_is_refused() {
-    let problems = built_in().map("opendrone/skate-park").unwrap_err();
+fn the_skate_park_is_the_built_in_packs_one_map_and_bando_isnt_built_in_yet() {
+    // Basis: Rule (#63: the Skate Park is in the built-in Pack, checked like
+    // any dropped one; Bando waits for its own ticket).
+    let packs = built_in();
+    let ids: Vec<&str> = packs.maps().iter().map(|m| m.id.as_str()).collect();
+    assert_eq!(ids, ["opendrone/skate-park"]);
+    let problems = packs.map("opendrone/bando").unwrap_err();
     assert_eq!(
         problems.to_string(),
-        "opendrone/skate-park: there's no Map with this id; so far only the built-in Test Maps exist: test/empty-air, test/flat-floor, test/wall, test/thin-rail, test/floor-and-ceiling, test/ledge, test/block"
+        "opendrone/bando: there's no Map here: packs/opendrone/maps/bando/map.toml doesn't exist"
     );
 }
 

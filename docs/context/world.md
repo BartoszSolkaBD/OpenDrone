@@ -54,6 +54,7 @@ _Avoid_: Sandbox, practice mode
 - Every Map mixes Gap sizes: a few that only the whoop fits (0.5–1 m), most at 2–5 m for both Quads, and a few big 5" dives (15 m or more).
 - A Map has no invisible walls. Its ground runs to the horizon inside a solid Backdrop, with nothing worth flying to beyond about 100 m.
 - A Launch Spot is on open, flat ground, with at least 3 m clear all round and open sky above, facing the Map's main feature.
+- A Map's solid parts and its Launch Spot come from tags in its `.glb`, which a Blender script makes ([Building a Map](../building-a-map.md)); every object says whether it is solid.
 - A Map looks realistic: real-world materials such as concrete, brick, rust and plywood. No real graffiti or brand logos.
 - Each Map has one fixed time of day. The alpha's Skate Park and Bando are both in sunny early afternoon.
 - A Map sets the world's physical values: gravity, air density and, later, wind. Pilot settings never change them.

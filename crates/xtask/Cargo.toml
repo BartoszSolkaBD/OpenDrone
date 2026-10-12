@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+flate2.workspace = true
 object.workspace = true
 opendrone-flight-controller.workspace = true
 opendrone-input.workspace = true
@@ -18,7 +19,10 @@ pulldown-cmark.workspace = true
 ra-ap-rustc_lexer.workspace = true
 rustc-demangle.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 toml.workspace = true
+toml_edit.workspace = true
+zip.workspace = true
 
 [lints]
 workspace = true

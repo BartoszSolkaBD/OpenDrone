@@ -7,11 +7,13 @@
 //! east is +x, up is +y and north is −z. A Quad's body axes (forward, left,
 //! up) turn into Bevy's the same way, so forward is +x, up +y and left −z.
 
+use std::collections::BTreeMap;
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::camera::visibility::NoCpuCulling;
+use bevy::light::CascadeShadowConfigBuilder;
 use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 use opendrone_maths::{Attitude, Vec3 as Vec3d};
@@ -21,7 +23,8 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
-use crate::set_up::FlightPlan;
+use crate::map_drawing::{MaterialLibrary, part_mesh};
+use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
@@ -76,12 +79,81 @@ fn set_up_the_grid(mut gizmos: ResMut<GizmoConfigStore>) {
     config.line.width = 1.5;
 }
 
+/// The Map's own parts, drawn from its `.glb`: every part with its material
+/// from the library ([`MaterialLibrary`]), the sun with shadows and a sky's
+/// worth of fill light. A Test Map has no `.glb`, and is drawn from its solid
+/// parts instead.
+fn draw_the_map_from_its_file(
+    plan: &FlightPlan,
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
+) {
+    let library = MaterialLibrary::read(&repo_folder());
+    let mut by_name: BTreeMap<String, Handle<StandardMaterial>> = BTreeMap::new();
+    for part in &plan.map.drawing {
+        let material = by_name
+            .entry(part.material.clone())
+            .or_insert_with(|| materials.add(library.material(&part.material, part.colour, images)))
+            .clone();
+        commands.spawn((
+            Mesh3d(meshes.add(part_mesh(part))),
+            MeshMaterial3d(material),
+            Transform::IDENTITY,
+            Name::new(part.name.clone()),
+        ));
+    }
+    info!(
+        "drew {} on {} parts, {} of its {} materials with their pictures",
+        plan.map.name,
+        plan.map.drawing.len(),
+        by_name.len().min(library.textured()),
+        by_name.len()
+    );
+    // Sunny early afternoon: the sun about 50° up, from the south-south-east,
+    // with shadows, and a bright sky's fill light (about 3 stops down in the
+    // shade, as a clear day's is).
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::srgb(0.75, 0.82, 1.0),
+        brightness: 3000.0,
+        ..default()
+    });
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 100_000.0,
+            shadow_maps_enabled: true,
+            ..default()
+        },
+        CascadeShadowConfigBuilder {
+            num_cascades: 4,
+            minimum_distance: 0.1,
+            maximum_distance: 160.0,
+            first_cascade_far_bound: 6.0,
+            ..default()
+        }
+        .build(),
+        // Light travels away from the sun: north-north-west and down.
+        Transform::IDENTITY.looking_to(point(Vec3d::new(-0.38, 0.52, -0.77)).normalize(), Vec3::Y),
+    ));
+}
+
 fn draw_the_map(
     plan: Res<FlightPlan>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
+    if !plan.map.drawing.is_empty() {
+        return draw_the_map_from_its_file(
+            &plan,
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut images,
+        );
+    }
     let surface = materials.add(StandardMaterial {
         base_color: Color::srgb(0.42, 0.42, 0.4),
         perceptual_roughness: 0.9,
