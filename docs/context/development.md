@@ -39,7 +39,7 @@ A named part of the repo, such as Physics, Scenarios or Repo rules, with its fol
 _Avoid_: Module, component, team
 
 **Lane**:
-A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time.
+A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time; a PR that waits for the maintainer steps out of its Lane so it holds nothing up. Each ticket carries a `lane: <Lane>` label for each Lane it takes.
 _Avoid_: Track, queue, stream
 
 **Work Count**:
