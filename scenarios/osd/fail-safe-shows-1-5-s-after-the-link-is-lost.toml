@@ -1,0 +1,107 @@
+# 1.5 s after the Radio Link is lost, the OSD's warnings read FAIL SAFE,
+# blinking, and its Flight Mode reads !FS!, as Betaflight 2026.6.2's OSD
+# shows Failsafe's stage 2 (#31 §10; src/main/osd/osd_warnings.c and
+# osd_elements.c). Before then FAIL SAFE never shows; Link Quality reads 0
+# and blinks from 0.25 s.
+#
+# With the Arm switch held on, Betaflight shows the reason arming is refused
+# first, ahead of FAIL SAFE: RXLOSS from 0.15 s, then FAILSAFE and RXLOSS in
+# turn (a-lost-link-shows-rxloss-then-failsafe-with-the-arm-switch-on.toml).
+# A lost Input Device leaves the Arm switch where it was, on. So this
+# Scenario switches the "arming disabled" warning off, as a pilot can in
+# Betaflight's OSD tab, to show FAIL SAFE itself.
+#
+# The Flight Controller alone, armed, as failsafe.toml flies it: the last
+# frame at 0.996 s, DROP at the 11 ms check at 2.497 s. The OSD redraws 12
+# times a second on the Flight Controller's clock, at the first loop at or
+# after each 83,333 µs: the one at 2.5 s draws FAIL SAFE. Each loop's state
+# shows at the end of its 125 µs step, so the loop at 2.5 s shows at
+# 2.500125 s.
+format = 2
+name   = "1.5 s after the Radio Link is lost, the warnings read FAIL SAFE and the Flight Mode reads !FS!"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "1 s", input_device = "lost" },
+]
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "Flight Mode"
+at    = "1 s"
+value = "AIR"
+basis = "source: osdElementFlymode: with Airmode always on, Acro reads AIR"
+
+[[osd.expect]]
+what  = "Link Quality"
+at    = "1 s"
+value = "7:100"
+basis = "source: osdElementLinkQuality writes ELRS's rf_Mode and its Link Quality, \"%1d:%2d\": 250 Hz is rate 7 (ExpressLRS 3.6.4's expresslrs_RFrates_e), and every frame arrives"
+
+[[osd.expect]]
+what  = "Link Quality"
+over  = "1 s to 2 s"
+reads = "7: 0"
+first = "between 0.25 s and 0.334 s"
+basis = "source: crsfCheckRssi: 250 ms after the last link statistics (with the last frame at 0.996 s), Link Quality is 0; the OSD shows it at its next redraw, within 83.3 ms"
+
+[[osd.expect]]
+what  = "Link Quality blinks"
+at    = "1.5 s"
+value = "yes"
+basis = "source: osdUpdateAlarms: Link Quality below osd_link_quality_alarm (80%) blinks"
+
+[[osd.expect]]
+what  = "warnings"
+over  = "1 s to 3 s"
+reads = "FAIL SAFE"
+first = "between 1.497 s and 1.5917 s"
+basis = "source: renderOsdWarning: FAIL SAFE once failsafeIsActive, from the drop at the first 11 ms check past 2.496 s (failsafe.toml), at the OSD's next redraw, within 83.3 ms"
+
+[[osd.expect]]
+what  = "Flight Mode"
+over  = "1 s to 3 s"
+reads = "!FS!"
+first = "between 1.497 s and 1.5917 s"
+basis = "source: osdElementFlymode: FAILSAFE_MODE first, from the drop, at the next redraw"
+
+[[osd.expect]]
+what  = "warnings blinks"
+at    = "2.6 s"
+value = "yes"
+basis = "source: renderOsdWarning: FAIL SAFE blinks"
+
+[[osd.expect]]
+what  = "Flight Mode"
+at    = "3.5 s"
+value = "!FS!"
+basis = "source: osdElementFlymode: !FS! for as long as Failsafe lasts, while the link stays lost"

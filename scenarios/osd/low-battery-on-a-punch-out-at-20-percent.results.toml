@@ -1,0 +1,64 @@
+# Results of low-battery-on-a-punch-out-at-20-percent.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A punch-out at 20% charge reads LOW BATTERY"
+
+[[expect]]
+what     = "battery voltage at 2 s"
+basis    = "Observed"
+expected = "between 3 V and 3.45 V"
+measured = "3.34 V"
+
+[[expect]]
+what     = "warnings at 0.9 s"
+basis    = "Source"
+expected = "(blank)"
+measured = "(blank)"
+
+[[expect]]
+what     = "average cell voltage at 0.9 s"
+basis    = "Observed"
+expected = "3.72V"
+measured = "3.72V"
+
+[[expect]]
+what     = "warnings reads LOW BATTERY, first over 1 s to 3 s"
+basis    = "Observed"
+expected = "between 0.6 s and 0.75 s"
+measured = "0.667 s"
+
+[[expect]]
+what     = "warnings blinks at 2.5 s"
+basis    = "Source"
+expected = "yes"
+measured = "yes"
+
+[[expect]]
+what     = "average cell voltage blinks at 2.5 s"
+basis    = "Source"
+expected = "yes"
+measured = "yes"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "536ddc3d29a1db34"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "baca6e5e37cf4ab2"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "780cde5e20854ded"
+"0.6 s" = "a026f83a85288bc2"
+"0.9 s" = "86e8c02c4baa1131"
+"1.2 s" = "ef834675f76b1b28"
+"1.5 s" = "77b55564b7426b7e"
+"1.8 s" = "cc1b4bd0656c6191"
+"2.1 s" = "c779bddac02e5902"
+"2.4 s" = "8b8543e65c60cd87"
+"2.7 s" = "7aa62154c460bfb2"
+"3 s" = "56b92f0ffef9aef4"

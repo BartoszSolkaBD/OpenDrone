@@ -27,6 +27,22 @@ set runaway_takeoff_prevention = ON    # 4.3 default
 set runaway_takeoff_deactivate_delay = 500 # 4.3 default; ms
 set runaway_takeoff_deactivate_throttle_percent = 20 # 4.3 default; percent
 
+# Power & Battery
+set current_meter = ADC                # hand-set: the BETAFPVF411 board's default, which a 4.3 diff leaves out (#31 §3)
+set vbat_min_cell_voltage = 330        # 4.3 default; hundredths of a volt
+set vbat_max_cell_voltage = 435        # diff; hundredths of a volt
+set vbat_warning_cell_voltage = 350    # 4.3 default; hundredths of a volt
+# Power & Battery, CLI only
+set vbat_full_cell_voltage = 410       # 4.3 default; hundredths of a volt
+set force_battery_cell_count = 0       # 4.3 default; 0 works it out
+set vbat_hysteresis = 1                # 4.3 default; hundredths of a volt
+set vbat_detect_cell_voltage = 300     # 4.3 default; hundredths of a volt
+set use_vbat_alerts = ON               # 4.3 default
+set vbat_display_lpf_period = 30       # 4.3 default; tenths of a second
+set ibat_lpf_period = 10               # 4.3 default; tenths of a second
+set vbat_duration_for_warning = 0      # 4.3 default; tenths of a second
+set vbat_duration_for_critical = 0     # 4.3 default; tenths of a second
+
 # Failsafe
 set rx_min_usec = 885                  # 4.3 default; µs
 set rx_max_usec = 2115                 # 4.3 default; µs
@@ -117,6 +133,7 @@ set airmode_start_throttle_percent = 25 # 4.3 default
 
 # Motors
 set motor_pwm_protocol = DSHOT300      # diff
+set dshot_bidir = ON                   # diff
 set motor_idle = 600                   # diff (was dshot_idle_value); hundredths of a percent
 set motor_poles = 12                   # diff; must match [motors] poles
 set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
@@ -154,7 +171,3 @@ set dyn_notch_min_hz = 130             # diff; Hz
 set dyn_notch_max_hz = 600             # 4.3 default; Hz
 # Blackbox
 set blackbox_sample_rate = 1/2         # diff
-
-# Not simulated yet, and not known to OpenDrone: the other settings the diff sets.
-set dshot_bidir = ON                   # diff
-set vbat_max_cell_voltage = 435        # diff

@@ -29,11 +29,11 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "9f15c5f7059acf42"   # test/freestyle-5-output-limit-80: what the Simulation receives from it
+quad = "2a55a883e0baae20"   # test/freestyle-5-output-limit-80: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "ec52b0e513cf39cc"   # the Flight Controller's whole state after each of 3 cases, in order
+run  = "35e9b537e0f19023"   # the Flight Controller's whole state after each of 3 cases, in order
 
 [fingerprints.checkpoints]   # the Flight Controller's whole state after each case
-"case 1" = "58374f1686e21f6c"
-"case 2" = "e1e86d7223891f49"
-"case 3" = "ebc5440976b9f2b2"
+"case 1" = "c40df2df93ac5972"
+"case 2" = "dd3d97caf0920473"
+"case 3" = "d326525e7a7c2d08"

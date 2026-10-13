@@ -1,0 +1,92 @@
+# A punch-out on a tired pack makes the OSD warn LOW BATTERY, blinking: the
+# Whoop 65's 1S pack at 20% rests at 3.77 V, and full throttle sags it below
+# vbat_warning_cell_voltage, 3.50 V (#31 §10; src/main/sensors/battery.c,
+# batteryUpdateVoltageState, and src/main/osd/osd_warnings.c).
+#
+# Betaflight doesn't warn at once: it low-passes the voltage it shows and
+# warns on (vbat_display_lpf_period 30, about half a second's lag), and
+# checks it 5 times a second. Below 3.30 V a cell it would warn LAND NOW
+# instead; this sag doesn't go that low.
+#
+# Mid-air at 20 m, armed, the Flight Controller fresh and the motors
+# settled, at 40% throttle; full throttle from 1 s to 3 s.
+format = 2
+name   = "A punch-out at 20% charge reads LOW BATTERY"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 20 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "20%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off" },
+  { at = "1 s", throttle = "100%" },
+  { at = "3 s", throttle = "40%" },
+]
+
+[[expect]]
+what  = "battery voltage"
+at    = "2 s"
+value = "between 3 V and 3.45 V"
+basis = "observed: full throttle sags the 1S pack at 20% well below 3.5 V"
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "warnings"
+at    = "0.9 s"
+value = "(blank)"
+basis = "source: renderOsdWarning: at 40% throttle the pack holds above 3.50 V, so no battery warning; armed, so no BATT < FULL"
+
+[[osd.expect]]
+what  = "average cell voltage"
+at    = "0.9 s"
+value = "3.72V"
+basis = "observed: the 1S pack at 20% under 40% throttle, through the board's ADC and Betaflight's low-pass"
+
+[[osd.expect]]
+what  = "warnings"
+over  = "1 s to 3 s"
+reads = "LOW BATTERY"
+first = "between 0.6 s and 0.75 s"
+basis = "observed: 0.667 s. The low-passed voltage falls through 3.49 V (3.50 V less vbat_hysteresis) about half a second after the punch, and the next 5 Hz check and OSD redraw show it; its moment depends on the sag"
+
+[[osd.expect]]
+what  = "warnings blinks"
+at    = "2.5 s"
+value = "yes"
+basis = "source: renderOsdWarning: LOW BATTERY blinks"
+
+[[osd.expect]]
+what  = "average cell voltage blinks"
+at    = "2.5 s"
+value = "yes"
+basis = "source: osdUpdateAlarms: the voltages blink while the battery isn't OK"

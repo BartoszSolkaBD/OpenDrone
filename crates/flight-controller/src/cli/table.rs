@@ -22,7 +22,8 @@
 //! settings.c` for names and ranges, and each parameter group's reset values
 //! (`pg/rx.c`, `pg/motor.c`, `flight/pid.c`, `flight/imu.c`,
 //! `flight/mixer_init.c`, `flight/failsafe.c`, `sensors/gyro.c`,
-//! `fc/rc_controls.c`, `fc/controlrate_profile.c`, `blackbox/blackbox.c`) at
+//! `fc/rc_controls.c`, `fc/controlrate_profile.c`, `blackbox/blackbox.c`,
+//! `sensors/battery.c`) at
 //! tags 4.3.0, 4.4.0, 4.5.0, 2025.12.1 and 2026.6.2, for a build with every
 //! flight feature on.
 //!
@@ -48,6 +49,8 @@ use super::Family;
 pub enum Place {
     Configuration,
     ConfigurationCli,
+    PowerBattery,
+    PowerBatteryCli,
     Failsafe,
     FailsafeCli,
     PidTuning,
@@ -67,6 +70,8 @@ impl Place {
         match self {
             Place::Configuration => "Configuration",
             Place::ConfigurationCli => "Configuration, CLI only",
+            Place::PowerBattery => "Power & Battery",
+            Place::PowerBatteryCli => "Power & Battery, CLI only",
             Place::Failsafe => "Failsafe",
             Place::FailsafeCli => "Failsafe, CLI only",
             Place::PidTuning => "PID Tuning",
@@ -222,6 +227,22 @@ pub const SETTINGS: &[Setting] = &[
     all("runaway_takeoff_prevention", ConfigurationCli, "", "ON"),
     all("runaway_takeoff_deactivate_delay", ConfigurationCli, "ms", "500"),
     all("runaway_takeoff_deactivate_throttle_percent", ConfigurationCli, "percent", "20"),
+    // Power & Battery. Betaflight's own current_meter default is VIRTUAL;
+    // most boards set ADC, which a `diff` taken without `bare` on 4.3 or 4.4
+    // leaves out. The cell voltages sit in 2026.6's battery profiles.
+    all("current_meter", PowerBattery, "", "VIRTUAL"),
+    all("vbat_min_cell_voltage", PowerBattery, "hundredths of a volt", "330"),
+    all("vbat_max_cell_voltage", PowerBattery, "hundredths of a volt", "430"),
+    all("vbat_warning_cell_voltage", PowerBattery, "hundredths of a volt", "350"),
+    all("vbat_full_cell_voltage", PowerBatteryCli, "hundredths of a volt", "410"),
+    all("force_battery_cell_count", PowerBatteryCli, "0 works it out", "0"),
+    all("vbat_hysteresis", PowerBatteryCli, "hundredths of a volt", "1"),
+    all("vbat_detect_cell_voltage", PowerBatteryCli, "hundredths of a volt", "300"),
+    all("use_vbat_alerts", PowerBatteryCli, "", "ON"),
+    all("vbat_display_lpf_period", PowerBatteryCli, "tenths of a second", "30"),
+    all("ibat_lpf_period", PowerBatteryCli, "tenths of a second", "10"),
+    all("vbat_duration_for_warning", PowerBatteryCli, "tenths of a second", "0"),
+    all("vbat_duration_for_critical", PowerBatteryCli, "tenths of a second", "0"),
     // Failsafe. A Channel outside rx_min_usec to rx_max_usec is invalid.
     all("rx_min_usec", Failsafe, "µs", "885"),
     all("rx_max_usec", Failsafe, "µs", "2115"),
@@ -370,6 +391,7 @@ pub const SETTINGS: &[Setting] = &[
     // each board's settings chose one.
     row("motor_pwm_protocol", Motors, "",
         [Same("DISABLED"), Same("DISABLED"), Same("DSHOT600"), Same("DSHOT600"), Same("DSHOT600")]),
+    all("dshot_bidir", Motors, "", "OFF"),
     row("motor_idle", Motors, "hundredths of a percent",
         [Was("dshot_idle_value", "550"), Was("dshot_idle_value", "550"), Was("dshot_idle_value", "550"), Same("550"), Same("550")]),
     all("motor_poles", Motors, "must match [motors] poles", "14"),
@@ -603,7 +625,6 @@ const HARDWARE_ONLY: &[&str] = &[
     "vbat_scale",
     "vbat_divider",
     "vbat_multiplier",
-    "current_meter",
     "battery_meter",
     "serial_update_rate_hz",
     "system_hse_mhz",

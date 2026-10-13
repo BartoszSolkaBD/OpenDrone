@@ -1,0 +1,93 @@
+# The statistics page after disarming (#31 §4; src/main/osd/osd.c,
+# osdProcessStats1, osdRefreshStats and osdProcessStats2): on disarming,
+# Betaflight's OSD clears the screen for up to 60 s and lists the statistics
+# that are on and that the sim has a source for. With Betaflight's defaults,
+# that's the armed time (timer 2, TOTAL ARM), the lowest battery voltage,
+# and, with a current sensor, the highest current and the mAh used. Throttle
+# above 1750 µs dismisses it.
+#
+# A Freestyle 5″ resting on the floor, starting as Reset leaves it
+# (arming-waits-for-the-escs-after-reset.toml). It arms at 2.004 s, idles on
+# the floor, and disarms more than three frames after the Arm switch goes
+# off at 6.5 s; then the throttle goes up at 8 s.
+format = 2
+name   = "The statistics page shows the armed time after disarming, and throttle up dismisses it"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "off" },
+  { at = "2 s",   arm = "on" },
+  { at = "6.5 s", arm = "off" },
+  { at = "8 s",   throttle = "100%" },
+]
+
+[[expect]]
+what  = "the Quad disarms"
+over  = "6.5 s to 7 s"
+first = "0.016125 s ± 0.000001 s"
+basis = "source: processRcStickPositions: the Arm switch must read off on more than three frames in a row (rcDisarmTicks), so the frame at 6.516 s disarms"
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "statistics page"
+at    = "6.5 s"
+value = "(blank)"
+basis = "source: osdProcessStats1: the page shows only once the Quad has disarmed"
+
+[[osd.expect]]
+what  = "statistic TOTAL ARM"
+at    = "7 s"
+value = "00:04"
+basis = "source: osdProcessStats1 adds each redraw's time to the armed time while armed, from the redraw that finds the Quad armed (the one at 2.0834 s) to the last before it disarms (6.5 s): 4.5 s, shown in whole seconds"
+
+[[osd.expect]]
+what  = "statistics page"
+at    = "7 s"
+value = "--- STATS --- / TOTAL ARM : 00:04 / MIN BATTERY : 25.18V / MAX CURRENT : 0.16A / USED MAH : 0mAh"
+basis = "observed: Betaflight's default statistics with a source in the sim (#31 §4), the Freestyle 5″ idling on the floor on a full pack"
+
+[[osd.expect]]
+what  = "statistics page"
+over  = "8 s to 8.3 s"
+reads = "(blank)"
+first = "between 0.0001 s and 0.1677 s"
+basis = "source: osdProcessStats2: throttle above 1750 µs (IS_HI) ends the page at the next redraw, and the one after draws the elements again"
+
+[[osd.expect]]
+what  = "disarmed"
+at    = "8.3 s"
+value = "DISARMED"
+basis = "source: osdElementDisarmed, back with the elements"

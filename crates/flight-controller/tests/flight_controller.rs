@@ -4,7 +4,8 @@
 //! Scenarios in `scenarios/flight-controller/`.
 
 use opendrone_flight_controller::{
-    Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings, Tune,
+    BatteryReading, Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings,
+    Tune,
 };
 use opendrone_maths::{Attitude, DEGREE, Vec3};
 
@@ -16,6 +17,19 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("runaway_takeoff_prevention", "ON"),
     ("runaway_takeoff_deactivate_delay", "500"),
     ("runaway_takeoff_deactivate_throttle_percent", "20"),
+    ("current_meter", "ADC"),
+    ("vbat_min_cell_voltage", "330"),
+    ("vbat_max_cell_voltage", "430"),
+    ("vbat_warning_cell_voltage", "350"),
+    ("vbat_full_cell_voltage", "410"),
+    ("force_battery_cell_count", "0"),
+    ("vbat_hysteresis", "1"),
+    ("vbat_detect_cell_voltage", "300"),
+    ("use_vbat_alerts", "ON"),
+    ("vbat_display_lpf_period", "30"),
+    ("ibat_lpf_period", "10"),
+    ("vbat_duration_for_warning", "0"),
+    ("vbat_duration_for_critical", "0"),
     ("rx_min_usec", "885"),
     ("rx_max_usec", "2115"),
     ("failsafe_delay", "15"),
@@ -93,7 +107,9 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("yaw_control_reversed", "OFF"),
     ("airmode_start_throttle_percent", "25"),
     ("motor_pwm_protocol", "DSHOT600"),
+    ("dshot_bidir", "OFF"),
     ("motor_idle", "550"),
+    ("motor_poles", "14"),
     ("yaw_motors_reversed", "OFF"),
     ("mixer_type", "LEGACY"),
     ("crashflip_motor_percent", "0"),
@@ -109,6 +125,11 @@ const STILL: SensorReadings = SensorReadings {
     gyro: Vec3::ZERO,
     attitude: Attitude::BODY_IS_WORLD,
     escs_ready: true,
+    battery: BatteryReading {
+        voltage: 0.0,
+        current: 0.0,
+    },
+    motor_rpm: [0.0; 4],
 };
 
 #[test]
@@ -189,9 +210,9 @@ fn settings_the_flight_controller_doesnt_know_are_left_alone() {
     let lines = DEFAULTS
         .iter()
         .copied()
-        .chain([("motor_poles", "14"), ("vbat_max_cell_voltage", "435")]);
+        .chain([("osd_vbat_pos", "2433"), ("dyn_idle_min_rpm", "0")]);
     assert_eq!(Tune::read(lines).unwrap(), tune());
-    assert!(Tune::check("vbat_max_cell_voltage", "anything").is_ok());
+    assert!(Tune::check("dyn_idle_min_rpm", "anything").is_ok());
 }
 
 #[test]

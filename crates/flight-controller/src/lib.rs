@@ -43,11 +43,19 @@
 //!   ([`dshot_command`]);
 //! - yaw spin recovery (#26 §4, `yaw_spin`) and runaway takeoff prevention
 //!   (`runaway`);
+//! - the battery as Betaflight reads it ([`battery`]): the voltage through the
+//!   board's ADC and its low-pass, the cell count, LOW and CRITICAL, and the
+//!   current and mAh where the Tune's `current_meter` reads them;
+//! - the beeper ([`beeper`]), and what else Betaflight's OSD reads each loop:
+//!   the switches, Link Quality and ELRS's rate code, and each motor's RPM
+//!   over bidirectional DShot, all in the [`DebugRecord`];
+//! - Betaflight's OSD logic ([`osd`]), which runs beside the Simulation on
+//!   the loops' records and never feeds back into a flight (ADR-0022);
 //! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
-//!   a 2026.6 Tune, and the pilot's pasted Rates and `aux` switches.
+//!   a 2026.6 Tune, and the pilot's pasted Rates, `aux` switches and OSD
+//!   layout.
 //!
-//! Angle and Horizon (#51), the OSD paste and the OSD logic (#59) arrive with
-//! their tickets.
+//! Angle and Horizon (#51) arrive with their ticket.
 //!
 //! # Power-up
 //!
@@ -96,6 +104,12 @@
 //!    in Crash Flip the sticks drive the motors instead. A spin direction
 //!    command queued by arming or disarming goes out in their place
 //!    ([`dshot_command`]).
+//! 9. The battery's tasks run when due, 50 times a second for the voltage
+//!    and current and 5 for its state ([`battery`]); then the beeper is told
+//!    what to beep (the "gyro calibrated" beeps on the first loop, arming,
+//!    disarming, `RX_LOST`, the warning beeps for a refused arm, Crash Flip,
+//!    a low or critical battery) and takes its 100 Hz step ([`beeper`]).
+//!    None of it changes the motor commands.
 //!
 //! # Directions
 //!
@@ -130,6 +144,8 @@
 //! [ADR-0022]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0022-osd-worked-out-beside-the-simulation.md
 
 pub mod arming;
+pub mod battery;
+pub mod beeper;
 mod channels;
 pub mod cli;
 pub mod dshot_command;
@@ -138,6 +154,7 @@ mod feedforward;
 mod filter;
 mod gyro_filter;
 mod mixer;
+pub mod osd;
 mod pid;
 pub mod rates;
 mod rc_smoothing;
@@ -150,6 +167,8 @@ mod yaw_spin;
 use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotRates, Vec3};
 
 use arming::Arming;
+use battery::{Battery, BatteryAlarm};
+use beeper::{Beeper, BeeperMode};
 use dshot_command::DshotCommands;
 use failsafe::{Failsafe, Receiver};
 use feedforward::{Feedforward, FeedforwardFrame};
@@ -163,14 +182,16 @@ use throttle_shaping::ThrottleShaping;
 use yaw_spin::YawSpin;
 
 pub use arming::ArmingBlocks;
+pub use battery::{BatteryReading, BatteryReadings, BatteryState};
+pub use beeper::BeeperReadings;
 pub use channels::{Channel, Channels};
 pub use failsafe::FailsafePhase;
 pub use mixer::{DSHOT_HIGHEST, DSHOT_LOWEST};
 pub use pid::Terms;
 pub use rates::{Axis, AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use tune::{
-    FailsafeProcedure, FeedforwardAveraging, Gains, ItermRelax, ItermRelaxType, LowpassType,
-    MixerType, MotorProtocol, TpaMode, Tune, TuneProblems, YawSpinRecovery,
+    CurrentMeter, FailsafeProcedure, FeedforwardAveraging, Gains, ItermRelax, ItermRelaxType,
+    LowpassType, MixerType, MotorProtocol, TpaMode, Tune, TuneProblems, YawSpinRecovery,
 };
 
 /// What a real board's sensors read, which is all the Flight Controller
@@ -189,6 +210,36 @@ pub struct SensorReadings {
     /// the ESCs' start-up after power-up, about 1.7 s (#32 §4). Running ESCs
     /// (a mid-air start) are ready.
     pub escs_ready: bool,
+    /// What the board reads of its battery.
+    pub battery: BatteryReading,
+    /// Each motor's speed, in revolutions a minute, as its ESC reports it
+    /// over bidirectional DShot, in Betaflight's motor order. The Flight
+    /// Controller reads it only with the Tune's `dshot_bidir` on.
+    pub motor_rpm: [f64; 4],
+}
+
+impl SensorReadings {
+    /// Readings with no battery and the motors still, such as a fresh Flight
+    /// Controller's at power-up, which reads only the gyro before its first
+    /// loop.
+    pub fn still(gyro: Vec3, attitude: Attitude, escs_ready: bool) -> SensorReadings {
+        SensorReadings {
+            gyro,
+            attitude,
+            escs_ready,
+            battery: BatteryReading::default(),
+            motor_rpm: [0.0; 4],
+        }
+    }
+}
+
+/// The Flight Mode the Flight Controller flies, as its OSD names it. Angle
+/// and Horizon arrive with #51; until then it always flies Acro.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlightMode {
+    Acro,
+    Angle,
+    Horizon,
 }
 
 /// Failsafe as one loop left it, for the OSD and Scenarios.
@@ -278,6 +329,34 @@ pub struct DebugRecord {
     /// The flight has counted as stable since power-up, so runaway takeoff
     /// prevention has switched itself off (`runawayTakeoffCheckDisabled`).
     pub flight_stable: bool,
+    /// The battery: its voltage, cell count and state, and the current and
+    /// mAh drawn where the Tune's `current_meter` reads them.
+    pub battery: BatteryReadings,
+    /// The beeper: what it plays, and how many beeps have started.
+    pub beeper: BeeperReadings,
+    /// The loop's moment on the Flight Controller's own clock, in whole µs
+    /// since power-up (`micros()`): what the OSD's timers count.
+    pub since_power_up_us: u64,
+    /// The Arm switch as the Modes table reads it, as of the last frame
+    /// (`IS_RC_MODE_ACTIVE(BOXARM)`).
+    pub arm_switch: bool,
+    /// The Crash Flip switch the same way (`BOXCRASHFLIP`).
+    pub crash_flip_switch: bool,
+    /// The sticks as Betaflight reads them, in µs: roll, pitch, yaw and
+    /// throttle (`rcData`).
+    pub sticks_us: [f64; 4],
+    /// The throttle in whole percent above `min_check`
+    /// (`calculateThrottlePercent`), as the OSD shows it.
+    pub throttle_percent: u8,
+    pub flight_mode: FlightMode,
+    /// The Radio Link's Link Quality, in percent, as ELRS reports it over
+    /// CRSF: 100 while frames arrive, 0 once none has for 250 ms.
+    pub link_quality: u8,
+    /// ELRS's code for the Packet Rate (`rf_Mode`), such as 7 for 250 Hz.
+    pub rf_mode: u8,
+    /// Each motor's RPM as bidirectional DShot reports it, in Betaflight's
+    /// motor order; `None` with the Tune's `dshot_bidir` off.
+    pub motor_rpm: Option<[u32; 4]>,
 }
 
 impl DebugRecord {
@@ -333,6 +412,12 @@ pub struct FlightController {
     /// `crashflip_rate`'s fade; `None` outside Crash Flip.
     tilt_at_start: Option<f64>,
     dshot: DshotCommands,
+    battery: Battery,
+    beeper: Beeper,
+    /// When the last Radio Link frame arrived, in µs since power-up: a
+    /// fresh Flight Controller's link counts as settled, as if one just had.
+    last_frame_us: u64,
+    rf_mode: u8,
     last: DebugRecord,
 }
 
@@ -365,6 +450,8 @@ impl FlightController {
         let receiver = Receiver::at_power_up(&tune);
         let failsafe = Failsafe::at_power_up(&tune);
         let yaw_spin = YawSpin::new(&tune, &rates);
+        let battery = Battery::new(&tune);
+        let beeper = Beeper::new();
         FlightController {
             last: DebugRecord {
                 armed,
@@ -384,6 +471,22 @@ impl FlightController {
                 crash_flip: false,
                 yaw_spin_recovery: false,
                 flight_stable: false,
+                battery: battery.readings,
+                beeper: beeper.readings(),
+                since_power_up_us: 0,
+                arm_switch: armed,
+                crash_flip_switch: false,
+                sticks_us: [
+                    receiver.data.roll,
+                    receiver.data.pitch,
+                    receiver.data.yaw,
+                    receiver.data.throttle,
+                ],
+                throttle_percent: 0,
+                flight_mode: FlightMode::Acro,
+                link_quality: 100,
+                rf_mode: elrs_rf_mode(packet_rate_hz),
+                motor_rpm: None,
             },
             tune,
             rates,
@@ -409,6 +512,10 @@ impl FlightController {
             runaway: Runaway::default(),
             tilt_at_start: None,
             dshot: DshotCommands::new(loop_hz),
+            battery,
+            beeper,
+            last_frame_us: 0,
+            rf_mode: elrs_rf_mode(packet_rate_hz),
         }
     }
 
@@ -447,11 +554,16 @@ impl FlightController {
         let now_us = self.loops * 1_000_000 / u64::from(self.loop_hz);
         let now_ms = now_us / 1000;
         let before = (self.arming.armed, self.arming.crash_flip);
-        let changed = self.receiver.look(now_us, frame);
-        self.failsafe.check(now_ms, &mut self.arming);
-        if changed {
-            self.receive(now_us, readings);
+        if frame.is_some() {
+            self.last_frame_us = now_us;
         }
+        let changed = self.receiver.look(now_us, frame);
+        let rx_lost = self.failsafe.check(now_ms, &mut self.arming);
+        let warning = if changed {
+            self.receive(now_us, readings)
+        } else {
+            None
+        };
         let unfiltered = degrees(readings.gyro);
         let gyro = self.gyro_filters.apply(unfiltered);
         self.process_sticks(changed);
@@ -530,6 +642,9 @@ impl FlightController {
         };
         let (sent, direction) = self.dshot.output(dshot);
         let motors = sent.map(|dshot| MotorCommand { dshot, direction });
+        let alarm = self.battery.step(now_us, readings.battery, &self.tune);
+        self.sound_beeper(now_us, before.0, rx_lost, warning, changed, alarm);
+        let rc = self.receiver.data;
         self.last = DebugRecord {
             armed: self.arming.armed,
             arming_blocks: self.arming.blocks,
@@ -548,9 +663,71 @@ impl FlightController {
             crash_flip: self.arming.crash_flip,
             yaw_spin_recovery: self.yaw_spin.active,
             flight_stable: self.runaway.done,
+            battery: self.battery.readings,
+            beeper: self.beeper.readings(),
+            since_power_up_us: now_us,
+            arm_switch: self.arming.arm_switch(),
+            crash_flip_switch: self.arming.crash_flip_switch(),
+            sticks_us: [rc.roll, rc.pitch, rc.yaw, rc.throttle],
+            throttle_percent: rc.throttle_percent(&self.tune) as u8,
+            flight_mode: FlightMode::Acro,
+            link_quality: if now_us.saturating_sub(self.last_frame_us) > LINK_STATISTICS_TIMEOUT_US
+            {
+                0
+            } else {
+                100
+            },
+            rf_mode: self.rf_mode,
+            motor_rpm: self.tune.dshot_bidir.then(|| {
+                readings
+                    .motor_rpm
+                    .map(|rpm| telemetry_rpm(rpm, self.tune.motor_poles))
+            }),
         };
         self.loops += 1;
         motors
+    }
+
+    /// Betaflight's beeper, in the order its tasks would ask: the three
+    /// "gyro calibrated" beeps on the first loop, arming and disarming (not
+    /// a disarm by runaway takeoff prevention), `RX_LOST` when Failsafe
+    /// found the link down, the warning beeps for a refused arm, Crash Flip
+    /// on each frame, and the battery's alarm. A beep starts only if it
+    /// outranks the one playing. Then the beeper takes its step.
+    fn sound_beeper(
+        &mut self,
+        now_us: u64,
+        was_armed: bool,
+        rx_lost: bool,
+        warning: Option<u8>,
+        frame: bool,
+        alarm: Option<BatteryAlarm>,
+    ) {
+        if self.loops == 0 {
+            self.beeper.beep(BeeperMode::GyroCalibrated);
+        }
+        match (was_armed, self.arming.armed) {
+            (false, true) => self.beeper.beep(BeeperMode::Arming),
+            (true, false) if !self.arming.blocks.runaway => {
+                self.beeper.beep(BeeperMode::Disarming);
+            }
+            _ => {}
+        }
+        if rx_lost {
+            self.beeper.beep(BeeperMode::RxLost);
+        }
+        if let Some(count) = warning {
+            self.beeper.warn(count);
+        }
+        if frame && self.arming.crash_flip {
+            self.beeper.beep(BeeperMode::CrashFlip);
+        }
+        match alarm {
+            Some(BatteryAlarm::Low) => self.beeper.beep(BeeperMode::BatteryLow),
+            Some(BatteryAlarm::Critical) => self.beeper.beep(BeeperMode::BatteryCriticalLow),
+            None => {}
+        }
+        self.beeper.update(now_us);
     }
 
     /// Betaflight's work on the Channels, in its order: they are worked out
@@ -559,7 +736,7 @@ impl FlightController {
     /// prevention adds up stable flight; then the Arm and Crash Flip
     /// switches; then the stick commands and the setpoints; then the arming
     /// checks.
-    fn receive(&mut self, now_us: u64, readings: &SensorReadings) {
+    fn receive(&mut self, now_us: u64, readings: &SensorReadings) -> Option<u8> {
         let now_ms = now_us / 1000;
         let good = self
             .receiver
@@ -604,7 +781,7 @@ impl FlightController {
         );
 
         let was_armed = self.arming.armed;
-        self.arming.frame(
+        let warning = self.arming.frame(
             &rc,
             &self.tune,
             arming::Readings {
@@ -624,6 +801,7 @@ impl FlightController {
             self.setpoint[axis.index()] = self.rates.setpoint(axis, deflection);
         }
         self.command = Some(command);
+        warning
     }
 
     /// Betaflight's work on the sticks each loop (`processRcCommand`): when
@@ -701,6 +879,9 @@ impl FlightController {
             }
         }
         self.dshot.write_fingerprint(f);
+        self.battery.write_fingerprint(f);
+        self.beeper.write_fingerprint(f);
+        f.write_u64(self.last_frame_us);
         for motor in self.last.motors {
             f.write_u64(u64::from(motor.dshot));
             f.write_u64(match motor.direction {
@@ -735,6 +916,36 @@ fn degrees(rotation: Vec3) -> [f64; 3] {
         rotation.y / DEGREE,
         rotation.z / DEGREE,
     ]
+}
+
+/// How long Betaflight waits for ELRS's link statistics before it counts
+/// the Link Quality as 0 (`CRSF_LINK_STATUS_UPDATE_TIMEOUT_US`).
+const LINK_STATISTICS_TIMEOUT_US: u64 = 250_000;
+
+/// ELRS's code for a Packet Rate, as its receiver reports it in its link
+/// statistics (`rf_Mode`: the rate's place in `expresslrs_RFrates_e`,
+/// ExpressLRS 3.6.4's `src/include/common.h`): the 2.4 GHz LoRa rates, 333 Hz
+/// Full and 1000 Hz FLRC.
+fn elrs_rf_mode(packet_rate_hz: u32) -> u8 {
+    match packet_rate_hz {
+        50 => 2,
+        100 => 3,
+        150 => 5,
+        250 => 7,
+        333 => 8,
+        500 => 9,
+        1000 => 13,
+        _ => 0,
+    }
+}
+
+/// A motor's RPM as bidirectional DShot brings it back and Betaflight reads
+/// it: the electrical RPM in whole hundreds, back to RPM by the motor's pole
+/// pairs, rounded (`erpmToRpm`, then `lrintf`).
+fn telemetry_rpm(rpm: f64, motor_poles: u8) -> u32 {
+    let pole_pairs = f64::from((motor_poles / 2).max(1));
+    let hundreds = (rpm.abs() * pole_pairs / 100.0).floor();
+    (hundreds * 100.0 / pole_pairs).round() as u32
 }
 
 fn stopped() -> MotorCommand {

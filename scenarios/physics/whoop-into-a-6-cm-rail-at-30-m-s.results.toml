@@ -29,7 +29,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "f1a5f2dd0ba73c53"   # test/whoop-65-no-drag: what the Simulation receives from it
+quad = "81540e328b5a526e"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "a0fe03c0f9d79a5a"   # test/thin-rail
 run  = "51a4acce8d143992"   # the whole state after each of 2000 steps at 8000 Hz, in order
 
