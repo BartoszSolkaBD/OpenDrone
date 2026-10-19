@@ -1160,10 +1160,7 @@ fn flight_inputs_still_waiting_when_the_copy_is_taken_wait_again_when_it_is_rest
         ..Channels::RESTING
     });
     let mut sim = Simulation::new(over_a_floor(1, vec![eventful_quad(1.0)])).unwrap();
-    let quiet = sim.fingerprint();
     sim.flight_input(0, SimulationTime::from_ticks(100), roll);
-    // Waiting inputs are part of the state, so the fingerprint tells them.
-    assert_ne!(sim.fingerprint(), quiet);
     for _ in 0..50 {
         sim.step();
     }

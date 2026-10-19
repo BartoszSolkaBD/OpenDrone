@@ -287,9 +287,11 @@ struct SimulatedQuad {
 
 impl SimulatedQuad {
     /// Feeds this Quad's whole state into a fingerprint, in a fixed order:
-    /// the body, the motor commands, the Radio Link, Input smoothing, the
-    /// Flight Controller seam, and, only if any are still waiting, the Flight
-    /// Inputs that have not arrived yet.
+    /// the body, the motor commands, the Radio Link, Input smoothing and the
+    /// Flight Controller seam. The Flight Inputs that have not arrived yet are
+    /// left out: when the caller hands one over is not part of the flight (the
+    /// game gives them between ticks, the runner just before one), only the
+    /// tick it arrives at is.
     fn write_fingerprint(&self, f: &mut Fingerprinter) {
         self.body.write_fingerprint(f);
         self.motor_commands.write_fingerprint(f);
@@ -302,13 +304,6 @@ impl SimulatedQuad {
             }
         }
         self.flight_controller.write_fingerprint(f);
-        if !self.inputs.is_empty() {
-            f.write_u64(self.inputs.len() as u64);
-            for (at, input) in &self.inputs {
-                f.write_u64(at.ticks());
-                input.write_fingerprint(f);
-            }
-        }
     }
 
     /// Reset: the Quad on its Launch Spot, still, with a full battery and its
