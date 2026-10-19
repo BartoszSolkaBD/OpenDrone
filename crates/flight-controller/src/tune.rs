@@ -149,6 +149,15 @@ pub struct Tune {
     pub throttle_boost: u8,
     /// `motor_output_limit`: the top of the motors' range, in percent.
     pub motor_output_limit: u8,
+    /// `angle_p_gain`: how hard Angle and Horizon turn the Quad towards the
+    /// angle the sticks ask for, in tenths of °/s for each degree off.
+    pub angle_p_gain: u8,
+    /// `angle_limit`: the tilt full stick asks for in Angle and Horizon, in
+    /// degrees.
+    pub angle_limit: u8,
+    /// `horizon_level_strength`: how much Horizon levels at most, in percent
+    /// (100 or more levels as hard as Angle).
+    pub horizon_level_strength: u8,
     /// `pidsum_limit`: the most roll or pitch may ask of the motors, where
     /// 1000 is the whole motor range.
     pub pidsum_limit: u16,
@@ -182,6 +191,31 @@ pub struct Tune {
     /// `throttle_boost_cutoff`: the cutoff of the low-pass whose difference
     /// from the throttle throttle boost adds, in Hz.
     pub throttle_boost_cutoff: u8,
+    /// `angle_feedforward`: how much of the sticks' feedforward pushes Angle
+    /// and Horizon's tilt along, in percent.
+    pub angle_feedforward: u8,
+    /// `angle_feedforward_smoothing_ms`: how strongly that push is smoothed:
+    /// its low-pass's time constant, in ms.
+    pub angle_feedforward_smoothing_ms: u8,
+    /// `angle_earth_ref`: how much a yaw while tilted in Angle and Horizon
+    /// turns about the world's vertical instead of the Quad's own, in
+    /// percent (0: off).
+    pub angle_earth_ref: u8,
+    /// `horizon_limit_sticks`: the roll or pitch stick, in hundredths, at
+    /// which Horizon stops levelling.
+    pub horizon_limit_sticks: u8,
+    /// `horizon_limit_degrees`: the tilt, in degrees, at which Horizon stops
+    /// levelling.
+    pub horizon_limit_degrees: u8,
+    /// `horizon_ignore_sticks`: whether Horizon levels as hard whatever the
+    /// sticks do.
+    pub horizon_ignore_sticks: bool,
+    /// `horizon_delay_ms`: how slowly Horizon's levelling comes back after it
+    /// fades: its low-pass's time constant, in ms.
+    pub horizon_delay_ms: u16,
+    /// `level_race_mode`: whether Angle and Horizon level only the roll, and
+    /// leave pitch to the sticks as in Acro.
+    pub level_race_mode: bool,
     /// `gyro_lpf1_type`: the gyro's first low-pass.
     pub gyro_lpf1_type: LowpassType,
     /// `gyro_lpf1_static_hz`: its cutoff when it isn't dynamic, in Hz (0:
@@ -542,6 +576,9 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_breakpoint", Kind::Number(1000, 2000)),
     ("throttle_boost", Kind::Number(0, 100)),
     ("motor_output_limit", Kind::Number(1, 100)),
+    ("angle_p_gain", Kind::Number(0, 200)),
+    ("angle_limit", Kind::Number(10, 80)),
+    ("horizon_level_strength", Kind::Number(0, 100)),
     ("pidsum_limit", Kind::Number(100, 1000)),
     ("pidsum_limit_yaw", Kind::Number(100, 1000)),
     ("iterm_windup", Kind::Number(20, 100)),
@@ -554,6 +591,14 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_low_breakpoint", Kind::Number(1000, 2000)),
     ("tpa_low_always", Kind::OffOn),
     ("throttle_boost_cutoff", Kind::Number(5, 50)),
+    ("angle_feedforward", Kind::Number(0, 200)),
+    ("angle_feedforward_smoothing_ms", Kind::Number(10, 250)),
+    ("angle_earth_ref", Kind::Number(0, 100)),
+    ("horizon_limit_sticks", Kind::Number(10, 200)),
+    ("horizon_limit_degrees", Kind::Number(10, 250)),
+    ("horizon_ignore_sticks", Kind::OffOn),
+    ("horizon_delay_ms", Kind::Number(10, 5000)),
+    ("level_race_mode", Kind::OffOn),
     ("gyro_lpf1_type", Kind::Word(&LowpassType::WORDS)),
     ("gyro_lpf1_static_hz", Kind::Number(0, 1000)),
     ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000)),
@@ -799,6 +844,9 @@ impl Tune {
             tpa_breakpoint: n("tpa_breakpoint") as u16,
             throttle_boost: small("throttle_boost"),
             motor_output_limit: small("motor_output_limit"),
+            angle_p_gain: small("angle_p_gain"),
+            angle_limit: small("angle_limit"),
+            horizon_level_strength: small("horizon_level_strength"),
             pidsum_limit: n("pidsum_limit") as u16,
             pidsum_limit_yaw: n("pidsum_limit_yaw") as u16,
             iterm_windup: small("iterm_windup"),
@@ -811,6 +859,14 @@ impl Tune {
             tpa_low_breakpoint: n("tpa_low_breakpoint") as u16,
             tpa_low_always: n("tpa_low_always") == 1,
             throttle_boost_cutoff: small("throttle_boost_cutoff"),
+            angle_feedforward: small("angle_feedforward"),
+            angle_feedforward_smoothing_ms: small("angle_feedforward_smoothing_ms"),
+            angle_earth_ref: small("angle_earth_ref"),
+            horizon_limit_sticks: small("horizon_limit_sticks"),
+            horizon_limit_degrees: small("horizon_limit_degrees"),
+            horizon_ignore_sticks: n("horizon_ignore_sticks") == 1,
+            horizon_delay_ms: hz("horizon_delay_ms"),
+            level_race_mode: n("level_race_mode") == 1,
             gyro_lpf1_type: LowpassType::from_place(n("gyro_lpf1_type")),
             gyro_lpf1_static_hz: hz("gyro_lpf1_static_hz"),
             gyro_lpf1_dyn_min_hz: hz("gyro_lpf1_dyn_min_hz"),
@@ -968,6 +1024,9 @@ impl Tune {
             u64::from(self.tpa_breakpoint),
             u64::from(self.throttle_boost),
             u64::from(self.motor_output_limit),
+            u64::from(self.angle_p_gain),
+            u64::from(self.angle_limit),
+            u64::from(self.horizon_level_strength),
             u64::from(self.pidsum_limit),
             u64::from(self.pidsum_limit_yaw),
             u64::from(self.iterm_windup),
@@ -980,6 +1039,14 @@ impl Tune {
             u64::from(self.tpa_low_breakpoint),
             u64::from(self.tpa_low_always),
             u64::from(self.throttle_boost_cutoff),
+            u64::from(self.angle_feedforward),
+            u64::from(self.angle_feedforward_smoothing_ms),
+            u64::from(self.angle_earth_ref),
+            u64::from(self.horizon_limit_sticks),
+            u64::from(self.horizon_limit_degrees),
+            u64::from(self.horizon_ignore_sticks),
+            u64::from(self.horizon_delay_ms),
+            u64::from(self.level_race_mode),
             self.gyro_lpf1_type.place(),
             u64::from(self.gyro_lpf1_static_hz),
             u64::from(self.gyro_lpf1_dyn_min_hz),

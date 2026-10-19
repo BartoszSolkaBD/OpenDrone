@@ -1,0 +1,181 @@
+# In Angle, roll and pitch's sticks ask for a tilt instead of a rotation
+# speed, and the Flight Controller turns the Quad towards it, as Betaflight
+# 2026.6.2's `pidLevel` does (src/main/flight/pid.c; its gains in
+# `pidInitConfig`, pid_init.c).
+#
+# On the Freestyle 5″'s Tune, Betaflight 2026.6.2's defaults: `angle_limit`
+# 60°, `angle_p_gain` 50 and `angle_earth_ref` 100.
+#
+# - The tilt asked for is the axis's setpoint (from the Rates) as a share of
+#   the Rates' max rate, 670 °/s, times 60°: full stick asks for 60°, half
+#   stick for 60° × 193.54 ÷ 670 = 17.33°, as Actual 70/670 gives 193.54 °/s
+#   at the half stick that reaches Betaflight (0.5126 of full, over CRSF).
+# - The setpoint the PID loop works to is how far the true attitude is from
+#   that tilt, times 50 ÷ 10 = 5 °/s for each degree.
+# - With the earth reference, yaw's rate is cut by the cosine of the larger
+#   tilt asked for, so a yaw while tilted turns about the world's vertical.
+# - Yaw itself stays in Acro.
+#
+# Centred sticks reach Betaflight at 1500.77 µs over CRSF (see
+# actual-rates.toml): 0.10966 °/s on each axis, which asks for a tilt of
+# 0.00982°.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop,
+# with the attitude reading the case gives. A fresh Flight Controller that
+# levels from its first frame on starts with the levelling's low-passes
+# settled, as if it had flown Angle since power-up, and feedforward is 0 on
+# the first frame, so each case shows the levelling's own numbers.
+#
+# The PID setpoint is in the pilot's directions: rolling right, pitching nose
+# up and yawing nose right are positive.
+format = 2
+name   = "In Angle the sticks ask for a tilt, and the Flight Controller turns the Quad towards it"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Angle"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+# Level, sticks centred: almost nothing to do.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "0.0491 °/s ± 0.0001 °/s"
+basis = "source: pidLevel: the centred stick asks for 60° × 0.10966 ÷ 670 = 0.00982°; level, that is 0.00982° off, times 5 = 0.0491 °/s"
+
+[[case.expect]]
+what  = "yaw PID setpoint"
+value = "0.10966 °/s ± 0.00001 °/s"
+basis = "source: pidController: yaw stays in Acro, its setpoint the Rates' 0.10966 °/s, cut by the cosine of 0.00982°, which is 1"
+
+# Rolled right 30°, sticks centred: it rolls back left.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 30°, pitch 0°, heading 0°"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "-149.95 °/s ± 0.01 °/s"
+basis = "source: pidLevel: (0.00982° − 30°) × 5 = −149.95 °/s, rolling left"
+
+# Pitched nose up 20°, sticks centred: it pitches back down.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 0°, pitch 20°, heading 0°"
+
+[[case.expect]]
+what  = "pitch PID setpoint"
+value = "-100.05 °/s ± 0.01 °/s"
+basis = "source: pidLevel: 20° nose up against 0.00982° nose down asked for, (0.00982° + 20°) × 5 = 100.05 °/s nose down"
+
+# Full right roll, level: it asks for the angle limit, 60°.
+[[case]]
+roll       = "100%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "300 °/s ± 0.001 °/s"
+basis = "source: pidLevel: full stick asks for 670 ÷ 670 × 60° = 60°; level, 60° × 5 = 300 °/s"
+
+# Half right roll, level: about 17°.
+[[case]]
+roll       = "50%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "86.661 °/s ± 0.001 °/s"
+basis = "source: pidLevel: half stick asks for 60° × 193.54 ÷ 670 = 17.332°, times 5 = 86.661 °/s"
+
+# Half back on pitch, level: about 17° nose up.
+[[case]]
+roll       = "0%"
+pitch      = "-50%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "pitch PID setpoint"
+value = "86.097 °/s ± 0.001 °/s"
+basis = "source: pidLevel: half back stick asks for 60° × 192.28 ÷ 670 = 17.219° nose up, times 5 = 86.097 °/s nose up"
+
+# Full right roll, rolled right 90°: the tilt asked for stops at 60°, so it
+# rolls back left.
+[[case]]
+roll       = "100%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 90°, pitch 0°, heading 0°"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "-150 °/s ± 0.001 °/s"
+basis = "source: pidLevel: the tilt asked for is held within angle_limit 60°; (60° − 90°) × 5 = −150 °/s"
+
+# Full right roll with half right yaw: the earth reference cuts the yaw by the
+# cosine of the 60° asked for.
+[[case]]
+roll       = "100%"
+pitch      = "0%"
+yaw        = "50%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "yaw PID setpoint"
+value = "96.772 °/s ± 0.001 °/s"
+basis = "source: pidController's earth reference (angle_earth_ref 100%): the yaw's 193.54 °/s times cos(60°) = 96.772 °/s"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "300 °/s ± 0.001 °/s"
+basis = "source: pidLevel: on the first loop the earth reference has no yaw from the loop before to add, so roll is the tilt's alone: 60° × 5"

@@ -1,0 +1,184 @@
+# In Horizon, the Flight Controller works out Angle's setpoint (see
+# angle-asks-for-a-tilt.toml) and blends it with the Acro one by a strength
+# from 0 to 1, as Betaflight 2026.6.2's `calcHorizonLevelStrength` and
+# `pidLevel` do (src/main/flight/pid.c):
+#
+#   setpoint = Acro's × (1 − strength) + Angle's × strength
+#
+# On the Freestyle 5″'s Tune, Betaflight 2026.6.2's defaults, the strength is
+#
+#   (135° − the tilt) ÷ 135°, at least 0          (horizon_limit_degrees 135)
+#   × (0.75 − the stick) ÷ 0.75, at least 0       (horizon_limit_sticks 75)
+#   × 0.75                                        (horizon_level_strength 75)
+#
+# with the tilt the larger of the roll and pitch angles, and the stick the
+# larger of the roll and pitch sticks' deflection from centre. Level with the
+# sticks centred, it levels at 0.75 of Angle's strength; full stick, or a
+# tilt of 135° or more, flies pure Acro.
+#
+# Centred sticks reach Betaflight at 1500.77 µs over CRSF, 0.00155 of full
+# stick (0.10966 °/s on Actual 70/670), so "centred" gives 0.74845 and not
+# quite 0.75. Half stick reaches it at 0.5126 of full (193.54 °/s), and asks
+# Angle for 17.332°.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop.
+# A fresh Flight Controller that levels from its first frame on starts with
+# the levelling's low-passes settled, Horizon's strength low-pass
+# (`horizon_delay_ms`) and RC smoothing's on the sticks among them, so each
+# case shows the strength and blend of its own sticks and attitude.
+format = 2
+name   = "Horizon blends Angle's levelling into Acro, less the further the Quad tilts and the sticks move"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Horizon"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+# Level, sticks centred.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0.74845 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: level, 1; the centred stick's 0.00155, (0.75 − 0.00155) ÷ 0.75; times 0.75 = 0.74845"
+
+# Rolled right 45°, sticks centred: a third less, and it rolls back left.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 45°, pitch 0°, heading 0°"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0.49897 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: (135° − 45°) ÷ 135° × 0.99793 × 0.75 = 0.49897"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "-112.19 °/s ± 0.01 °/s"
+basis = "source: pidLevel: Acro's 0.10966 °/s × (1 − 0.49897) + Angle's (0.00982° − 45°) × 5 = −224.95 °/s × 0.49897 = −112.19 °/s"
+
+# Pitched nose up 30°, sticks centred.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 0°, pitch 30°, heading 0°"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0.58213 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: the tilt is the larger of roll and pitch, 30°: (135° − 30°) ÷ 135° × 0.99793 × 0.75 = 0.58213"
+
+[[case.expect]]
+what  = "pitch PID setpoint"
+value = "-87.394 °/s ± 0.001 °/s"
+basis = "source: pidLevel: Acro's −0.10966 °/s × 0.41787 + Angle's −(0.00982° + 30°) × 5 × 0.58213 = −87.394 °/s, nose down"
+
+# Half right roll, level: the stick takes two thirds of the strength away.
+[[case]]
+roll       = "50%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0.23739 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: (0.75 − 0.51261) ÷ 0.75 × 0.75 = 0.23739"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "168.17 °/s ± 0.01 °/s"
+basis = "source: pidLevel: Acro's 193.54 °/s × 0.76261 + Angle's 17.332° × 5 × 0.23739 = 168.17 °/s"
+
+# Full right roll: past horizon_limit_sticks, pure Acro.
+[[case]]
+roll       = "100%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0 ± 0"
+basis = "source: calcHorizonLevelStrength: a stick of 1, past 0.75, gives max((0.75 − 1) ÷ 0.75, 0) = 0"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "670 °/s ± 0.001 °/s"
+basis = "source: pidLevel: at strength 0 the Acro setpoint passes alone, the max rate"
+
+# Rolled to 135°: past horizon_limit_degrees, pure Acro.
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+attitude   = "roll 135°, pitch 0°, heading 0°"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0 ± 0.000001"
+basis = "source: calcHorizonLevelStrength: at a tilt of 135°, (135° − 135°) ÷ 135° = 0"
+
+[[case.expect]]
+what  = "roll PID setpoint"
+value = "0.10966 °/s ± 0.0001 °/s"
+basis = "source: pidLevel: at strength 0 the Acro setpoint passes alone"
+
+# A quarter right roll with half right yaw: the earth reference cuts the yaw
+# by the cosine of the tilt asked for, scaled by the strength.
+[[case]]
+roll       = "25%"
+pitch      = "0%"
+yaw        = "50%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "Horizon strength"
+value = "0.49355 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: a quarter stick reaches Betaflight at 0.25645: (0.75 − 0.25645) ÷ 0.75 × 0.75 = 0.49355"
+
+[[case.expect]]
+what  = "yaw PID setpoint"
+value = "193.354 °/s ± 0.001 °/s"
+basis = "source: pidController's earth reference: the yaw's 193.543 °/s times cos(5.1414° × 0.49355) = 193.354 °/s, the tilt asked for (60° × 57.412 ÷ 670) scaled by the strength"

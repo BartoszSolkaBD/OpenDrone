@@ -1,0 +1,84 @@
+# In Angle, letting go of the sticks levels the Quad: centred sticks ask for
+# a level Quad, and the Flight Controller turns it there against the true
+# attitude it reads, as Betaflight 2026.6's Angle does (#51).
+#
+# The Whoop 65 on its imported Tune, mid-air from a hover's "settled"
+# motors, armed, in Angle, with the throttle about where it hovers. Its Tune
+# gives Angle `angle_limit` 55° and `angle_p_gain` 50 (its 4.3 defaults,
+# translated from `level_limit` and `angle_level_strength`). At 1 s the
+# roll stick goes to full right, which asks for the angle limit, 55°, and
+# the Quad leans over and holds there: in Angle full stick is a tilt, not a
+# rotation. At 2 s the stick is let go, and the Quad rolls back to level and
+# stays there, sinking and drifting, but upright.
+format = 2
+name   = "In Angle, the Whoop 65 holds the tilt full stick asks for, and levels itself when the stick is let go"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/whoop-65"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 50 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Angle"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off" },
+  { at = "1 s", roll = "100%" },
+  { at = "2 s", roll = "0%" },
+]
+
+[[expect]]
+what    = "tilt"
+over    = "0 s to 1 s"
+highest = "0° ± 1°"
+basis   = "rule: in Angle, centred sticks ask for a level Quad"
+
+[[expect]]
+what  = "roll"
+over  = "1.5 s to 2 s"
+mean  = "between 45° and 55°"
+basis = "rule: in Angle, full stick asks for a tilt of angle_limit, 55° on the Whoop 65's Tune, and the Quad holds near it instead of rolling on"
+
+[[expect]]
+what  = "roll"
+over  = "1.5 s to 2 s"
+mean  = "50.0° ± 0.5°"
+basis = "observed: over this stretch the Quad is still closing in on 55°, as the I term builds against the ducts' drag: roll is 45.1° at 1.5 s and 52.6° at 2 s, and reaches 55.0° by 5 s with the stick held"
+
+[[expect]]
+what    = "roll"
+over    = "1.5 s to 2 s"
+highest = "55° ± 5°"
+basis   = "rule: in Angle, full stick holds the Quad near angle_limit, 55°, and never rolls it over"
+
+[[expect]]
+what    = "tilt"
+over    = "3 s to 4 s"
+highest = "0° ± 2°"
+basis   = "rule: in Angle, letting go of the sticks levels the Quad"
+
+[[expect]]
+what  = "roll rate"
+at    = "4 s"
+value = "0 °/s ± 2 °/s"
+basis = "rule: in Angle, once level with the sticks centred, the Quad stays level"

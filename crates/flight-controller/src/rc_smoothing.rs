@@ -23,7 +23,9 @@
 //!
 //! A third-order low-pass (PT3) runs every loop on each setpoint, on the
 //! throttle and on feedforward, turning the steps between frames into a
-//! smooth curve. Its cutoff is the Tune's (`rc_smoothing_setpoint_cutoff`,
+//! smooth curve. While Horizon flies, one more on each of the roll and pitch
+//! sticks' deflection smooths the sticks Horizon's strength reads. Its cutoff
+//! is the Tune's (`rc_smoothing_setpoint_cutoff`,
 //! `rc_smoothing_throttle_cutoff`) or, at 0, worked out from the detected
 //! Packet Rate: `rate × 1.5 ÷ (1 + rc_smoothing_auto_factor ÷ 10)`, never
 //! below 15 Hz, cut to whole Hz. At the default auto factor 30 that is 93 Hz
@@ -183,14 +185,23 @@ pub(crate) struct RcSmoothing {
     /// Roll, pitch and yaw's setpoints, then the throttle.
     setpoint: [Lowpass; 4],
     feedforward: [Lowpass; 3],
+    /// Roll and pitch's stick deflection, for Horizon
+    /// (`filterRcDeflection`).
+    deflection_lowpass: [Lowpass; 2],
     /// The newest frame's setpoints and throttle (`rxDataToSmooth`), and
-    /// whether the filters have settled on the first.
+    /// roll and pitch's deflection (`rcDeflection`), and whether the filters
+    /// have settled on the first.
     newest: [f64; 4],
+    newest_deflection: [f64; 2],
     settled: bool,
     /// The smoothed setpoints and throttle, and feedforward, from the last
     /// loop.
     pub smoothed: [f64; 4],
     pub feedforward_smoothed: [f64; 3],
+    /// Roll and pitch's deflection as Horizon reads it, from −1 to +1
+    /// (`getRcDeflection`): smoothed while Horizon flies, with RC smoothing
+    /// on.
+    pub deflection: [f64; 2],
 }
 
 impl RcSmoothing {
@@ -207,10 +218,13 @@ impl RcSmoothing {
             dt: 1.0 / f64::from(loop_hz.max(1)),
             setpoint: core::array::from_fn(|_| Lowpass::pt(3, 0.0)),
             feedforward: core::array::from_fn(|_| Lowpass::pt(3, 0.0)),
+            deflection_lowpass: core::array::from_fn(|_| Lowpass::pt(3, 0.0)),
             newest: [0.0; 4],
+            newest_deflection: [0.0; 2],
             settled: false,
             smoothed: [0.0; 4],
             feedforward_smoothed: [0.0; 3],
+            deflection: [0.0; 2],
         };
         if smoothing.on {
             smoothing.set_cutoffs(detected_hz);
@@ -246,18 +260,29 @@ impl RcSmoothing {
             filter.set_k(k_setpoint);
         }
         self.setpoint[3].set_k(k_throttle);
-        for filter in &mut self.feedforward {
+        for filter in self
+            .feedforward
+            .iter_mut()
+            .chain(&mut self.deflection_lowpass)
+        {
             filter.set_k(k_setpoint);
         }
     }
 
     /// One loop (`processRcSmoothingFilter`): `newest` is the frame's
-    /// setpoints and throttle when a frame's Channels were worked out this
-    /// loop. With RC smoothing on, every filter takes one step; with it off,
-    /// the newest values pass as they are.
-    pub fn apply(&mut self, newest: Option<[f64; 4]>, feedforward: [f64; 3]) {
-        if let Some(newest) = newest {
+    /// setpoints and throttle, and roll and pitch's deflection, when a
+    /// frame's Channels were worked out this loop. With RC smoothing on, every
+    /// filter takes one step, the deflection's only while Horizon flies; with
+    /// it off, the newest values pass as they are.
+    pub fn apply(
+        &mut self,
+        newest: Option<([f64; 4], [f64; 2])>,
+        feedforward: [f64; 3],
+        horizon: bool,
+    ) {
+        if let Some((newest, deflection)) = newest {
             self.newest = newest;
+            self.newest_deflection = deflection;
             if !self.settled {
                 self.settled = true;
                 for (filter, value) in self.setpoint.iter_mut().zip(newest) {
@@ -266,12 +291,23 @@ impl RcSmoothing {
                 for (filter, value) in self.feedforward.iter_mut().zip(feedforward) {
                     filter.settle(value);
                 }
+                for (filter, value) in self.deflection_lowpass.iter_mut().zip(deflection) {
+                    filter.settle(value);
+                }
             }
         }
         if !self.on {
             self.smoothed = self.newest;
             self.feedforward_smoothed = feedforward;
+            self.deflection = self.newest_deflection;
             return;
+        }
+        for (smoothed, (filter, value)) in self.deflection.iter_mut().zip(
+            self.deflection_lowpass
+                .iter_mut()
+                .zip(self.newest_deflection),
+        ) {
+            *smoothed = if horizon { filter.apply(value) } else { value };
         }
         for (smoothed, (filter, value)) in self
             .smoothed
@@ -292,12 +328,19 @@ impl RcSmoothing {
     pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
         f.write_u64(u64::from(self.setpoint_cutoff_hz));
         f.write_u64(u64::from(self.throttle_cutoff_hz));
-        for filter in self.setpoint.iter().chain(&self.feedforward) {
+        for filter in self
+            .setpoint
+            .iter()
+            .chain(&self.feedforward)
+            .chain(&self.deflection_lowpass)
+        {
             filter.write_fingerprint(f);
         }
         f.write_f64s(&self.newest);
+        f.write_f64s(&self.newest_deflection);
         f.write_u64(u64::from(self.settled));
         f.write_f64s(&self.smoothed);
         f.write_f64s(&self.feedforward_smoothed);
+        f.write_f64s(&self.deflection);
     }
 }

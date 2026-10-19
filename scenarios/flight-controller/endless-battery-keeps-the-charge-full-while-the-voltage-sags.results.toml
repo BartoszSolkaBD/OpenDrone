@@ -35,18 +35,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "536ddc3d29a1db34"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "f67af2e1e6d4c9d5"   # the whole state after each of 64000 steps at 8000 Hz, in order
+run  = "6c918a6d66b33ee0"   # the whole state after each of 64000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.8 s" = "61312f8ea0183a73"
-"1.6 s" = "74bcc556b3d83388"
-"2.4 s" = "84a62d6870ebc80e"
-"3.2 s" = "46bce1c0f27f3fa4"
-"4 s" = "7066499d664b1fc1"
-"4.8 s" = "1ad3b767874d5ba5"
-"5.6 s" = "08cdceb12d79217e"
-"6.4 s" = "c20ffd9ab6543e2e"
-"7.2 s" = "4b6cf45308db61b7"
-"8 s" = "4259705a2048a0cd"
+"0.8 s" = "a58ae3326c28dc9c"
+"1.6 s" = "2874941a82bafaef"
+"2.4 s" = "12ecf31335339841"
+"3.2 s" = "d45df1dffee92b83"
+"4 s" = "84d37a73e50c2e6a"
+"4.8 s" = "4ecb98e8da8c05f2"
+"5.6 s" = "f81a07807d211a49"
+"6.4 s" = "6ac5d98d34d03e6a"
+"7.2 s" = "cf8d8b273ec1c612"
+"8 s" = "e3d758419e4956dc"
