@@ -158,10 +158,11 @@ fn dshot_idle_value_becomes_motor_idle_and_level_limit_becomes_angle_limit() {
         got(&limited, "angle_limit"),
         is("45", "diff (was level_limit)")
     );
-    // Nothing reads Angle yet (#51), so it stays under "Not simulated yet".
+    // The Flight Controller reads Angle's limit (#51), so it sits under its
+    // tab.
     assert_eq!(
         limited.setting("angle_limit").unwrap().written,
-        Where::NotSimulatedYet
+        Where::UnderItsTab
     );
 }
 
@@ -202,12 +203,11 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
     }
     // The Flight Controller reads low-throttle TPA (#50), Crash Flip's rate
     // fade (#54) and yaw hold (#49), so the Tune sets them under their tabs.
-    // It doesn't know Angle's earth reference yet; the Tune spells it out
-    // all the same, under "Not simulated yet".
     for name in [
         "tpa_low_rate",
         "crashflip_rate",
         "feedforward_yaw_hold_gain",
+        "angle_earth_ref",
     ] {
         assert_eq!(
             meteor.setting(name).unwrap().written,
@@ -215,10 +215,6 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
             "{name}"
         );
     }
-    assert_eq!(
-        meteor.setting("angle_earth_ref").unwrap().written,
-        Where::NotSimulatedYet
-    );
 }
 
 #[test]
@@ -462,10 +458,8 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
     assert!(known.contains(
         "set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)"
     ));
-    // Then every other setting the translator knows, spelled out, ADR-0008's
-    // values among them.
+    // Then every other setting the translator knows, spelled out.
     for line in [
-        "set angle_earth_ref = 0                # ADR-0008; percent",
         "set failsafe_switch_mode = STAGE1      # 4.3 default",
         "set blackbox_sample_rate = 1/2         # diff",
         "set dyn_notch_q = 350                  # diff",

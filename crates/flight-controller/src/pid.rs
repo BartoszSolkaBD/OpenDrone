@@ -34,7 +34,7 @@
 //!   `max(0, 1 − that ÷ 40 °/s)` of the error; with GYRO, by the error
 //!   between the low-passed setpoint and the gyro, less that quick part. RP
 //!   relaxes roll and pitch, RPY yaw too, and the `_INC` kinds still let I
-//!   shrink at full speed.
+//!   shrink at full speed. In Angle the 40 °/s is 8 °/s.
 //! - **Anti-gravity** (`anti_gravity_gain`): the mixer's throttle speed
 //!   ([`crate::throttle_shaping`]), times the gain, adds 0.34 times itself to
 //!   roll and pitch's I gain, and multiplies their P by 1 plus it times
@@ -73,6 +73,8 @@ const ANTI_GRAVITY_SETPOINT: f64 = 50.0;
 /// I-term relax's setpoint speed, in °/s, at which I stops growing
 /// (`ITERM_RELAX_SETPOINT_THRESHOLD`).
 const ITERM_RELAX_THRESHOLD: f64 = 40.0;
+/// In Angle, I-term relax's threshold is this share of it.
+const ANGLE_RELAX_SHARE: f64 = 0.2;
 /// Dynamic D's low-passes, in Hz: on the gyro's speed, and on the result
 /// (`D_MAX_RANGE_HZ`, `D_MAX_LOWPASS_HZ`).
 const D_MAX_RANGE_HZ: f64 = 85.0;
@@ -115,6 +117,9 @@ pub(crate) struct Modes {
     pub reset_iterm: bool,
     /// In yaw spin recovery.
     pub yaw_spin: bool,
+    /// Flying Angle (`FLIGHT_MODE(ANGLE_MODE)`): I-term relax counts a
+    /// quick stick from a fifth of its usual threshold.
+    pub angle: bool,
 }
 
 /// The PID loop's memory.
@@ -162,6 +167,9 @@ pub(crate) struct Pid {
     pub terms: [Terms; 3],
     /// Each axis's Dynamic D multiplier this loop, from 1 to D max ÷ D.
     pub d_max_factor: [f64; 3],
+    /// Each axis's setpoint this loop compared with the gyro, in °/s
+    /// (`previousPidSetpoint`).
+    pub setpoint: [f64; 3],
 }
 
 impl Pid {
@@ -258,12 +266,13 @@ impl Pid {
             tpa_mode: tune.tpa_mode,
             terms: [Terms::default(); 3],
             d_max_factor: [1.0; 3],
+            setpoint: [0.0; 3],
         }
     }
 
-    /// One loop. `setpoint` is each axis's setpoint after RC smoothing,
-    /// `gyro` the filtered gyro and `feedforward` each axis's feedforward,
-    /// after RC smoothing; `shaping` is what the mixer worked out from its
+    /// One loop. `setpoint` is each axis's setpoint after RC smoothing and
+    /// any levelling, `gyro` the filtered gyro and `feedforward` each axis's
+    /// feedforward, after RC smoothing (0 on an axis Angle holds); `shaping` is what the mixer worked out from its
     /// throttle the loop before, and `modes` what else the loop is told.
     pub fn step(
         &mut self,
@@ -277,6 +286,7 @@ impl Pid {
             stabilising,
             reset_iterm,
             yaw_spin,
+            angle,
         } = modes;
         let i_boost = shaping.anti_gravity * ANTI_GRAVITY_KI;
         // The D term's low-passes run first, on every axis
@@ -297,9 +307,10 @@ impl Pid {
             } else {
                 setpoint[axis]
             };
+            self.setpoint[axis] = target;
             let error = target - gyro[axis];
             let previous_i = self.iterm[axis];
-            let i_error = self.relax(axis, first, previous_i, target, gyro[axis], error);
+            let i_error = self.relax(axis, first, previous_i, target, gyro[axis], error, angle);
             let p_tpa = match self.tpa_mode {
                 TpaMode::Pd => shaping.tpa,
                 TpaMode::D => 1.0,
@@ -365,7 +376,8 @@ impl Pid {
     /// the axis's setpoint (after yaw spin recovery), its gyro reading and
     /// error, and its I term from the loop before. The setpoint's low-pass
     /// runs on every axis whenever relax is on, and settles on the first
-    /// loop's setpoint.
+    /// loop's setpoint. In Angle its threshold is a fifth.
+    #[allow(clippy::too_many_arguments)]
     fn relax(
         &mut self,
         axis: usize,
@@ -374,6 +386,7 @@ impl Pid {
         setpoint: f64,
         gyro: f64,
         error: f64,
+        angle: bool,
     ) -> f64 {
         let Some(lowpass) = self.relax_lowpass.as_mut() else {
             return error;
@@ -387,7 +400,12 @@ impl Pid {
         if axis == 2 && !on_yaw {
             return error;
         }
-        let factor = functions::max(0.0, 1.0 - quick / ITERM_RELAX_THRESHOLD);
+        let threshold = if angle {
+            ITERM_RELAX_THRESHOLD * ANGLE_RELAX_SHARE
+        } else {
+            ITERM_RELAX_THRESHOLD
+        };
+        let factor = functions::max(0.0, 1.0 - quick / threshold);
         let shrinking = (previous_i > 0.0 && error < 0.0) || (previous_i < 0.0 && error > 0.0);
         let lets_shrink = matches!(self.iterm_relax, ItermRelax::RpInc | ItermRelax::RpyInc);
         if lets_shrink && shrinking {
@@ -460,6 +478,7 @@ impl Pid {
             f.write_u64(u64::from(settled));
         }
         f.write_f64s(&self.d_max_factor);
+        f.write_f64s(&self.setpoint);
         for terms in self.terms {
             f.write_f64s(&[terms.p, terms.i, terms.d, terms.f, terms.sum]);
         }

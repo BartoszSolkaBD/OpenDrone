@@ -1,0 +1,58 @@
+# Results of horizon-levelling-comes-back-slowly.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Horizon's levelling fades at once when the sticks move, and comes back over horizon_delay_ms"
+
+[[expect]]
+what     = "Horizon strength at 0.5 s"
+basis    = "Source"
+expected = "0.74845 ± 0.00001"
+measured = "0.748"
+
+[[expect]]
+what     = "Horizon strength at 0.55 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "Horizon strength at 0.65 s"
+basis    = "Source"
+expected = "0.6257 ± 0.003"
+measured = "0.623"
+
+[[expect]]
+what     = "Horizon strength at 1.1 s"
+basis    = "Source"
+expected = "0.6985 ± 0.003"
+measured = "0.698"
+
+[[expect]]
+what     = "Horizon strength at 3 s"
+basis    = "Source"
+expected = "0.7472 ± 0.0005"
+measured = "0.747"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "50ba44076ca68296"   # the whole state after each of 24000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.3 s" = "3b9291627330d16a"
+"0.6 s" = "f07a7ad05996be95"
+"0.9 s" = "b67ee68892c4aea5"
+"1.2 s" = "9a56700721fc974e"
+"1.5 s" = "b4d5ae97ac83b680"
+"1.8 s" = "52a0fcf56321fd1f"
+"2.1 s" = "150e5c1154e7cb1e"
+"2.4 s" = "ba22088b6888c131"
+"2.7 s" = "4100d8479400e831"
+"3 s" = "842aaa9d0e6d5b6d"

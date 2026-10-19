@@ -77,6 +77,9 @@ set tpa_rate = 65                      # 2026.6.2 default; percent
 set tpa_breakpoint = 1350              # 2026.6.2 default; µs
 set throttle_boost = 5                 # 2026.6.2 default; 0 is off
 set motor_output_limit = 100           # 2026.6.2 default; percent
+set angle_p_gain = 50                  # 2026.6.2 default
+set angle_limit = 60                   # 2026.6.2 default; degrees
+set horizon_level_strength = 75        # 2026.6.2 default
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 2026.6.2 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 2026.6.2 default
@@ -90,6 +93,14 @@ set tpa_low_rate = 20                  # 2026.6.2 default; percent; 0 is off
 set tpa_low_breakpoint = 1050          # 2026.6.2 default; µs
 set tpa_low_always = OFF               # 2026.6.2 default
 set throttle_boost_cutoff = 15         # 2026.6.2 default; Hz
+set angle_feedforward = 50             # 2026.6.2 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6.2 default; ms
+set angle_earth_ref = 100              # 2026.6.2 default; percent
+set horizon_limit_sticks = 75          # 2026.6.2 default
+set horizon_limit_degrees = 135        # 2026.6.2 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6.2 default
+set horizon_delay_ms = 500             # 2026.6.2 default; ms
+set level_race_mode = OFF              # 2026.6.2 default
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 2026.6.2 default
