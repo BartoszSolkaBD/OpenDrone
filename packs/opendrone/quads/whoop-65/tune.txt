@@ -27,6 +27,22 @@ set runaway_takeoff_prevention = ON    # 4.3 default
 set runaway_takeoff_deactivate_delay = 500 # 4.3 default; ms
 set runaway_takeoff_deactivate_throttle_percent = 20 # 4.3 default; percent
 
+# Power & Battery
+set current_meter = ADC                # hand-set: the BETAFPVF411 board's default, which a 4.3 diff leaves out (#31 §3)
+set vbat_min_cell_voltage = 330        # 4.3 default; hundredths of a volt
+set vbat_max_cell_voltage = 435        # diff; hundredths of a volt
+set vbat_warning_cell_voltage = 350    # 4.3 default; hundredths of a volt
+# Power & Battery, CLI only
+set vbat_full_cell_voltage = 410       # 4.3 default; hundredths of a volt
+set force_battery_cell_count = 0       # 4.3 default; 0 works it out
+set vbat_hysteresis = 1                # 4.3 default; hundredths of a volt
+set vbat_detect_cell_voltage = 300     # 4.3 default; hundredths of a volt
+set use_vbat_alerts = ON               # 4.3 default
+set vbat_display_lpf_period = 30       # 4.3 default; tenths of a second
+set ibat_lpf_period = 10               # 4.3 default; tenths of a second
+set vbat_duration_for_warning = 0      # 4.3 default; tenths of a second
+set vbat_duration_for_critical = 0     # 4.3 default; tenths of a second
+
 # Failsafe
 set rx_min_usec = 885                  # 4.3 default; µs
 set rx_max_usec = 2115                 # 4.3 default; µs
@@ -69,6 +85,9 @@ set tpa_rate = 70                      # diff; percent
 set tpa_breakpoint = 1350              # 4.3 default; µs
 set throttle_boost = 5                 # 4.3 default; 0 is off
 set motor_output_limit = 100           # 4.3 default; percent
+set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
+set angle_limit = 55                   # 4.3 default (was level_limit); degrees
+set horizon_level_strength = 50        # 4.3 default
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 4.3 default
@@ -82,6 +101,14 @@ set tpa_low_rate = 0                   # ADR-0008; percent; 0 is off
 set tpa_low_breakpoint = 1050          # 2026.6 default; µs
 set tpa_low_always = OFF               # 2026.6 default
 set throttle_boost_cutoff = 15         # 4.3 default; Hz
+set angle_feedforward = 50             # 2026.6 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
+set angle_earth_ref = 0                # ADR-0008; percent
+set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
+set horizon_limit_degrees = 135        # 2026.6 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6 default
+set horizon_delay_ms = 500             # 2026.6 default; ms
+set level_race_mode = OFF              # 4.3 default
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 4.3 default
@@ -117,6 +144,7 @@ set airmode_start_throttle_percent = 25 # 4.3 default
 
 # Motors
 set motor_pwm_protocol = DSHOT300      # diff
+set dshot_bidir = ON                   # diff
 set motor_idle = 600                   # diff (was dshot_idle_value); hundredths of a percent
 set motor_poles = 12                   # diff; must match [motors] poles
 set yaw_motors_reversed = OFF          # 4.3 default; must match [props] direction
@@ -137,24 +165,9 @@ set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro
 set failsafe_switch_mode = STAGE1      # 4.3 default
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
 set failsafe_stick_threshold = 30      # 4.3 default; percent
-# PID Tuning
-set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
-set angle_limit = 55                   # 4.3 default (was level_limit); degrees
-set horizon_level_strength = 50        # 4.3 default
-set angle_feedforward = 50             # 2026.6 default
-set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
-set angle_earth_ref = 0                # ADR-0008; percent
-set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
-set horizon_limit_degrees = 135        # 2026.6 default; degrees
-set horizon_ignore_sticks = OFF        # 2026.6 default
-set horizon_delay_ms = 500             # 2026.6 default; ms
 # PID Tuning, filters
 set dyn_notch_q = 350                  # diff
 set dyn_notch_min_hz = 130             # diff; Hz
 set dyn_notch_max_hz = 600             # 4.3 default; Hz
 # Blackbox
 set blackbox_sample_rate = 1/2         # diff
-
-# Not simulated yet, and not known to OpenDrone: the other settings the diff sets.
-set dshot_bidir = ON                   # diff
-set vbat_max_cell_voltage = 435        # diff

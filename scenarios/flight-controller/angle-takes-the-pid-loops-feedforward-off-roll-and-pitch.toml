@@ -1,0 +1,71 @@
+# In Angle, roll and pitch are wholly the levelling's, so the PID loop's own
+# feedforward (its F term) is 0 on them, as in Betaflight 2026.6.2's
+# `pidController` (src/main/flight/pid.c): the stick's speed already reaches
+# the levelling through Angle's own feedforward (`angle_feedforward`), which
+# moves the tilt asked for. Yaw stays in Acro, so its F term works as ever.
+#
+# The Flight Controller alone, in Angle, level, on the Freestyle 5″'s Tune
+# (Betaflight 2026.6.2's defaults). From 0.5 s to 0.7 s the roll, pitch and
+# yaw sticks ramp from centre to 50%; in Acro each F term would be about 20
+# while they move (see feedforward-at-250-hz.toml).
+format = 2
+name   = "In Angle, the PID loop's F term is 0 on roll and pitch, and yaw keeps its own"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Angle"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "0%", pitch = "0%", yaw = "0%" },
+  { at = "0.7 s", roll = "ramp to 50%", pitch = "ramp to 50%", yaw = "ramp to 50%" },
+]
+
+[[expect]]
+what    = "roll F term"
+over    = "0.5 s to 0.8 s"
+highest = "0 ± 0"
+basis   = "source: pidController: in Angle, an axis the levelling holds gets no PID feedforward (pidSetpointDelta = 0)"
+
+[[expect]]
+what   = "roll F term"
+over   = "0.5 s to 0.8 s"
+lowest = "0 ± 0"
+basis  = "source: pidController: in Angle, an axis the levelling holds gets no PID feedforward (pidSetpointDelta = 0)"
+
+[[expect]]
+what    = "pitch F term"
+over    = "0.5 s to 0.8 s"
+highest = "0 ± 0"
+basis   = "source: pidController: in Angle, an axis the levelling holds gets no PID feedforward (pidSetpointDelta = 0)"
+
+[[expect]]
+what   = "pitch F term"
+over   = "0.5 s to 0.8 s"
+lowest = "0 ± 0"
+basis  = "source: pidController: in Angle, an axis the levelling holds gets no PID feedforward (pidSetpointDelta = 0)"
+
+[[expect]]
+what  = "yaw F term"
+over  = "0.55 s to 0.7 s"
+mean  = "between 5 and 40"
+basis = "source: pidController: yaw stays in Acro and keeps its feedforward from calculateFeedforward, pushing the nose right while the yaw stick moves right"

@@ -246,20 +246,6 @@ fn what_a_flight_controller_loop_did_cant_be_measured_before_the_first_loop() {
 }
 
 #[test]
-fn angle_and_horizon_wait_for_their_ticket() {
-    let text = tracer().replacen(
-        "flight_mode       = \"Acro\"",
-        "flight_mode       = \"Angle\"",
-        1,
-    );
-    let found = failures(&report(&fixture("angle-assist", &text)));
-    assert_eq!(found.len(), 1, "{found:#?}");
-    assert!(found[0].ends_with(
-        "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)"
-    ));
-}
-
-#[test]
 fn endless_battery_runs_in_a_flight_scenario_but_not_with_the_flight_controller_alone() {
     // Endless Battery is the Simulation's Assist, on session state (#13, #57).
     let flying = tracer().replacen("endless_battery = \"off\"", "endless_battery = \"on\"", 1);

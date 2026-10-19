@@ -1,0 +1,76 @@
+# Results of fail-safe-shows-1-5-s-after-the-link-is-lost.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "1.5 s after the Radio Link is lost, the warnings read FAIL SAFE and the Flight Mode reads !FS!"
+
+[[expect]]
+what     = "Flight Mode at 1 s"
+basis    = "Source"
+expected = "AIR"
+measured = "AIR"
+
+[[expect]]
+what     = "Link Quality at 1 s"
+basis    = "Source"
+expected = "7:100"
+measured = "7:100"
+
+[[expect]]
+what     = "Link Quality reads 7: 0, first over 1 s to 2 s"
+basis    = "Source"
+expected = "between 0.25 s and 0.334 s"
+measured = "0.250 s"
+
+[[expect]]
+what     = "Link Quality blinks at 1.5 s"
+basis    = "Source"
+expected = "yes"
+measured = "yes"
+
+[[expect]]
+what     = "warnings reads FAIL SAFE, first over 1 s to 3 s"
+basis    = "Source"
+expected = "between 1.497 s and 1.5917 s"
+measured = "1.50 s"
+
+[[expect]]
+what     = "Flight Mode reads !FS!, first over 1 s to 3 s"
+basis    = "Source"
+expected = "between 1.497 s and 1.5917 s"
+measured = "1.50 s"
+
+[[expect]]
+what     = "warnings blinks at 2.6 s"
+basis    = "Source"
+expected = "yes"
+measured = "yes"
+
+[[expect]]
+what     = "Flight Mode at 3.5 s"
+basis    = "Source"
+expected = "!FS!"
+measured = "!FS!"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "431e7fc940cfdb80"   # the whole state after each of 28000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.35 s" = "1a96207e4bcd2d0f"
+"0.7 s" = "999e5d1d607bb8be"
+"1.05 s" = "a232d97249c1b0ab"
+"1.4 s" = "84efe67768bb4ee3"
+"1.75 s" = "32d34cd0b90b8312"
+"2.1 s" = "565ce2eeb1587edc"
+"2.45 s" = "80fe3793339cef1a"
+"2.8 s" = "0aba21a2a51f759c"
+"3.15 s" = "9ba663f2b2b4025d"
+"3.5 s" = "61b85d63619b8a71"

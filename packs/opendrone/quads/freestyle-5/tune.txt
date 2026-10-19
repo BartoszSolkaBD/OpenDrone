@@ -19,6 +19,22 @@ set runaway_takeoff_prevention = ON    # 2026.6.2 default
 set runaway_takeoff_deactivate_delay = 500 # 2026.6.2 default; ms of stable flight before it switches off
 set runaway_takeoff_deactivate_throttle_percent = 20 # 2026.6.2 default; percent
 
+# Power & Battery
+set current_meter = ADC                # hand-set: a typical 5″ stack measures its current (#31 §3); Betaflight's own default is VIRTUAL
+set vbat_min_cell_voltage = 330        # 2026.6.2 default; hundredths of a volt: LAND NOW below this a cell
+set vbat_max_cell_voltage = 430        # 2026.6.2 default; hundredths of a volt: a full cell, for the cell count
+set vbat_warning_cell_voltage = 350    # 2026.6.2 default; hundredths of a volt: LOW BATTERY below this a cell
+# Power & Battery, CLI only
+set vbat_full_cell_voltage = 410       # 2026.6.2 default; hundredths of a volt
+set force_battery_cell_count = 0       # 2026.6.2 default; 0 works it out
+set vbat_hysteresis = 1                # 2026.6.2 default; hundredths of a volt
+set vbat_detect_cell_voltage = 300     # 2026.6.2 default; hundredths of a volt
+set use_vbat_alerts = ON               # 2026.6.2 default
+set vbat_display_lpf_period = 30       # 2026.6.2 default; tenths of a second
+set ibat_lpf_period = 10               # 2026.6.2 default; tenths of a second
+set vbat_duration_for_warning = 0      # 2026.6.2 default; tenths of a second
+set vbat_duration_for_critical = 0     # 2026.6.2 default; tenths of a second
+
 # Failsafe
 set rx_min_usec = 885                  # 2026.6.2 default; µs: a Channel below this is invalid, and Failsafe's stage 1 throttle
 set rx_max_usec = 2115                 # 2026.6.2 default; µs: a Channel above this is invalid
@@ -61,6 +77,9 @@ set tpa_rate = 65                      # 2026.6.2 default; percent
 set tpa_breakpoint = 1350              # 2026.6.2 default; µs
 set throttle_boost = 5                 # 2026.6.2 default; 0 is off
 set motor_output_limit = 100           # 2026.6.2 default; percent
+set angle_p_gain = 50                  # 2026.6.2 default
+set angle_limit = 60                   # 2026.6.2 default; degrees
+set horizon_level_strength = 75        # 2026.6.2 default
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 2026.6.2 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 2026.6.2 default
@@ -74,6 +93,14 @@ set tpa_low_rate = 20                  # 2026.6.2 default; percent; 0 is off
 set tpa_low_breakpoint = 1050          # 2026.6.2 default; µs
 set tpa_low_always = OFF               # 2026.6.2 default
 set throttle_boost_cutoff = 15         # 2026.6.2 default; Hz
+set angle_feedforward = 50             # 2026.6.2 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6.2 default; ms
+set angle_earth_ref = 100              # 2026.6.2 default; percent
+set horizon_limit_sticks = 75          # 2026.6.2 default
+set horizon_limit_degrees = 135        # 2026.6.2 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6.2 default
+set horizon_delay_ms = 500             # 2026.6.2 default; ms
+set level_race_mode = OFF              # 2026.6.2 default
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 2026.6.2 default
@@ -109,6 +136,7 @@ set airmode_start_throttle_percent = 25 # 2026.6.2 default
 
 # Motors
 set motor_pwm_protocol = DSHOT600      # 2026.6.2 default
+set dshot_bidir = OFF                  # 2026.6.2 default; no RPM from the ESCs, so the OSD's motor RPM reads blank
 set motor_idle = 550                   # 2026.6.2 default; hundredths of a percent: 5.5%
 set motor_poles = 14                   # 2026.6.2 default; must match [motors] poles (the Velox V2207 V3 is 12N14P)
 set yaw_motors_reversed = OFF          # 2026.6.2 default; must match [props] direction, props-in

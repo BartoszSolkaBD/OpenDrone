@@ -18,7 +18,8 @@
 //! - what Betaflight makes of each Radio Link frame: the [`Channels`] in µs,
 //!   the stick commands with the deadband, and the throttle through its
 //!   curve;
-//! - a built-in Modes table with Arm on AUX1 and Crash Flip on AUX3, and
+//! - a built-in Modes table with Arm on AUX1, the Flight Mode on AUX2 and
+//!   Crash Flip on AUX3, and
 //!   Betaflight's arming checks (throttle low, tilt within `small_angle`
 //!   unless the Crash Flip switch is on, the ESCs' ready beep in place of
 //!   Betaflight's boot grace, the Radio Link and Failsafe, and the Arm switch
@@ -43,11 +44,21 @@
 //!   ([`dshot_command`]);
 //! - yaw spin recovery (#26 §4, `yaw_spin`) and runaway takeoff prevention
 //!   (`runaway`);
+//! - the battery as Betaflight reads it ([`battery`]): the voltage through the
+//!   board's ADC and its low-pass, the cell count, LOW and CRITICAL, and the
+//!   current and mAh where the Tune's `current_meter` reads them;
+//! - the beeper ([`beeper`]), and what else Betaflight's OSD reads each loop:
+//!   the switches, Link Quality and ELRS's rate code, and each motor's RPM
+//!   over bidirectional DShot, all in the [`DebugRecord`];
+//! - Betaflight's OSD logic ([`osd`]), which runs beside the Simulation on
+//!   the loops' records and never feeds back into a flight (ADR-0022);
 //! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
-//!   a 2026.6 Tune, and the pilot's pasted Rates and `aux` switches.
-//!
-//! Angle and Horizon (#51), the OSD paste and the OSD logic (#59) arrive with
-//! their tickets.
+//!   a 2026.6 Tune, and the pilot's pasted Rates, `aux` switches and OSD
+//!   layout;
+//! - Angle and Horizon, the self-levelling Flight Modes, picked on AUX2
+//!   through the built-in Modes table (Angle too while Failsafe's stage 2
+//!   runs), levelling against the true attitude the sensor readings give
+//!   (`level`).
 //!
 //! # Power-up
 //!
@@ -75,18 +86,21 @@
 //!    `airmode_start_throttle_percent` after arming; runaway takeoff
 //!    prevention adds up stable flight; the Arm switch arms or (after more
 //!    than three frames off) disarms, and the Crash Flip switch is read as
-//!    it arms; the sticks become commands, and the Rates turn them into each
-//!    axis's setpoint; the arming checks run, and the Crash Flip switch going
-//!    off disarms.
+//!    it arms; the Flight Mode is picked; the sticks become commands, and the
+//!    Rates turn them into each axis's setpoint; the arming checks run, and
+//!    the Crash Flip switch going off disarms.
 //!    With the Channels, the frame's gap is timed for the detected Packet
 //!    Rate.
 //! 4. The gyro reading passes through its low-passes.
 //! 5. If the Channels were worked out again, the detected Packet Rate moves
 //!    on (retuning RC smoothing and feedforward every third frame that
 //!    counts) and feedforward is worked out for the frame. Then RC smoothing
-//!    takes a step on the setpoints, the throttle and feedforward.
+//!    takes a step on the setpoints, the throttle and feedforward, and in
+//!    Horizon on the roll and pitch sticks.
 //! 6. Yaw spin recovery watches the filtered gyro's yaw rate.
-//! 7. The PID loop compares each smoothed setpoint with the filtered gyro,
+//! 7. In Angle and Horizon, the levelling turns the smoothed setpoints into
+//!    the ones the PID loop works to (`level`). The PID loop compares each
+//!    setpoint with the filtered gyro,
 //!    with the TPA factor and anti-gravity the mixer worked out the loop
 //!    before; then runaway takeoff prevention checks the PID sums.
 //! 8. The smoothed throttle passes the pilot's throttle limit. Outside Crash
@@ -96,6 +110,12 @@
 //!    in Crash Flip the sticks drive the motors instead. A spin direction
 //!    command queued by arming or disarming goes out in their place
 //!    ([`dshot_command`]).
+//! 9. The battery's tasks run when due, 50 times a second for the voltage
+//!    and current and 5 for its state ([`battery`]); then the beeper is told
+//!    what to beep (the "gyro calibrated" beeps on the first loop, arming,
+//!    disarming, `RX_LOST`, the warning beeps for a refused arm, Crash Flip,
+//!    a low or critical battery) and takes its 100 Hz step ([`beeper`]).
+//!    None of it changes the motor commands.
 //!
 //! # Directions
 //!
@@ -130,6 +150,8 @@
 //! [ADR-0022]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0022-osd-worked-out-beside-the-simulation.md
 
 pub mod arming;
+pub mod battery;
+pub mod beeper;
 mod channels;
 pub mod cli;
 pub mod dshot_command;
@@ -137,7 +159,9 @@ pub mod failsafe;
 mod feedforward;
 mod filter;
 mod gyro_filter;
+mod level;
 mod mixer;
+pub mod osd;
 mod pid;
 pub mod rates;
 mod rc_smoothing;
@@ -150,10 +174,13 @@ mod yaw_spin;
 use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotRates, Vec3};
 
 use arming::Arming;
+use battery::{Battery, BatteryAlarm};
+use beeper::{Beeper, BeeperMode};
 use dshot_command::DshotCommands;
 use failsafe::{Failsafe, Receiver};
 use feedforward::{Feedforward, FeedforwardFrame};
 use gyro_filter::{DynamicThrottle, GyroFilters};
+use level::Levelling;
 use mixer::CrashFlipInputs;
 use pid::{Modes, Pid};
 use rc_smoothing::{PacketRate, RcSmoothing};
@@ -163,14 +190,16 @@ use throttle_shaping::ThrottleShaping;
 use yaw_spin::YawSpin;
 
 pub use arming::ArmingBlocks;
+pub use battery::{BatteryReading, BatteryReadings, BatteryState};
+pub use beeper::BeeperReadings;
 pub use channels::{Channel, Channels};
 pub use failsafe::FailsafePhase;
 pub use mixer::{DSHOT_HIGHEST, DSHOT_LOWEST};
 pub use pid::Terms;
 pub use rates::{Axis, AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use tune::{
-    FailsafeProcedure, FeedforwardAveraging, Gains, ItermRelax, ItermRelaxType, LowpassType,
-    MixerType, MotorProtocol, TpaMode, Tune, TuneProblems, YawSpinRecovery,
+    CurrentMeter, FailsafeProcedure, FeedforwardAveraging, Gains, ItermRelax, ItermRelaxType,
+    LowpassType, MixerType, MotorProtocol, TpaMode, Tune, TuneProblems, YawSpinRecovery,
 };
 
 /// What a real board's sensors read, which is all the Flight Controller
@@ -189,6 +218,36 @@ pub struct SensorReadings {
     /// the ESCs' start-up after power-up, about 1.7 s (#32 §4). Running ESCs
     /// (a mid-air start) are ready.
     pub escs_ready: bool,
+    /// What the board reads of its battery.
+    pub battery: BatteryReading,
+    /// Each motor's speed, in revolutions a minute, as its ESC reports it
+    /// over bidirectional DShot, in Betaflight's motor order. The Flight
+    /// Controller reads it only with the Tune's `dshot_bidir` on.
+    pub motor_rpm: [f64; 4],
+}
+
+impl SensorReadings {
+    /// Readings with no battery and the motors still, such as a fresh Flight
+    /// Controller's at power-up, which reads only the gyro before its first
+    /// loop.
+    pub fn still(gyro: Vec3, attitude: Attitude, escs_ready: bool) -> SensorReadings {
+        SensorReadings {
+            gyro,
+            attitude,
+            escs_ready,
+            battery: BatteryReading::default(),
+            motor_rpm: [0.0; 4],
+        }
+    }
+}
+
+/// The Flight Mode the Flight Controller flies, as its OSD names it: Acro,
+/// or Angle and Horizon, which level the Quad on their own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlightMode {
+    Acro,
+    Angle,
+    Horizon,
 }
 
 /// Failsafe as one loop left it, for the OSD and Scenarios.
@@ -237,9 +296,16 @@ pub struct DebugRecord {
     /// nose down, yaw nose left positive. This is the newest frame's, before
     /// any smoothing (Betaflight's `rawSetpoint`).
     pub setpoint: [f64; 3],
-    /// Each axis's setpoint as the PID loop uses it: after RC smoothing,
-    /// when it's on (`getSetpointRate`). In the same axes and °/s.
+    /// Each axis's setpoint after RC smoothing, when it's on
+    /// (`getSetpointRate`). In the same axes and °/s.
     pub smoothed_setpoint: [f64; 3],
+    /// Each axis's setpoint as the PID loop compared it with the gyro: after
+    /// RC smoothing and, in Angle and Horizon, the levelling, and 0 on yaw in
+    /// yaw spin recovery (`pidGetPreviousSetpoint`, which Blackbox logs as
+    /// the setpoint). In the same axes and °/s.
+    pub pid_setpoint: [f64; 3],
+    /// How strongly Horizon levelled, from 0 to 1: 0 outside Horizon.
+    pub horizon_strength: f64,
     /// The gyro as the sensor reads it, in Betaflight's axes and °/s
     /// (Blackbox's `gyroUnfilt`).
     pub gyro: [f64; 3],
@@ -278,6 +344,34 @@ pub struct DebugRecord {
     /// The flight has counted as stable since power-up, so runaway takeoff
     /// prevention has switched itself off (`runawayTakeoffCheckDisabled`).
     pub flight_stable: bool,
+    /// The battery: its voltage, cell count and state, and the current and
+    /// mAh drawn where the Tune's `current_meter` reads them.
+    pub battery: BatteryReadings,
+    /// The beeper: what it plays, and how many beeps have started.
+    pub beeper: BeeperReadings,
+    /// The loop's moment on the Flight Controller's own clock, in whole µs
+    /// since power-up (`micros()`): what the OSD's timers count.
+    pub since_power_up_us: u64,
+    /// The Arm switch as the Modes table reads it, as of the last frame
+    /// (`IS_RC_MODE_ACTIVE(BOXARM)`).
+    pub arm_switch: bool,
+    /// The Crash Flip switch the same way (`BOXCRASHFLIP`).
+    pub crash_flip_switch: bool,
+    /// The sticks as Betaflight reads them, in µs: roll, pitch, yaw and
+    /// throttle (`rcData`).
+    pub sticks_us: [f64; 4],
+    /// The throttle in whole percent above `min_check`
+    /// (`calculateThrottlePercent`), as the OSD shows it.
+    pub throttle_percent: u8,
+    pub flight_mode: FlightMode,
+    /// The Radio Link's Link Quality, in percent, as ELRS reports it over
+    /// CRSF: 100 while frames arrive, 0 once none has for 250 ms.
+    pub link_quality: u8,
+    /// ELRS's code for the Packet Rate (`rf_Mode`), such as 7 for 250 Hz.
+    pub rf_mode: u8,
+    /// Each motor's RPM as bidirectional DShot reports it, in Betaflight's
+    /// motor order; `None` with the Tune's `dshot_bidir` off.
+    pub motor_rpm: Option<[u32; 4]>,
 }
 
 impl DebugRecord {
@@ -322,6 +416,10 @@ pub struct FlightController {
     arming: Arming,
     /// Airmode's start: the throttle passed its threshold since arming.
     throttle_raised: bool,
+    /// The Flight Mode the last frame picked (Acro before the first), and
+    /// Angle and Horizon's work.
+    flight_mode: FlightMode,
+    levelling: Levelling,
     /// Whether the PID loop works, and whether I is emptied each loop
     /// (`pidStabilisationState`, `pidSetItermReset`).
     stabilising: bool,
@@ -333,6 +431,12 @@ pub struct FlightController {
     /// `crashflip_rate`'s fade; `None` outside Crash Flip.
     tilt_at_start: Option<f64>,
     dshot: DshotCommands,
+    battery: Battery,
+    beeper: Beeper,
+    /// When the last Radio Link frame arrived, in µs since power-up: a
+    /// fresh Flight Controller's link counts as settled, as if one just had.
+    last_frame_us: u64,
+    rf_mode: u8,
     last: DebugRecord,
 }
 
@@ -365,6 +469,13 @@ impl FlightController {
         let receiver = Receiver::at_power_up(&tune);
         let failsafe = Failsafe::at_power_up(&tune);
         let yaw_spin = YawSpin::new(&tune, &rates);
+        let battery = Battery::new(&tune);
+        let beeper = Beeper::new();
+        let levelling = Levelling::new(
+            &tune,
+            [rates.max_rate(Axis::Roll), rates.max_rate(Axis::Pitch)],
+            loop_hz,
+        );
         FlightController {
             last: DebugRecord {
                 armed,
@@ -372,6 +483,8 @@ impl FlightController {
                 failsafe: failsafe_readings(&failsafe, &receiver),
                 setpoint: [0.0; 3],
                 smoothed_setpoint: [0.0; 3],
+                pid_setpoint: [0.0; 3],
+                horizon_strength: 0.0,
                 gyro,
                 filtered_gyro: gyro,
                 detected_packet_rate: packet_rate.detected_hz,
@@ -384,6 +497,22 @@ impl FlightController {
                 crash_flip: false,
                 yaw_spin_recovery: false,
                 flight_stable: false,
+                battery: battery.readings,
+                beeper: beeper.readings(),
+                since_power_up_us: 0,
+                arm_switch: armed,
+                crash_flip_switch: false,
+                sticks_us: [
+                    receiver.data.roll,
+                    receiver.data.pitch,
+                    receiver.data.yaw,
+                    receiver.data.throttle,
+                ],
+                throttle_percent: 0,
+                flight_mode: FlightMode::Acro,
+                link_quality: 100,
+                rf_mode: elrs_rf_mode(packet_rate_hz),
+                motor_rpm: None,
             },
             tune,
             rates,
@@ -402,6 +531,8 @@ impl FlightController {
             throttle_shaping,
             arming,
             throttle_raised: false,
+            flight_mode: FlightMode::Acro,
+            levelling,
             stabilising: false,
             reset_iterm: true,
             pid,
@@ -409,6 +540,10 @@ impl FlightController {
             runaway: Runaway::default(),
             tilt_at_start: None,
             dshot: DshotCommands::new(loop_hz),
+            battery,
+            beeper,
+            last_frame_us: 0,
+            rf_mode: elrs_rf_mode(packet_rate_hz),
         }
     }
 
@@ -447,11 +582,18 @@ impl FlightController {
         let now_us = self.loops * 1_000_000 / u64::from(self.loop_hz);
         let now_ms = now_us / 1000;
         let before = (self.arming.armed, self.arming.crash_flip);
-        let changed = self.receiver.look(now_us, frame);
-        self.failsafe.check(now_ms, &mut self.arming);
-        if changed {
-            self.receive(now_us, readings);
+        if frame.is_some() {
+            self.last_frame_us = now_us;
         }
+        let changed = self.receiver.look(now_us, frame);
+        // This loop works out the first frame since power-up.
+        let first_frame = changed && self.command.is_none();
+        let rx_lost = self.failsafe.check(now_ms, &mut self.arming);
+        let warning = if changed {
+            self.receive(now_us, readings)
+        } else {
+            None
+        };
         let unfiltered = degrees(readings.gyro);
         let gyro = self.gyro_filters.apply(unfiltered);
         self.process_sticks(changed);
@@ -464,15 +606,24 @@ impl FlightController {
         self.throttle_shaping.settle(throttle);
         let shaping = self.throttle_shaping.shaping();
         self.yaw_spin.check(gyro[2], now_us);
+        let levelled = self.levelling.step(level::Inputs {
+            mode: self.flight_mode,
+            setpoint: smoothed_setpoint,
+            feedforward: self.rc_smoothing.feedforward_smoothed,
+            deflection: self.rc_smoothing.deflection,
+            attitude: readings.attitude,
+            first_frame,
+        });
         self.pid.step(
-            smoothed_setpoint,
+            levelled.setpoint,
             gyro,
-            self.rc_smoothing.feedforward_smoothed,
+            levelled.feedforward,
             shaping,
             Modes {
                 stabilising: self.stabilising,
                 reset_iterm: self.reset_iterm,
                 yaw_spin: self.yaw_spin.active,
+                angle: self.flight_mode == FlightMode::Angle,
             },
         );
         let sums = self.pid.terms.map(|terms| terms.sum);
@@ -530,12 +681,17 @@ impl FlightController {
         };
         let (sent, direction) = self.dshot.output(dshot);
         let motors = sent.map(|dshot| MotorCommand { dshot, direction });
+        let alarm = self.battery.step(now_us, readings.battery, &self.tune);
+        self.sound_beeper(now_us, before.0, rx_lost, warning, changed, alarm);
+        let rc = self.receiver.data;
         self.last = DebugRecord {
             armed: self.arming.armed,
             arming_blocks: self.arming.blocks,
             failsafe: failsafe_readings(&self.failsafe, &self.receiver),
             setpoint: self.setpoint,
             smoothed_setpoint,
+            pid_setpoint: self.pid.setpoint,
+            horizon_strength: levelled.horizon_strength,
             gyro: unfiltered,
             filtered_gyro: gyro,
             detected_packet_rate: self.packet_rate.detected_hz,
@@ -548,9 +704,71 @@ impl FlightController {
             crash_flip: self.arming.crash_flip,
             yaw_spin_recovery: self.yaw_spin.active,
             flight_stable: self.runaway.done,
+            battery: self.battery.readings,
+            beeper: self.beeper.readings(),
+            since_power_up_us: now_us,
+            arm_switch: self.arming.arm_switch(),
+            crash_flip_switch: self.arming.crash_flip_switch(),
+            sticks_us: [rc.roll, rc.pitch, rc.yaw, rc.throttle],
+            throttle_percent: rc.throttle_percent(&self.tune) as u8,
+            flight_mode: self.flight_mode,
+            link_quality: if now_us.saturating_sub(self.last_frame_us) > LINK_STATISTICS_TIMEOUT_US
+            {
+                0
+            } else {
+                100
+            },
+            rf_mode: self.rf_mode,
+            motor_rpm: self.tune.dshot_bidir.then(|| {
+                readings
+                    .motor_rpm
+                    .map(|rpm| telemetry_rpm(rpm, self.tune.motor_poles))
+            }),
         };
         self.loops += 1;
         motors
+    }
+
+    /// Betaflight's beeper, in the order its tasks would ask: the three
+    /// "gyro calibrated" beeps on the first loop, arming and disarming (not
+    /// a disarm by runaway takeoff prevention), `RX_LOST` when Failsafe
+    /// found the link down, the warning beeps for a refused arm, Crash Flip
+    /// on each frame, and the battery's alarm. A beep starts only if it
+    /// outranks the one playing. Then the beeper takes its step.
+    fn sound_beeper(
+        &mut self,
+        now_us: u64,
+        was_armed: bool,
+        rx_lost: bool,
+        warning: Option<u8>,
+        frame: bool,
+        alarm: Option<BatteryAlarm>,
+    ) {
+        if self.loops == 0 {
+            self.beeper.beep(BeeperMode::GyroCalibrated);
+        }
+        match (was_armed, self.arming.armed) {
+            (false, true) => self.beeper.beep(BeeperMode::Arming),
+            (true, false) if !self.arming.blocks.runaway => {
+                self.beeper.beep(BeeperMode::Disarming);
+            }
+            _ => {}
+        }
+        if rx_lost {
+            self.beeper.beep(BeeperMode::RxLost);
+        }
+        if let Some(count) = warning {
+            self.beeper.warn(count);
+        }
+        if frame && self.arming.crash_flip {
+            self.beeper.beep(BeeperMode::CrashFlip);
+        }
+        match alarm {
+            Some(BatteryAlarm::Low) => self.beeper.beep(BeeperMode::BatteryLow),
+            Some(BatteryAlarm::Critical) => self.beeper.beep(BeeperMode::BatteryCriticalLow),
+            None => {}
+        }
+        self.beeper.update(now_us);
     }
 
     /// Betaflight's work on the Channels, in its order: they are worked out
@@ -559,7 +777,7 @@ impl FlightController {
     /// prevention adds up stable flight; then the Arm and Crash Flip
     /// switches; then the stick commands and the setpoints; then the arming
     /// checks.
-    fn receive(&mut self, now_us: u64, readings: &SensorReadings) {
+    fn receive(&mut self, now_us: u64, readings: &SensorReadings) -> Option<u8> {
         let now_ms = now_us / 1000;
         let good = self
             .receiver
@@ -604,7 +822,7 @@ impl FlightController {
         );
 
         let was_armed = self.arming.armed;
-        self.arming.frame(
+        let warning = self.arming.frame(
             &rc,
             &self.tune,
             arming::Readings {
@@ -617,6 +835,7 @@ impl FlightController {
         if !was_armed && self.arming.armed {
             self.runaway.arm();
         }
+        self.flight_mode = arming::flight_mode(&rc, self.failsafe.active);
 
         let command = RcCommand::new(&rc, &self.tune, &self.throttle_lookup);
         for axis in Axis::ALL {
@@ -624,13 +843,14 @@ impl FlightController {
             self.setpoint[axis.index()] = self.rates.setpoint(axis, deflection);
         }
         self.command = Some(command);
+        warning
     }
 
     /// Betaflight's work on the sticks each loop (`processRcCommand`): when
     /// the Channels were worked out again, the detected Packet Rate moves on,
     /// retuning RC smoothing and feedforward every third frame that counts,
     /// and feedforward is worked out for the frame; then RC smoothing takes a
-    /// step.
+    /// step, on the roll and pitch sticks too while Horizon flies.
     fn process_sticks(&mut self, changed: bool) {
         let newest = match (changed, self.command) {
             (true, Some(command)) => {
@@ -646,16 +866,26 @@ impl FlightController {
                     gap: self.packet_rate.gap_us as f64 * 1e-6,
                     rate_hz: self.packet_rate.rate_hz,
                 });
-                Some([
-                    self.setpoint[0],
-                    self.setpoint[1],
-                    self.setpoint[2],
-                    command.throttle as f64,
-                ])
+                Some((
+                    [
+                        self.setpoint[0],
+                        self.setpoint[1],
+                        self.setpoint[2],
+                        command.throttle as f64,
+                    ],
+                    [
+                        command.deflection(&self.tune, Axis::Roll),
+                        command.deflection(&self.tune, Axis::Pitch),
+                    ],
+                ))
             }
             _ => None,
         };
-        self.rc_smoothing.apply(newest, self.feedforward.raw);
+        self.rc_smoothing.apply(
+            newest,
+            self.feedforward.raw,
+            self.flight_mode == FlightMode::Horizon,
+        );
     }
 
     /// Where runaway takeoff prevention finds the Flight Controller now.
@@ -690,6 +920,12 @@ impl FlightController {
         for flag in [self.throttle_raised, self.stabilising, self.reset_iterm] {
             f.write_u64(u64::from(flag));
         }
+        f.write_u64(match self.flight_mode {
+            FlightMode::Acro => 0,
+            FlightMode::Angle => 1,
+            FlightMode::Horizon => 2,
+        });
+        self.levelling.write_fingerprint(f);
         self.pid.write_fingerprint(f);
         self.yaw_spin.write_fingerprint(f);
         self.runaway.write_fingerprint(f);
@@ -701,6 +937,9 @@ impl FlightController {
             }
         }
         self.dshot.write_fingerprint(f);
+        self.battery.write_fingerprint(f);
+        self.beeper.write_fingerprint(f);
+        f.write_u64(self.last_frame_us);
         for motor in self.last.motors {
             f.write_u64(u64::from(motor.dshot));
             f.write_u64(match motor.direction {
@@ -735,6 +974,36 @@ fn degrees(rotation: Vec3) -> [f64; 3] {
         rotation.y / DEGREE,
         rotation.z / DEGREE,
     ]
+}
+
+/// How long Betaflight waits for ELRS's link statistics before it counts
+/// the Link Quality as 0 (`CRSF_LINK_STATUS_UPDATE_TIMEOUT_US`).
+const LINK_STATISTICS_TIMEOUT_US: u64 = 250_000;
+
+/// ELRS's code for a Packet Rate, as its receiver reports it in its link
+/// statistics (`rf_Mode`: the rate's place in `expresslrs_RFrates_e`,
+/// ExpressLRS 3.6.4's `src/include/common.h`): the 2.4 GHz LoRa rates, 333 Hz
+/// Full and 1000 Hz FLRC.
+fn elrs_rf_mode(packet_rate_hz: u32) -> u8 {
+    match packet_rate_hz {
+        50 => 2,
+        100 => 3,
+        150 => 5,
+        250 => 7,
+        333 => 8,
+        500 => 9,
+        1000 => 13,
+        _ => 0,
+    }
+}
+
+/// A motor's RPM as bidirectional DShot brings it back and Betaflight reads
+/// it: the electrical RPM in whole hundreds, back to RPM by the motor's pole
+/// pairs, rounded (`erpmToRpm`, then `lrintf`).
+fn telemetry_rpm(rpm: f64, motor_poles: u8) -> u32 {
+    let pole_pairs = f64::from((motor_poles / 2).max(1));
+    let hundreds = (rpm.abs() * pole_pairs / 100.0).floor();
+    (hundreds * 100.0 / pole_pairs).round() as u32
 }
 
 fn stopped() -> MotorCommand {

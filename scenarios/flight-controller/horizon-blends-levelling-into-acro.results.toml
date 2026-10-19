@@ -1,0 +1,103 @@
+# Results of horizon-blends-levelling-into-acro.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Horizon blends Angle's levelling into Acro, less the further the Quad tilts and the sticks move"
+
+[[expect]]
+what     = "Horizon strength with throttle 50%, arm on"
+basis    = "Source"
+expected = "0.74845 ± 0.00001"
+measured = "0.748"
+
+[[expect]]
+what     = "Horizon strength with throttle 50%, arm on, attitude roll 45°, pitch 0°"
+basis    = "Source"
+expected = "0.49897 ± 0.00001"
+measured = "0.499"
+
+[[expect]]
+what     = "roll PID setpoint with throttle 50%, arm on, attitude roll 45°, pitch 0°"
+basis    = "Source"
+expected = "-112.19 °/s ± 0.01 °/s"
+measured = "-112 °/s"
+
+[[expect]]
+what     = "Horizon strength with throttle 50%, arm on, attitude roll 0°, pitch 30°"
+basis    = "Source"
+expected = "0.58213 ± 0.00001"
+measured = "0.582"
+
+[[expect]]
+what     = "pitch PID setpoint with throttle 50%, arm on, attitude roll 0°, pitch 30°"
+basis    = "Source"
+expected = "-87.394 °/s ± 0.001 °/s"
+measured = "-87.4 °/s"
+
+[[expect]]
+what     = "Horizon strength with roll 50%, throttle 50%, arm on"
+basis    = "Source"
+expected = "0.23739 ± 0.00001"
+measured = "0.237"
+
+[[expect]]
+what     = "roll PID setpoint with roll 50%, throttle 50%, arm on"
+basis    = "Source"
+expected = "168.17 °/s ± 0.01 °/s"
+measured = "168 °/s"
+
+[[expect]]
+what     = "Horizon strength with roll 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll PID setpoint with roll 100%, throttle 50%, arm on"
+basis    = "Source"
+expected = "670 °/s ± 0.001 °/s"
+measured = "670 °/s"
+
+[[expect]]
+what     = "Horizon strength with throttle 50%, arm on, attitude roll 135°, pitch 0°"
+basis    = "Source"
+expected = "0 ± 0.000001"
+measured = "0"
+
+[[expect]]
+what     = "roll PID setpoint with throttle 50%, arm on, attitude roll 135°, pitch 0°"
+basis    = "Source"
+expected = "0.10966 °/s ± 0.0001 °/s"
+measured = "0.110 °/s"
+
+[[expect]]
+what     = "Horizon strength with roll 25%, yaw 50%, throttle 50%, arm on"
+basis    = "Source"
+expected = "0.49355 ± 0.00001"
+measured = "0.494"
+
+[[expect]]
+what     = "yaw PID setpoint with roll 25%, yaw 50%, throttle 50%, arm on"
+basis    = "Source"
+expected = "193.354 °/s ± 0.001 °/s"
+measured = "193 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "d11f0d003564380b"   # the Flight Controller's whole state after each of 7 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "478a45993c5dffc9"
+"case 2" = "e855a9f67b34f0ef"
+"case 3" = "4f3fe9da1d07e08b"
+"case 4" = "47a3b4133ea46a59"
+"case 5" = "a169881d1357bf70"
+"case 6" = "b0f55a73b82eb967"
+"case 7" = "3e910e0a48afbbcf"

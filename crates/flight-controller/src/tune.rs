@@ -43,6 +43,44 @@ pub struct Tune {
     /// percent, a stable flight needs with a stick moved (twice it, up to
     /// 75%, without).
     pub runaway_takeoff_deactivate_throttle_percent: u8,
+    /// `current_meter`: where the battery current comes from. `ADC` and
+    /// `ESC` read the physics' current; `NONE` has none; `VIRTUAL` and `MSP`
+    /// aren't simulated yet, so they read none ([`Tune::not_simulated_values`]).
+    pub current_meter: CurrentMeter,
+    /// `vbat_min_cell_voltage`: below this a cell is critical (` LAND NOW`),
+    /// in hundredths of a volt.
+    pub vbat_min_cell_voltage: u16,
+    /// `vbat_max_cell_voltage`: a full cell, in hundredths of a volt; the
+    /// cell count is worked out against it at power-up.
+    pub vbat_max_cell_voltage: u16,
+    /// `vbat_warning_cell_voltage`: below this a cell is low (`LOW
+    /// BATTERY`), in hundredths of a volt.
+    pub vbat_warning_cell_voltage: u16,
+    /// `vbat_full_cell_voltage`: below this, never armed since power-up, the
+    /// OSD warns `BATT < FULL`, in hundredths of a volt.
+    pub vbat_full_cell_voltage: u16,
+    /// `force_battery_cell_count`: the cell count, or 0 to work it out.
+    pub force_battery_cell_count: u8,
+    /// `vbat_hysteresis`: how far below a threshold the voltage must fall
+    /// before its state starts, in hundredths of a volt.
+    pub vbat_hysteresis: u8,
+    /// `vbat_detect_cell_voltage`: below this a reading counts as no battery,
+    /// in hundredths of a volt.
+    pub vbat_detect_cell_voltage: u16,
+    /// `use_vbat_alerts`: whether a low or critical battery sounds the
+    /// beeper.
+    pub use_vbat_alerts: bool,
+    /// `vbat_display_lpf_period`: the battery voltage's low-pass, as its
+    /// period in tenths of a second.
+    pub vbat_display_lpf_period: u8,
+    /// `ibat_lpf_period`: the battery current's low-pass, as its period in
+    /// tenths of a second (0: off).
+    pub ibat_lpf_period: u8,
+    /// `vbat_duration_for_warning`: how long the voltage must stay low
+    /// before the battery counts as low, in tenths of a second.
+    pub vbat_duration_for_warning: u8,
+    /// `vbat_duration_for_critical`: the same for critical.
+    pub vbat_duration_for_critical: u8,
     /// `rx_min_usec`: a Channel below this, in µs, is invalid. It is also
     /// the throttle Failsafe's stage 1 sets.
     pub rx_min_usec: u16,
@@ -111,6 +149,15 @@ pub struct Tune {
     pub throttle_boost: u8,
     /// `motor_output_limit`: the top of the motors' range, in percent.
     pub motor_output_limit: u8,
+    /// `angle_p_gain`: how hard Angle and Horizon turn the Quad towards the
+    /// angle the sticks ask for, in tenths of °/s for each degree off.
+    pub angle_p_gain: u8,
+    /// `angle_limit`: the tilt full stick asks for in Angle and Horizon, in
+    /// degrees.
+    pub angle_limit: u8,
+    /// `horizon_level_strength`: how much Horizon levels at most, in percent
+    /// (100 or more levels as hard as Angle).
+    pub horizon_level_strength: u8,
     /// `pidsum_limit`: the most roll or pitch may ask of the motors, where
     /// 1000 is the whole motor range.
     pub pidsum_limit: u16,
@@ -144,6 +191,31 @@ pub struct Tune {
     /// `throttle_boost_cutoff`: the cutoff of the low-pass whose difference
     /// from the throttle throttle boost adds, in Hz.
     pub throttle_boost_cutoff: u8,
+    /// `angle_feedforward`: how much of the sticks' feedforward pushes Angle
+    /// and Horizon's tilt along, in percent.
+    pub angle_feedforward: u8,
+    /// `angle_feedforward_smoothing_ms`: how strongly that push is smoothed:
+    /// its low-pass's time constant, in ms.
+    pub angle_feedforward_smoothing_ms: u8,
+    /// `angle_earth_ref`: how much a yaw while tilted in Angle and Horizon
+    /// turns about the world's vertical instead of the Quad's own, in
+    /// percent (0: off).
+    pub angle_earth_ref: u8,
+    /// `horizon_limit_sticks`: the roll or pitch stick, in hundredths, at
+    /// which Horizon stops levelling.
+    pub horizon_limit_sticks: u8,
+    /// `horizon_limit_degrees`: the tilt, in degrees, at which Horizon stops
+    /// levelling.
+    pub horizon_limit_degrees: u8,
+    /// `horizon_ignore_sticks`: whether Horizon levels as hard whatever the
+    /// sticks do.
+    pub horizon_ignore_sticks: bool,
+    /// `horizon_delay_ms`: how slowly Horizon's levelling comes back after it
+    /// fades: its low-pass's time constant, in ms.
+    pub horizon_delay_ms: u16,
+    /// `level_race_mode`: whether Angle and Horizon level only the roll, and
+    /// leave pitch to the sticks as in Acro.
+    pub level_race_mode: bool,
     /// `gyro_lpf1_type`: the gyro's first low-pass.
     pub gyro_lpf1_type: LowpassType,
     /// `gyro_lpf1_static_hz`: its cutoff when it isn't dynamic, in Hz (0:
@@ -208,10 +280,16 @@ pub struct Tune {
     pub airmode_start_throttle_percent: u8,
     /// `mixer_type`: only Legacy is simulated.
     pub mixer_type: MixerType,
+    /// `motor_poles`: the motors' magnet poles, which turn the ESCs'
+    /// electrical RPM into RPM.
+    pub motor_poles: u8,
     /// `yaw_motors_reversed`: props out.
     pub yaw_motors_reversed: bool,
     /// `motor_pwm_protocol`: one of the DShot speeds.
     pub motor_pwm_protocol: MotorProtocol,
+    /// `dshot_bidir`: bidirectional DShot, which brings each motor's RPM
+    /// back from its ESC.
+    pub dshot_bidir: bool,
     /// `motor_idle`: the motors' idle, in hundredths of a percent (550 is
     /// 5.5%).
     pub motor_idle: u16,
@@ -345,6 +423,41 @@ impl FailsafeProcedure {
     }
 }
 
+/// `current_meter`, in Betaflight's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CurrentMeter {
+    None,
+    /// The board's current sensor: the battery current the physics gives.
+    Adc,
+    /// Worked out from the throttle: not simulated yet, so no current.
+    Virtual,
+    /// The ESCs' telemetry: the battery current the physics gives.
+    Esc,
+    /// From MSP: not simulated yet, so no current.
+    Msp,
+}
+
+impl CurrentMeter {
+    /// Betaflight's words for it, in its order.
+    pub const WORDS: [&'static str; 5] = ["NONE", "ADC", "VIRTUAL", "ESC", "MSP"];
+
+    /// Whether the Flight Controller reads a current: the meter is one the
+    /// sim simulates.
+    pub fn measures(self) -> bool {
+        matches!(self, CurrentMeter::Adc | CurrentMeter::Esc)
+    }
+
+    fn place(self) -> u64 {
+        match self {
+            CurrentMeter::None => 0,
+            CurrentMeter::Adc => 1,
+            CurrentMeter::Virtual => 2,
+            CurrentMeter::Esc => 3,
+            CurrentMeter::Msp => 4,
+        }
+    }
+}
+
 /// `mixer_type`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MixerType {
@@ -406,6 +519,19 @@ const SPECS: &[(&str, Kind)] = &[
         "runaway_takeoff_deactivate_throttle_percent",
         Kind::Number(0, 100),
     ),
+    ("current_meter", Kind::Word(&CurrentMeter::WORDS)),
+    ("vbat_min_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_max_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_warning_cell_voltage", Kind::Number(100, 500)),
+    ("vbat_full_cell_voltage", Kind::Number(100, 500)),
+    ("force_battery_cell_count", Kind::Number(0, 24)),
+    ("vbat_hysteresis", Kind::Number(0, 250)),
+    ("vbat_detect_cell_voltage", Kind::Number(0, 2000)),
+    ("use_vbat_alerts", Kind::OffOn),
+    ("vbat_display_lpf_period", Kind::Number(1, 255)),
+    ("ibat_lpf_period", Kind::Number(0, 255)),
+    ("vbat_duration_for_warning", Kind::Number(0, 150)),
+    ("vbat_duration_for_critical", Kind::Number(0, 150)),
     ("rx_min_usec", Kind::Number(750, 2250)),
     ("rx_max_usec", Kind::Number(750, 2250)),
     ("failsafe_delay", Kind::Number(1, 200)),
@@ -450,6 +576,9 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_breakpoint", Kind::Number(1000, 2000)),
     ("throttle_boost", Kind::Number(0, 100)),
     ("motor_output_limit", Kind::Number(1, 100)),
+    ("angle_p_gain", Kind::Number(0, 200)),
+    ("angle_limit", Kind::Number(10, 80)),
+    ("horizon_level_strength", Kind::Number(0, 100)),
     ("pidsum_limit", Kind::Number(100, 1000)),
     ("pidsum_limit_yaw", Kind::Number(100, 1000)),
     ("iterm_windup", Kind::Number(20, 100)),
@@ -462,6 +591,14 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_low_breakpoint", Kind::Number(1000, 2000)),
     ("tpa_low_always", Kind::OffOn),
     ("throttle_boost_cutoff", Kind::Number(5, 50)),
+    ("angle_feedforward", Kind::Number(0, 200)),
+    ("angle_feedforward_smoothing_ms", Kind::Number(10, 250)),
+    ("angle_earth_ref", Kind::Number(0, 100)),
+    ("horizon_limit_sticks", Kind::Number(10, 200)),
+    ("horizon_limit_degrees", Kind::Number(10, 250)),
+    ("horizon_ignore_sticks", Kind::OffOn),
+    ("horizon_delay_ms", Kind::Number(10, 5000)),
+    ("level_race_mode", Kind::OffOn),
     ("gyro_lpf1_type", Kind::Word(&LowpassType::WORDS)),
     ("gyro_lpf1_static_hz", Kind::Number(0, 1000)),
     ("gyro_lpf1_dyn_min_hz", Kind::Number(0, 1000)),
@@ -495,7 +632,9 @@ const SPECS: &[(&str, Kind)] = &[
             "the simulated ESCs run Bluejay, which reads DShot: DSHOT150, DSHOT300 or DSHOT600",
         ),
     ),
+    ("dshot_bidir", Kind::OffOn),
     ("motor_idle", Kind::Number(0, 2000)),
+    ("motor_poles", Kind::Number(4, 255)),
     ("yaw_motors_reversed", Kind::OffOn),
     (
         "mixer_type",
@@ -636,6 +775,25 @@ impl Tune {
             runaway_takeoff_deactivate_throttle_percent: small(
                 "runaway_takeoff_deactivate_throttle_percent",
             ),
+            current_meter: match n("current_meter") {
+                0 => CurrentMeter::None,
+                1 => CurrentMeter::Adc,
+                2 => CurrentMeter::Virtual,
+                3 => CurrentMeter::Esc,
+                _ => CurrentMeter::Msp,
+            },
+            vbat_min_cell_voltage: n("vbat_min_cell_voltage") as u16,
+            vbat_max_cell_voltage: n("vbat_max_cell_voltage") as u16,
+            vbat_warning_cell_voltage: n("vbat_warning_cell_voltage") as u16,
+            vbat_full_cell_voltage: n("vbat_full_cell_voltage") as u16,
+            force_battery_cell_count: small("force_battery_cell_count"),
+            vbat_hysteresis: small("vbat_hysteresis"),
+            vbat_detect_cell_voltage: n("vbat_detect_cell_voltage") as u16,
+            use_vbat_alerts: n("use_vbat_alerts") == 1,
+            vbat_display_lpf_period: small("vbat_display_lpf_period"),
+            ibat_lpf_period: small("ibat_lpf_period"),
+            vbat_duration_for_warning: small("vbat_duration_for_warning"),
+            vbat_duration_for_critical: small("vbat_duration_for_critical"),
             rx_min_usec: n("rx_min_usec") as u16,
             rx_max_usec: n("rx_max_usec") as u16,
             failsafe_delay: small("failsafe_delay"),
@@ -686,6 +844,9 @@ impl Tune {
             tpa_breakpoint: n("tpa_breakpoint") as u16,
             throttle_boost: small("throttle_boost"),
             motor_output_limit: small("motor_output_limit"),
+            angle_p_gain: small("angle_p_gain"),
+            angle_limit: small("angle_limit"),
+            horizon_level_strength: small("horizon_level_strength"),
             pidsum_limit: n("pidsum_limit") as u16,
             pidsum_limit_yaw: n("pidsum_limit_yaw") as u16,
             iterm_windup: small("iterm_windup"),
@@ -698,6 +859,14 @@ impl Tune {
             tpa_low_breakpoint: n("tpa_low_breakpoint") as u16,
             tpa_low_always: n("tpa_low_always") == 1,
             throttle_boost_cutoff: small("throttle_boost_cutoff"),
+            angle_feedforward: small("angle_feedforward"),
+            angle_feedforward_smoothing_ms: small("angle_feedforward_smoothing_ms"),
+            angle_earth_ref: small("angle_earth_ref"),
+            horizon_limit_sticks: small("horizon_limit_sticks"),
+            horizon_limit_degrees: small("horizon_limit_degrees"),
+            horizon_ignore_sticks: n("horizon_ignore_sticks") == 1,
+            horizon_delay_ms: hz("horizon_delay_ms"),
+            level_race_mode: n("level_race_mode") == 1,
             gyro_lpf1_type: LowpassType::from_place(n("gyro_lpf1_type")),
             gyro_lpf1_static_hz: hz("gyro_lpf1_static_hz"),
             gyro_lpf1_dyn_min_hz: hz("gyro_lpf1_dyn_min_hz"),
@@ -725,12 +894,14 @@ impl Tune {
             yaw_control_reversed: n("yaw_control_reversed") == 1,
             airmode_start_throttle_percent: small("airmode_start_throttle_percent"),
             mixer_type: MixerType::Legacy,
+            motor_poles: small("motor_poles"),
             yaw_motors_reversed: n("yaw_motors_reversed") == 1,
             motor_pwm_protocol: match n("motor_pwm_protocol") {
                 0 => MotorProtocol::Dshot150,
                 1 => MotorProtocol::Dshot300,
                 _ => MotorProtocol::Dshot600,
             },
+            dshot_bidir: n("dshot_bidir") == 1,
             motor_idle: n("motor_idle") as u16,
             crashflip_motor_percent: small("crashflip_motor_percent"),
             crashflip_rate: small("crashflip_rate"),
@@ -739,19 +910,41 @@ impl Tune {
     }
 
     /// The settings whose value this Flight Controller reads but doesn't
-    /// simulate yet, each with a plain sentence saying what flies instead:
-    /// so far, a `failsafe_procedure` of AUTO-LAND or GPS-RESCUE, which flies
-    /// DROP (#21).
+    /// simulate yet, each with a plain sentence saying what flies instead: a
+    /// `failsafe_procedure` of AUTO-LAND or GPS-RESCUE, which flies DROP
+    /// (#21), and a `current_meter` of VIRTUAL or MSP, which reads no current
+    /// (#31 §3).
     pub fn not_simulated_values(&self) -> Vec<(&'static str, String)> {
-        match self.failsafe_procedure {
-            FailsafeProcedure::Drop => Vec::new(),
-            other => vec![(
+        let mut values = Vec::new();
+        if self.failsafe_procedure != FailsafeProcedure::Drop {
+            values.push((
                 "failsafe_procedure",
                 format!(
                     "`failsafe_procedure` is {}, which isn't simulated yet: the Quad flies DROP, disarming as Failsafe's stage 2 starts",
-                    other.word()
+                    self.failsafe_procedure.word()
                 ),
-            )],
+            ));
+        }
+        if matches!(
+            self.current_meter,
+            CurrentMeter::Virtual | CurrentMeter::Msp
+        ) {
+            values.push((
+                "current_meter",
+                format!(
+                    "`current_meter` is {}, which isn't simulated yet: the Flight Controller reads no current, so the OSD's current and mAh read blank",
+                    CurrentMeter::WORDS[self.current_meter.place() as usize]
+                ),
+            ));
+        }
+        values
+    }
+
+    /// The ticket that brings a value [`Tune::not_simulated_values`] names.
+    pub fn not_simulated_ticket(name: &str) -> &'static str {
+        match name {
+            "current_meter" => "#31",
+            _ => "#21",
         }
     }
 
@@ -768,6 +961,19 @@ impl Tune {
             u64::from(self.runaway_takeoff_prevention),
             u64::from(self.runaway_takeoff_deactivate_delay),
             u64::from(self.runaway_takeoff_deactivate_throttle_percent),
+            self.current_meter.place(),
+            u64::from(self.vbat_min_cell_voltage),
+            u64::from(self.vbat_max_cell_voltage),
+            u64::from(self.vbat_warning_cell_voltage),
+            u64::from(self.vbat_full_cell_voltage),
+            u64::from(self.force_battery_cell_count),
+            u64::from(self.vbat_hysteresis),
+            u64::from(self.vbat_detect_cell_voltage),
+            u64::from(self.use_vbat_alerts),
+            u64::from(self.vbat_display_lpf_period),
+            u64::from(self.ibat_lpf_period),
+            u64::from(self.vbat_duration_for_warning),
+            u64::from(self.vbat_duration_for_critical),
             u64::from(self.rx_min_usec),
             u64::from(self.rx_max_usec),
             u64::from(self.failsafe_delay),
@@ -818,6 +1024,9 @@ impl Tune {
             u64::from(self.tpa_breakpoint),
             u64::from(self.throttle_boost),
             u64::from(self.motor_output_limit),
+            u64::from(self.angle_p_gain),
+            u64::from(self.angle_limit),
+            u64::from(self.horizon_level_strength),
             u64::from(self.pidsum_limit),
             u64::from(self.pidsum_limit_yaw),
             u64::from(self.iterm_windup),
@@ -830,6 +1039,14 @@ impl Tune {
             u64::from(self.tpa_low_breakpoint),
             u64::from(self.tpa_low_always),
             u64::from(self.throttle_boost_cutoff),
+            u64::from(self.angle_feedforward),
+            u64::from(self.angle_feedforward_smoothing_ms),
+            u64::from(self.angle_earth_ref),
+            u64::from(self.horizon_limit_sticks),
+            u64::from(self.horizon_limit_degrees),
+            u64::from(self.horizon_ignore_sticks),
+            u64::from(self.horizon_delay_ms),
+            u64::from(self.level_race_mode),
             self.gyro_lpf1_type.place(),
             u64::from(self.gyro_lpf1_static_hz),
             u64::from(self.gyro_lpf1_dyn_min_hz),
@@ -861,7 +1078,9 @@ impl Tune {
                 MotorProtocol::Dshot300 => 1,
                 MotorProtocol::Dshot600 => 2,
             },
+            u64::from(self.dshot_bidir),
             u64::from(self.motor_idle),
+            u64::from(self.motor_poles),
             u64::from(self.yaw_motors_reversed),
             match self.mixer_type {
                 MixerType::Legacy => 0,

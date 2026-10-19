@@ -2,11 +2,13 @@
 //! Auto-arm Assist in front of it.
 
 use opendrone_flight_controller::{
-    Channels, DebugRecord, FlightController, Rates, SensorReadings, SpinDirection as FcDirection,
-    Tune,
+    BatteryReading, Channels, DebugRecord, FlightController, Rates, SensorReadings,
+    SpinDirection as FcDirection, Tune,
 };
 use opendrone_maths::Fingerprinter;
-use opendrone_physics::{MotorCommand, MotorCommands, QuadState, SpinDirection, gyro_reading};
+use opendrone_physics::{
+    MotorCommand, MotorCommands, QuadBody, QuadState, SpinDirection, gyro_reading,
+};
 
 use crate::auto_arm::AutoArm;
 use crate::{FlightControllerSeam, PacketRate, PhysicsRate, SimulationTime};
@@ -14,12 +16,36 @@ use crate::{FlightControllerSeam, PacketRate, PhysicsRate, SimulationTime};
 /// What the sensors read from a Quad's state: the gyro (its true rotation,
 /// with no noise, each axis clipped at the board's range, `gyro_range` in
 /// rad/s, #26 §4) and the true attitude, and whether its ESCs have played
-/// their ready beep.
+/// their ready beep. With no battery and the motors still: what a fresh
+/// Flight Controller reads before its first loop, when it reads only the
+/// gyro. Each loop reads the whole board ([`board_readings`]).
 pub fn sensor_readings(state: &QuadState, escs_ready: bool, gyro_range: f64) -> SensorReadings {
-    SensorReadings {
-        gyro: gyro_reading(state.rotation, gyro_range),
-        attitude: state.attitude,
+    SensorReadings::still(
+        gyro_reading(state.rotation, gyro_range),
+        state.attitude,
         escs_ready,
+    )
+}
+
+/// Everything the board reads of a Quad each loop: the gyro and attitude as
+/// [`sensor_readings`] reads them, whether the ESCs are ready, the battery's
+/// voltage and current at its terminals, and each motor's speed in RPM, as
+/// its ESC reports it.
+pub fn board_readings(body: &QuadBody) -> SensorReadings {
+    let battery = body.battery();
+    SensorReadings {
+        battery: BatteryReading {
+            voltage: battery.voltage,
+            current: battery.current,
+        },
+        motor_rpm: body
+            .motors()
+            .map(|motor| motor.speed * 60.0 / (2.0 * core::f64::consts::PI)),
+        ..sensor_readings(
+            body.state(),
+            body.escs_ready(),
+            body.parameters().gyro_range,
+        )
     }
 }
 
@@ -123,5 +149,9 @@ impl FlightControllerSeam for OurFlightController {
                 auto_arm.write_fingerprint(f);
             }
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
     }
 }

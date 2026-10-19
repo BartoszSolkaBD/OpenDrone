@@ -12,8 +12,10 @@ use opendrone_test_pilot::Jobs;
 
 use crate::format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 use crate::measure::Measure;
+use crate::osd::{self, OsdExpectation, OsdExpected, OsdSection, OsdWhen};
 use crate::rates::{self, Rates};
 use crate::track::{TrackRules, read_input_track};
+use opendrone_flight_controller::osd::{OsdLayout, OsdReading};
 
 /// A Scenario, read and checked.
 #[derive(Clone, Debug)]
@@ -36,6 +38,8 @@ pub struct Scenario {
     /// The other runs its Expectations compare with: the same Scenario with
     /// a starting-state item or two changed.
     pub other_runs: Vec<OtherRun>,
+    /// Its `[osd]` section, if it expects OSD text (ADR-0022).
+    pub osd: Option<OsdSection>,
 }
 
 impl Scenario {
@@ -394,7 +398,7 @@ impl BasisKind {
     }
 }
 
-const TOP: &[&str] = &["format", "name", "start", "inputs", "expect", "case"];
+const TOP: &[&str] = &["format", "name", "start", "inputs", "expect", "case", "osd"];
 const START: &[&str] = &[
     "kind",
     "quad",
@@ -494,6 +498,9 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
     } else {
         Vec::new()
     };
+    let osd = root
+        .get("osd")
+        .and_then(|item| reader.osd(&item, !cases.is_empty()));
     let other_runs = reader.other_runs;
     let last_input = match &inputs {
         Inputs::Motors(timeline) => timeline.iter().map(|(time, _)| time.ticks()).max(),
@@ -508,6 +515,12 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
             When::Over { to, .. } => to,
         }))
         .chain((!cases.is_empty()).then_some(1))
+        .chain(osd.iter().flat_map(|osd| {
+            osd.expectations.iter().map(|e| match e.when {
+                OsdWhen::At(tick) => tick,
+                OsdWhen::First { to, .. } => to,
+            })
+        }))
         .max()
         .unwrap_or(0);
     let (Some(name), Some(start)) = (name, start) else {
@@ -522,6 +535,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         cases,
         length: SimulationTime::from_ticks(length),
         other_runs,
+        osd,
     })
 }
 
@@ -674,14 +688,6 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         problems,
     );
     let flies = matches!(kind, Some(Kind::Flight | Kind::FlightController));
-    if flies
-        && matches!(flight_mode, Some(FlightMode::Angle | FlightMode::Horizon))
-        && let Some(item) = start.get("flight_mode")
-    {
-        problems.push(item.problem(
-            "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)",
-        ));
-    }
     let assists = start.table("assists", problems).and_then(|table| {
         table.refuse_unknown(ASSISTS, problems);
         let mut on = |key| {
@@ -1652,6 +1658,11 @@ impl Reader<'_> {
     }
 
     fn expectations(&mut self, root: &Table<'_, '_>) -> Vec<Expectation> {
+        // A Scenario that expects only OSD text has its Expectations in
+        // [osd], as [[osd.expect]].
+        if root.get("expect").is_none() && root.get("osd").is_some() {
+            return Vec::new();
+        }
         let Some(list) = root
             .require("expect", self.problems)
             .and_then(|e| e.array(self.problems))
@@ -2332,6 +2343,224 @@ impl Reader<'_> {
             return None;
         }
         Some(((from, to), (from_time, to_time)))
+    }
+
+    /// The `[osd]` section: the OSD options every OSD Expectation depends
+    /// on, spelled out, and its `[[osd.expect]]`s (ADR-0022).
+    fn osd(&mut self, item: &Item<'_, '_>, cases: bool) -> Option<OsdSection> {
+        let table = item.table(self.problems)?;
+        table.refuse_unknown(
+            &[
+                "timer_1",
+                "timer_2",
+                "warnings",
+                "statistics",
+                "alarms",
+                "expect",
+            ],
+            self.problems,
+        );
+        let refusal = match self.kind {
+            Kind::Physics => Some(
+                "a Physics Scenario scripts its motors, so no Flight Controller runs to work out an OSD",
+            ),
+            Kind::ThrustStand if self.scripted => Some(
+                "this Thrust Stand Scenario scripts its motors, so no Flight Controller runs to work out an OSD",
+            ),
+            Kind::FlightController if cases => Some(
+                "a table of [[case]]s runs one loop a case, too short for the OSD, which redraws 12 times a second: give the Flight Controller a Timeline",
+            ),
+            _ => None,
+        };
+        if let Some(sentence) = refusal {
+            self.problems.push(item.problem(sentence));
+            return None;
+        }
+        let mut layout = OsdLayout::opendrone_default();
+        layout.show_everything();
+        for (index, key) in ["timer_1", "timer_2"].into_iter().enumerate() {
+            if let Some((text, item)) = table.text(key, self.problems) {
+                match osd::timer(text) {
+                    Ok(timer) => layout.timers[index] = timer,
+                    Err(sentence) => self.problems.push(item.problem(sentence)),
+                }
+            }
+        }
+        layout.warnings = 0;
+        if let Some(list) = table
+            .require("warnings", self.problems)
+            .and_then(|list| list.array(self.problems))
+        {
+            for entry in list {
+                if let Some(words) = entry.text(self.problems) {
+                    match osd::warning(words) {
+                        Ok(warning) => layout.warnings |= warning.bit(),
+                        Err(sentence) => self.problems.push(entry.problem(sentence)),
+                    }
+                }
+            }
+        }
+        layout.statistics = 0;
+        if let Some(list) = table
+            .require("statistics", self.problems)
+            .and_then(|list| list.array(self.problems))
+        {
+            for entry in list {
+                if let Some(words) = entry.text(self.problems) {
+                    match osd::statistic(words) {
+                        Ok(statistic) => layout.statistics |= statistic.bit(),
+                        Err(sentence) => self.problems.push(entry.problem(sentence)),
+                    }
+                }
+            }
+        }
+        if let Some(alarms) = table.table("alarms", self.problems) {
+            alarms.refuse_unknown(
+                &["rssi", "link_quality", "rssi_dbm", "rsnr", "capacity"],
+                self.problems,
+            );
+            let mut alarm = |key: &str, unit: &str, lowest: i64, highest: i64| -> Option<i64> {
+                let (text, item) = alarms.text(key, self.problems)?;
+                match osd::alarm(text, unit, lowest, highest) {
+                    Ok(value) => Some(value),
+                    Err(sentence) => {
+                        self.problems
+                            .push(item.problem(format!("`{key}`: {sentence}")));
+                        None
+                    }
+                }
+            };
+            if let Some(v) = alarm("rssi", "%", 0, 100) {
+                layout.alarms.rssi = v as u8;
+            }
+            if let Some(v) = alarm("link_quality", "%", 0, 100) {
+                layout.alarms.link_quality = v as u16;
+            }
+            if let Some(v) = alarm("rssi_dbm", "dBm", -130, 0) {
+                layout.alarms.rssi_dbm = v as i16;
+            }
+            if let Some(v) = alarm("rsnr", "dB", -30, 20) {
+                layout.alarms.rsnr = v as i16;
+            }
+            if let Some(v) = alarm("capacity", "mAh", 0, 20000) {
+                layout.alarms.capacity = v as u16;
+            }
+        }
+        let mut expectations = Vec::new();
+        if let Some(list) = table
+            .require("expect", self.problems)
+            .and_then(|list| list.array(self.problems))
+        {
+            if list.is_empty() {
+                self.problems
+                    .push(table.problem("an [osd] section needs at least one [[osd.expect]]"));
+            }
+            for entry in list {
+                if let Some(expectation) = entry
+                    .table(self.problems)
+                    .and_then(|table| self.osd_expectation(&table, entry.line()))
+                {
+                    expectations.push(expectation);
+                }
+            }
+        }
+        Some(OsdSection {
+            layout,
+            expectations,
+        })
+    }
+
+    /// One `[[osd.expect]]`: what it reads, `at` a moment with the `value`
+    /// it reads, or `over` a stretch with `reads` and `first`, how long after
+    /// the stretch's start it first reads that (or "never").
+    fn osd_expectation(&mut self, table: &Table<'_, '_>, line: usize) -> Option<OsdExpectation> {
+        table.refuse_unknown(
+            &["what", "at", "value", "over", "reads", "first", "basis"],
+            self.problems,
+        );
+        let reading = table.text("what", self.problems).and_then(|(text, item)| {
+            let reading = OsdReading::named(text);
+            if reading.is_none() {
+                self.problems.push(item.problem(format!(
+                    "the OSD has no \"{text}\": name an element (such as warnings, Flight Mode, timer 2, Link Quality or average cell voltage), \"<element> blinks\", \"message\", \"statistics page\" or \"statistic <label>\", such as \"statistic TOTAL ARM\""
+                )));
+            }
+            reading
+        });
+        let basis = table
+            .text("basis", self.problems)
+            .and_then(|(text, item)| self.basis(text, &item));
+        let what = table.get("what").and_then(|w| w.as_str()).unwrap_or("");
+        let timing = match (table.get("at"), table.get("over")) {
+            (Some(at), None) => {
+                let tick = at
+                    .text(self.problems)
+                    .and_then(|text| self.moment(text, &at));
+                let value = table.text("value", self.problems);
+                let ((tick, time), (value, _)) = (tick?, value?);
+                Some((
+                    OsdWhen::At(tick),
+                    OsdExpected::Text(value.to_string()),
+                    format!("{what} at {}", time.text()),
+                ))
+            }
+            (None, Some(over)) => {
+                let stretch = over
+                    .text(self.problems)
+                    .and_then(|text| self.stretch(text, &over));
+                let reads = table.text("reads", self.problems);
+                let first = table.text("first", self.problems);
+                let (((from, to), (from_time, to_time)), (reads, _), (first, first_item)) =
+                    (stretch?, reads?, first?);
+                let expected = if first.trim() == "never" {
+                    OsdExpected::Never
+                } else {
+                    match units::parse_expected(first) {
+                        Ok(expected) if expected.dimension() == Dimension::TIME => {
+                            OsdExpected::Time(expected)
+                        }
+                        Ok(_) => {
+                            self.problems.push(first_item.problem(
+                                "`first` is how long after the stretch's start it first reads that, such as \"1.5 s ± 0.1 s\", or \"never\"",
+                            ));
+                            return None;
+                        }
+                        Err(p) => {
+                            self.problems.push(first_item.problem(p.0));
+                            return None;
+                        }
+                    }
+                };
+                Some((
+                    OsdWhen::First {
+                        from,
+                        to,
+                        reads: reads.to_string(),
+                    },
+                    expected,
+                    format!(
+                        "{what} reads {reads}, first over {} to {}",
+                        from_time.text(),
+                        to_time.text()
+                    ),
+                ))
+            }
+            _ => {
+                self.problems.push(table.problem(
+                    "an OSD Expectation says either `at` a moment, with the `value` it reads, or `over` a stretch, with what it `reads` and `first`, how long after the stretch's start it first reads that",
+                ));
+                None
+            }
+        };
+        let (reading, basis, (when, expected, description)) = (reading?, basis?, timing?);
+        Some(OsdExpectation {
+            reading,
+            when,
+            expected,
+            basis,
+            line,
+            description,
+        })
     }
 
     /// "rule: …", "source: …" or "observed: …".

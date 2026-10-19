@@ -5,7 +5,8 @@
 //!
 //! Switches reach the Flight Controller with fixed meanings (ADR-0017), so
 //! the Modes table is built in: Arm on AUX1 and Crash Flip on AUX3, high is
-//! on. Flight Mode on AUX2 joins it with its ticket (#51).
+//! on, and the Flight Mode on AUX2, with Horizon in the middle and Angle high
+//! (`flight_mode`).
 //!
 //! Arming follows Betaflight's checks, each named as Betaflight names it
 //! ([`ArmingBlocks`]): the throttle below `min_check` (`THROTTLE`), the tilt
@@ -43,6 +44,7 @@
 
 use opendrone_maths::{Attitude, Fingerprinter, Vec3, functions};
 
+use crate::FlightMode;
 use crate::receiver::RcData;
 use crate::tune::Tune;
 
@@ -78,6 +80,36 @@ const CRASH_FLIP: ModeRange = ModeRange {
     start: 1700.0,
     end: 2100.0,
 };
+
+/// Horizon (`BOXHORIZON`): AUX2 from 1300 to 1700 µs, so its switch's middle
+/// position (1500 µs) is on.
+const HORIZON: ModeRange = ModeRange {
+    aux: 1,
+    start: 1300.0,
+    end: 1700.0,
+};
+
+/// Angle (`BOXANGLE`): AUX2 from 1700 to 2100 µs, so its switch's high
+/// position is on.
+const ANGLE: ModeRange = ModeRange {
+    aux: 1,
+    start: 1700.0,
+    end: 2100.0,
+};
+
+/// The Flight Mode a frame's Channels pick, as Betaflight's
+/// `processRxModes` does: Angle when its switch is on, or while Failsafe's
+/// stage 2 runs (`failsafeIsActive`); otherwise Horizon when its switch is
+/// on; otherwise Acro.
+pub(crate) fn flight_mode(rc: &RcData, failsafe_active: bool) -> FlightMode {
+    if ANGLE.is_on(rc) || failsafe_active {
+        FlightMode::Angle
+    } else if HORIZON.is_on(rc) {
+        FlightMode::Horizon
+    } else {
+        FlightMode::Acro
+    }
+}
 
 /// How many frames in a row the Arm switch must read off before an armed
 /// Quad disarms: more than three (`rcDisarmTicks`).
@@ -131,6 +163,27 @@ impl ArmingBlocks {
         "FLIP_SWITCH",
         "ARM_SWITCH",
     ];
+
+    /// Each flag's bit in Betaflight's `armingDisableFlags`, in
+    /// [`ArmingBlocks::NAMES`] order: the order the OSD cycles through them
+    /// in, and, plus one, how many beeps the warning beeps count.
+    pub const BITS: [u8; 9] = [1, 2, 3, 5, 7, 8, 9, 25, 29];
+
+    /// The raised flags as Betaflight's `armingDisableFlags` bits.
+    pub fn bits(self) -> u32 {
+        ArmingBlocks::BITS
+            .into_iter()
+            .zip(self.flags())
+            .filter(|(_, raised)| *raised)
+            .fold(0, |bits, (bit, _)| bits | 1 << bit)
+    }
+
+    /// Betaflight's name for a flag by its bit, if it is one OpenDrone's
+    /// Flight Controller raises.
+    pub fn name_of_bit(bit: u8) -> Option<&'static str> {
+        let place = ArmingBlocks::BITS.iter().position(|b| *b == bit)?;
+        Some(ArmingBlocks::NAMES[place])
+    }
 
     /// Each flag, in [`ArmingBlocks::NAMES`] order.
     pub fn flags(self) -> [bool; 9] {
@@ -204,6 +257,9 @@ pub(crate) struct Arming {
     /// Whether frames were arriving when the arming status was last updated
     /// (`hadRx`). A fresh Flight Controller's link counts as settled.
     had_signal: bool,
+    /// The refusal the warning beeps last told, as its bit plus one, or 0
+    /// (`lastArmingDisabledReason`).
+    last_refusal: u8,
 }
 
 impl Arming {
@@ -222,6 +278,7 @@ impl Arming {
             user_disarm: false,
             disarm_frames: 0,
             had_signal: true,
+            last_refusal: 0,
         }
     }
 
@@ -239,14 +296,28 @@ impl Arming {
     ///
     /// A switch disarm counts only while Failsafe counts the link as up, so
     /// a held Arm Channel never disarms on its own during a loss.
-    pub fn frame(&mut self, rc: &RcData, tune: &Tune, readings: Readings) {
+    ///
+    /// Gives the warning beeps' count when the Arm switch is on, arming is
+    /// refused, and the lowest refusal has changed since they last told one
+    /// (`tryArm`): that refusal's bit plus one.
+    pub fn frame(&mut self, rc: &RcData, tune: &Tune, readings: Readings) -> Option<u8> {
+        let mut warning = None;
         if self.arm_mode {
             self.disarm_frames = 0;
             self.update_status(rc, tune, readings);
-            if !self.blocks.any() && !self.armed {
-                self.armed = true;
-                // `tryArm`: the Crash Flip switch is read now, and only now.
-                self.crash_flip = self.crash_flip_mode;
+            if !self.blocks.any() {
+                if !self.armed {
+                    self.armed = true;
+                    // `tryArm`: the Crash Flip switch is read now, and only now.
+                    self.crash_flip = self.crash_flip_mode;
+                    self.last_refusal = 0;
+                }
+            } else {
+                let refusal = self.blocks.bits().trailing_zeros() as u8 + 1;
+                if refusal != self.last_refusal {
+                    self.last_refusal = refusal;
+                    warning = Some(refusal);
+                }
             }
         } else {
             self.user_disarm = true;
@@ -261,6 +332,19 @@ impl Arming {
         self.arm_mode = ARM.is_on(rc);
         self.crash_flip_mode = CRASH_FLIP.is_on(rc);
         self.update_status(rc, tune, readings);
+        warning
+    }
+
+    /// Whether the Arm switch is on in the Modes table, as of the last frame
+    /// (`IS_RC_MODE_ACTIVE(BOXARM)`).
+    pub fn arm_switch(&self) -> bool {
+        self.arm_mode
+    }
+
+    /// Whether the Crash Flip switch is on in the Modes table, as of the last
+    /// frame (`IS_RC_MODE_ACTIVE(BOXCRASHFLIP)`).
+    pub fn crash_flip_switch(&self) -> bool {
+        self.crash_flip_mode
     }
 
     /// Betaflight's `updateArmingStatus`. Armed, it watches only the Crash
@@ -316,6 +400,7 @@ impl Arming {
         f.write_u64(u64::from(self.user_disarm));
         f.write_u64(u64::from(self.disarm_frames));
         f.write_u64(u64::from(self.had_signal));
+        f.write_u64(u64::from(self.last_refusal));
     }
 }
 

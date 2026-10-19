@@ -303,17 +303,20 @@ impl Failsafe {
     /// passed since the last check: the link goes down once no good Channels
     /// have arrived for the stage 1 period
     /// (`failsafeCheckDataFailurePeriod`), then Failsafe moves on
-    /// (`failsafeUpdateState`).
-    pub fn check(&mut self, now_ms: u64, arming: &mut Arming) {
+    /// (`failsafeUpdateState`). True when it checked and found the link down,
+    /// which sounds the beeper's `RX_LOST`.
+    pub fn check(&mut self, now_ms: u64, arming: &mut Arming) -> bool {
         if now_ms.saturating_sub(self.last_check) <= CHECK_AFTER {
-            return;
+            return false;
         }
         if now_ms.saturating_sub(self.good_at) > self.failure_period {
             self.link_up = false;
             arming.blocks.rx_loss = true;
         }
+        let link_down = !self.link_up;
         self.update(now_ms, arming);
         self.last_check = now_ms;
+        link_down
     }
 
     /// `failsafeUpdateState`, for DROP: every procedure flies it.

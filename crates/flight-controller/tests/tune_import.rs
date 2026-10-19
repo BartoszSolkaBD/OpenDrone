@@ -158,10 +158,11 @@ fn dshot_idle_value_becomes_motor_idle_and_level_limit_becomes_angle_limit() {
         got(&limited, "angle_limit"),
         is("45", "diff (was level_limit)")
     );
-    // Nothing reads Angle yet (#51), so it stays under "Not simulated yet".
+    // The Flight Controller reads Angle's limit (#51), so it sits under its
+    // tab.
     assert_eq!(
         limited.setting("angle_limit").unwrap().written,
-        Where::NotSimulatedYet
+        Where::UnderItsTab
     );
 }
 
@@ -202,12 +203,11 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
     }
     // The Flight Controller reads low-throttle TPA (#50), Crash Flip's rate
     // fade (#54) and yaw hold (#49), so the Tune sets them under their tabs.
-    // It doesn't know Angle's earth reference yet; the Tune spells it out
-    // all the same, under "Not simulated yet".
     for name in [
         "tpa_low_rate",
         "crashflip_rate",
         "feedforward_yaw_hold_gain",
+        "angle_earth_ref",
     ] {
         assert_eq!(
             meteor.setting(name).unwrap().written,
@@ -215,10 +215,6 @@ fn settings_4_3_lacked_take_adr_0008s_values() {
             "{name}"
         );
     }
-    assert_eq!(
-        meteor.setting("angle_earth_ref").unwrap().written,
-        Where::NotSimulatedYet
-    );
 }
 
 #[test]
@@ -406,8 +402,14 @@ fn hardware_only_settings_are_dropped() {
 #[test]
 fn settings_not_simulated_yet_stay_under_their_own_heading() {
     // Basis: Rule (ADR-0015, #21: RPM filter, notches and the rest stay in
-    // the Tune, listed as not simulated yet).
-    let meteor = meteor();
+    // the Tune, listed as not simulated yet). The Meteor's diff with two
+    // settings the translator doesn't know added, as its own two
+    // (`dshot_bidir`, `vbat_max_cell_voltage`) are read now (#59).
+    let meteor = import(&changed(
+        METEOR,
+        "set dshot_bidir = ON\n",
+        "set dshot_bidir = ON\nset rpm_filter_harmonics = 3\nset thrust_linear = 20\n",
+    ));
     let text = meteor.tune_txt("Whoop 65", "meteor");
     let (read, after) = text
         .split_once("\n# Not simulated yet. ")
@@ -456,10 +458,8 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
     assert!(known.contains(
         "set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro noise, #21)"
     ));
-    // Then every other setting the translator knows, spelled out, ADR-0008's
-    // values among them.
+    // Then every other setting the translator knows, spelled out.
     for line in [
-        "set angle_earth_ref = 0                # ADR-0008; percent",
         "set failsafe_switch_mode = STAGE1      # 4.3 default",
         "set blackbox_sample_rate = 1/2         # diff",
         "set dyn_notch_q = 350                  # diff",
@@ -479,8 +479,8 @@ fn settings_not_simulated_yet_stay_under_their_own_heading() {
             .map(|(n, v, m)| format!("{n} = {v} # {m}"))
             .collect::<Vec<_>>(),
         [
-            "dshot_bidir = ON # diff",
-            "vbat_max_cell_voltage = 435 # diff"
+            "rpm_filter_harmonics = 3 # diff",
+            "thrust_linear = 20 # diff"
         ]
     );
     // A setting 2026.6 has no counterpart for is left out, with the reason.
@@ -725,7 +725,9 @@ fn a_4_3_or_4_4_diff_not_taken_bare_is_imported_with_a_note_about_the_boards_def
     // Basis: Source (4.3.0's cli.c:6245 and 4.4.0's cli.c:6222: without
     // `bare`, a `diff` first applies the board's own defaults).
     for import in [meteor(), cetus()] {
-        assert_eq!(import.warnings.len(), 1);
+        // The other note: neither sets `current_meter`, so it imports at
+        // Betaflight's default, VIRTUAL, which isn't simulated yet (#31 §3).
+        assert_eq!(import.warnings.len(), 2);
         assert!(
             import.warnings[0].starts_with(
                 "In Betaflight 4.3 and 4.4, a `diff` without `bare` lists what differs from the board's own defaults, not Betaflight's:"
@@ -733,6 +735,7 @@ fn a_4_3_or_4_4_diff_not_taken_bare_is_imported_with_a_note_about_the_boards_def
             "{:?}",
             import.warnings
         );
+        assert_eq!(import.warnings[1], CURRENT_METER_NOTE);
     }
     assert!(
         meteor()
@@ -740,8 +743,12 @@ fn a_4_3_or_4_4_diff_not_taken_bare_is_imported_with_a_note_about_the_boards_def
             .contains("- Note: In Betaflight 4.3 and 4.4, a `diff` without `bare`")
     );
     let bare = changed(METEOR, "# diff all\n", "# diff bare\n");
-    assert_eq!(import(&bare).warnings, Vec::<String>::new());
+    assert_eq!(import(&bare).warnings, [CURRENT_METER_NOTE]);
 }
+
+/// The note for a `current_meter` of VIRTUAL, Betaflight's own default,
+/// which isn't simulated yet (#31 §3).
+const CURRENT_METER_NOTE: &str = "`current_meter` is VIRTUAL, which isn't simulated yet: the Flight Controller reads no current, so the OSD's current and mAh read blank";
 
 #[test]
 fn a_dump_or_a_diff_from_4_5_or_newer_is_imported_without_that_note() {
@@ -749,16 +756,16 @@ fn a_dump_or_a_diff_from_4_5_or_newer_is_imported_without_that_note() {
     // backupAndResetConfigs only resets to the firmware's defaults, with a
     // board's defaults built into its firmware).
     let dump = changed(METEOR, "# diff all\n", "# dump all\n");
-    assert_eq!(import(&dump).warnings, Vec::<String>::new());
+    assert_eq!(import(&dump).warnings, [CURRENT_METER_NOTE]);
     let four_five = changed(CETUS, "(S411) 4.4.0 Oct", "(S411) 4.5.0 Oct");
-    assert_eq!(import(&four_five).warnings, Vec::<String>::new());
+    assert_eq!(import(&four_five).warnings, [CURRENT_METER_NOTE]);
     let latest = changed(METEOR, "(S411) 4.3.0 Jun", "(S411) 2026.6.2 Jun");
     let latest = changed(
         &latest,
         "set dshot_idle_value = 600",
         "set motor_idle = 600",
     );
-    assert_eq!(import(&latest).warnings, Vec::<String>::new());
+    assert_eq!(import(&latest).warnings, [CURRENT_METER_NOTE]);
 }
 
 #[test]
@@ -923,5 +930,18 @@ fn a_bare_2026_6_diff_gives_betaflight_2026_6_2s_defaults_as_the_freestyle_5s_tu
             .map(|(n, v, _)| (n.clone(), v.clone()))
             .collect()
     };
-    assert_eq!(values(&imported[..five.len()]), values(&five));
+    // But for `current_meter`, which the 5″ sets by hand to ADC, as a 5″
+    // stack measures its current (#31 §3).
+    let hand_set = |lines: &[(String, String, String)]| -> Vec<(String, String)> {
+        values(lines)
+            .into_iter()
+            .filter(|(name, _)| name != "current_meter")
+            .collect()
+    };
+    assert_eq!(hand_set(&imported[..five.len()]), hand_set(&five));
+    assert!(
+        five.iter().any(|(n, v, mark)| n == "current_meter"
+            && v == "ADC"
+            && mark.starts_with("hand-set:"))
+    );
 }

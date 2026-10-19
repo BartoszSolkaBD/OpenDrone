@@ -138,6 +138,13 @@ pub enum Measure {
     /// The setpoint as our Flight Controller's PID loop uses it: after RC
     /// smoothing, when that's on. In the pilot's directions.
     SmoothedSetpoint(Axis),
+    /// The setpoint our Flight Controller's PID loop compared with the gyro:
+    /// after RC smoothing and, in Angle and Horizon, the levelling, which
+    /// asks for a tilt instead of a rotation speed. In the pilot's
+    /// directions.
+    PidSetpoint(Axis),
+    /// How strongly Horizon levels, from 0 to 1: 0 outside Horizon.
+    HorizonStrength,
     /// The gyro after our Flight Controller's low-passes, as every part of it
     /// reads the gyro, in the pilot's directions.
     FilteredGyro(Axis),
@@ -460,7 +467,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 103] = [
+const ALL: [(&str, Measure); 107] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -533,6 +540,10 @@ const ALL: [(&str, Measure); 103] = [
         "yaw smoothed setpoint",
         Measure::SmoothedSetpoint(Axis::Yaw),
     ),
+    ("roll PID setpoint", Measure::PidSetpoint(Axis::Roll)),
+    ("pitch PID setpoint", Measure::PidSetpoint(Axis::Pitch)),
+    ("yaw PID setpoint", Measure::PidSetpoint(Axis::Yaw)),
+    ("Horizon strength", Measure::HorizonStrength),
     ("filtered gyro roll rate", Measure::FilteredGyro(Axis::Roll)),
     (
         "filtered gyro pitch rate",
@@ -687,9 +698,11 @@ impl Measure {
             Measure::MotorRestarts(_) => Dimension::NONE,
             Measure::BatteryVoltage | Measure::BatterySag => Dimension::VOLTAGE,
             Measure::BatteryChargeUsed => Dimension::CHARGE,
-            Measure::Setpoint(_) | Measure::SmoothedSetpoint(_) | Measure::FilteredGyro(_) => {
-                Dimension::ROTATION_SPEED
-            }
+            Measure::Setpoint(_)
+            | Measure::SmoothedSetpoint(_)
+            | Measure::PidSetpoint(_)
+            | Measure::FilteredGyro(_) => Dimension::ROTATION_SPEED,
+            Measure::HorizonStrength => Dimension::NONE,
             Measure::DetectedPacketRate
             | Measure::SetpointSmoothingCutoff
             | Measure::ThrottleSmoothingCutoff => Dimension::PER_SECOND,
@@ -713,6 +726,8 @@ impl Measure {
         match self {
             Measure::Setpoint(_)
             | Measure::SmoothedSetpoint(_)
+            | Measure::PidSetpoint(_)
+            | Measure::HorizonStrength
             | Measure::FilteredGyro(_)
             | Measure::DetectedPacketRate
             | Measure::SetpointSmoothingCutoff
@@ -844,6 +859,8 @@ impl Measure {
             }
             Measure::Setpoint(_)
             | Measure::SmoothedSetpoint(_)
+            | Measure::PidSetpoint(_)
+            | Measure::HorizonStrength
             | Measure::FilteredGyro(_)
             | Measure::DetectedPacketRate
             | Measure::SetpointSmoothingCutoff
@@ -877,6 +894,8 @@ impl Measure {
             Measure::SmoothedSetpoint(axis) => {
                 pilot(axis, record.smoothed_setpoint[index(axis)]) * DEGREE
             }
+            Measure::PidSetpoint(axis) => pilot(axis, record.pid_setpoint[index(axis)]) * DEGREE,
+            Measure::HorizonStrength => record.horizon_strength,
             Measure::FilteredGyro(axis) => pilot(axis, record.filtered_gyro[index(axis)]) * DEGREE,
             Measure::DetectedPacketRate => record.detected_packet_rate,
             Measure::SetpointSmoothingCutoff => f64::from(record.rc_smoothing_cutoffs?[0]),

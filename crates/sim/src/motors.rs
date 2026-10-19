@@ -34,6 +34,18 @@ pub trait FlightControllerSeam {
 
     /// Feeds whatever it remembers into the Simulation's fingerprint.
     fn write_fingerprint(&self, f: &mut Fingerprinter);
+
+    /// A copy of it with everything it remembers, so that the Simulation can
+    /// be copied whole ([`Simulation::snapshot`](crate::Simulation::snapshot)).
+    /// A copy must go on exactly as the original would, and share nothing
+    /// with it that a step could change.
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam>;
+}
+
+impl Clone for Box<dyn FlightControllerSeam> {
+    fn clone(&self) -> Box<dyn FlightControllerSeam> {
+        self.clone_box()
+    }
 }
 
 /// The scripted-motors stand-in for Physics and Thrust Stand Scenarios: motor
@@ -88,5 +100,9 @@ impl FlightControllerSeam for ScriptedMotors {
     fn write_fingerprint(&self, f: &mut Fingerprinter) {
         f.write_u64(self.next as u64);
         self.current.write_fingerprint(f);
+    }
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
     }
 }

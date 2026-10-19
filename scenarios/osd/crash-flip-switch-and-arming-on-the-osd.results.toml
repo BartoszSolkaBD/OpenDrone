@@ -1,0 +1,76 @@
+# Results of crash-flip-switch-and-arming-on-the-osd.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Disarmed with the Crash Flip switch on reads CRASHFLIP SW, and arming reads ARMED for 0.5 s"
+
+[[expect]]
+what     = "warnings at 0.9 s"
+basis    = "Source"
+expected = "CRASHFLIP SW"
+measured = "CRASHFLIP SW"
+
+[[expect]]
+what     = "warnings blinks at 0.9 s"
+basis    = "Source"
+expected = "no"
+measured = "no"
+
+[[expect]]
+what     = "disarmed at 0.9 s"
+basis    = "Source"
+expected = "DISARMED"
+measured = "DISARMED"
+
+[[expect]]
+what     = "message reads ARMED / >CRASH FLIP<, first over 1 s to 1.2 s"
+basis    = "Source"
+expected = "between 0.004125 s and 0.0876 s"
+measured = "0.0835 s"
+
+[[expect]]
+what     = "message at 1.5 s"
+basis    = "Source"
+expected = "ARMED / >CRASH FLIP<"
+measured = "ARMED / >CRASH FLIP<"
+
+[[expect]]
+what     = "message reads (blank), first over 1.5 s to 1.7 s"
+basis    = "Source"
+expected = "between 0.0834 s and 0.1677 s"
+measured = "0.0835 s"
+
+[[expect]]
+what     = "warnings at 1.7 s"
+basis    = "Source"
+expected = ">CRASH FLIP<"
+measured = ">CRASH FLIP<"
+
+[[expect]]
+what     = "disarmed at 1.7 s"
+basis    = "Source"
+expected = "(blank)"
+measured = "(blank)"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "d5d4dab6a70684e0"   # the whole state after each of 13600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.17 s" = "5641054d451994bd"
+"0.34 s" = "1259b1ca79ccd86d"
+"0.51 s" = "ea73b32f33d5cd32"
+"0.68 s" = "1daf9e72acb46348"
+"0.85 s" = "bcf451c8bdd513f5"
+"1.02 s" = "6389af6c87b897ef"
+"1.19 s" = "0608ec85d5de81a3"
+"1.36 s" = "09b362372d192ace"
+"1.53 s" = "66acc829a198578b"
+"1.7 s" = "a1ed7e6b08e6ea37"
