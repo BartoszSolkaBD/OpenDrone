@@ -8,8 +8,8 @@ mod common;
 use common::{STEP, WORLD, whoop};
 use opendrone_maths::{Attitude, DEGREE, Fingerprinter, PilotAngles, Vec3};
 use opendrone_physics::{
-    MapCollision, MapShape, MotorCommands, Mount, QuadBody, QuadParameters, QuadStart, QuadState,
-    SetUpProblem, StartingMotors, World,
+    MapCollision, MapShape, MotorCommands, Mount, PropWash, QuadBody, QuadParameters, QuadStart,
+    QuadState, SetUpProblem, StartingMotors, World,
 };
 
 /// The Whoop 65's props: 17.5 mm across the radius.
@@ -97,6 +97,57 @@ fn over_a_floor_each_rotor_gives_sanchez_cuevas_eq_4_times_its_open_air_thrust_a
                 eq_4(z)
             );
         }
+    }
+}
+
+#[test]
+fn the_gain_multiplies_the_thrust_that_prop_wash_leaves() {
+    // Basis: Rule (the air works out each rotor's thrust, Prop Wash's loss and
+    // flicker included, and the gain of the surfaces near the rotor then
+    // multiplies that thrust). A whoop sinking at 5 m/s, inside the band where
+    // Prop Wash acts, two radii above a floor: its thrust over the floor is its
+    // thrust in open air, Prop Wash's flicker and all, times the gain the same
+    // whoop gets from the floor with no Prop Wash.
+    let state = QuadState {
+        velocity: Vec3::new(0.0, 0.0, -5.0),
+        ..at(1.0 + 2.0 * R, Attitude::BODY_IS_WORLD)
+    };
+    let washed = QuadParameters {
+        prop_wash: PropWash {
+            strength: 0.2,
+            flicker: 15.0,
+        },
+        ..whoop()
+    };
+    let floor = map(&[floor_at(1.0)]);
+    let open_air = MapCollision::default();
+    let thrusts = |parameters: QuadParameters, map: &MapCollision| {
+        let mut quad = settled_in_open_air(parameters, state, Mount::Free);
+        thrusts_after_a_step(&mut quad, map)
+    };
+    let wash_over_the_floor = thrusts(washed.clone(), &floor);
+    let wash_in_open_air = thrusts(washed, &open_air);
+    let gains: Vec<f64> = thrusts(whoop(), &floor)
+        .iter()
+        .zip(thrusts(whoop(), &open_air))
+        .map(|(near, far)| near / far)
+        .collect();
+    assert!(gains.iter().all(|gain| *gain > 1.05), "{gains:?}");
+    // Prop Wash acts: each rotor flickers its own way, so the thrusts differ.
+    let first = wash_in_open_air[0];
+    assert!(
+        wash_in_open_air
+            .iter()
+            .any(|thrust| (thrust - first).abs() > 0.01 * first),
+        "{wash_in_open_air:?}"
+    );
+    for k in 0..4 {
+        let expected = wash_in_open_air[k] * gains[k];
+        assert!(
+            (wash_over_the_floor[k] - expected).abs() < 1e-9 * expected,
+            "rotor {k}: {} against {expected}",
+            wash_over_the_floor[k]
+        );
     }
 }
 

@@ -49,13 +49,13 @@ measured = "7.88 gf"
 [[expect]]
 what     = "motor 1 thrust, lowest over 0 s to 0.5 s"
 basis    = "Observed"
-expected = "5.83 gf ± 0.3 gf"
+expected = "5.81 gf ± 0.3 gf"
 measured = "5.81 gf"
 
 [[expect]]
 what     = "motor 1 thrust, highest over 0 s to 0.5 s"
 basis    = "Observed"
-expected = "7.93 gf ± 0.3 gf"
+expected = "8.04 gf ± 0.3 gf"
 measured = "8.04 gf"
 
 [[expect]]
@@ -73,7 +73,7 @@ measured = "4.18°"
 [[expect]]
 what     = "vertical speed at 0.5 s"
 basis    = "Observed"
-expected = "-4.92 m/s ± 0.1 m/s"
+expected = "-4.98 m/s ± 0.1 m/s"
 measured = "-4.98 m/s"
 
 [[expect]]

@@ -8,9 +8,13 @@
 # 70/670/0, about three and a half turns.
 #
 # At 30% throttle the whoop sinks, about 13 m in the three seconds, with
-# the air acting on it (#108). Its roll rate swings above and below the max
-# rate as it rolls on, and the PID loop pulls it back: over a whole second
-# it holds the max rate.
+# the air acting on it (#108). The air acts through its ducts, and two of
+# the ducts' numbers are Estimates, `ram_drag` and `nose_up_offset`: they
+# are what makes its roll rate swing above and below the max rate as it
+# rolls on. The PID loop pulls it back: over a whole second it holds the
+# max rate. Feedforward (#49) and I-term relax (#50) don't cause the swing:
+# the stick is held steady from 1 s, so both are zero there. Only #49's
+# filters and #50's Dynamic D might move it a little.
 #
 # Sinking a few metres a second, its rotors are inside the band where a
 # rotor sinks into its own air, so Prop Wash (#46) shakes it as it rolls,
@@ -24,8 +28,8 @@
 # and RC smoothing (#49), with the Tune's loop shaping (#50): Dynamic D
 # raising D from 45 towards 48 on fast moves, I-term relax holding I back
 # while the setpoint climbs, anti-gravity, TPA from 1350 µs and throttle
-# boost. The Source Expectations hold either way; the Observed swings moved
-# when the loop shaping landed.
+# boost. The Source Expectations hold either way. The Observed roll, pitch and
+# yaw swings moved a little when the loop shaping landed.
 format = 2
 name   = "The Whoop 65 flies on its imported Tune: full right roll reaches the max rate"
 
@@ -86,13 +90,13 @@ basis = "observed: with the sticks centred the whoop holds still; a centred stic
 what    = "roll rate"
 over    = "1.5 s to 3 s"
 highest = "837 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108); it peaked at 836 °/s before the loop shaping (#50)"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it through the ducts (#108: their `ram_drag` and `nose_up_offset` Estimates); it peaked at 836 °/s before the loop shaping (#50), which moved it a little"
 
 [[expect]]
 what    = "roll rate"
 over    = "1.5 s to 3 s"
 lowest  = "501 °/s ± 3%"
-basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it (#108) and Prop Wash shaking it (#46: was 530 °/s without it); it dipped to 495 °/s before the loop shaping (#50)"
+basis   = "observed: the roll rate swings around the max rate as the sinking whoop rolls on, with the air acting on it through the ducts (#108: their `ram_drag` and `nose_up_offset` Estimates) and Prop Wash shaking it (#46: was 530 °/s without it); it dipped to 495 °/s before the loop shaping (#50), which moved it a little"
 
 [[expect]]
 what    = "pitch rate"

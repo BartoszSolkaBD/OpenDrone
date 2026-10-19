@@ -101,7 +101,7 @@
 //! Thrust grows with power to the ⅔, so **at the same power the thrust is
 //! `γ^⅔` times its open-air thrust**, as Hsiao and Chirarattananon say of
 //! their own measurement ("amplified by a factor of 4^(2/3) or 2.5 times for
-//! the same power consumption", §V.C). Here a motor at a fixed speed gives
+//! the same power consumption", §VI-C1). Here a motor at a fixed speed gives
 //! its prop the same power whatever the air does ([`crate::air`] holds the
 //! power fixed the same way), so the gain is `γ^⅔`: +7.4% at half a radius,
 //! +2.0% at one radius, +0.5% at two. It grows the closer the rotor gets:
@@ -297,6 +297,11 @@ pub(crate) fn can_work(rotors: &Rotors) -> bool {
 /// thrust times its gain less one, along the body's up axis at its hub, so it
 /// lifts the Quad and turns it about its centre of mass. A rotor with a gain
 /// of exactly 1, or no thrust, changes nothing.
+///
+/// The thrusts in the push are what the air left each rotor, Prop Wash's loss
+/// and flicker included, so the gain multiplies the thrust left after Prop
+/// Wash. Prop Wash's own share is worked out from the thrust before the gain
+/// ([`crate::prop_wash::share`]): the gain doesn't move the band.
 pub(crate) fn add_lift(push: &mut Push, gains: &[f64; 4], positions: &[Vec3; 4]) {
     for k in 0..4 {
         let thrust = push.thrusts[k];

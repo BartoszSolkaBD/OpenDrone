@@ -26,8 +26,8 @@
 # at about 0.555 s. Its front props strike the wall first and stop, and it
 # bounces back at about 2 m/s. Their ESCs find them stalled and restart them,
 # 0.1 s later and capped at the start-up power limit at first, so they run
-# again by about 0.86 s; until then the Flight Controller asks for all the
-# nose-up pitch it can, the pitch sum above 600 from about 0.556 s to 0.86 s,
+# again by about 0.88 s; until then the Flight Controller asks for all the
+# nose-up pitch it can, the pitch sum above 600 from about 0.556 s to 0.88 s,
 # and the Quad tumbles. Running again, it settles in Acro about 51° nose down,
 # so its thrust carries it back east into the wall at about 1.42 s, and it
 # ends up pressed against the wall's face, nose in, still armed and flying.
@@ -37,10 +37,12 @@
 # those out.
 #
 # Since ground and ceiling effect (#44): nose down and pressed against the
-# wall's face, its rotors blow close to the wall, which cushions them, so the PID
-# sums moved a little (the roll sum's lowest from 1.6 s to 3 s from 5.64 to
-# 2.08, the speed east at 1 s from -0.0915 to -0.0858 m/s). The hit, the
-# restarts, the second hit at about 1.41 s and where it ends up are the same.
+# wall's face (about roll -45°, pitch -69°, heading 144°), its rotors draw
+# their air from the wall and blow away from it, so the wall gives them the
+# ceiling effect, a pull toward the wall. The PID sums moved a little (the
+# roll sum's lowest from 1.6 s to 3 s from 5.64 to 2.08), and so did the
+# speed east at 1 s, from -0.0915 to -0.0858 m/s. The hit, the restarts, the
+# second hit at about 1.41 s and where it ends up are the same.
 #
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
 # west), level and armed, its motors "settled", flying east at 10 m/s with
@@ -124,7 +126,7 @@ basis   = "observed: with its front props struck and stopped, the Flight Control
 what   = "pitch PID sum"
 over   = "0.556 s to 0.85 s"
 lowest = "between 600 and 3000"
-basis  = "observed: the pitch sum is above 600 from just after the hit until the struck props run again, about 0.86 s: about 300 ms, far longer than the 75 ms Betaflight's runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c), which disarms the same flight with the guard on (a-quad-pinned-against-a-wall-right-after-arming-disarms.toml)"
+basis  = "observed: the pitch sum is above 600 from just after the hit until the struck props run again, about 0.88 s: about 300 ms, far longer than the 75 ms Betaflight's runaway takeoff prevention needs (RUNAWAY_TAKEOFF_ACTIVATE_DELAY, core.c), which disarms the same flight with the guard on (a-quad-pinned-against-a-wall-right-after-arming-disarms.toml)"
 
 [[expect]]
 what   = "pitch PID sum"
@@ -134,63 +136,15 @@ basis  = "observed: until the second hit, it never goes below -600"
 
 [[expect]]
 what   = "pitch PID sum"
-over   = "1.04 s to 1.07 s"
+over   = "1.04 s to 1.34 s"
 lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
+basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing (with the highest below, one pair of windows over the stretch that ten 30 ms lowest windows covered: together they say every sample is within ±600, which is stronger than the ten were)"
 
 [[expect]]
-what   = "pitch PID sum"
-over   = "1.07 s to 1.10 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.10 s to 1.13 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.13 s to 1.16 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.16 s to 1.19 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.19 s to 1.22 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.22 s to 1.25 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.25 s to 1.28 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.28 s to 1.31 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
-
-[[expect]]
-what   = "pitch PID sum"
-over   = "1.31 s to 1.34 s"
-lowest = "between -600 and 600"
-basis  = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing"
+what    = "pitch PID sum"
+over    = "1.04 s to 1.34 s"
+highest = "between -600 and 600"
+basis   = "observed: its props running again, it flies back toward the wall nose down, asking next to nothing: the pitch sum never goes above 600 for any stretch, let alone the 75 ms that runaway takeoff prevention needs (it measures about 1.1)"
 
 [[expect]]
 what    = "pitch PID sum"

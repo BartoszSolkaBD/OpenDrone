@@ -487,6 +487,13 @@ impl Simulation {
         }
     }
 
+    /// A Quad's Prop Wash flicker after the last tick (at the start before
+    /// the first): each rotor's, from -1 to 1, in Betaflight's motor order
+    /// ([`Flicker::values`]).
+    pub fn quad_flicker(&self, quad: usize) -> [f64; 4] {
+        self.quads[quad].body.flicker().values()
+    }
+
     /// Every place where the Map pushed a Quad during the last tick, by part
     /// and then by Map shape, with how hard each prop rubbed (none before the
     /// first tick, and none on the thrust stand).
