@@ -17,10 +17,20 @@
 //! - [`sound`](mod@sound): the Quad's sound On the Quad, on the sound's own
 //!   thread, silent when there's no sound device (#74);
 //! - [`drawing`]: the Map and the Quad drawn from their solid parts, a grid
-//!   on a Test Map's floor, and a placeholder camera on the Quad's frame;
+//!   on a Test Map's floor, and the FPV Camera on the Quad's frame;
+//! - [`camera`]: the FPV Camera (#66): the Quad's fisheye Lens, the Analog and
+//!   Digital Video Looks, Auto-exposure, Camera Tilt and FOV in flight, and
+//!   Digital's 15 ms late picture, all outside the Simulation;
 //! - [`status`]: what the pilot needs to know, in the window's title;
+//! - [`developer`]: commands that draw into an image instead of the window,
+//!   to save the picture or measure what the camera costs a frame;
 //! - [`reference`](mod@reference): the reference check, a Scenario flown through the game's
-//!   stepping, which must match the headless runner's fingerprint.
+//!   stepping, which must match the headless runner's fingerprint;
+//! - [`watch`]: a developer command that opens a Flight or Thrust Stand
+//!   Scenario in the FPV view, with pause (#73);
+//! - [`save`]: the Save Flight Action (#73), which writes the flight as a
+//!   Scenario and an Input Track the headless runner flies again to the same
+//!   fingerprint.
 //!
 //! Rendering isn't pipelined and VSync is off, for the least delay from the
 //! sticks to the picture (#28 §7).
@@ -28,15 +38,19 @@
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 //! [ADR-0021]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0021-alpha-starts-on-bevy-0-20.md
 
+pub mod camera;
 pub mod clock;
+pub mod developer;
 pub mod drawing;
 pub mod pilot;
 pub mod reference;
+pub mod save;
 pub mod set_up;
 pub mod settings;
 pub mod sound;
 pub mod status;
 pub mod stepping;
+pub mod watch;
 
 use std::time::Duration;
 
@@ -46,17 +60,39 @@ use bevy::prelude::*;
 use bevy::render::pipelined_rendering::PipelinedRenderingPlugin;
 use bevy::window::PresentMode;
 
+use crate::camera::CameraPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pilot::{KeyboardPlugin, Pilot, PilotPlugin};
 use crate::set_up::FlightPlan;
 use crate::sound::SoundPlugin;
 use crate::status::StatusPlugin;
 use crate::stepping::{Flight, SteppingPlugin};
+use crate::watch::WatchedScenario;
+
+pub use crate::developer::{measure_camera_cost, screenshot_after};
 
 /// The game in its window: the flight, the pilot's Input Devices and the
 /// keyboard, drawn with no pipelining and no VSync, and the Quad's sound.
 pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
     let flight = Flight::new(plan.simulation(None)?)?;
+    Ok(window_game(plan, pilot, flight))
+}
+
+/// The game in its window, watching a Scenario (#73): its flight stepped by
+/// the game, with nobody flying it. Pause works as in any flight.
+pub fn watching_game(watched: WatchedScenario, pilot: Pilot) -> App {
+    let WatchedScenario {
+        plan,
+        flight,
+        watching,
+    } = watched;
+    let mut app = window_game(plan, pilot.watching(), flight);
+    app.insert_resource(watching);
+    app
+}
+
+/// The game's window, systems and resources, flying `flight`.
+fn window_game(plan: FlightPlan, pilot: Pilot, flight: Flight) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -76,124 +112,14 @@ pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
         PilotPlugin,
         KeyboardPlugin,
         DrawingPlugin,
+        CameraPlugin,
         StatusPlugin,
         SoundPlugin,
     ))
     .insert_resource(plan)
     .insert_non_send(flight)
     .insert_resource(pilot);
-    Ok(app)
-}
-
-/// A developer command: saves the camera's picture to a BMP file once the
-/// game has run for `seconds`, then quits. Agents use it to look at the
-/// picture on a machine they can't watch. The camera draws into a picture
-/// of its own, 1280 × 720, instead of the window, so it works with the
-/// screen locked too.
-pub fn screenshot_after(app: &mut App, seconds: f64, path: std::path::PathBuf) {
-    app.insert_resource(ScreenshotAt {
-        after: Duration::from_secs_f64(seconds),
-        path,
-        picture: None,
-        taken: false,
-    })
-    .add_systems(PostStartup, draw_into_a_picture)
-    .add_systems(Update, take_the_screenshot);
-}
-
-#[derive(Resource)]
-struct ScreenshotAt {
-    after: Duration,
-    path: std::path::PathBuf,
-    picture: Option<Handle<Image>>,
-    taken: bool,
-}
-
-fn draw_into_a_picture(
-    mut at: ResMut<ScreenshotAt>,
-    mut images: ResMut<Assets<Image>>,
-    cameras: Query<Entity, With<Camera3d>>,
-    mut commands: Commands,
-) {
-    use bevy::camera::RenderTarget;
-    use bevy::render::render_resource::TextureFormat;
-    let picture = images.add(Image::new_target_texture(
-        1280,
-        720,
-        TextureFormat::Rgba8UnormSrgb,
-        None,
-    ));
-    for camera in &cameras {
-        commands
-            .entity(camera)
-            .insert(RenderTarget::Image(picture.clone().into()));
-    }
-    at.picture = Some(picture);
-}
-
-fn take_the_screenshot(
-    mut at: ResMut<ScreenshotAt>,
-    real: Res<Time<Real>>,
-    mut commands: Commands,
-) {
-    use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
-    if at.taken || real.elapsed() < at.after {
-        return;
-    }
-    let Some(picture) = at.picture.clone() else {
-        return;
-    };
-    at.taken = true;
-    let path = at.path.clone();
-    commands.spawn(Screenshot::image(picture)).observe(
-        move |captured: On<ScreenshotCaptured>, mut exit: MessageWriter<AppExit>| {
-            let saved = captured
-                .image
-                .clone()
-                .try_into_dynamic()
-                .map_err(|e| e.to_string())
-                .and_then(|picture| {
-                    let rgb = picture.to_rgb8();
-                    write_bmp(&path, rgb.width(), rgb.height(), rgb.as_raw())
-                        .map_err(|e| e.to_string())
-                });
-            match saved {
-                Ok(()) => {
-                    info!("saved the picture to {}", path.display());
-                    exit.write(AppExit::Success);
-                }
-                Err(problem) => {
-                    error!("the picture can't be saved: {problem}");
-                    exit.write(AppExit::error());
-                }
-            }
-        },
-    );
-}
-
-/// Writes 8-bit RGB rows, top first, as an uncompressed 24-bit BMP file.
-fn write_bmp(path: &std::path::Path, width: u32, height: u32, rgb: &[u8]) -> std::io::Result<()> {
-    let row = (width as usize * 3).div_ceil(4) * 4;
-    let size = 54 + row * height as usize;
-    let mut file = Vec::with_capacity(size);
-    file.extend_from_slice(b"BM");
-    file.extend_from_slice(&(size as u32).to_le_bytes());
-    file.extend_from_slice(&[0; 4]);
-    file.extend_from_slice(&54u32.to_le_bytes());
-    file.extend_from_slice(&40u32.to_le_bytes());
-    file.extend_from_slice(&(width as i32).to_le_bytes());
-    file.extend_from_slice(&(height as i32).to_le_bytes());
-    file.extend_from_slice(&1u16.to_le_bytes());
-    file.extend_from_slice(&24u16.to_le_bytes());
-    file.extend_from_slice(&[0; 24]);
-    for y in (0..height as usize).rev() {
-        let start = y * width as usize * 3;
-        for pixel in rgb[start..start + width as usize * 3].chunks(3) {
-            file.extend_from_slice(&[pixel[2], pixel[1], pixel[0]]);
-        }
-        file.resize(file.len() + row - width as usize * 3, 0);
-    }
-    std::fs::write(path, file)
+    app
 }
 
 /// How long a headless run lasts, in the computer's time.

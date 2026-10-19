@@ -14,13 +14,13 @@ measured = "670 °/s"
 what     = "roll rate at 1.25 s"
 basis    = "Source"
 expected = "670 °/s ± 3%"
-measured = "675 °/s"
+measured = "670 °/s"
 
 [[expect]]
 what     = "roll rate, mean over 1.3 s to 1.5 s"
 basis    = "Source"
 expected = "670 °/s ± 3%"
-measured = "671 °/s"
+measured = "670 °/s"
 
 [[expect]]
 what     = "roll rate at 0.9 s"
@@ -32,37 +32,37 @@ measured = "0.104 °/s"
 what     = "pitch rate, lowest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.134 °/s"
+measured = "-0.159 °/s"
 
 [[expect]]
 what     = "pitch rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.0791 °/s"
+measured = "-0.0731 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.0843 °/s"
+measured = "0.0777 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.139 °/s"
+measured = "0.181 °/s"
 
 [[expect]]
 what     = "roll rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
-expected = "830 °/s ± 2%"
-measured = "830 °/s"
+expected = "670 °/s ± 1%"
+measured = "670 °/s"
 
 [[expect]]
 what     = "roll rate at 1.8 s"
 basis    = "Observed"
-expected = "-1.8 °/s ± 1 °/s"
-measured = "-2.01 °/s"
+expected = "0 °/s ± 0.5 °/s"
+measured = "-0.194 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "930ed539d6c22485"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "aec02cafcbd83670"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "0a8cc8a1068d73ed"   # the whole state after each of 14400 steps at 8000 Hz, in order
+run  = "a1a463db75c6b714"   # the whole state after each of 14400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.18 s" = "4ea47c21fdd33b63"
-"0.36 s" = "6f1be5a998b7e4c7"
-"0.54 s" = "834ce669e8f761f3"
-"0.72 s" = "99b2dcabdf29be23"
-"0.9 s" = "ddf8555a8eb687ad"
-"1.08 s" = "50980e27865577da"
-"1.26 s" = "dd811eab4d8a8de4"
-"1.44 s" = "95f92c26daab6535"
-"1.62 s" = "ecbbbd8aa3db99e1"
-"1.8 s" = "76d6e8afc82e83b1"
+"0.18 s" = "092d2f5e0a6f5131"
+"0.36 s" = "ceb4af2db1e791d5"
+"0.54 s" = "c10fc66a5d28b051"
+"0.72 s" = "fe67f8cec81f9fd3"
+"0.9 s" = "e303aaa18e3004c8"
+"1.08 s" = "e43592121378ff58"
+"1.26 s" = "5f50de1d613277c3"
+"1.44 s" = "4bb76d1eb57bb682"
+"1.62 s" = "a1e5965e25afdc5e"
+"1.8 s" = "cc30293350b28649"

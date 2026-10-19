@@ -1,0 +1,64 @@
+# Results of the-statistics-page-shows-the-armed-time-after-disarming.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The statistics page shows the armed time after disarming, and throttle up dismisses it"
+
+[[expect]]
+what     = "the Quad disarms, first over 6.5 s to 7 s"
+basis    = "Source"
+expected = "0.016125 s ± 0.000001 s"
+measured = "0.0161 s"
+
+[[expect]]
+what     = "statistics page at 6.5 s"
+basis    = "Source"
+expected = "(blank)"
+measured = "(blank)"
+
+[[expect]]
+what     = "statistic TOTAL ARM at 7 s"
+basis    = "Source"
+expected = "00:04"
+measured = "00:04"
+
+[[expect]]
+what     = "statistics page at 7 s"
+basis    = "Observed"
+expected = "--- STATS --- / TOTAL ARM : 00:04 / MIN BATTERY : 25.18V / MAX CURRENT : 0.16A / USED MAH : 0mAh"
+measured = "--- STATS --- / TOTAL ARM : 00:04 / MIN BATTERY : 25.18V / MAX CURRENT : 0.16A / USED MAH : 0mAh"
+
+[[expect]]
+what     = "statistics page reads (blank), first over 8 s to 8.3 s"
+basis    = "Source"
+expected = "between 0.0001 s and 0.1677 s"
+measured = "0.0835 s"
+
+[[expect]]
+what     = "disarmed at 8.3 s"
+basis    = "Source"
+expected = "DISARMED"
+measured = "DISARMED"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "aec02cafcbd83670"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "15cbeb4e88c44e72"   # test/flat-floor
+run  = "bc421c5e2d8db8ac"   # the whole state after each of 66400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.83 s" = "60f4fabbb4983c0b"
+"1.66 s" = "7252d2a3fa7c6070"
+"2.49 s" = "f7931994208f9d1f"
+"3.32 s" = "3787c20c15d27741"
+"4.15 s" = "187ab89694e162bf"
+"4.98 s" = "7f6b8f7c2e7c82b1"
+"5.81 s" = "fb30cf52df64806c"
+"6.64 s" = "f5f0593853dc1c86"
+"7.47 s" = "cfe05481906d007d"
+"8.3 s" = "15ead97986521e5b"

@@ -1,0 +1,217 @@
+// The FPV Camera's one merged pass (ADR-0009): the Quad's fisheye Lens, the camera's own response
+// and the Analog or Digital Video Look, in one go.
+//
+// The Map was drawn once, by a normal camera, into `src_tex`: wider than the picture, with a mip
+// chain. For every pixel of the window we find which direction the Lens sees there, look that
+// direction up in the flat render, and make the Analog or Digital picture from it. Breakup joins
+// this pass with its own ticket.
+//
+// Reimplemented from the #28 prototype, which tuned every number here by eye.
+import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput;
+
+struct FpvParams {
+    picture: vec4<f32>,  // x0, y0, w, h of the picture (window px)
+    lens: vec4<f32>,     // R (the 4:3 frame's half-diagonal, px), theta_max, curve k, g(theta_max)
+    source: vec4<f32>,   // tan half-extent x, y of the flat render; its w, h (px)
+    mode: vec4<f32>,     // look (0 Analog, 1 Digital), time (s), frame number, -
+    analog: vec4<f32>,   // window px per analog pixel across, softness, grain, colour bleed
+    grade: vec4<f32>,    // contrast, saturation, Digital's sharpening, -
+    camera: vec4<f32>,   // dynamic range factor, window px per analog line, window px per Digital line, -
+};
+
+@group(0) @binding(0) var src_tex: texture_2d<f32>;
+@group(0) @binding(1) var src_samp: sampler;
+@group(0) @binding(2) var<uniform> P: FpvParams;
+// Plain trilinear (no anisotropy): Analog's soft taps want blur, not crisp edges.
+@group(0) @binding(3) var blur_samp: sampler;
+
+fn pcg(v: u32) -> u32 {
+    let state = v * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+fn hash3(x: i32, y: i32, z: u32) -> f32 {
+    let h = pcg(bitcast<u32>(x) ^ pcg(bitcast<u32>(y) ^ pcg(z)));
+    return f32(h) * (1.0 / 4294967295.0);
+}
+
+fn vnoise(p: vec2<f32>, seed: u32) -> f32 {
+    let i = floor(p);
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let ix = i32(i.x);
+    let iy = i32(i.y);
+    let a = hash3(ix, iy, seed);
+    let b = hash3(ix + 1, iy, seed);
+    let c = hash3(ix, iy + 1, seed);
+    let d = hash3(ix + 1, iy + 1, seed);
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// Window pixel -> uv in the flat render. The Lens: r / R = g(theta) / g(theta_max), with
+// g(theta) = theta (curve 0, the stock equidistant fisheye) or tan(k theta) / k (gentler, k > 0).
+fn warp(pix: vec2<f32>) -> vec2<f32> {
+    let c = P.picture.xy + 0.5 * P.picture.zw;
+    let q = (pix - c) / P.lens.x;
+    let r = max(length(q), 1e-6);
+    let theta_max = P.lens.y;
+    let k = P.lens.z;
+    let gmax = P.lens.w;
+    var theta = r * theta_max;
+    if (k > 1e-4) {
+        theta = atan(r * gmax * k) / k;
+    }
+    theta = min(theta, 1.5607);
+    let s = tan(theta) * q / r;
+    return vec2<f32>(s.x / P.source.x, s.y / P.source.y) * 0.5 + 0.5;
+}
+
+// The camera's response. The Map render stores Reinhard-compressed light (y = x / (1 + x), after
+// Auto-exposure), so we undo that, squeeze or stretch the stops around the exposure's middle grey
+// to this camera's dynamic range, and apply the punchy (ACES) tone curve.
+const PIVOT: f32 = 0.263;  // light that ACES shows as 18% grey
+
+fn rrt_odt(v: vec3<f32>) -> vec3<f32> {
+    let a = v * (v + 0.0245786) - 0.000090537;
+    let b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return a / b;
+}
+
+fn aces(color: vec3<f32>) -> vec3<f32> {
+    let rgb_to_rrt = mat3x3<f32>(
+        vec3<f32>(0.59719, 0.35458, 0.04823),
+        vec3<f32>(0.07600, 0.90834, 0.01566),
+        vec3<f32>(0.02840, 0.13383, 0.83777),
+    );
+    let odt_to_rgb = mat3x3<f32>(
+        vec3<f32>(1.60475, -0.53108, -0.07367),
+        vec3<f32>(-0.10208, 1.10813, -0.00605),
+        vec3<f32>(-0.00327, -0.07276, 1.07602),
+    );
+    var c = color * rgb_to_rrt;
+    c = rrt_odt(c);
+    c = c * odt_to_rgb;
+    return clamp(c, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+fn camera_curve(y_in: vec3<f32>) -> vec3<f32> {
+    let y = clamp(y_in, vec3<f32>(0.0), vec3<f32>(0.992));
+    let x = max(y / (vec3<f32>(1.0) - y), vec3<f32>(1e-6));
+    let xs = PIVOT * exp2(log2(x / PIVOT) * P.camera.x);
+    return aces(xs);
+}
+
+fn to_gamma(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(1.0 / 2.2));
+}
+
+fn to_linear(c: vec3<f32>) -> vec3<f32> {
+    return pow(max(c, vec3<f32>(0.0)), vec3<f32>(2.2));
+}
+
+fn rgb2yiq(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        dot(c, vec3<f32>(0.299, 0.587, 0.114)),
+        dot(c, vec3<f32>(0.596, -0.274, -0.322)),
+        dot(c, vec3<f32>(0.211, -0.523, 0.312)),
+    );
+}
+
+fn yiq2rgb(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        c.x + 0.956 * c.y + 0.621 * c.z,
+        c.x - 0.272 * c.y - 0.647 * c.z,
+        c.x - 1.106 * c.y + 1.703 * c.z,
+    );
+}
+
+fn sample_soft(uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec3<f32> {
+    return textureSampleGrad(src_tex, blur_samp, uv, gx, gy).rgb;
+}
+
+fn sample_sharp(uv: vec2<f32>, gx: vec2<f32>, gy: vec2<f32>) -> vec3<f32> {
+    return textureSampleGrad(src_tex, src_samp, uv, gx, gy).rgb;
+}
+
+fn analog(pix: vec2<f32>) -> vec3<f32> {
+    let frame = u32(P.mode.z);
+    let apx = P.analog.x;     // window px per analog pixel across (from the camera's TV lines)
+    let apy = P.camera.y;     // window px per analog line (from the camera's lines)
+    let soft = P.analog.y;
+    let grain = P.analog.z;
+    let bleed = P.analog.w;
+
+    let rel = pix - P.picture.xy;
+    let uv = warp(pix);
+    let gx = warp(pix + vec2<f32>(1.0, 0.0)) - uv;
+    let gy = warp(pix + vec2<f32>(0.0, 1.0)) - uv;
+
+    // Luma: a soft picture of the camera's lines, four taps spread over the analog pixel.
+    let fx = gx * (apx * soft);
+    let fy = gy * (apy * soft / 0.7);  // Kell factor: interlaced video resolves ~70% of its lines
+    let g0 = fx * 0.75;
+    let g1 = fy * 0.75;
+    // (The camera curve runs once on each blurred result, not per tap: it costs ~0.3 ms per tap set.)
+    let t0 = sample_soft(uv + 0.30 * fx + 0.10 * fy, g0, g1);
+    let t1 = sample_soft(uv - 0.30 * fx - 0.10 * fy, g0, g1);
+    let t2 = sample_soft(uv + 0.10 * fx - 0.30 * fy, g0, g1);
+    let t3 = sample_soft(uv - 0.10 * fx + 0.30 * fy, g0, g1);
+    let lum = rgb2yiq(to_gamma(camera_curve((t0 + t1 + t2 + t3) * 0.25))).x;
+
+    // Chroma: much less bandwidth, and it trails to the right (colour bleed).
+    let bx = gx * (apx * max(bleed, 0.01));
+    let cg = bx * 0.5;
+    let c0 = sample_soft(uv - bx * 0.15, cg, fy);
+    let c1 = sample_soft(uv - bx * 0.50, cg, fy);
+    let c2 = sample_soft(uv - bx * 0.85, cg, fy);
+    let chroma = rgb2yiq(to_gamma(camera_curve((c0 + c1 + c2) / 3.0))).yz;
+    var yiq = vec3<f32>(lum, chroma);
+
+    // Grade: contrast and saturation in gamma space.
+    yiq.x = (yiq.x - 0.5) * P.grade.x + 0.5;
+    yiq = vec3<f32>(yiq.x, yiq.yz * P.grade.y);
+
+    // Faint grain on the analog grid, new every frame.
+    let a = rel / vec2<f32>(apx, apy);
+    yiq.x = yiq.x + (vnoise(a, frame * 3u + 1u) - 0.5) * grain * 2.0;
+
+    let rgb = yiq2rgb(yiq);
+    return to_linear(clamp(rgb, vec3<f32>(0.0), vec3<f32>(1.0)));
+}
+
+fn digital(pix: vec2<f32>) -> vec3<f32> {
+    let uv = warp(pix);
+    let gx = warp(pix + vec2<f32>(1.0, 0.0)) - uv;
+    let gy = warp(pix + vec2<f32>(0.0, 1.0)) - uv;
+    // The transmitted picture's resolution (1080 lines is a little softer than a 1440p window).
+    let blur = max(P.camera.z, 1.0);
+    var c = camera_curve(sample_sharp(uv, gx * blur, gy * blur));
+    if (P.grade.z > 0.0) {
+        let b = camera_curve(sample_sharp(uv, gx * 2.5 * blur, gy * 2.5 * blur));
+        c = max(c + (c - b) * P.grade.z, vec3<f32>(0.0));
+    }
+    var g = to_gamma(c);
+    let l = dot(g, vec3<f32>(0.299, 0.587, 0.114));
+    g = mix(vec3<f32>(l), g, P.grade.y);
+    g = (g - 0.5) * P.grade.x + 0.5;
+    return to_linear(clamp(g, vec3<f32>(0.0), vec3<f32>(1.0)));
+}
+
+@fragment
+fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
+    let pix = in.position.xy;
+    let p0 = P.picture.xy;
+    let p1 = P.picture.xy + P.picture.zw;
+    let inside = pix.x >= p0.x && pix.x < p1.x && pix.y >= p0.y && pix.y < p1.y;
+    if (!inside) {
+        return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+    }
+    var col: vec3<f32>;
+    if (P.mode.x < 0.5) {
+        col = analog(pix);
+    } else {
+        col = digital(pix);
+    }
+    return vec4<f32>(col, 1.0);
+}

@@ -1,0 +1,88 @@
+# Results of dynamic-d.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "Dynamic D raises D towards D max on fast stick and gyro moves"
+
+[[expect]]
+what     = "roll Dynamic D factor at 0.5 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "roll Dynamic D factor at 0.501 s"
+basis    = "Source"
+expected = "1.064304 ± 0.000001"
+measured = "1.06"
+
+[[expect]]
+what     = "roll Dynamic D factor at 0.503 s"
+basis    = "Source"
+expected = "1.333333 ± 0.000001"
+measured = "1.33"
+
+[[expect]]
+what     = "roll D term at 0.503125 s"
+basis    = "Source"
+expected = "148.459 ± 0.001"
+measured = "148"
+
+[[expect]]
+what     = "yaw Dynamic D factor at 0.503 s"
+basis    = "Source"
+expected = "1 ± 0"
+measured = "1.00"
+
+[[expect]]
+what     = "roll Dynamic D factor at 0.51 s"
+basis    = "Source"
+expected = "1.321777 ± 0.000001"
+measured = "1.32"
+
+[[expect]]
+what     = "roll Dynamic D factor at 0.55 s"
+basis    = "Source"
+expected = "1 ± 0.00001"
+measured = "1.00"
+
+[[expect]]
+what     = "roll Dynamic D factor at 1.001 s"
+basis    = "Source"
+expected = "1.024678 ± 0.000001"
+measured = "1.02"
+
+[[expect]]
+what     = "roll Dynamic D factor at 1.005 s"
+basis    = "Source"
+expected = "1.282968 ± 0.000001"
+measured = "1.28"
+
+[[expect]]
+what     = "roll Dynamic D factor at 1.02 s"
+basis    = "Source"
+expected = "1.017806 ± 0.000001"
+measured = "1.02"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "e37a1341e2357c0f"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "a4fff9060c524312"   # the whole state after each of 8160 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.102 s" = "c9646ed7254c5c9c"
+"0.204 s" = "25aca014312b87b8"
+"0.306 s" = "2eea65516aac0643"
+"0.408 s" = "a91f83612c2dd3a7"
+"0.51 s" = "9a6fa301951a6e60"
+"0.612 s" = "1f150dd34a6f8670"
+"0.714 s" = "7286eda7993b5bef"
+"0.816 s" = "b74059e9cd2c0792"
+"0.918 s" = "786becbb1e6b1a4d"
+"1.02 s" = "20947994f82347cd"

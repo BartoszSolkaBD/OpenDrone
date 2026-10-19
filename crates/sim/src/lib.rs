@@ -69,7 +69,9 @@
 //! smoothing moves on by a step; the Flight Controller seam reads the sensors
 //! (the state at the tick's start, and whether the ESCs have beeped ready)
 //! and the frame and gives the motor commands; the physics moves the Quad on
-//! by one step with them.
+//! by one step with them. The board's readings are the gyro and attitude,
+//! whether the ESCs are ready, the battery's voltage and current, and each
+//! motor's RPM ([`board_readings`]).
 //!
 //! A crash never disarms or resets the Quad on its own: only the pilot's
 //! Arm switch, Failsafe or Reset do.
@@ -110,12 +112,12 @@ mod time;
 use opendrone_maths::{Fingerprint, Fingerprinter, Random, Vec3};
 use opendrone_physics::{MapCollision, QuadBody, QuadStart};
 
-pub use flight_controller::{OurFlightController, sensor_readings};
+pub use flight_controller::{OurFlightController, board_readings, sensor_readings};
 pub use input_smoothing::{INPUT_SMOOTHING_HZ, InputSmoothing};
 pub use motors::{FlightControllerSeam, ScriptedMotors};
 pub use opendrone_flight_controller::{
-    ArmingBlocks, Channel, Channels, DebugRecord, FailsafePhase, FailsafeReadings, Rates,
-    SensorReadings, Terms, Tune,
+    ArmingBlocks, BatteryReading, BatteryReadings, BatteryState, BeeperReadings, Channel, Channels,
+    DebugRecord, FailsafePhase, FailsafeReadings, Rates, SensorReadings, Terms, Tune,
 };
 pub use opendrone_physics::GroundAndCeiling;
 pub use opendrone_physics::{
@@ -400,11 +402,7 @@ impl Simulation {
             }
             quad.radio_link_output = quad.radio_link_output.after(frame, &quad.radio_link);
             let channels = frame.map(|frame| frame.channels);
-            let readings = sensor_readings(
-                quad.body.state(),
-                quad.body.escs_ready(),
-                quad.body.parameters().gyro_range,
-            );
+            let readings = board_readings(&quad.body);
             quad.motor_commands =
                 quad.flight_controller
                     .step(self.time, &readings, channels.as_ref());

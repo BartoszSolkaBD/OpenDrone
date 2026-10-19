@@ -344,9 +344,10 @@ pub fn import_tune<'t>(text: &'t str) -> Result<TuneImport, Refusal> {
     if let Ok(tune) = Tune::read(read.map(|s| (s.name.as_str(), s.value.as_str()))) {
         for (name, sentence) in tune.not_simulated_values() {
             if let Some(setting) = settings.iter_mut().find(|s| s.name == name) {
+                let ticket = Tune::not_simulated_ticket(name);
                 setting.note = match setting.note.as_str() {
-                    "" => "not simulated yet (#21)".to_string(),
-                    note => format!("{note}; not simulated yet (#21)"),
+                    "" => format!("not simulated yet ({ticket})"),
+                    note => format!("{note}; not simulated yet ({ticket})"),
                 };
             }
             warnings.push(sentence);
@@ -473,6 +474,52 @@ impl TuneImport {
     /// from, then every setting written, one `set` line each with its mark.
     /// `quad` is the Quad's on-screen name and `source` names the file the
     /// export was read from.
+    /// Keeps the `hand-set` lines of a Tune imported before, so importing
+    /// again doesn't undo a change made by hand: each setting such a line
+    /// sets takes its value and its `hand-set: <reason>` mark. Gives the
+    /// names kept, in the old Tune's order. A kept value the Flight
+    /// Controller can't read is a problem, as any other is.
+    pub fn keep_hand_set(&mut self, previous: &str) -> Vec<String> {
+        let mut kept = Vec::new();
+        for text in previous.lines() {
+            let Some((set, comment)) = text.split_once('#') else {
+                continue;
+            };
+            let Some(reason) = comment.trim().strip_prefix("hand-set:") else {
+                continue;
+            };
+            let reason = reason.split(';').next().unwrap_or("").trim();
+            let Some((name, value)) = set
+                .trim()
+                .strip_prefix("set ")
+                .and_then(|rest| rest.split_once('='))
+            else {
+                continue;
+            };
+            let (name, value) = (name.trim(), value.trim());
+            let Some(setting) = self.settings.iter_mut().find(|s| s.name == name) else {
+                continue;
+            };
+            setting.value = value.to_string();
+            setting.mark = format!("hand-set: {reason}");
+            setting.line = None;
+            setting.note = table::SETTINGS
+                .iter()
+                .find(|s| s.name == name)
+                .map_or_else(String::new, |s| s.note.to_string());
+            if matches!(setting.written, Where::UnderItsTab | Where::FlownAsOff)
+                && let Err(sentence) = Tune::check(name, value)
+            {
+                self.problems.push(sentence);
+            }
+            // A note on the value the export gave no longer holds.
+            let said = format!("`{name}` is ");
+            self.warnings.retain(|warning| !warning.starts_with(&said));
+            kept.push(name.to_string());
+        }
+        kept
+    }
+
     pub fn tune_txt(&self, quad: &str, source: &str) -> String {
         let mut out = String::new();
         let mut line = |text: &str| {

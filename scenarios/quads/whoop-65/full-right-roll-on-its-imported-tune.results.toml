@@ -14,7 +14,7 @@ measured = "670 °/s"
 what     = "roll rate, mean over 2 s to 3 s"
 basis    = "Source"
 expected = "670 °/s ± 3%"
-measured = "669 °/s"
+measured = "665 °/s"
 
 [[expect]]
 what     = "roll rate at 0.9 s"
@@ -25,14 +25,14 @@ measured = "0.0936 °/s"
 [[expect]]
 what     = "roll rate, highest over 1.5 s to 3 s"
 basis    = "Observed"
-expected = "829 °/s ± 3%"
-measured = "836 °/s"
+expected = "837 °/s ± 3%"
+measured = "837 °/s"
 
 [[expect]]
 what     = "roll rate, lowest over 1.5 s to 3 s"
 basis    = "Observed"
-expected = "491 °/s ± 3%"
-measured = "495 °/s"
+expected = "501 °/s ± 3%"
+measured = "501 °/s"
 
 [[expect]]
 what     = "pitch rate, lowest over 1 s to 3 s"
@@ -43,26 +43,26 @@ measured = "-28.2 °/s"
 [[expect]]
 what     = "pitch rate, highest over 1 s to 3 s"
 basis    = "Observed"
-expected = "14.7 °/s ± 3 °/s"
-measured = "14.5 °/s"
+expected = "17.0 °/s ± 3 °/s"
+measured = "17.0 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 3 s"
 basis    = "Observed"
 expected = "-9.35 °/s ± 1.5 °/s"
-measured = "-9.97 °/s"
+measured = "-10.0 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 3 s"
 basis    = "Observed"
-expected = "10.6 °/s ± 1.5 °/s"
-measured = "10.5 °/s"
+expected = "12.2 °/s ± 1.5 °/s"
+measured = "12.2 °/s"
 
 [[expect]]
 what     = "roll rate at 3.5 s"
 basis    = "Observed"
-expected = "5.22 °/s ± 5 °/s"
-measured = "4.87 °/s"
+expected = "-4.93 °/s ± 5 °/s"
+measured = "-4.93 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "7e45b8c6b4fcd541"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "536ddc3d29a1db34"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "825f73299061b04d"   # the whole state after each of 28000 steps at 8000 Hz, in order
+run  = "5cf0823cb39f8d8b"   # the whole state after each of 28000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.35 s" = "628a4afb73876451"
-"0.7 s" = "fcb6a53daa8296e8"
-"1.05 s" = "a59f98ef071cf7ae"
-"1.4 s" = "f91b2ba5776a89a4"
-"1.75 s" = "546ab4913823cb97"
-"2.1 s" = "8844f54cf6a12cf7"
-"2.45 s" = "67365a9b83aac198"
-"2.8 s" = "392883d55975b70d"
-"3.15 s" = "f0dd4b9d07e72931"
-"3.5 s" = "060ee3d2f8ebeccd"
+"0.35 s" = "5ef04f4857253285"
+"0.7 s" = "3e5e2c80bbea0801"
+"1.05 s" = "a5a8f0e4eae5e471"
+"1.4 s" = "b90c4e562c7b7a62"
+"1.75 s" = "350f19e9c39ed0cb"
+"2.1 s" = "531f285de79b868c"
+"2.45 s" = "8de9a4dbc6edbddc"
+"2.8 s" = "cc40101bd18e867f"
+"3.15 s" = "98ebbcdc506714b3"
+"3.5 s" = "b2eb0c9f448f9cda"

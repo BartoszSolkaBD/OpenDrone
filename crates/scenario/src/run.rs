@@ -15,6 +15,7 @@ use opendrone_sim::{
 use opendrone_test_pilot::{Jobs, TestPilot};
 
 use crate::measure::{Sample, angle_near};
+use crate::osd::OsdRun;
 use crate::read::{
     BasisKind, Case, Comparison, Expectation, Expecting, FlightMode, InputDevice, Inputs, Kind,
     Named, PilotChanges, PilotEntry, Scenario, Start, Statistic, Stick, When,
@@ -96,7 +97,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
 
     if start.kind == Kind::FlightController {
         let tune = tune.expect("a Flight Controller Scenario reads the Tune");
-        return Ok(run_alone(scenario, &tune, quad_received));
+        return Ok(run_alone(scenario, &tune, &quad.name, quad_received));
     }
     let map = map.expect("every kind but the Flight Controller's names a Map");
 
@@ -107,6 +108,14 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         .map(|e| Tally::new(e, e.when))
         .collect();
     let this_run = Plan::this_run(scenario);
+    // The OSD, worked out beside the run, where the Scenario expects OSD
+    // text; the reader keeps `[osd]` to Scenarios that fly our Flight
+    // Controller.
+    let mut osd = scenario
+        .osd
+        .as_ref()
+        .zip(tune.as_ref())
+        .map(|(section, tune)| OsdRun::new(section, &quad.name, tune));
     let (step_fingerprints, first_broken_number) = simulate(
         scenario,
         &quad,
@@ -114,6 +123,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
         tune.as_ref(),
         &this_run,
         &mut tallies,
+        osd.as_mut(),
     )?;
 
     // Each other run, measuring the Expectations that compare with it.
@@ -145,18 +155,21 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             tune.as_ref(),
             &plan,
             &mut other_tallies,
+            None,
         )?;
         for (n, tally) in numbers.into_iter().zip(&other_tallies) {
             others[n] = Some(tally.value());
         }
     }
 
+    let mut expectations: Vec<Measured> = tallies
+        .into_iter()
+        .zip(others)
+        .map(|(tally, other)| tally.finish(other))
+        .collect();
+    expectations.extend(osd.map(OsdRun::finish).unwrap_or_default());
     Ok(Outcome {
-        expectations: tallies
-            .into_iter()
-            .zip(others)
-            .map(|(tally, other)| tally.finish(other))
-            .collect(),
+        expectations,
         first_broken_number,
         step_fingerprints,
         steps_are_cases: false,
@@ -324,7 +337,8 @@ impl<'s> Plan<'s> {
 }
 
 /// Builds the Simulation for one run and steps it to the run's end, showing
-/// every tally the output after each step. Gives back the whole state's
+/// every tally the output after each step, and the OSD, if one is worked out
+/// beside the run, each Flight Controller loop. Gives back the whole state's
 /// fingerprint after every step, and where a broken number first appeared.
 fn simulate(
     scenario: &Scenario,
@@ -333,6 +347,7 @@ fn simulate(
     tune: Option<&Tune>,
     plan: &Plan<'_>,
     tallies: &mut [Tally<'_>],
+    mut osd: Option<&mut OsdRun<'_>>,
 ) -> Result<(Vec<Fingerprint>, Option<String>), Problems> {
     let (mut sim, mut feed) = set_up(scenario, quad, map, tune, plan)?;
     // Where the motors are scripted, no sticks reach a Flight Controller.
@@ -368,6 +383,14 @@ fn simulate(
         }
         for tally in tallies.iter_mut() {
             tally.see(tick, before.as_ref(), &now, step);
+        }
+        if let Some(osd) = osd.as_mut() {
+            let record = if tick > 0 {
+                output.flight_controller
+            } else {
+                None
+            };
+            osd.see(tick, record.as_ref(), step);
         }
         before = Some(now);
     }
@@ -496,7 +519,7 @@ fn set_up(
 
 /// Runs a Flight Controller Scenario: the Flight Controller alone, fed its
 /// Timeline, or each case of its table on a fresh Flight Controller.
-fn run_alone(scenario: &Scenario, tune: &Tune, quad: Received) -> Outcome {
+fn run_alone(scenario: &Scenario, tune: &Tune, quad_name: &str, quad: Received) -> Outcome {
     let start = &scenario.start;
     let mut first_broken_number = None;
     let mut step_fingerprints = Vec::new();
@@ -507,11 +530,23 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad: Received) -> Outcome {
             .map(|e| Tally::new(e, e.when))
             .collect();
         let mut feed = Feed::new(&scenario.inputs, start, start.physics_rate);
-        let (fingerprints, broken) =
-            loop_alone(start, tune, &mut feed, scenario.length, &mut tallies);
+        let mut osd = scenario
+            .osd
+            .as_ref()
+            .map(|section| OsdRun::new(section, quad_name, tune));
+        let (fingerprints, broken) = loop_alone(
+            start,
+            tune,
+            &mut feed,
+            scenario.length,
+            &mut tallies,
+            osd.as_mut(),
+        );
         step_fingerprints = fingerprints;
         first_broken_number = broken;
-        tallies.into_iter().map(|t| t.finish(None)).collect()
+        let mut measured: Vec<Measured> = tallies.into_iter().map(|t| t.finish(None)).collect();
+        measured.extend(osd.map(OsdRun::finish).unwrap_or_default());
+        measured
     } else {
         let mut measured = Vec::new();
         for case in &scenario.cases {
@@ -528,6 +563,7 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad: Received) -> Outcome {
                 &mut feed,
                 SimulationTime::from_ticks(1),
                 &mut tallies,
+                None,
             );
             if first_broken_number.is_none()
                 && let Some(broken) = broken
@@ -568,6 +604,7 @@ fn loop_alone(
     feed: &mut Feed,
     length: SimulationTime,
     tallies: &mut [Tally<'_>],
+    mut osd: Option<&mut OsdRun<'_>>,
 ) -> (Vec<Fingerprint>, Option<String>) {
     let rate = start.physics_rate;
     let mut flight_controller = FlightController::new(
@@ -623,6 +660,9 @@ fn loop_alone(
         }
         for tally in tallies.iter_mut() {
             tally.see(tick, before.as_ref(), &now, rate.step_length());
+        }
+        if let Some(osd) = osd.as_mut() {
+            osd.see(tick, now.flight_controller.as_ref(), rate.step_length());
         }
         before = Some(now);
     }
@@ -683,11 +723,7 @@ impl Feed {
                 inputs: track.inputs.clone(),
                 next: 0,
                 device: track.device,
-                readings: SensorReadings {
-                    gyro: start.rotation,
-                    attitude: start.attitude,
-                    escs_ready: true,
-                },
+                readings: SensorReadings::still(start.rotation, start.attitude, true),
             },
             Inputs::Motors(_) => Feed::None,
         }
@@ -745,11 +781,7 @@ impl Feed {
         match self {
             Feed::Timeline { track, .. } => track.readings(tick),
             Feed::Recorded { readings, .. } => *readings,
-            Feed::None => SensorReadings {
-                gyro: Vec3::ZERO,
-                attitude: Attitude::BODY_IS_WORLD,
-                escs_ready: true,
-            },
+            Feed::None => SensorReadings::still(Vec3::ZERO, Attitude::BODY_IS_WORLD, true),
         }
     }
 }
@@ -870,13 +902,14 @@ impl PilotTrack {
 
     /// The sensor readings at a step, for the Flight Controller alone. It
     /// has no ESCs to wait for: a Flight Controller Scenario's ESCs count as
-    /// ready.
+    /// ready. It has no battery and no motors, so its Flight Controller finds
+    /// no battery and reads no RPM.
     fn readings(&self, tick: u64) -> SensorReadings {
-        SensorReadings {
-            gyro: held(&self.rotation, tick).unwrap_or(Vec3::ZERO),
-            attitude: held(&self.attitude, tick).unwrap_or(Attitude::BODY_IS_WORLD),
-            escs_ready: true,
-        }
+        SensorReadings::still(
+            held(&self.rotation, tick).unwrap_or(Vec3::ZERO),
+            held(&self.attitude, tick).unwrap_or(Attitude::BODY_IS_WORLD),
+            true,
+        )
     }
 }
 

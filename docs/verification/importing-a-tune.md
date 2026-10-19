@@ -16,7 +16,7 @@ The Whoop 65's Tune is made this way, from the maintainer's Meteor65 Pro.
    It writes the folder's `tune.txt` and lists what it did: the renames, the settings kept as "not simulated yet", and every line it left out, with the reason. To see a Tune without writing it, put `--print` in place of the folder.
 3. Run `cargo xtask packs`. The Pack checker reads the new Tune and compares `motor_poles` and `yaw_motors_reversed` with the Quad definition.
 
-Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is imported again in that ticket's PR. A readable check holds the committed file to exactly what the importer writes, so the Tune is never edited by hand. A real `hand-set` change would need that check changed too.
+Each new Flight Controller ticket reads more settings, so the Whoop 65's Tune is imported again in that ticket's PR. A readable check holds the committed file to exactly what the importer writes, with one exception: importing again keeps the Tune's `hand-set` lines, value and reason. The Whoop 65 has one, `current_meter = ADC`: its board, the BETAFPVF411, defaults to ADC, which a 4.3 `diff` leaves out, so the importer would write Betaflight's own default, VIRTUAL (#31 §3).
 
 ## What it accepts
 
@@ -43,7 +43,7 @@ Every `set` line ends with a mark saying where its value came from, then perhaps
 | `ADR-0008` | the old version had no such setting, or it meant something else; set to behave like the old version |
 | `2026.6 default` | the old version had no such setting, and no value behaves like it: Betaflight 2026.6.2's default |
 | `(was …)` | the setting's old name, after one of the marks above |
-| `hand-set: <reason>` | changed by hand (the importer never writes it) |
+| `hand-set: <reason>` | changed by hand (the importer writes it only to keep a hand-set line when it imports again) |
 
 ## What it translates
 
@@ -70,11 +70,11 @@ A setting the export doesn't set takes **its own version's** default, never 2026
 
 The "Not simulated yet" part of a Tune comes last, in three parts. Together with the settings under the tabs, they spell out every setting the translator knows, about 100 (ADR-0015):
 
-- **What the Flight Controller knows but flies as off** until its ticket lands ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): Dynamic D, I-term relax, anti-gravity, TPA and throttle boost (#50), and the dynamic notch, which waits for gyro noise (#21). Each mark ends `not simulated yet (#50)` or the like, and they come in the order the Freestyle 5″'s Tune lists them.
-- **Every other setting the translator knows** that the Flight Controller doesn't read yet, by tab: what the next Flight Controller tickets read (Failsafe, the rest of the loop shaping #50 brings, Angle and Horizon), with ADR-0008's values where the old version lacked a setting, and the rest of the dynamic notch and the Blackbox rate.
+- **What the Flight Controller knows but flies as off** ([Checking a Pack](checking-a-pack.md#the-tune-tunetxt)): the dynamic notch's count, which waits for gyro noise (#21). Its mark ends `not simulated yet (waits for gyro noise, #21)`.
+- **Every other setting the translator knows** that the Flight Controller doesn't read yet, by tab: what the next Flight Controller tickets read (Failsafe, Angle and Horizon), with ADR-0008's values where the old version lacked a setting, and the rest of the dynamic notch and the Blackbox rate.
 - **The settings the export sets that the translator doesn't know**, as the real quad had them: for the Meteor, `dshot_bidir` (the RPM filter's motor speed) and `vbat_max_cell_voltage`.
 
-Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab, as #54 did for Crash Flip's settings, yaw spin recovery and runaway takeoff prevention, and #49 for the filters, RC smoothing and feedforward. The Meteor's yaw hold, which 4.3 didn't have, arrives under its tab off, as ADR-0008 sets it (`feedforward_yaw_hold_gain = 0`).
+Once a ticket makes the Flight Controller read a setting, importing again moves it under its tab, as #54 did for Crash Flip's settings, yaw spin recovery and runaway takeoff prevention, #49 for the filters, RC smoothing and feedforward, and #50 for Dynamic D, I-term relax, anti-gravity, TPA and throttle boost. The Meteor's low-throttle TPA, which 4.3 didn't have, arrives under its tab off (`tpa_low_rate = 0`, ADR-0008), and its anti-gravity takes 2026.6's default gain, 80, as no 2026.6 gain behaves like 4.3's. The Meteor's yaw hold, which 4.3 didn't have, arrives under its tab off, as ADR-0008 sets it (`feedforward_yaw_hold_gain = 0`).
 
 ## What still differs from the real quad
 

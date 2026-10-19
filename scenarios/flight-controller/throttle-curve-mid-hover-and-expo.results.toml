@@ -1,0 +1,60 @@
+# Results of throttle-curve-mid-hover-and-expo.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The pilot's throttle mid, hover and expo shape the throttle as Betaflight's do"
+
+[[expect]]
+what     = "mixer throttle with arm on"
+basis    = "Source"
+expected = "0% ± 0.0001%"
+measured = "0%"
+
+[[expect]]
+what     = "mixer throttle with throttle 15%, arm on"
+basis    = "Source"
+expected = "17.9% ± 0.0001%"
+measured = "17.9%"
+
+[[expect]]
+what     = "mixer throttle with throttle 30%, arm on"
+basis    = "Source"
+expected = "36.8% ± 0.0001%"
+measured = "36.8%"
+
+[[expect]]
+what     = "mixer throttle with throttle 50%, arm on"
+basis    = "Source"
+expected = "48.2% ± 0.0001%"
+measured = "48.2%"
+
+[[expect]]
+what     = "mixer throttle with throttle 75%, arm on"
+basis    = "Source"
+expected = "69.7% ± 0.0001%"
+measured = "69.7%"
+
+[[expect]]
+what     = "mixer throttle with throttle 100%, arm on"
+basis    = "Source"
+expected = "100% ± 0.0001%"
+measured = "100%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "aec02cafcbd83670"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "4d14f3188a7fa19e"   # the Flight Controller's whole state after each of 6 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "43a5c72e13411b57"
+"case 2" = "ee55476dc57db6ff"
+"case 3" = "906e78613b3f464a"
+"case 4" = "35730145715ec54c"
+"case 5" = "3a67ff6a2489e8c1"
+"case 6" = "3a131fcad95974bd"

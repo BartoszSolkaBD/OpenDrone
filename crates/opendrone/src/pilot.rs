@@ -20,8 +20,14 @@
 //!   Device's profile binds to them.
 //! - **When the Quad disarms,** for any reason, every Arm Virtual Switch
 //!   turns itself off.
+//! - **Save Flight** is an Action with no default key on any device: a
+//!   profile may bind it. It writes the flight so far as a Scenario and an
+//!   Input Track ([`crate::save`]), and says where in the window's title.
+//! - **Watching a Scenario** ([`Pilot::watching`]): no Input Device flies,
+//!   Reset and Save Flight do nothing, and Pause works as always.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -36,8 +42,12 @@ use opendrone_input::{Batch, DeviceId, InputEvent, InputThread, Inputs, Lost};
 use opendrone_sim::{Channel, Channels, FlightInput, InputDeviceFacts, ReportRate};
 
 use crate::clock::SimulationClock;
-use crate::set_up::FlightPlan;
+use crate::save::save_flight;
+use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
+
+/// How long a note about Save Flight stays in the window's title.
+const NOTICE_FOR: Duration = Duration::from_secs(6);
 
 /// How far a stick must move from where it rested when its device was found
 /// to start the flight: a quarter of the way from centre to full, so a
@@ -66,6 +76,14 @@ pub struct Pilot {
     /// Whether the Quad was armed after the last frame's steps.
     armed: bool,
     flight_mode: FlightMode,
+    /// Where Save Flight writes: `scenarios/saved/` in the repo.
+    saves_to: PathBuf,
+    /// What the last Save Flight said, and when, on the input thread's clock.
+    notice: Option<(String, Duration)>,
+    /// A Scenario is being watched: nothing flies.
+    watching: bool,
+    /// The flight keeps the run's fingerprint too: for the readable checks.
+    checking_every_step: bool,
 }
 
 impl Pilot {
@@ -105,7 +123,39 @@ impl Pilot {
             actions_held: BTreeMap::new(),
             armed: false,
             flight_mode: plan.settings.flight_mode,
+            saves_to: repo_folder().join("scenarios").join("saved"),
+            notice: None,
+            watching: false,
+            checking_every_step: false,
         }
+    }
+
+    /// The flights this pilot starts also keep the fingerprint of the whole
+    /// run ([`Flight::checking_every_step`]): for the readable checks, never
+    /// the game.
+    pub fn checking_every_step(mut self) -> Pilot {
+        self.checking_every_step = true;
+        self
+    }
+
+    /// Where Save Flight writes, instead of `scenarios/saved/` in the repo.
+    pub fn saving_to(mut self, folder: PathBuf) -> Pilot {
+        self.saves_to = folder;
+        self
+    }
+
+    /// A pilot who only watches a Scenario ([`crate::watch`]): no Input
+    /// Device becomes the Flying Input Device, Reset and Save Flight do
+    /// nothing, and Pause and the camera's keys work as always.
+    pub fn watching(mut self) -> Pilot {
+        self.watching = true;
+        self
+    }
+
+    /// What Save Flight said last, for a few seconds after it did.
+    pub fn notice(&self, real: &Time<Real>) -> Option<&str> {
+        let (text, at) = self.notice.as_ref()?;
+        (self.input_clock(real) < *at + NOTICE_FOR).then_some(text.as_str())
     }
 
     /// One frame's reading, before its ticks: the input thread's batches
@@ -184,6 +234,22 @@ impl Pilot {
         self.inputs.device(self.flying?)?.lost()
     }
 
+    /// The Actions held on every connected Input Device, each once, in a
+    /// fixed order. The camera's Actions repeat while held, so it reads what
+    /// is held rather than the presses [`Pilot::read`] fires.
+    pub fn actions_held(&self) -> Vec<Action> {
+        let mut held: Vec<Action> = self
+            .inputs
+            .devices()
+            .iter()
+            .filter(|device| device.lost().is_none())
+            .flat_map(|device| device.actions_held())
+            .collect();
+        held.sort();
+        held.dedup();
+        held
+    }
+
     /// How many Input Devices are plugged in.
     pub fn devices_plugged_in(&self) -> usize {
         self.inputs
@@ -232,7 +298,10 @@ impl Pilot {
                 } => {
                     if self.flying == Some(device) {
                         self.forward(world, at, FlightInput::Channels(self.channels(&channels)));
-                    } else if self.flying.is_none() && self.sticks_moved(device, &channels) {
+                    } else if !self.watching
+                        && self.flying.is_none()
+                        && self.sticks_moved(device, &channels)
+                    {
                         queue.extend(self.start_flight(device, at, world));
                     }
                 }
@@ -289,8 +358,12 @@ impl Pilot {
             );
         }
         let name = found.info().name.clone();
-        let flight = world.plan.simulation(Some(facts)).and_then(Flight::new);
+        let flight = world
+            .plan
+            .simulation(Some(facts))
+            .and_then(|simulation| Flight::keeping(simulation, facts));
         let flight = match flight {
+            Ok(flight) if self.checking_every_step => flight.checking_every_step(),
             Ok(flight) => flight,
             Err(problem) => {
                 error!("the flight can't start: {problem}");
@@ -341,15 +414,47 @@ impl Pilot {
     }
 
     /// Fires an Action.
-    fn fire(&self, action: Action, at: Duration, world: &mut FlightWorld<'_>) {
+    fn fire(&mut self, action: Action, at: Duration, world: &mut FlightWorld<'_>) {
         match action {
+            Action::Reset if self.watching => {}
             Action::Reset => {
                 info!("Reset");
                 self.forward(world, at, FlightInput::Reset);
             }
             Action::Pause => toggle_pause(world.game_clock),
-            // Camera Tilt, FOV and Save Flight arrive with their tickets.
-            _ => {}
+            Action::SaveFlight => {
+                let said = if self.watching {
+                    "a watched Scenario has no flight to save".to_string()
+                } else {
+                    match save_flight(world.plan, world.flight, &self.saves_to) {
+                        Ok(saved) => {
+                            info!(
+                                "saved the flight: {} and {}, {:.3} s, the state's fingerprint after the last step {}",
+                                saved.scenario.display(),
+                                saved.track.display(),
+                                saved.seconds,
+                                saved.state_fingerprint
+                            );
+                            let name = saved
+                                .scenario
+                                .file_name()
+                                .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+                            format!("flight saved as {name}")
+                        }
+                        Err(problem) => {
+                            error!("the flight can't be saved: {problem}");
+                            format!("the flight can't be saved: {problem}")
+                        }
+                    }
+                };
+                self.notice = Some((said, at));
+            }
+            // Camera Tilt and FOV never enter the Simulation: the camera's
+            // plugin reads them held, to repeat them.
+            Action::CameraTiltUp
+            | Action::CameraTiltDown
+            | Action::FovWider
+            | Action::FovNarrower => {}
         }
     }
 }

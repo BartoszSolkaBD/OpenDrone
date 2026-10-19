@@ -4,9 +4,10 @@
 //! Scenarios in `scenarios/flight-controller/`.
 
 use opendrone_flight_controller::{
-    Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings, Tune,
+    BatteryReading, Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings,
+    Tune,
 };
-use opendrone_maths::{Attitude, Vec3};
+use opendrone_maths::{Attitude, DEGREE, Vec3};
 
 /// The Freestyle 5″'s Tune: Betaflight 2026.6.2's defaults.
 const DEFAULTS: &[(&str, &str)] = &[
@@ -16,6 +17,19 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("runaway_takeoff_prevention", "ON"),
     ("runaway_takeoff_deactivate_delay", "500"),
     ("runaway_takeoff_deactivate_throttle_percent", "20"),
+    ("current_meter", "ADC"),
+    ("vbat_min_cell_voltage", "330"),
+    ("vbat_max_cell_voltage", "430"),
+    ("vbat_warning_cell_voltage", "350"),
+    ("vbat_full_cell_voltage", "410"),
+    ("force_battery_cell_count", "0"),
+    ("vbat_hysteresis", "1"),
+    ("vbat_detect_cell_voltage", "300"),
+    ("use_vbat_alerts", "ON"),
+    ("vbat_display_lpf_period", "30"),
+    ("ibat_lpf_period", "10"),
+    ("vbat_duration_for_warning", "0"),
+    ("vbat_duration_for_critical", "0"),
     ("rx_min_usec", "885"),
     ("rx_max_usec", "2115"),
     ("failsafe_delay", "15"),
@@ -25,14 +39,17 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("p_roll", "45"),
     ("i_roll", "80"),
     ("d_roll", "30"),
+    ("d_max_roll", "40"),
     ("f_roll", "120"),
     ("p_pitch", "47"),
     ("i_pitch", "84"),
     ("d_pitch", "34"),
+    ("d_max_pitch", "46"),
     ("f_pitch", "125"),
     ("p_yaw", "45"),
     ("i_yaw", "80"),
     ("d_yaw", "0"),
+    ("d_max_yaw", "0"),
     ("f_yaw", "120"),
     ("feedforward_transition", "0"),
     ("feedforward_averaging", "2_POINT"),
@@ -40,6 +57,16 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("feedforward_jitter_factor", "7"),
     ("feedforward_boost", "15"),
     ("feedforward_max_rate_limit", "90"),
+    ("d_max_gain", "0"),
+    ("d_max_advance", "35"),
+    ("iterm_relax", "RP"),
+    ("iterm_relax_type", "SETPOINT"),
+    ("iterm_relax_cutoff", "15"),
+    ("anti_gravity_gain", "80"),
+    ("tpa_mode", "D"),
+    ("tpa_rate", "65"),
+    ("tpa_breakpoint", "1350"),
+    ("throttle_boost", "5"),
     ("motor_output_limit", "100"),
     ("pidsum_limit", "500"),
     ("pidsum_limit_yaw", "400"),
@@ -47,6 +74,12 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("pid_at_min_throttle", "ON"),
     ("feedforward_yaw_hold_gain", "15"),
     ("feedforward_yaw_hold_time", "100"),
+    ("anti_gravity_cutoff_hz", "5"),
+    ("anti_gravity_p_gain", "100"),
+    ("tpa_low_rate", "20"),
+    ("tpa_low_breakpoint", "1050"),
+    ("tpa_low_always", "OFF"),
+    ("throttle_boost_cutoff", "15"),
     ("gyro_lpf1_type", "PT1"),
     ("gyro_lpf1_static_hz", "250"),
     ("gyro_lpf1_dyn_min_hz", "250"),
@@ -74,7 +107,9 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("yaw_control_reversed", "OFF"),
     ("airmode_start_throttle_percent", "25"),
     ("motor_pwm_protocol", "DSHOT600"),
+    ("dshot_bidir", "OFF"),
     ("motor_idle", "550"),
+    ("motor_poles", "14"),
     ("yaw_motors_reversed", "OFF"),
     ("mixer_type", "LEGACY"),
     ("crashflip_motor_percent", "0"),
@@ -90,6 +125,11 @@ const STILL: SensorReadings = SensorReadings {
     gyro: Vec3::ZERO,
     attitude: Attitude::BODY_IS_WORLD,
     escs_ready: true,
+    battery: BatteryReading {
+        voltage: 0.0,
+        current: 0.0,
+    },
+    motor_rpm: [0.0; 4],
 };
 
 #[test]
@@ -129,9 +169,9 @@ fn a_tune_must_spell_out_every_setting_the_flight_controller_reads() {
     let partial = DEFAULTS
         .iter()
         .copied()
-        .filter(|(name, _)| !matches!(*name, "p_roll" | "motor_idle"));
+        .filter(|(name, _)| !matches!(*name, "p_roll" | "tpa_rate" | "motor_idle"));
     let problems = Tune::read(partial).unwrap_err();
-    assert_eq!(problems.missing, ["p_roll", "motor_idle"]);
+    assert_eq!(problems.missing, ["p_roll", "tpa_rate", "motor_idle"]);
     assert!(problems.wrong.is_empty());
 }
 
@@ -170,9 +210,9 @@ fn settings_the_flight_controller_doesnt_know_are_left_alone() {
     let lines = DEFAULTS
         .iter()
         .copied()
-        .chain([("motor_poles", "14"), ("vbat_max_cell_voltage", "435")]);
+        .chain([("osd_vbat_pos", "2433"), ("dyn_idle_min_rpm", "0")]);
     assert_eq!(Tune::read(lines).unwrap(), tune());
-    assert!(Tune::check("vbat_max_cell_voltage", "anything").is_ok());
+    assert!(Tune::check("dyn_idle_min_rpm", "anything").is_ok());
 }
 
 #[test]
@@ -183,31 +223,54 @@ fn settings_not_simulated_yet_are_optional_but_checked_as_betaflight_checks_them
         .iter()
         .map(|(name, _)| *name)
         .collect();
+    assert_eq!(names, ["dyn_notch_count"]);
+    // The filters, RC smoothing and feedforward (#49), and Dynamic D, I-term
+    // relax, anti-gravity, TPA and throttle boost (#50) are simulated now.
     for name in [
+        "f_roll",
+        "yaw_lowpass_hz",
+        "rc_smoothing",
         "d_max_roll",
         "iterm_relax",
         "anti_gravity_gain",
         "tpa_low_rate",
+        "throttle_boost",
     ] {
-        assert!(names.contains(&name), "{name}");
-    }
-    // The filters, RC smoothing and feedforward are simulated now (#49).
-    for name in ["f_roll", "yaw_lowpass_hz", "rc_smoothing"] {
         assert!(!names.contains(&name), "{name}");
         assert!(Tune::settings().contains(&name), "{name}");
     }
-    // Set off, they read; the Flight Controller flies as now either way.
-    let off = DEFAULTS.iter().copied().chain([
-        ("anti_gravity_gain", "0"),
-        ("tpa_low_rate", "0"),
-        ("iterm_relax", "OFF"),
-    ]);
+    // Set off, the dynamic notch reads; the Flight Controller flies as now
+    // either way.
+    let off = DEFAULTS.iter().copied().chain([("dyn_notch_count", "0")]);
     assert_eq!(Tune::read(off).unwrap(), tune());
     // A value Betaflight wouldn't take is refused.
-    let wrong = DEFAULTS
-        .iter()
-        .copied()
-        .chain([("anti_gravity_gain", "251"), ("iterm_relax", "SOME")]);
+    let wrong = DEFAULTS.iter().copied().chain([("dyn_notch_count", "8")]);
+    let problems = Tune::read(wrong).unwrap_err();
+    assert!(problems.missing.is_empty());
+    assert_eq!(
+        problems.wrong,
+        [(
+            "dyn_notch_count",
+            "`dyn_notch_count` is a whole number from 0 to 7, not \"8\"".to_string()
+        )]
+    );
+    assert!(Tune::check("dyn_notch_count", "8").is_err());
+    assert!(Tune::check("dyn_notch_count", "0").is_ok());
+}
+
+#[test]
+fn the_loop_shaping_settings_are_checked_as_betaflight_checks_them() {
+    // Basis: Source (the ranges and words of Betaflight 2026.6.2's
+    // src/main/cli/settings.c, for a Quad: `tpa_mode` has no PDS, which is
+    // for wings, and `tpa_low_rate` can't go below 0).
+    let wrong = DEFAULTS.iter().map(|(name, value)| match *name {
+        "iterm_relax" => (*name, "SOME"),
+        "anti_gravity_gain" => (*name, "251"),
+        "tpa_mode" => (*name, "PDS"),
+        "tpa_low_rate" => (*name, "-10"),
+        "throttle_boost_cutoff" => (*name, "4"),
+        _ => (*name, *value),
+    });
     let problems = Tune::read(wrong).unwrap_err();
     assert!(problems.missing.is_empty());
     assert_eq!(
@@ -222,10 +285,20 @@ fn settings_not_simulated_yet_are_optional_but_checked_as_betaflight_checks_them
                 "anti_gravity_gain",
                 "`anti_gravity_gain` is a whole number from 0 to 250, not \"251\"".to_string()
             ),
+            (
+                "tpa_mode",
+                "`tpa_mode` must be one of PD, D, not \"PDS\"".to_string()
+            ),
+            (
+                "tpa_low_rate",
+                "`tpa_low_rate` is a whole number from 0 to 100, not \"-10\"".to_string()
+            ),
+            (
+                "throttle_boost_cutoff",
+                "`throttle_boost_cutoff` is a whole number from 5 to 50, not \"4\"".to_string()
+            ),
         ]
     );
-    assert!(Tune::check("dyn_notch_count", "8").is_err());
-    assert!(Tune::check("dyn_notch_count", "0").is_ok());
 }
 
 #[test]
@@ -564,5 +637,165 @@ fn frames_off_on_alternate_sides_are_jitter_and_leave_the_detected_packet_rate_a
     assert!(
         seen.iter()
             .all(|(rate, cutoff)| *rate == 250.0 && *cutoff == 93)
+    );
+}
+
+/// Armed, the sticks and throttle as given (each from −1 to 1, the throttle
+/// from 0 to 1).
+fn sticks(roll: f64, yaw: f64, throttle: f64) -> Channels {
+    Channels {
+        roll: Channel::from_stick(roll),
+        yaw: Channel::from_stick(yaw),
+        throttle: Channel::from_throttle(throttle),
+        ..arm(true)
+    }
+}
+
+/// The gyro reading a roll and a yaw in Betaflight's directions (roll right,
+/// yaw nose left), in °/s.
+fn turning(roll: f64, yaw: f64) -> SensorReadings {
+    SensorReadings {
+        gyro: Vec3::new(roll * DEGREE, 0.0, yaw * DEGREE),
+        ..STILL
+    }
+}
+
+/// A fresh, armed Flight Controller on this Tune and Betaflight's default
+/// Rates.
+fn armed(tune: Tune) -> FlightController {
+    FlightController::new(tune, Rates::BETAFLIGHT_DEFAULT, 8000, 250, true, &STILL)
+}
+
+#[test]
+fn tpa_mode_pd_cuts_p_by_the_tpa_factor_as_well_as_d() {
+    // Basis: Source (`isTpaActive` and `getTpaFactor`, pid.c: P takes the TPA
+    // factor only in tpa_mode PD; D takes it in either mode). At full
+    // throttle the factor is 1 − tpa_rate 65% = 0.35, whatever anti-gravity
+    // adds to P on both alike.
+    let mut d_only = armed(tune());
+    let mut pd = armed(tune_with("tpa_mode", "PD"));
+    for fc in [&mut d_only, &mut pd] {
+        frames(fc, sticks(0.0, 0.0, 1.0), turning(-10.0, 0.0), 8000);
+    }
+    let (p_d_only, p_pd) = (d_only.debug().terms[0].p, pd.debug().terms[0].p);
+    assert_eq!(d_only.debug().tpa_factor, 0.35);
+    assert!(p_d_only > 14.0, "{p_d_only}");
+    assert!((p_pd / p_d_only - 0.35).abs() < 1e-12, "{p_pd} {p_d_only}");
+}
+
+#[test]
+fn low_throttle_tpa_always_on_keeps_cutting_whenever_the_throttle_is_low() {
+    // Basis: Source (`getTpaFactorClassic`: with tpa_low_always ON
+    // isTpaLowFaded never sets, so below tpa_low_breakpoint the cut comes
+    // back: 1 − tpa_low_rate 20% at zero throttle).
+    // RC smoothing brings the throttle back down over a few milliseconds, so
+    // the factor is checked once it has.
+    let mut always = armed(tune_with("tpa_low_always", "ON"));
+    let mut once = armed(tune());
+    for fc in [&mut always, &mut once] {
+        frames(fc, sticks(0.0, 0.0, 0.0), STILL, 800);
+        assert_eq!(fc.debug().tpa_factor, 0.8);
+        frames(fc, sticks(0.0, 0.0, 0.5), STILL, 800);
+        frames(fc, sticks(0.0, 0.0, 0.0), STILL, 800);
+    }
+    assert!((always.debug().tpa_factor - 0.8).abs() < 1e-9);
+    assert_eq!(once.debug().tpa_factor, 1.0);
+}
+
+/// The roll and yaw I terms after a run: 0.5 s at half throttle with the
+/// sticks centred and the gyro as `before`, then the roll and yaw sticks
+/// at 50% and the gyro as `after` for `loops` loops.
+fn i_terms_after_a_stick_jump(
+    tune: Tune,
+    before: SensorReadings,
+    after: SensorReadings,
+    loops: u32,
+) -> (f64, f64) {
+    let mut fc = armed(tune);
+    frames(&mut fc, sticks(0.0, 0.0, 0.5), before, 4000);
+    frames(&mut fc, sticks(0.5, 0.5, 0.5), after, loops);
+    let terms = fc.debug().terms;
+    (terms[0].i, terms[2].i)
+}
+
+#[test]
+fn i_term_relax_rpy_holds_yaws_i_back_too_and_off_holds_nothing_back() {
+    // Basis: Source (`applyItermRelax`: RP relaxes roll and pitch, RPY yaw as
+    // well, OFF none). 80 loops after the sticks jump to 50%, 193.5 °/s,
+    // with the gyro still, the setpoint is far from its 15 Hz low-pass: I
+    // grows only in the first few loops, while RC smoothing brings the
+    // setpoint in. Yaw's I grows the other way, as yaw right is negative in
+    // Betaflight's directions.
+    let still = turning(0.0, 0.0);
+    let at =
+        |relax: &str| i_terms_after_a_stick_jump(tune_with("iterm_relax", relax), still, still, 80);
+    let (rp, rpy, off) = (at("RP"), at("RPY"), at("OFF"));
+    // Roll's I is held back alike under RP and RPY, and not with relax off.
+    assert!((rp.0 - rpy.0).abs() < 1e-9, "{rp:?} {rpy:?}");
+    assert!(off.0 > rp.0 + 10.0, "{off:?} {rp:?}");
+    // Yaw's I isn't held back under RP, as with relax off, but is under RPY.
+    assert!((rp.1 - off.1).abs() < 1e-9, "{rp:?} {off:?}");
+    assert!(rpy.1 > rp.1 + 10.0, "{rpy:?} {rp:?}");
+}
+
+#[test]
+fn i_term_relax_rp_inc_still_lets_i_shrink_during_a_fast_stick_move() {
+    // Basis: Source (`applyItermRelax`: with RP_INC an I that the error would
+    // shrink isn't held back). Rolling left at 50 °/s against centred sticks
+    // winds roll's I up to its limit, 400; then the stick jumps to 50% with
+    // the gyro at 300 °/s, past what it asks, so the error shrinks I.
+    let before = turning(-50.0, 0.0);
+    let after = turning(300.0, 0.0);
+    let at = |relax: &str| {
+        i_terms_after_a_stick_jump(tune_with("iterm_relax", relax), before, after, 80)
+    };
+    let (rp, rp_inc) = (at("RP"), at("RP_INC"));
+    assert!(rp.0 > 395.0, "{rp:?}");
+    assert!(rp_inc.0 < rp.0 - 10.0, "{rp_inc:?} {rp:?}");
+}
+
+#[test]
+fn i_term_relax_gyro_grows_i_by_the_error_left_past_the_sticks_quick_part() {
+    // Basis: Source (`applyItermRelax`, ITERM_RELAX_GYRO: I grows by the
+    // low-passed setpoint less the gyro, with the setpoint's quick part, the
+    // setpoint less its low-pass, as a deadband). With the gyro still, the
+    // low-passed setpoint stays inside that deadband while it is less than
+    // half the setpoint, so I doesn't move at all; SETPOINT lets a little
+    // through while RC smoothing brings the setpoint in. Once the stick has
+    // settled, GYRO grows I by the plain error, as with relax off.
+    let gyro = tune_with("iterm_relax_type", "GYRO");
+    let setpoint = tune();
+    let off = tune_with("iterm_relax", "OFF");
+    let (still, after) = (turning(0.0, 0.0), turning(190.0, 0.0));
+    let start = i_terms_after_a_stick_jump(gyro.clone(), still, still, 0).0;
+    let held = i_terms_after_a_stick_jump(gyro.clone(), still, still, 80).0;
+    assert_eq!(held, start);
+    let leaked = i_terms_after_a_stick_jump(setpoint, still, still, 80).0;
+    assert!(leaked > start + 0.1, "{leaked} {start}");
+    let growth = |tune: &Tune| {
+        let a = i_terms_after_a_stick_jump(tune.clone(), still, after, 4000).0;
+        let b = i_terms_after_a_stick_jump(tune.clone(), still, after, 4800).0;
+        b - a
+    };
+    assert!((growth(&gyro) - growth(&off)).abs() < 1e-6);
+}
+
+#[test]
+fn anti_gravity_gain_0_adds_nothing_when_the_throttle_moves() {
+    // Basis: Source (`pidController`: P and I are strengthened by the
+    // throttle's speed times anti_gravity_gain: nothing at 0).
+    let mut off = armed(tune_with("anti_gravity_gain", "0"));
+    frames(&mut off, sticks(0.0, 0.0, 0.3), turning(-10.0, 0.0), 4000);
+    let steady = off.debug().terms[0].p;
+    frames(&mut off, sticks(0.0, 0.0, 0.0), turning(-10.0, 0.0), 160);
+    assert!((off.debug().terms[0].p - steady).abs() < 1e-9);
+    // At the 5″'s own gain, 80, the same chop strengthens P.
+    let mut on = armed(tune());
+    frames(&mut on, sticks(0.0, 0.0, 0.3), turning(-10.0, 0.0), 4000);
+    frames(&mut on, sticks(0.0, 0.0, 0.0), turning(-10.0, 0.0), 160);
+    assert!(
+        on.debug().terms[0].p > steady * 1.5,
+        "{}",
+        on.debug().terms[0].p
     );
 }

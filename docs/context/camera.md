@@ -20,6 +20,10 @@ _Avoid_: Fisheye (as a setting name), distortion, lens FX
 How wide the FPV Camera sees, in degrees, measured corner to corner of the 4:3 picture, like the number on a camera's box. Each Quad has a default, and the pilot can change it on every Quad.
 _Avoid_: Zoom, horizontal FOV (other sims' numbers are measured across a flat lens and don't compare)
 
+**Aspect ratio**:
+The shape of the FPV picture: 4:3, the camera's own and the default, or 16:9. 16:9 crops the top and bottom of the 4:3 picture, so the view across stays the same and nothing stretches. It belongs to the pilot, and no Preset changes it.
+_Avoid_: Resolution, stretch
+
 **Video Look**:
 How the pilot's picture is made: Analog or Digital. It belongs to the pilot, not to the Quad.
 _Avoid_: Video mode, filter, VTX type, video system
@@ -72,6 +76,8 @@ _Avoid_: OSD config, HUD layout
 - The sim's notices in flight (the Camera Tilt, FOV and Flight Mode readouts and the device notice) sit at the top centre of the picture, one line at a time.
 - In Digital only, the goggles also show Video Signal bars, which the pilot can switch off. Analog shows none, as analog goggles don't.
 - The OSD is worked out beside the Simulation, from the Flight Controller's state, 12 times a second in Simulation Time. It never changes a flight ([ADR-0022](../adr/0022-osd-worked-out-beside-the-simulation.md)).
+- The reason arming is refused comes first among the warnings whenever the Arm switch is on, armed or not, as in Betaflight 2026.6. A lost Radio Link leaves the Arm switch on, so it shows `RXLOSS` from 0.15 s, then `FAILSAFE` and `RXLOSS` in turn once Failsafe drops the Quad; `FAIL SAFE` shows only with the Arm switch off or the arming-disabled warning switched off (#59, correcting #31's "no warning for 1.5 s, then `FAIL SAFE`").
+- A board reads its battery voltage through Betaflight's ADC at its default scale, so a 4.35 V cell reads 4.34 V, and the cell count is worked out from it at power-up as Betaflight does.
 - Graphics quality tiers may change how sharp the picture is, never the Lens, FOV, Breakup or Digital's delay. Every machine shows the same signal.
 - All camera and video effects together fit in 2 ms of a High-tier frame on the dev machine, and the Map is drawn once per frame ([ADR-0009](../adr/0009-fisheye-from-one-warped-render.md)).
 - Only the camera's own steps count against those 2 ms: the merged pass and what feeds it. The OSD is drawn inside the merged pass, so it counts too. Drawing the Map wider than the picture, for the fisheye, counts as drawing the Map, under the 45 fps promise.

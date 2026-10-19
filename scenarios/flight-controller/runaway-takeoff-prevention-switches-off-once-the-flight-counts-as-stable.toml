@@ -74,8 +74,8 @@ basis = "source: processRx: the frame at 0.704 s brings the stretches to 200 + 3
 [[expect]]
 what  = "roll PID sum"
 at    = "1 s"
-value = "-1120.49 ± 0.01"
-basis = "source: pidController: the centred stick asks 0.110 °/s against the gyro's 500 °/s, so P is 0.032029 × 45 × (0.110 - 500) = -720.49, and I has wound up to its limit, -400: past 600, with the gyro moving"
+value = "-1156.18 ± 0.01"
+basis = "source: pidController: the centred stick asks 0.110 °/s against the gyro's 500 °/s, so P is 0.032029 × 45 × (0.110 - 500) = -720.49 before anti-gravity. The throttle's drop at 0.9 s, from 47% to 26% through RC smoothing, leaves anti-gravity's 5 Hz PT2 of the throttle's speed (pidUpdateAntiGravityThrottleFilter) at 0.1821 at 1 s, times anti_gravity_gain 80 = 14.57, which multiplies P by 1 + 14.57 × 0.0034 = 1.0495: -756.18. I has wound up to its limit, -400: past 600, with the gyro moving"
 
 [[expect]]
 what  = "the Quad disarms"

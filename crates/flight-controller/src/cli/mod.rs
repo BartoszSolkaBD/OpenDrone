@@ -8,6 +8,8 @@
 //!   pasted `diff`, `diff all` or `dump` (#13).
 //! - [`AuxPaste`] reads the Arm, Flight Mode and Crash Flip switches from
 //!   pasted `aux` lines (#19 §5, [ADR-0017]).
+//! - [`OsdPaste`] reads the pilot's OSD layout from pasted `osd_*` lines
+//!   (#31 §7).
 //!
 //! The settings it knows, their names and their defaults in each Betaflight
 //! version, are one table, [`table`]: one row a setting. Names, numbers and
@@ -22,6 +24,7 @@
 // Not `aux`: Windows can't hold a file of that name.
 pub mod aux_paste;
 mod import;
+mod osd_paste;
 mod rates;
 pub mod table;
 
@@ -29,6 +32,7 @@ use core::fmt;
 
 pub use aux_paste::AuxPaste;
 pub use import::{ImportedSetting, LeftOut, TuneImport, Where, Why, import_tune};
+pub use osd_paste::OsdPaste;
 pub use rates::{NowAfter, RatesPaste};
 
 /// A Betaflight version, as the CLI prints it on its `# version` line, such

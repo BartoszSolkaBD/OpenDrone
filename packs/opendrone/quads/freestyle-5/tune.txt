@@ -19,6 +19,22 @@ set runaway_takeoff_prevention = ON    # 2026.6.2 default
 set runaway_takeoff_deactivate_delay = 500 # 2026.6.2 default; ms of stable flight before it switches off
 set runaway_takeoff_deactivate_throttle_percent = 20 # 2026.6.2 default; percent
 
+# Power & Battery
+set current_meter = ADC                # hand-set: a typical 5″ stack measures its current (#31 §3); Betaflight's own default is VIRTUAL
+set vbat_min_cell_voltage = 330        # 2026.6.2 default; hundredths of a volt: LAND NOW below this a cell
+set vbat_max_cell_voltage = 430        # 2026.6.2 default; hundredths of a volt: a full cell, for the cell count
+set vbat_warning_cell_voltage = 350    # 2026.6.2 default; hundredths of a volt: LOW BATTERY below this a cell
+# Power & Battery, CLI only
+set vbat_full_cell_voltage = 410       # 2026.6.2 default; hundredths of a volt
+set force_battery_cell_count = 0       # 2026.6.2 default; 0 works it out
+set vbat_hysteresis = 1                # 2026.6.2 default; hundredths of a volt
+set vbat_detect_cell_voltage = 300     # 2026.6.2 default; hundredths of a volt
+set use_vbat_alerts = ON               # 2026.6.2 default
+set vbat_display_lpf_period = 30       # 2026.6.2 default; tenths of a second
+set ibat_lpf_period = 10               # 2026.6.2 default; tenths of a second
+set vbat_duration_for_warning = 0      # 2026.6.2 default; tenths of a second
+set vbat_duration_for_critical = 0     # 2026.6.2 default; tenths of a second
+
 # Failsafe
 set rx_min_usec = 885                  # 2026.6.2 default; µs: a Channel below this is invalid, and Failsafe's stage 1 throttle
 set rx_max_usec = 2115                 # 2026.6.2 default; µs: a Channel above this is invalid
@@ -32,14 +48,17 @@ set failsafe_recovery_delay = 5        # 2026.6.2 default; tenths of a second of
 set p_roll = 45                        # 2026.6.2 default
 set i_roll = 80                        # 2026.6.2 default
 set d_roll = 30                        # 2026.6.2 default
+set d_max_roll = 40                    # 2026.6.2 default; Dynamic D raises D up to this
 set f_roll = 120                       # 2026.6.2 default
 set p_pitch = 47                       # 2026.6.2 default
 set i_pitch = 84                       # 2026.6.2 default
 set d_pitch = 34                       # 2026.6.2 default
+set d_max_pitch = 46                   # 2026.6.2 default
 set f_pitch = 125                      # 2026.6.2 default
 set p_yaw = 45                         # 2026.6.2 default
 set i_yaw = 80                         # 2026.6.2 default
 set d_yaw = 0                          # 2026.6.2 default
+set d_max_yaw = 0                      # 2026.6.2 default
 set f_yaw = 120                        # 2026.6.2 default
 set feedforward_transition = 0         # 2026.6.2 default; hundredths of stick; 0 is off
 set feedforward_averaging = 2_POINT    # 2026.6.2 default
@@ -47,6 +66,16 @@ set feedforward_smooth_factor = 65     # 2026.6.2 default; percent, at a 250 Hz 
 set feedforward_jitter_factor = 7      # 2026.6.2 default; µs of stick a frame
 set feedforward_boost = 15             # 2026.6.2 default
 set feedforward_max_rate_limit = 90    # 2026.6.2 default; 0 is off
+set d_max_gain = 0                     # 2026.6.2 default; the gyro's pull on Dynamic D: 0 is none
+set d_max_advance = 35                 # 2026.6.2 default; the sticks' pull on Dynamic D
+set iterm_relax = RP                   # 2026.6.2 default
+set iterm_relax_type = SETPOINT        # 2026.6.2 default
+set iterm_relax_cutoff = 15            # 2026.6.2 default; Hz
+set anti_gravity_gain = 80             # 2026.6.2 default; 0 is off
+set tpa_mode = D                       # 2026.6.2 default
+set tpa_rate = 65                      # 2026.6.2 default; percent
+set tpa_breakpoint = 1350              # 2026.6.2 default; µs
+set throttle_boost = 5                 # 2026.6.2 default; 0 is off
 set motor_output_limit = 100           # 2026.6.2 default; percent
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 2026.6.2 default; 1000 is the whole motor range
@@ -55,6 +84,12 @@ set iterm_windup = 80                  # 2026.6.2 default; the I limit, in perce
 set pid_at_min_throttle = ON           # 2026.6.2 default
 set feedforward_yaw_hold_gain = 15     # 2026.6.2 default; 0 is off
 set feedforward_yaw_hold_time = 100    # 2026.6.2 default; ms
+set anti_gravity_cutoff_hz = 5         # 2026.6.2 default; Hz
+set anti_gravity_p_gain = 100          # 2026.6.2 default
+set tpa_low_rate = 20                  # 2026.6.2 default; percent; 0 is off
+set tpa_low_breakpoint = 1050          # 2026.6.2 default; µs
+set tpa_low_always = OFF               # 2026.6.2 default
+set throttle_boost_cutoff = 15         # 2026.6.2 default; Hz
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 2026.6.2 default
@@ -90,6 +125,7 @@ set airmode_start_throttle_percent = 25 # 2026.6.2 default
 
 # Motors
 set motor_pwm_protocol = DSHOT600      # 2026.6.2 default
+set dshot_bidir = OFF                  # 2026.6.2 default; no RPM from the ESCs, so the OSD's motor RPM reads blank
 set motor_idle = 550                   # 2026.6.2 default; hundredths of a percent: 5.5%
 set motor_poles = 14                   # 2026.6.2 default; must match [motors] poles (the Velox V2207 V3 is 12N14P)
 set yaw_motors_reversed = OFF          # 2026.6.2 default; must match [props] direction, props-in
@@ -99,18 +135,7 @@ set crashflip_motor_percent = 0        # 2026.6.2 default; percent
 set crashflip_rate = 0                 # 2026.6.2 default; tens of °/s; 0 is off
 set crashflip_auto_rearm = OFF         # 2026.6.2 default
 
-# Not simulated yet. The Flight Controller checks these values but flies as
-# if each were off until its ticket lands: Dynamic D, I-term relax,
-# anti-gravity, TPA and throttle boost come with #50; the dynamic notch waits
-# for gyro noise (#21) (ADR-0015).
-# PID Tuning
-set d_max_roll = 40                    # 2026.6.2 default; not simulated yet (#50)
-set d_max_pitch = 46                   # 2026.6.2 default; not simulated yet (#50)
-set d_max_yaw = 0                      # 2026.6.2 default; not simulated yet (#50)
-set iterm_relax = RP                   # 2026.6.2 default; not simulated yet (#50)
-set anti_gravity_gain = 80             # 2026.6.2 default; not simulated yet (#50)
-set tpa_rate = 65                      # 2026.6.2 default; not simulated yet (#50)
-set tpa_low_rate = 20                  # 2026.6.2 default; not simulated yet (#50)
-set throttle_boost = 5                 # 2026.6.2 default; not simulated yet (#50)
+# Not simulated yet. The Flight Controller checks this value but flies as if
+# it were off: the dynamic notch waits for gyro noise (#21) (ADR-0015).
 # PID Tuning, filters
 set dyn_notch_count = 3                # 2026.6.2 default; not simulated yet (waits for gyro noise, #21)

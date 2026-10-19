@@ -65,18 +65,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "6d36821cbd21ae3b"   # test/freestyle-5-other-low-pass-kinds: what the Simulation receives from it
+quad = "be3c1124c0a15ae2"   # test/freestyle-5-other-low-pass-kinds: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "fd718902b48d5c62"   # the whole state after each of 4800 steps at 8000 Hz, in order
+run  = "5d17f3dda8379728"   # the whole state after each of 4800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.06 s" = "3fe6441e94766def"
-"0.12 s" = "ab1d87ac9acefa9e"
-"0.18 s" = "f7758dfd7de3dac3"
-"0.24 s" = "cf6ffafcadb31c87"
-"0.3 s" = "51ba2702a9b09dd1"
-"0.36 s" = "afbd16dd3f7333da"
-"0.42 s" = "7954eb6ea9e1c8db"
-"0.48 s" = "8a8b8d6706c8728e"
-"0.54 s" = "1927d185d148a071"
-"0.6 s" = "23efcf6c75d14913"
+"0.06 s" = "61ea58a0cca041a4"
+"0.12 s" = "d814deeeb2261b41"
+"0.18 s" = "5c9d22470e5da379"
+"0.24 s" = "1455b8d2b81c5bf4"
+"0.3 s" = "42556b3b5c04a00a"
+"0.36 s" = "893e430aa7599351"
+"0.42 s" = "555879273023036e"
+"0.48 s" = "38a8c639c75eb11f"
+"0.54 s" = "8cb93b5330767425"
+"0.6 s" = "88f8c604a46f028c"

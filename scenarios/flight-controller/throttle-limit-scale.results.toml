@@ -1,0 +1,46 @@
+# Results of throttle-limit-scale.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "The pilot's throttle limit, SCALE, shrinks the whole throttle range"
+
+[[expect]]
+what     = "mixer throttle with throttle 30%, arm on"
+basis    = "Source"
+expected = "20.56% ± 0.0001%"
+measured = "20.6%"
+
+[[expect]]
+what     = "mixer throttle with throttle 50%, arm on"
+basis    = "Source"
+expected = "37.84% ± 0.0001%"
+measured = "37.8%"
+
+[[expect]]
+what     = "mixer throttle with throttle 75%, arm on"
+basis    = "Source"
+expected = "59.36% ± 0.0001%"
+measured = "59.4%"
+
+[[expect]]
+what     = "mixer throttle with throttle 100%, arm on"
+basis    = "Source"
+expected = "80% ± 0.0001%"
+measured = "80.0%"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "aec02cafcbd83670"   # opendrone/freestyle-5: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "7ae7c7a961a880cf"   # the Flight Controller's whole state after each of 4 cases, in order
+
+[fingerprints.checkpoints]   # the Flight Controller's whole state after each case
+"case 1" = "104d2385626fbb7e"
+"case 2" = "cf86c1a29744dce3"
+"case 3" = "308b73e3cc130f03"
+"case 4" = "b6ebceaa52a7b1e2"

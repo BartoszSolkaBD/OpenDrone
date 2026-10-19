@@ -55,7 +55,9 @@ sdl3-sys = { version = "=0.7.2", default-features = false }
 # keyboard. Not Bevy's audio (the sound is Firewheel's, ADR-0023), nor its
 # gamepads (Input Devices go through SDL, ADR-0018). `tonemapping_luts` gives
 # the default tonemapping its look-up tables, which need `ktx2` and
-# `zstd_rust` to read. On Linux it draws on X11 and Wayland, as Bevy's own
+# `zstd_rust` to read. `bevy_post_process` is for the FPV Camera's
+# Auto-exposure, and `bevy_curve` for the compensation curve that keeps it in
+# each Video Look's limits. On Linux it draws on X11 and Wayland, as Bevy's own
 # default does.
 bevy = { version = "=0.20.0", default-features = false, features = [
     "std",
@@ -80,6 +82,8 @@ bevy = { version = "=0.20.0", default-features = false, features = [
     "bevy_material",
     "bevy_gizmos",
     "bevy_gizmos_render",
+    "bevy_post_process",
+    "bevy_curve",
     "tonemapping_luts",
     "ktx2",
     "zstd_rust",
@@ -97,6 +101,10 @@ triple_buffer = "=9.0.0"
 # Firewheel's buffer views, so the Quad's sound can be made with no sound
 # device, in tests (ADR-0023).
 audioadapter-buffers = { version = "=5.2.0", default-features = false, features = ["std"] }
+# The GPU's own timestamps, to measure what the FPV Camera costs a frame: the
+# same wgpu Bevy 0.20.0 draws with, whose query types it doesn't re-export.
+# Only the game uses it.
+wgpu = { version = "=30.0.1", default-features = false }
 serde_json = "=1.0.151"
 toml = "=1.1.6"
 # The format migration steps rewrite Scenario and Pack files with it, keeping

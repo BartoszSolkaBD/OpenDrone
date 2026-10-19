@@ -1,0 +1,89 @@
+# The pilot's throttle limit, SCALE, shrinks the whole throttle range to
+# `throttle_limit_percent`, as Betaflight 2026.6.2's mixer does
+# (`applyThrottleLimit`, src/main/flight/mixer.c; the Betaflight research
+# §1). throttle-limit-clip.toml shows CLIP. The limit belongs to the pilot's
+# Rates, in `[start.rates]`: here SCALE at 80%, so the mixer's throttle is
+# the throttle curve's times 0.80, and full stick gives 80%.
+#
+# Each case is a fresh Flight Controller, one Radio Link frame and one loop,
+# and measures the mixer's throttle after the limit: on a fresh Flight
+# Controller RC smoothing and throttle boost start settled on the first
+# frame. Through Betaflight's straight throttle curve (mid 0.50, hover 0.50,
+# expo 0) the sticks give 0.257 at 30%, 0.473 at 50%, 0.742 at 75% and 1 at
+# 100% (throttle-boost.toml). It flies the Freestyle 5″ on its own Tune.
+format = 2
+name   = "The pilot's throttle limit, SCALE, shrinks the whole throttle range"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit scale 80%"
+quickrates_rc_expo = "off"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "30%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "20.56% ± 0.0001%"
+basis = "source: applyThrottleLimit: SCALE, 0.257 × 0.80 = 0.2056"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "50%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "37.84% ± 0.0001%"
+basis = "source: applyThrottleLimit: SCALE, 0.473 × 0.80 = 0.3784"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "75%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "59.36% ± 0.0001%"
+basis = "source: applyThrottleLimit: SCALE, 0.742 × 0.80 = 0.5936"
+
+[[case]]
+roll       = "0%"
+pitch      = "0%"
+yaw        = "0%"
+throttle   = "100%"
+arm        = "on"
+crash_flip = "off"
+
+[[case.expect]]
+what  = "mixer throttle"
+value = "80% ± 0.0001%"
+basis = "source: applyThrottleLimit: SCALE, full stick gives 1 × 0.80 = 0.80"

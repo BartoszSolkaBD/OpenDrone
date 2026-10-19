@@ -98,11 +98,11 @@ basis   = "observed: full right roll asks for nothing in yaw, and the PID loop h
 [[expect]]
 what    = "roll rate"
 over    = "1 s to 1.5 s"
-highest = "830 °/s ± 2%"
-basis   = "observed: the roll overshoots the max rate: the I term winds up while the roll spins up, as Betaflight's would without I-term relax, which comes with #50. With the filters, RC smoothing and feedforward (#49) it peaks at 830 °/s; before them it reached 869 °/s"
+highest = "670 °/s ± 1%"
+basis   = "observed: the roll doesn't overshoot the max rate: I-term relax (#50) holds the I term back while the setpoint climbs, so it doesn't wind up as the roll spins up. Without I-term relax, as before #50, it peaked at 830 °/s"
 
 [[expect]]
 what  = "roll rate"
 at    = "1.8 s"
-value = "-1.8 °/s ± 1 °/s"
-basis = "observed: after the stick is let go the roll stops and bounces back a little, the wound-up I term unwinding; I-term relax (#50) is what stops that bounce"
+value = "0 °/s ± 0.5 °/s"
+basis = "observed: after the stick is let go the roll stops without bouncing back, as I didn't wind up (I-term relax, #50); before #50 the wound-up I term unwinding bounced it back at -1.8 °/s"

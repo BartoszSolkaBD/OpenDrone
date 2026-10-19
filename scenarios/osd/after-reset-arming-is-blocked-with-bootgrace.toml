@@ -1,0 +1,114 @@
+# Power-up, as the OSD shows it (#31 §10, #32 §4; src/main/osd/
+# osd_warnings.c and osd.c):
+#
+# - With the Arm switch on while the ESCs start up, the warnings read
+#   BOOTGRACE: OpenDrone's Flight Controller holds Betaflight's boot grace
+#   until the ESCs' ready beep, at 1.662 s. Then only the Arm switch's own
+#   reason stands, ARM_SWITCH, until the switch goes off.
+# - The timers count the Flight Controller's clock, in Simulation Time:
+#   timer 1 the time since power-up, timer 2 the armed time.
+# - Reset powers the Flight Controller up afresh, so the timers start again
+#   from zero, no statistics page shows, and, with the Arm switch still on,
+#   the warnings read BOOTGRACE again.
+#
+# A Freestyle 5″ resting on the floor, starting as Reset leaves it
+# (arming-waits-for-the-escs-after-reset.toml). It arms at 2.204 s, idles on
+# the floor, and Reset comes at 3.5 s with the Arm switch on.
+format = 2
+name   = "After Reset, arming is blocked with BOOTGRACE, and the timers start again from zero"
+
+[start]
+kind              = "flight"
+quad              = "opendrone/freestyle-5"
+map               = "test/flat-floor"
+position          = "0 m east, 0 m north, 0.0175 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+armed             = false
+motors            = "powering up"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "on", crash_flip = "off" },
+  { at = "2 s",   arm = "off" },
+  { at = "2.2 s", arm = "on" },
+  { at = "3.5 s", reset = true },
+]
+
+[[expect]]
+what  = "the Quad arms"
+over  = "2 s to 2.5 s"
+first = "0.204125 s ± 0.000001 s"
+basis = "source: processRcStickPositions and tryArm: the frame at 2.2 s turns Arm on, and the next, at 2.204 s, arms"
+
+[osd]
+timer_1    = "on time, whole seconds, alarm at 10 min"
+timer_2    = "total armed time, whole seconds, alarm at 10 min"
+warnings   = ["arming disabled", "battery not full", "low battery", "battery critical", "visual beeper", "crash flip", "esc fail", "core temperature", "fail safe", "launch control", "gps rescue unavailable", "gps rescue failing", "load", "position hold failed", "autopilot abort"]
+statistics = ["timer 2", "max speed", "min battery", "min rssi", "max current", "used mah", "blackbox", "blackbox log number"]
+alarms     = { rssi = "20%", link_quality = "80%", rssi_dbm = "-60 dBm", rsnr = "4 dB", capacity = "2200 mAh" }
+
+[[osd.expect]]
+what  = "warnings"
+at    = "1 s"
+value = "BOOTGRACE"
+basis = "source: renderOsdWarning shows the reason arming is refused while the Arm switch is on, the Arm switch's own (ARM_SWITCH) only when it's the only one; BOOTGRACE holds until the ESCs' ready beep (#32 §4)"
+
+[[osd.expect]]
+what  = "warnings"
+at    = "1.9 s"
+value = "ARM_SWITCH"
+basis = "source: updateArmingStatus: once BOOTGRACE clears (ready at 1.662 s), the Arm switch on while it was refused leaves ARM_SWITCH alone, which renderOsdWarning shows"
+
+[[osd.expect]]
+what  = "timer 1"
+at    = "3.4 s"
+value = "00:03"
+basis = "rule: timer 1 counts the time since power-up, on the Flight Controller's clock in Simulation Time (ADR-0022)"
+
+[[osd.expect]]
+what  = "timer 2"
+at    = "3.4 s"
+value = "00:01"
+basis = "rule: timer 2 counts the armed time, from 2.204 s"
+
+[[osd.expect]]
+what  = "timer 1"
+at    = "3.7 s"
+value = "00:00"
+basis = "rule: Reset powers the Flight Controller up afresh, so the timers start again from zero (ADR-0022)"
+
+[[osd.expect]]
+what  = "timer 2"
+at    = "3.7 s"
+value = "00:00"
+basis = "rule: Reset powers the Flight Controller up afresh, so the timers start again from zero (ADR-0022)"
+
+[[osd.expect]]
+what  = "warnings"
+at    = "3.7 s"
+value = "BOOTGRACE"
+basis = "rule: Reset powers the ESCs up afresh, so arming waits for their ready beep again (#32 §4), and the Arm switch is still on"
+
+[[osd.expect]]
+what  = "statistics page"
+at    = "3.7 s"
+value = "(blank)"
+basis = "rule: the statistics page never shows after a Reset (#31 §4): the OSD starts afresh with the Flight Controller"

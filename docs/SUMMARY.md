@@ -62,6 +62,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 - [Checking a Pack](verification/checking-a-pack.md)
 - [Importing a Tune from Betaflight](verification/importing-a-tune.md)
 - [Watching Input Devices](verification/watching-input-devices.md)
+- [Watching a Scenario and saving a flight](verification/watching-and-saving-flights.md)
 - [The Scenario catalogue](book/scenario-catalogue.md)
 - [The Feel Test checklist](feel-test-checklist.md)
 - [Feel Test logs](book/feel-test-logs.md)
