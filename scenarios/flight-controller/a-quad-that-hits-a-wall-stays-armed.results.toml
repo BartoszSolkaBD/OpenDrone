@@ -53,64 +53,10 @@ expected = "between -600 and 600"
 measured = "-245"
 
 [[expect]]
-what     = "pitch PID sum, lowest over 1.04 s to 1.07 s"
+what     = "pitch PID sum, lowest over 1.04 s to 1.34 s"
 basis    = "Observed"
 expected = "between -600 and 600"
 measured = "-1.12"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.07 s to 1.10 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "-0.377"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.10 s to 1.13 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.0494"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.13 s to 1.16 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.319"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.16 s to 1.19 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.598"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.19 s to 1.22 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.715"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.22 s to 1.25 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.832"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.25 s to 1.28 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "0.922"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.28 s to 1.31 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "1.00"
-
-[[expect]]
-what     = "pitch PID sum, lowest over 1.31 s to 1.34 s"
-basis    = "Observed"
-expected = "between -600 and 600"
-measured = "1.07"
 
 [[expect]]
 what     = "pitch PID sum, highest over 1.6 s to 3 s"

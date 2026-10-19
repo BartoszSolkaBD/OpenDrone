@@ -12,7 +12,7 @@
 # same thrust, with γ = ½ + ½·√(1 + α₀/(8·(z/R)²)), and thrust grows with
 # power to the ⅔, so at the same power, which a motor at a fixed speed gives
 # its prop here, the thrust is γ^⅔ times its open-air thrust (Hsiao &
-# Chirarattananon §V.C: "amplified by a factor of 4^(2/3) or 2.5 times for
+# Chirarattananon §VI-C1: "amplified by a factor of 4^(2/3) or 2.5 times for
 # the same power consumption"). With z/R = 1 and α₀ = 1 (the Whoop 65's
 # ceiling_effect_asymmetry):
 #

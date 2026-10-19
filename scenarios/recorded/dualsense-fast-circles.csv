@@ -4,7 +4,7 @@
 # built-in Pack's Input Device profile, uncalibrated, by crates/input/tests/input_tracks.rs.
 # Device: DualSense Wireless Controller; heartbeat: off.
 # Times are Simulation Time at 8 kHz from the trace's first poll; Channels in µs.
-time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event
+time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input
 0,1051.405,1800.651,1787.125,1089.447,988,988,988,
 0.003875,1080.993,1821.786,1811.219,1106.355,,,,
 0.007875,1085.22,1842.921,1835.312,1119.036,,,,

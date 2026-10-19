@@ -5,7 +5,7 @@
 //! this header, then one row for each Flight Input, in time order:
 //!
 //! ```text
-//! time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event
+//! time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input
 //! 0,1500,1500,988,1500,988,988,988,
 //! 0.004,1503.5,,,,,,,
 //! 0.008,,,,,,,,
@@ -20,24 +20,25 @@
 //!   as the game rounds a live device's Channels (ADR-0007). A row gives
 //!   only the Channels that changed; an empty cell holds the last value.
 //!   The first row, at 0 s, gives every Channel.
-//! - **A row with no values and no event** is a report from the device that
+//! - **A row with no values and no other Flight Input** is a report from the device that
 //!   changed nothing. A device that reports at rest sends one every report,
 //!   and those are what keep it from counting as lost; a device that reports
 //!   only changes has none.
-//! - **`event`** is empty, `input device lost` (the computer reported the
-//!   Flying Input Device removed), `input device back` or `reset`. A row with
-//!   an event gives no Channels.
+//! - **`other flight input`** is empty, `input device lost` (the computer
+//!   reported the Flying Input Device removed), `input device back` or
+//!   `reset`: the Flight Inputs that aren't Channels. A row with one gives no
+//!   Channels.
 //!
 //! So a row comes only when something happens: a value changes, the device
-//! reports, or an event.
+//! reports, or another Flight Input comes.
 
 use opendrone_pack::{Problem, Problems};
 use opendrone_sim::{Channel, Channels, FlightInput, PhysicsRate, SimulationTime};
 
 /// The header every Input Track starts with, after its comments.
-pub const INPUT_TRACK_HEADER: &str = "time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event";
+pub const INPUT_TRACK_HEADER: &str = "time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input";
 
-/// The words of the `event` column.
+/// The words of the `other flight input` column.
 const LOST: &str = "input device lost";
 const BACK: &str = "input device back";
 const RESET: &str = "reset";
@@ -101,12 +102,12 @@ pub(crate) fn read_input_track(
         let Row {
             tick,
             values,
-            event,
+            other_input,
         } = read;
         let at = SimulationTime::from_ticks(tick);
         let current = match channels {
             Some(current) => current,
-            None => match (tick, event, values) {
+            None => match (tick, other_input, values) {
                 (
                     0,
                     "",
@@ -152,7 +153,7 @@ pub(crate) fn read_input_track(
         }
         last_tick = tick;
         let seconds = tick as f64 / hz;
-        match event {
+        match other_input {
             "" => {
                 let [roll, pitch, throttle, yaw, arm, flight_mode, crash_flip] = values;
                 let next = Channels {
@@ -206,8 +207,8 @@ struct Row<'r> {
     /// Roll, pitch, throttle, yaw, arm, flight mode and crash flip, where
     /// given.
     values: [Option<Channel>; 7],
-    /// Empty, or one of the event words.
-    event: &'r str,
+    /// Empty, or one of the words of the `other flight input` column.
+    other_input: &'r str,
 }
 
 /// Reads one row, or says what's wrong with it.
@@ -223,7 +224,7 @@ fn read_row<'r>(
     let cells: Vec<&str> = row.split(',').map(str::trim).collect();
     if cells.len() != 9 {
         problem(format!(
-            "a row has 9 cells, as the header does (the time, seven Channels and an event), not {}",
+            "a row has 9 cells, as the header does (the time, seven Channels and another Flight Input), not {}",
             cells.len()
         ));
         return None;
@@ -251,8 +252,8 @@ fn read_row<'r>(
             }
         }
     }
-    let event = cells[8];
-    match event {
+    let other_input = cells[8];
+    match other_input {
         "" | LOST | BACK => {}
         RESET if rules.reset => {}
         RESET => {
@@ -261,20 +262,22 @@ fn read_row<'r>(
         }
         other => {
             problem(format!(
-                "`event` is empty, \"{LOST}\", \"{BACK}\" or \"{RESET}\", not \"{other}\""
+                "`other flight input` is empty, \"{LOST}\", \"{BACK}\" or \"{RESET}\", not \"{other}\""
             ));
             fine = false;
         }
     }
-    if !event.is_empty() && values.iter().any(Option::is_some) {
-        problem("a row is one Flight Input: Channels, or an event, not both".to_string());
+    if !other_input.is_empty() && values.iter().any(Option::is_some) {
+        problem(
+            "a row is one Flight Input: Channels, or another Flight Input, not both".to_string(),
+        );
         fine = false;
     }
     let tick = tick?;
     fine.then_some(Row {
         tick,
         values,
-        event,
+        other_input,
     })
 }
 
