@@ -222,7 +222,7 @@ input_device = { report_rate = "250 Hz", reports_at_rest = true }
 The file starts with comment lines (`#`) saying where it came from, then its header, then a row for each Flight Input, in time order:
 
 ```text
-time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event
+time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input
 0,1525.882,1500,988,1500,988,988,988,
 0.003875,,,,,,,,
 0.008,1530.109,,,,,,,
@@ -230,8 +230,8 @@ time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (
 
 - **`time`** is Simulation Time from the Scenario's start, in seconds, each a whole number of physics steps.
 - **The Channels** are in µs, at the device's full resolution after its Calibration and channel mapping, as the input layer hands them to the game. Each is rounded to the receiver's nearest step as it enters the Simulation, as the game rounds a live device's. Arm, Flight Mode and Crash Flip are AUX1–3, with their fixed meanings ([ADR-0017](../adr/0017-switches-reach-the-flight-controller-with-fixed-meanings.md)).
-- **A row only when something happens.** The first row, at 0 s, gives every Channel. After it a row gives only the Channels that changed; an empty cell holds the last value. A row with no values and no event is a report from the device that changed nothing: a device that reports at rest sends one with every report, and those keep it from counting as lost. A device that reports only changes has none.
-- **`event`** is empty, `input device lost` (the computer reported the Flying Input Device removed), `input device back`, or `reset` (only in a Flight Scenario that starts as Reset leaves the Quad). A row with an event gives no Channels.
+- **A row only when something happens.** The first row, at 0 s, gives every Channel. After it a row gives only the Channels that changed; an empty cell holds the last value. A row with no values and no other Flight Input is a report from the device that changed nothing: a device that reports at rest sends one with every report, and those keep it from counting as lost. A device that reports only changes has none.
+- **`other flight input`** is empty, `input device lost` (the computer reported the Flying Input Device removed), `input device back`, or `reset` (only in a Flight Scenario that starts as Reset leaves the Quad). These are the Flight Inputs that aren't Channels, and a row with one gives no Channels.
 - The run lasts at least to the track's last row. After its last row the device says nothing more.
 
 The Input Tracks in `scenarios/recorded/` are the maintainer's own device recordings from the SDL3 input probe (#18, #27, #30), committed trimmed in `crates/input/tests/traces/`, played through the built-in Pack's Input Device profiles exactly as the game does. A readable check in `crates/input/tests/input_tracks.rs` makes each track afresh and fails if the committed one differs; `OPENDRONE_WRITE_INPUT_TRACKS=1 cargo test -p opendrone-input --test input_tracks` writes them again.

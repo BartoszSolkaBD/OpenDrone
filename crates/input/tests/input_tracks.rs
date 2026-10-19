@@ -13,8 +13,9 @@
 //! and `docs/verification/reading-a-scenario.md`): a row for each Flight
 //! Input, giving only the Channels that changed, in µs; an empty row for a
 //! report from a device that reports at rest that changed nothing; and the
-//! device unplugged and plugged back in as events. A device that reports at
-//! rest going silent is no event: the Simulation counts the silence itself.
+//! device unplugged and plugged back in, in the `other flight input` column.
+//! A device that reports at rest going silent is no Flight Input: the
+//! Simulation counts the silence itself.
 //! Times are Simulation Time at 8 kHz from the trace's first poll, each
 //! report entering at the first step at or after the input thread read it.
 
@@ -111,7 +112,7 @@ fn input_track(file: &str, about: &str) -> String {
     .unwrap();
     writeln!(
         text,
-        "time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),event"
+        "time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input"
     )
     .unwrap();
     let mut written: Option<[String; 7]> = None;

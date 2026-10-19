@@ -3,7 +3,8 @@
 # its descent. Air crossing the disc that fast carries the rotors out of
 # their own air, so Prop Wash doesn't act, and it flies on dead level. Proves
 # E19 in #10 (ADR-0005): Prop Wash is gone above about 2.75 times the
-# descent rate in forward speed.
+# descent rate in forward speed. Run again with another seed it flies the
+# same, to the last bit: the seed reaches the physics only through Prop Wash.
 #
 # The working (crates/physics/src/prop_wash.rs, "Where it acts"):
 #
@@ -98,3 +99,19 @@ what  = "speed north"
 at    = "1 s"
 value = "10.5 m/s ± 0.001 m/s"
 basis = "rule: level, with no drag, nothing pushes it along: it keeps its speed across the props"
+
+[[expect]]
+what    = "roll rate"
+at      = "1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "0 °/s ± 0 °/s"
+basis   = "rule: Prop Wash is gone at 3 times the descent, so every rotor's thrust factor is exactly 1 whatever its flicker (the seed reaches the physics only through Prop Wash's thrust factor, and where Prop Wash doesn't act it is exactly 1), so another seed changes nothing: the roll rate is the same to the last bit. The 2× Scenario (prop-wash-still-shakes-a-whoop-flying-across-at-2-times-the-descent.toml) expects a gap between seeds where Prop Wash still acts"
+
+[[expect]]
+what    = "pitch rate"
+at      = "1 s"
+against = { random_seed = 2 }
+compare = "gap"
+value   = "0 °/s ± 0 °/s"
+basis   = "rule: as above, for the pitch rate: with the thrust factor exactly 1 on every rotor, another seed changes nothing"

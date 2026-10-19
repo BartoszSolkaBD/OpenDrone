@@ -41,6 +41,17 @@
 //! source of their own: the research gives where the effect is, not how it
 //! grows inside.
 //!
+//! The fade replaces the `exp(−(μ/0.7)²)` term of research §4.4's cheap
+//! model, where `μ` is the air across the disc over `v_h`. That term judges
+//! the forward speed against the rotor's `v_h` alone, but the rule the same
+//! section cites (Talaeizadeh et al.) judges it against the descent: the
+//! escape is a ratio of the two. The exponential also never reaches zero, so
+//! "gone at 2.75 times the descent" could not hold exactly, and it takes most
+//! of Prop Wash away well before the rule does (at twice the descent, with the
+//! Whoop 65's `v_h`, it leaves about 5% of the bump where the rule leaves
+//! 22%). `(1 − r²)²` is 1 with no air across the disc, falls smoothly, and
+//! is exactly 0 at the rule's 2.75 times.
+//!
 //! # What it does
 //!
 //! With `k` the Quad's strength, `I` the share above (0 to 1) and `n` the
@@ -71,8 +82,8 @@
 //! the timing in seconds of Simulation Time: so the same seed gives the same
 //! flicker, on every computer, and a different seed a different one. Each
 //! rotor has its own generator, seeded from the Quad's seed (a generator
-//! seeded with it hands each rotor, in motor order, its first number as the
-//! rotor's seed), so a rotor's levels never depend on when the other rotors
+//! seeded with it hands each rotor, in motor order, the next number it draws
+//! as the rotor's seed), so a rotor's levels never depend on when the other rotors
 //! move on. That keeps the flicker the same at every physics rate, to within
 //! rounding in its timing (under 1e-11 of the −1 to 1 range, the worst measured 5e-13, over 1 s at 1, 4
 //! and 8 kHz, for every seed from 0 to 199 that the test sweeps), while the
@@ -81,9 +92,9 @@
 //! on at every step the Quad is free to fly, in the band or not, so a rotor
 //! entering the band meets it mid-flicker rather than at a fresh start; held
 //! on the thrust stand, in still air, it waits. The Simulation gives each Quad its own seed ([`Flicker::new`],
-//! [`crate::QuadBody::with_flicker`]); the generator, the levels and the
-//! timing are part of the Quad's state, so they are fingerprinted and copied
-//! with it.
+//! [`crate::QuadBody::with_flicker`]); each rotor's generator, its levels and its
+//! timing are part of the Quad's state, so they are fingerprinted and held
+//! in the Simulation's Snapshot with it.
 //!
 //! Settled motors (ADR-0002) are worked out with the flicker at its middle:
 //! they make up Prop Wash's average loss, so a settled Quad holds its stated
@@ -190,7 +201,7 @@ struct Glide {
 
 impl Flicker {
     /// The flicker the seed alone decides. A generator seeded from `seed`
-    /// hands each rotor, in Betaflight's motor order, the first number it
+    /// hands each rotor, in Betaflight's motor order, the next number it
     /// draws as that rotor's own seed. Each rotor's generator then draws
     /// where its rotor starts between two levels, then the two levels.
     pub fn new(seed: u64) -> Flicker {

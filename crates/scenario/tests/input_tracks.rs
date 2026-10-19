@@ -158,7 +158,7 @@ fn a_row_is_one_flight_input_with_channels_a_receiver_can_hold() {
     assert_eq!(
         found,
         [
-            "scenarios/recorded/track.csv line 5: a row is one Flight Input: Channels, or an event, not both"
+            "scenarios/recorded/track.csv line 5: a row is one Flight Input: Channels, or another Flight Input, not both"
         ]
     );
     let beyond = track().replace("0.004,1600,", "0.004,2400,");
@@ -182,7 +182,7 @@ fn a_row_is_one_flight_input_with_channels_a_receiver_can_hold() {
     assert_eq!(
         found,
         [
-            "scenarios/recorded/track.csv line 5: a row has 9 cells, as the header does (the time, seven Channels and an event), not 4"
+            "scenarios/recorded/track.csv line 5: a row has 9 cells, as the header does (the time, seven Channels and another Flight Input), not 4"
         ]
     );
 }
@@ -219,7 +219,7 @@ fn the_device_is_lost_and_back_by_turns_and_reset_needs_a_flight_that_starts_as_
     assert_eq!(
         found,
         [
-            "scenarios/recorded/track.csv line 7: `event` is empty, \"input device lost\", \"input device back\" or \"reset\", not \"unplugged\""
+            "scenarios/recorded/track.csv line 7: `other flight input` is empty, \"input device lost\", \"input device back\" or \"reset\", not \"unplugged\""
         ]
     );
 }
