@@ -26,8 +26,8 @@ _Avoid_: Checksum, hash (informal only)
 
 ## Rules
 
-- Only Flight Inputs change a flight. They are recorded and replayed exactly as they arrived.
-- Flight Inputs enter before any Assist, the Rates or the Radio Link. All of those run inside the Simulation, so a recording captures what the pilot's hands did.
+- Only Flight Inputs change a flight. They are saved in an Input Track and play back exactly as they arrived.
+- Flight Inputs enter before any Assist, the Rates or the Radio Link. All of those run inside the Simulation, so an Input Track captures what the pilot's hands did.
 - The Simulation never sees the computer's clock and never opens a file.
 - Camera Tilt, FOV, Pause and anything purely visual never enter the Simulation.
 - An Input Device counts as lost when the computer reports it removed. A device that keeps reporting at rest also counts as lost after 1 s without a report, as the Radio Link counts it from the Flight Inputs' stamps, so the same Input Track gives it exactly. A device that only reports changes is never counted as lost just because it goes quiet. Values that arrive in the same instant as the removal are thrown away.
