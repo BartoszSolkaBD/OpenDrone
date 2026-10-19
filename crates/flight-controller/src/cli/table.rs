@@ -30,11 +30,11 @@
 //! A row is written into a Tune under its [`Place`] once the Flight
 //! Controller reads it ([`crate::Tune::settings`]); until then the importer
 //! keeps it under "Not simulated yet" when the export sets it. The table also
-//! holds rows for the settings the next Flight Controller tickets read (#51
-//! Angle and Horizon; #52 Failsafe), so their Tunes come out of the importer
-//! as soon as the Flight Controller reads them; those tickets check their
-//! rows. #50 checked the rows for anti-gravity, I-term relax, TPA, Dynamic D
-//! and throttle boost against each version's source.
+//! holds rows for the settings the next Flight Controller tickets read (#52
+//! Failsafe), so their Tunes come out of the importer as soon as the Flight
+//! Controller reads them; those tickets check their rows. #50 checked the
+//! rows for anti-gravity, I-term relax, TPA, Dynamic D and throttle boost
+//! against each version's source, and #51 those for Angle and Horizon.
 //!
 //! [ADR-0008]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0008-copy-betaflight-2026-6-translate-older-tunes.md
 
@@ -353,6 +353,7 @@ pub const SETTINGS: &[Setting] = &[
         [Newer, Newer, Same("OFF"), Same("OFF"), Same("OFF")]),
     row("horizon_delay_ms", PidTuningCli, "ms",
         [Newer, Newer, Same("500"), Same("500"), Same("500")]),
+    all("level_race_mode", PidTuningCli, "", "OFF"),
     // PID Tuning, filters
     all("gyro_lpf1_type", Filters, "", "PT1"),
     all("gyro_lpf1_static_hz", Filters, "Hz; 0 is off", "250"),

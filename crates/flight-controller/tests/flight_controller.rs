@@ -4,8 +4,8 @@
 //! Scenarios in `scenarios/flight-controller/`.
 
 use opendrone_flight_controller::{
-    BatteryReading, Channel, Channels, FailsafeProcedure, FlightController, Rates, SensorReadings,
-    Tune,
+    BatteryReading, Channel, Channels, FailsafeProcedure, FlightController, FlightMode, Rates,
+    SensorReadings, Tune,
 };
 use opendrone_maths::{Attitude, DEGREE, Vec3};
 
@@ -68,6 +68,9 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("tpa_breakpoint", "1350"),
     ("throttle_boost", "5"),
     ("motor_output_limit", "100"),
+    ("angle_p_gain", "50"),
+    ("angle_limit", "60"),
+    ("horizon_level_strength", "75"),
     ("pidsum_limit", "500"),
     ("pidsum_limit_yaw", "400"),
     ("iterm_windup", "80"),
@@ -80,6 +83,14 @@ const DEFAULTS: &[(&str, &str)] = &[
     ("tpa_low_breakpoint", "1050"),
     ("tpa_low_always", "OFF"),
     ("throttle_boost_cutoff", "15"),
+    ("angle_feedforward", "50"),
+    ("angle_feedforward_smoothing_ms", "80"),
+    ("angle_earth_ref", "100"),
+    ("horizon_limit_sticks", "75"),
+    ("horizon_limit_degrees", "135"),
+    ("horizon_ignore_sticks", "OFF"),
+    ("horizon_delay_ms", "500"),
+    ("level_race_mode", "OFF"),
     ("gyro_lpf1_type", "PT1"),
     ("gyro_lpf1_static_hz", "250"),
     ("gyro_lpf1_dyn_min_hz", "250"),
@@ -798,4 +809,80 @@ fn anti_gravity_gain_0_adds_nothing_when_the_throttle_moves() {
         "{}",
         on.debug().terms[0].p
     );
+}
+
+/// Armed, sticks centred, the throttle at half and AUX2 at `micros`.
+fn flight_mode_at(micros: f64) -> Channels {
+    Channels {
+        flight_mode: Channel::from_micros(micros),
+        ..sticks(0.0, 0.0, 0.5)
+    }
+}
+
+#[test]
+fn aux2_low_flies_acro_middle_horizon_and_high_angle_through_the_built_in_modes_table() {
+    // Basis: Rule (ADR-0017: AUX2 low Acro, middle Horizon, high Angle) and
+    // Source (`processRxModes`: each frame's switches pick the Flight Mode
+    // through the Modes table's ranges, here Horizon from 1300 µs and Angle
+    // from 1700 µs, in Betaflight's 25 µs steps).
+    let mut fc = armed(tune());
+    assert_eq!(fc.debug().flight_mode, FlightMode::Acro);
+    for (micros, mode) in [
+        (988.0, FlightMode::Acro),
+        (1500.0, FlightMode::Horizon),
+        (2012.0, FlightMode::Angle),
+        (1290.0, FlightMode::Acro),
+        (1310.0, FlightMode::Horizon),
+        (1690.0, FlightMode::Horizon),
+        (1710.0, FlightMode::Angle),
+        (988.0, FlightMode::Acro),
+    ] {
+        frames(&mut fc, flight_mode_at(micros), STILL, 32);
+        assert_eq!(fc.debug().flight_mode, mode, "AUX2 at {micros} µs");
+    }
+    // The Flight Mode changes with the frame that brings the switch.
+    fc.step(&STILL, None);
+    assert_eq!(fc.debug().flight_mode, FlightMode::Acro);
+    fc.step(&STILL, Some(&flight_mode_at(2012.0)));
+    assert_eq!(fc.debug().flight_mode, FlightMode::Angle);
+}
+
+#[test]
+fn failsafes_stage_2_flies_angle_whatever_aux2_says() {
+    // Basis: Source (`processRxModes`: ANGLE_MODE while failsafeIsActive,
+    // Betaflight's "failsafe support"). DROP disarms the Quad at once, so the
+    // OSD shows !FS! rather than ANGL, but the Flight Mode is Angle until
+    // Failsafe ends.
+    let mut fc = armed(tune());
+    frames(&mut fc, flight_mode_at(988.0), STILL, 8000);
+    assert_eq!(fc.debug().flight_mode, FlightMode::Acro);
+    for _ in 0..16000 {
+        fc.step(&STILL, None);
+    }
+    assert!(fc.debug().failsafe.active);
+    assert_eq!(fc.debug().flight_mode, FlightMode::Angle);
+}
+
+#[test]
+fn angle_levels_against_the_attitude_reading() {
+    // Basis: Source (`pidLevel`: the setpoint is the tilt asked for less the
+    // attitude, times angle_p_gain ÷ 10) and Rule (#21: Angle levels against
+    // the true attitude the sensors give). Rolled right 10° with the sticks
+    // centred, which ask for 0.00982°, roll asks to roll left at about
+    // 50 °/s; level, at almost 0.
+    let rolled = SensorReadings {
+        attitude: Attitude::from_pilot_angles(opendrone_maths::PilotAngles {
+            roll: 10.0 * DEGREE,
+            pitch: 0.0,
+            heading: 0.0,
+        }),
+        ..STILL
+    };
+    let mut fc = armed(tune());
+    frames(&mut fc, flight_mode_at(2012.0), rolled, 1);
+    let roll = fc.debug().pid_setpoint[0];
+    assert!((roll - (0.00982 - 10.0) * 5.0).abs() < 0.001, "{roll}");
+    let mut level = armed(tune());
+    frames(&mut level, flight_mode_at(2012.0), STILL, 1);
+    assert!(level.debug().pid_setpoint[0].abs() < 0.1);
 }

@@ -1,0 +1,64 @@
+# Results of in-angle-letting-go-of-the-sticks-levels-the-quad.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "In Angle, the Whoop 65 holds the tilt full stick asks for, and levels itself when the stick is let go"
+
+[[expect]]
+what     = "tilt, highest over 0 s to 1 s"
+basis    = "Rule"
+expected = "0° ± 1°"
+measured = "0.0125°"
+
+[[expect]]
+what     = "roll, mean over 1.5 s to 2 s"
+basis    = "Rule"
+expected = "between 45° and 55°"
+measured = "50.0°"
+
+[[expect]]
+what     = "roll, mean over 1.5 s to 2 s"
+basis    = "Observed"
+expected = "50.0° ± 0.5°"
+measured = "50.0°"
+
+[[expect]]
+what     = "roll, highest over 1.5 s to 2 s"
+basis    = "Rule"
+expected = "55° ± 5°"
+measured = "52.6°"
+
+[[expect]]
+what     = "tilt, highest over 3 s to 4 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.235°"
+
+[[expect]]
+what     = "roll rate at 4 s"
+basis    = "Rule"
+expected = "0 °/s ± 2 °/s"
+measured = "-0.258 °/s"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "8a32bea8e4df9193"   # the whole state after each of 32000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.4 s" = "ee880de19897b740"
+"0.8 s" = "37e09f2ce57c6d13"
+"1.2 s" = "ab3fb4f9903003fb"
+"1.6 s" = "73195e38720d3b2d"
+"2 s" = "46fec282ec30fff6"
+"2.4 s" = "ad2c74f547c00a6d"
+"2.8 s" = "613c5ed7a2ecd31a"
+"3.2 s" = "d8fe9990b7d32d0c"
+"3.6 s" = "e49fd119e1e0a335"
+"4 s" = "c3e27cd7581c697b"

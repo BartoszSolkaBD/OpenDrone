@@ -688,14 +688,6 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         problems,
     );
     let flies = matches!(kind, Some(Kind::Flight | Kind::FlightController));
-    if flies
-        && matches!(flight_mode, Some(FlightMode::Angle | FlightMode::Horizon))
-        && let Some(item) = start.get("flight_mode")
-    {
-        problems.push(item.problem(
-            "the Flight Controller flies Acro so far: Angle and Horizon arrive with their ticket (#51)",
-        ));
-    }
     let assists = start.table("assists", problems).and_then(|table| {
         table.refuse_unknown(ASSISTS, problems);
         let mut on = |key| {

@@ -5,7 +5,8 @@
 //!
 //! Switches reach the Flight Controller with fixed meanings (ADR-0017), so
 //! the Modes table is built in: Arm on AUX1 and Crash Flip on AUX3, high is
-//! on. Flight Mode on AUX2 joins it with its ticket (#51).
+//! on, and the Flight Mode on AUX2, with Horizon in the middle and Angle high
+//! (`flight_mode`).
 //!
 //! Arming follows Betaflight's checks, each named as Betaflight names it
 //! ([`ArmingBlocks`]): the throttle below `min_check` (`THROTTLE`), the tilt
@@ -43,6 +44,7 @@
 
 use opendrone_maths::{Attitude, Fingerprinter, Vec3, functions};
 
+use crate::FlightMode;
 use crate::receiver::RcData;
 use crate::tune::Tune;
 
@@ -78,6 +80,36 @@ const CRASH_FLIP: ModeRange = ModeRange {
     start: 1700.0,
     end: 2100.0,
 };
+
+/// Horizon (`BOXHORIZON`): AUX2 from 1300 to 1700 µs, so its switch's middle
+/// position (1500 µs) is on.
+const HORIZON: ModeRange = ModeRange {
+    aux: 1,
+    start: 1300.0,
+    end: 1700.0,
+};
+
+/// Angle (`BOXANGLE`): AUX2 from 1700 to 2100 µs, so its switch's high
+/// position is on.
+const ANGLE: ModeRange = ModeRange {
+    aux: 1,
+    start: 1700.0,
+    end: 2100.0,
+};
+
+/// The Flight Mode a frame's Channels pick, as Betaflight's
+/// `processRxModes` does: Angle when its switch is on, or while Failsafe's
+/// stage 2 runs (`failsafeIsActive`); otherwise Horizon when its switch is
+/// on; otherwise Acro.
+pub(crate) fn flight_mode(rc: &RcData, failsafe_active: bool) -> FlightMode {
+    if ANGLE.is_on(rc) || failsafe_active {
+        FlightMode::Angle
+    } else if HORIZON.is_on(rc) {
+        FlightMode::Horizon
+    } else {
+        FlightMode::Acro
+    }
+}
 
 /// How many frames in a row the Arm switch must read off before an armed
 /// Quad disarms: more than three (`rcDisarmTicks`).
