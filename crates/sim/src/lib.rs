@@ -56,6 +56,11 @@
 //!   our Flight Controller's loop did.
 //! - [`Simulation::fingerprint`]: a fingerprint of the whole state, the same on
 //!   every computer, for the repeat and agreement checks.
+//!   [`Simulation::quad_fingerprint`] does the same for one Quad alone.
+//! - [`Simulation::snapshot`] and [`Simulation::restore`]: the whole state
+//!   copied and put back, for rollback and lockstep play. Restoring a copy and
+//!   replaying the same Flight Inputs gives the same fingerprint, step for
+//!   step.
 //! - After each tick, every Quad's state and its contacts with the Map,
 //!   including how hard each prop rubs ([`Simulation::contacts`]).
 //! - The read-only line question ([`Simulation::line_question`]): which Map
@@ -260,6 +265,7 @@ pub struct Simulation {
     quads: Vec<SimulatedQuad>,
 }
 
+#[derive(Clone)]
 struct SimulatedQuad {
     body: QuadBody,
     /// Where Reset puts it.
@@ -280,6 +286,26 @@ struct SimulatedQuad {
 }
 
 impl SimulatedQuad {
+    /// Feeds this Quad's whole state into a fingerprint, in a fixed order:
+    /// the body, the motor commands, the Radio Link, Input smoothing and the
+    /// Flight Controller seam. The Flight Inputs that have not arrived yet are
+    /// left out: when the caller hands one over is not part of the flight (the
+    /// game gives them between ticks, the runner just before one), only the
+    /// tick it arrives at is.
+    fn write_fingerprint(&self, f: &mut Fingerprinter) {
+        self.body.write_fingerprint(f);
+        self.motor_commands.write_fingerprint(f);
+        self.radio_link.write_fingerprint(f);
+        match &self.input_smoothing {
+            None => f.write_u64(0),
+            Some(smoothing) => {
+                f.write_u64(1);
+                smoothing.write_fingerprint(f);
+            }
+        }
+        self.flight_controller.write_fingerprint(f);
+    }
+
     /// Reset: the Quad on its Launch Spot, still, with a full battery and its
     /// ESCs just powered, and its Flight Controller powered up fresh. Its
     /// Radio Link and the Flight Inputs still to arrive are the pilot's, so
@@ -491,11 +517,10 @@ impl Simulation {
     }
 
     /// A fingerprint of the whole state, in a fixed order: Simulation Time,
-    /// the physics rate, the world, the random seed, then every Quad's state
-    /// (with its motors, ESCs, battery and Prop Wash flicker, the random
-    /// generator's place included), motor commands, Radio Link, Input
-    /// smoothing and Flight Controller seam. Two runs, or two computers,
-    /// that give the same fingerprint are in exactly the same state.
+    /// the physics rate, the world, the random seed, the number of Quads, then
+    /// every Quad's ([`Simulation::quad_fingerprint`]). Two runs, or two
+    /// computers, that give the same fingerprint are in exactly the same
+    /// state.
     ///
     /// The Map's solid parts never change, so they are left out, as the
     /// Quads' parameters are; the Results' Map fingerprint covers them. So
@@ -510,18 +535,77 @@ impl Simulation {
         f.write_u64(self.random_seed);
         f.write_u64(self.quads.len() as u64);
         for quad in &self.quads {
-            quad.body.write_fingerprint(&mut f);
-            quad.motor_commands.write_fingerprint(&mut f);
-            quad.radio_link.write_fingerprint(&mut f);
-            match &quad.input_smoothing {
-                None => f.write_u64(0),
-                Some(smoothing) => {
-                    f.write_u64(1);
-                    smoothing.write_fingerprint(&mut f);
-                }
-            }
-            quad.flight_controller.write_fingerprint(&mut f);
+            quad.write_fingerprint(&mut f);
         }
         f.finish()
+    }
+
+    /// A fingerprint of one Quad's state alone, counting from 0 in the
+    /// set-up's order: what [`Simulation::fingerprint`] holds for it, without
+    /// the clock, the world, the seed or the other Quads. A Quad that flies
+    /// with others has the same one as the Quad flying alone, step for step.
+    pub fn quad_fingerprint(&self, quad: usize) -> Fingerprint {
+        let mut f = Fingerprinter::new();
+        self.quads[quad].write_fingerprint(&mut f);
+        f.finish()
+    }
+
+    /// A copy of the whole state, to [`restore`](Simulation::restore) later:
+    /// Simulation Time, every Quad with its motors, ESCs and battery, its
+    /// Flight Controller's memory (the filters included), its Radio Link and
+    /// its Input smoothing, the random generators and the Flight Inputs that
+    /// have not arrived yet. Taking it changes nothing.
+    ///
+    /// Only the Map's solid parts are not in it: they never change, so a
+    /// copy fits the Simulation it came from, or any other built from the
+    /// same set-up.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            physics_rate: self.physics_rate,
+            world: self.world,
+            random_seed: self.random_seed,
+            time: self.time,
+            quads: self.quads.clone(),
+        }
+    }
+
+    /// Puts a [`snapshot`](Simulation::snapshot) back: the Simulation is
+    /// exactly as it was when the copy was taken, whatever happened since.
+    /// The same Flight Inputs given from there give the same fingerprint at
+    /// every step. Flight Inputs that were already waiting when the copy was
+    /// taken wait again, and those given since are forgotten, so a caller
+    /// that replays inputs gives only the ones from after the copy.
+    pub fn restore(&mut self, snapshot: &Snapshot) {
+        let Snapshot {
+            physics_rate,
+            world,
+            random_seed,
+            time,
+            quads,
+        } = snapshot.clone();
+        self.physics_rate = physics_rate;
+        self.world = world;
+        self.random_seed = random_seed;
+        self.time = time;
+        self.quads = quads;
+    }
+}
+
+/// A copy of a Simulation's whole state ([`Simulation::snapshot`]), which
+/// [`Simulation::restore`] puts back as often as it is wanted. It never
+/// changes, and holds no Map.
+#[derive(Clone)]
+pub struct Snapshot {
+    physics_rate: PhysicsRate,
+    world: World,
+    random_seed: u64,
+    time: SimulationTime,
+    quads: Vec<SimulatedQuad>,
+}
+
+impl Snapshot {
+    /// The Simulation Time the copy was taken at.
+    pub fn time(&self) -> SimulationTime {
+        self.time
     }
 }

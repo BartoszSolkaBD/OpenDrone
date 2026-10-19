@@ -19,7 +19,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | Input | Input Device, Radio, Gamepad, Flying Input Device, Channel, Virtual Switch, Action, Calibration, Radio Link, Packet Rate, Report Rate, Input Device profile | [docs/context/input.md](docs/context/input.md) |
 | World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Pack checker, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | FPV Camera, Camera Tilt, Lens, FOV, Aspect ratio, Video Look, Video Signal, Breakup, Dynamic Range, Auto-exposure, OSD, OSD layout | [docs/context/camera.md](docs/context/camera.md) |
-| Simulation | Simulation, Simulation Time, Flight Input | [docs/context/simulation.md](docs/context/simulation.md) |
+| Simulation | Simulation, Simulation Time, Flight Input, Snapshot, Fingerprint | [docs/context/simulation.md](docs/context/simulation.md) |
 | Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Save Flight, Test Pilot, Test Map, Test Quad, Feel Test, Feel Test log | [docs/context/verification.md](docs/context/verification.md) |
 | Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning | [docs/context/screens.md](docs/context/screens.md) |
 | Sound | Listening Position, Background Sound | [docs/context/sound.md](docs/context/sound.md) |
