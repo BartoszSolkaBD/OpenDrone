@@ -65,18 +65,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "ebfc599afaa93df4"   # test/whoop-65-small-pack: what the Simulation receives from it
+quad = "72ec6b16f679bbae"   # test/whoop-65-small-pack: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "503bcbbe4646065d"   # the whole state after each of 600000 steps at 8000 Hz, in order
+run  = "a8d01c92fa9e381c"   # the whole state after each of 600000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"7.5 s" = "e0b807193ea92cbe"
-"15 s" = "014eb47c99d1f14d"
-"22.5 s" = "34440ce3491c7aba"
-"30 s" = "3aac03d95131dd2f"
-"37.5 s" = "f3ee28364a4c23b8"
-"45 s" = "5954e16f6c30fecf"
-"52.5 s" = "9bbf18aa6e55de10"
-"60 s" = "7ee7cc6ee1c9f62e"
-"67.5 s" = "b06b2e0a692c9e66"
-"75 s" = "ed0412436e5df601"
+"7.5 s" = "07f051ffb7b80434"
+"15 s" = "68d7ea5bb520faf5"
+"22.5 s" = "ef0e90412189f029"
+"30 s" = "55b631d315579f71"
+"37.5 s" = "bf60a0cb98174960"
+"45 s" = "50fce047d6eec238"
+"52.5 s" = "6cf37599430f20c1"
+"60 s" = "c219ec807b7637a9"
+"67.5 s" = "e780fd34ef0770d2"
+"75 s" = "25c7e2571b082fcc"

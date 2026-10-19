@@ -18,7 +18,8 @@
 //! - what Betaflight makes of each Radio Link frame: the [`Channels`] in µs,
 //!   the stick commands with the deadband, and the throttle through its
 //!   curve;
-//! - a built-in Modes table with Arm on AUX1 and Crash Flip on AUX3, and
+//! - a built-in Modes table with Arm on AUX1, the Flight Mode on AUX2 and
+//!   Crash Flip on AUX3, and
 //!   Betaflight's arming checks (throttle low, tilt within `small_angle`
 //!   unless the Crash Flip switch is on, the ESCs' ready beep in place of
 //!   Betaflight's boot grace, the Radio Link and Failsafe, and the Arm switch
@@ -53,9 +54,11 @@
 //!   the loops' records and never feeds back into a flight (ADR-0022);
 //! - the Betaflight CLI translator ([`cli`]): a quad's `diff all` imported as
 //!   a 2026.6 Tune, and the pilot's pasted Rates, `aux` switches and OSD
-//!   layout.
-//!
-//! Angle and Horizon (#51) arrive with their ticket.
+//!   layout;
+//! - Angle and Horizon, the self-levelling Flight Modes, picked on AUX2
+//!   through the built-in Modes table (Angle too while Failsafe's stage 2
+//!   runs), levelling against the true attitude the sensor readings give
+//!   (`level`).
 //!
 //! # Power-up
 //!
@@ -83,18 +86,21 @@
 //!    `airmode_start_throttle_percent` after arming; runaway takeoff
 //!    prevention adds up stable flight; the Arm switch arms or (after more
 //!    than three frames off) disarms, and the Crash Flip switch is read as
-//!    it arms; the sticks become commands, and the Rates turn them into each
-//!    axis's setpoint; the arming checks run, and the Crash Flip switch going
-//!    off disarms.
+//!    it arms; the Flight Mode is picked; the sticks become commands, and the
+//!    Rates turn them into each axis's setpoint; the arming checks run, and
+//!    the Crash Flip switch going off disarms.
 //!    With the Channels, the frame's gap is timed for the detected Packet
 //!    Rate.
 //! 4. The gyro reading passes through its low-passes.
 //! 5. If the Channels were worked out again, the detected Packet Rate moves
 //!    on (retuning RC smoothing and feedforward every third frame that
 //!    counts) and feedforward is worked out for the frame. Then RC smoothing
-//!    takes a step on the setpoints, the throttle and feedforward.
+//!    takes a step on the setpoints, the throttle and feedforward, and in
+//!    Horizon on the roll and pitch sticks.
 //! 6. Yaw spin recovery watches the filtered gyro's yaw rate.
-//! 7. The PID loop compares each smoothed setpoint with the filtered gyro,
+//! 7. In Angle and Horizon, the levelling turns the smoothed setpoints into
+//!    the ones the PID loop works to (`level`). The PID loop compares each
+//!    setpoint with the filtered gyro,
 //!    with the TPA factor and anti-gravity the mixer worked out the loop
 //!    before; then runaway takeoff prevention checks the PID sums.
 //! 8. The smoothed throttle passes the pilot's throttle limit. Outside Crash
@@ -153,6 +159,7 @@ pub mod failsafe;
 mod feedforward;
 mod filter;
 mod gyro_filter;
+mod level;
 mod mixer;
 pub mod osd;
 mod pid;
@@ -173,6 +180,7 @@ use dshot_command::DshotCommands;
 use failsafe::{Failsafe, Receiver};
 use feedforward::{Feedforward, FeedforwardFrame};
 use gyro_filter::{DynamicThrottle, GyroFilters};
+use level::Levelling;
 use mixer::CrashFlipInputs;
 use pid::{Modes, Pid};
 use rc_smoothing::{PacketRate, RcSmoothing};
@@ -233,8 +241,8 @@ impl SensorReadings {
     }
 }
 
-/// The Flight Mode the Flight Controller flies, as its OSD names it. Angle
-/// and Horizon arrive with #51; until then it always flies Acro.
+/// The Flight Mode the Flight Controller flies, as its OSD names it: Acro,
+/// or Angle and Horizon, which level the Quad on their own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FlightMode {
     Acro,
@@ -288,9 +296,16 @@ pub struct DebugRecord {
     /// nose down, yaw nose left positive. This is the newest frame's, before
     /// any smoothing (Betaflight's `rawSetpoint`).
     pub setpoint: [f64; 3],
-    /// Each axis's setpoint as the PID loop uses it: after RC smoothing,
-    /// when it's on (`getSetpointRate`). In the same axes and °/s.
+    /// Each axis's setpoint after RC smoothing, when it's on
+    /// (`getSetpointRate`). In the same axes and °/s.
     pub smoothed_setpoint: [f64; 3],
+    /// Each axis's setpoint as the PID loop compared it with the gyro: after
+    /// RC smoothing and, in Angle and Horizon, the levelling, and 0 on yaw in
+    /// yaw spin recovery (`pidGetPreviousSetpoint`, which Blackbox logs as
+    /// the setpoint). In the same axes and °/s.
+    pub pid_setpoint: [f64; 3],
+    /// How strongly Horizon levelled, from 0 to 1: 0 outside Horizon.
+    pub horizon_strength: f64,
     /// The gyro as the sensor reads it, in Betaflight's axes and °/s
     /// (Blackbox's `gyroUnfilt`).
     pub gyro: [f64; 3],
@@ -401,6 +416,10 @@ pub struct FlightController {
     arming: Arming,
     /// Airmode's start: the throttle passed its threshold since arming.
     throttle_raised: bool,
+    /// The Flight Mode the last frame picked (Acro before the first), and
+    /// Angle and Horizon's work.
+    flight_mode: FlightMode,
+    levelling: Levelling,
     /// Whether the PID loop works, and whether I is emptied each loop
     /// (`pidStabilisationState`, `pidSetItermReset`).
     stabilising: bool,
@@ -452,6 +471,11 @@ impl FlightController {
         let yaw_spin = YawSpin::new(&tune, &rates);
         let battery = Battery::new(&tune);
         let beeper = Beeper::new();
+        let levelling = Levelling::new(
+            &tune,
+            [rates.max_rate(Axis::Roll), rates.max_rate(Axis::Pitch)],
+            loop_hz,
+        );
         FlightController {
             last: DebugRecord {
                 armed,
@@ -459,6 +483,8 @@ impl FlightController {
                 failsafe: failsafe_readings(&failsafe, &receiver),
                 setpoint: [0.0; 3],
                 smoothed_setpoint: [0.0; 3],
+                pid_setpoint: [0.0; 3],
+                horizon_strength: 0.0,
                 gyro,
                 filtered_gyro: gyro,
                 detected_packet_rate: packet_rate.detected_hz,
@@ -505,6 +531,8 @@ impl FlightController {
             throttle_shaping,
             arming,
             throttle_raised: false,
+            flight_mode: FlightMode::Acro,
+            levelling,
             stabilising: false,
             reset_iterm: true,
             pid,
@@ -558,6 +586,8 @@ impl FlightController {
             self.last_frame_us = now_us;
         }
         let changed = self.receiver.look(now_us, frame);
+        // This loop works out the first frame since power-up.
+        let first_frame = changed && self.command.is_none();
         let rx_lost = self.failsafe.check(now_ms, &mut self.arming);
         let warning = if changed {
             self.receive(now_us, readings)
@@ -576,15 +606,24 @@ impl FlightController {
         self.throttle_shaping.settle(throttle);
         let shaping = self.throttle_shaping.shaping();
         self.yaw_spin.check(gyro[2], now_us);
+        let levelled = self.levelling.step(level::Inputs {
+            mode: self.flight_mode,
+            setpoint: smoothed_setpoint,
+            feedforward: self.rc_smoothing.feedforward_smoothed,
+            deflection: self.rc_smoothing.deflection,
+            attitude: readings.attitude,
+            first_frame,
+        });
         self.pid.step(
-            smoothed_setpoint,
+            levelled.setpoint,
             gyro,
-            self.rc_smoothing.feedforward_smoothed,
+            levelled.feedforward,
             shaping,
             Modes {
                 stabilising: self.stabilising,
                 reset_iterm: self.reset_iterm,
                 yaw_spin: self.yaw_spin.active,
+                angle: self.flight_mode == FlightMode::Angle,
             },
         );
         let sums = self.pid.terms.map(|terms| terms.sum);
@@ -651,6 +690,8 @@ impl FlightController {
             failsafe: failsafe_readings(&self.failsafe, &self.receiver),
             setpoint: self.setpoint,
             smoothed_setpoint,
+            pid_setpoint: self.pid.setpoint,
+            horizon_strength: levelled.horizon_strength,
             gyro: unfiltered,
             filtered_gyro: gyro,
             detected_packet_rate: self.packet_rate.detected_hz,
@@ -670,7 +711,7 @@ impl FlightController {
             crash_flip_switch: self.arming.crash_flip_switch(),
             sticks_us: [rc.roll, rc.pitch, rc.yaw, rc.throttle],
             throttle_percent: rc.throttle_percent(&self.tune) as u8,
-            flight_mode: FlightMode::Acro,
+            flight_mode: self.flight_mode,
             link_quality: if now_us.saturating_sub(self.last_frame_us) > LINK_STATISTICS_TIMEOUT_US
             {
                 0
@@ -794,6 +835,7 @@ impl FlightController {
         if !was_armed && self.arming.armed {
             self.runaway.arm();
         }
+        self.flight_mode = arming::flight_mode(&rc, self.failsafe.active);
 
         let command = RcCommand::new(&rc, &self.tune, &self.throttle_lookup);
         for axis in Axis::ALL {
@@ -808,7 +850,7 @@ impl FlightController {
     /// the Channels were worked out again, the detected Packet Rate moves on,
     /// retuning RC smoothing and feedforward every third frame that counts,
     /// and feedforward is worked out for the frame; then RC smoothing takes a
-    /// step.
+    /// step, on the roll and pitch sticks too while Horizon flies.
     fn process_sticks(&mut self, changed: bool) {
         let newest = match (changed, self.command) {
             (true, Some(command)) => {
@@ -824,16 +866,26 @@ impl FlightController {
                     gap: self.packet_rate.gap_us as f64 * 1e-6,
                     rate_hz: self.packet_rate.rate_hz,
                 });
-                Some([
-                    self.setpoint[0],
-                    self.setpoint[1],
-                    self.setpoint[2],
-                    command.throttle as f64,
-                ])
+                Some((
+                    [
+                        self.setpoint[0],
+                        self.setpoint[1],
+                        self.setpoint[2],
+                        command.throttle as f64,
+                    ],
+                    [
+                        command.deflection(&self.tune, Axis::Roll),
+                        command.deflection(&self.tune, Axis::Pitch),
+                    ],
+                ))
             }
             _ => None,
         };
-        self.rc_smoothing.apply(newest, self.feedforward.raw);
+        self.rc_smoothing.apply(
+            newest,
+            self.feedforward.raw,
+            self.flight_mode == FlightMode::Horizon,
+        );
     }
 
     /// Where runaway takeoff prevention finds the Flight Controller now.
@@ -868,6 +920,12 @@ impl FlightController {
         for flag in [self.throttle_raised, self.stabilising, self.reset_iterm] {
             f.write_u64(u64::from(flag));
         }
+        f.write_u64(match self.flight_mode {
+            FlightMode::Acro => 0,
+            FlightMode::Angle => 1,
+            FlightMode::Horizon => 2,
+        });
+        self.levelling.write_fingerprint(f);
         self.pid.write_fingerprint(f);
         self.yaw_spin.write_fingerprint(f);
         self.runaway.write_fingerprint(f);

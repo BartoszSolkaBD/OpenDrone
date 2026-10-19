@@ -1,0 +1,77 @@
+# Horizon's strength falls at once as the sticks move, but comes back slowly,
+# as Betaflight 2026.6.2's `calcHorizonLevelStrength` makes it
+# (src/main/flight/pid.c): the strength is never more than its own
+# first-order low-pass, whose time constant is `horizon_delay_ms`, 500 ms on
+# the Freestyle 5″'s Tune (`pidInitFilters`, pid_init.c). So after a flick,
+# Horizon hands control back to the levelling gently.
+#
+# The Flight Controller alone, in Horizon, level. Sticks centred, the
+# strength is 0.74845 (see horizon-blends-levelling-into-acro.toml). At 0.5 s
+# the roll stick goes to full: past `horizon_limit_sticks` the strength is 0
+# within a few ms, as RC smoothing's low-pass on the sticks (93 Hz at
+# 250 Hz) lets the stick through. Meanwhile the low-pass falls towards 0:
+# after 0.1 s it is 0.74845 × e^(−0.1 ÷ 0.5) = 0.6128. At 0.6 s the stick
+# comes back to centre: the strength the sticks allow is 0.74845 again, but
+# the low-pass only climbs back towards it, 1 − e^(−t ÷ 0.5) of the way t
+# seconds later.
+format = 2
+name   = "Horizon's levelling fades at once when the sticks move, and comes back over horizon_delay_ms"
+
+[start]
+kind              = "flight controller"
+quad              = "opendrone/freestyle-5"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Horizon"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", roll = "100%" },
+  { at = "0.6 s", roll = "0%" },
+]
+
+[[expect]]
+what  = "Horizon strength"
+at    = "0.5 s"
+value = "0.74845 ± 0.00001"
+basis = "source: calcHorizonLevelStrength: level with the sticks centred, as it has been since power-up"
+
+[[expect]]
+what  = "Horizon strength"
+at    = "0.55 s"
+value = "0 ± 0"
+basis = "source: calcHorizonLevelStrength: full stick, past horizon_limit_sticks 0.75, gives 0, and the low-pass only holds the strength down, never up"
+
+[[expect]]
+what  = "Horizon strength"
+at    = "0.65 s"
+value = "0.6257 ± 0.003"
+basis = "source: calcHorizonLevelStrength: the low-pass fell to 0.74845 × e^(−0.2) = 0.6128 by 0.6 s, and 0.05 s later has climbed back 1 − e^(−0.1) of the way to 0.74845: 0.6257"
+
+[[expect]]
+what  = "Horizon strength"
+at    = "1.1 s"
+value = "0.6985 ± 0.003"
+basis = "source: calcHorizonLevelStrength: 0.5 s after the stick came back, one time constant, the low-pass has climbed 1 − e^(−1) of the way: 0.74845 − 0.1357 × e^(−1) = 0.6985"
+
+[[expect]]
+what  = "Horizon strength"
+at    = "3 s"
+value = "0.7472 ± 0.0005"
+basis = "source: calcHorizonLevelStrength: 2.4 s, almost five time constants, after the stick came back the strength is nearly whole again: 0.74845 − 0.1357 × e^(−4.8) = 0.7473"

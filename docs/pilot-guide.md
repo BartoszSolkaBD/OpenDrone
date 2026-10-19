@@ -27,12 +27,14 @@ The first build takes a few minutes. `--release` matters: without it the picture
 - CH5 high arms. CH6 is the Flight Mode: low Acro, middle Horizon, high Angle. CH7 high is Crash Flip.
 - SE (CH9) resets the Quad.
 
+**Angle and Horizon** level the Quad for you, as Betaflight 2026.6 does. In Angle the roll and pitch sticks ask for a tilt instead of a spin: full stick leans the Quad to its Tune's angle limit (55° on the Whoop 65, 60° on the Freestyle 5″), half stick about 17°, and letting go levels it. Horizon levels like Angle near the centre of the sticks and flies like Acro towards full stick or far from level, so you can still flip and roll; after a flick its levelling comes back over about half a second. Yaw is Acro in both. Both level against the Quad's true attitude, so they never drift.
+
 **On the DualSense** (over USB):
 
 - Mode 2: the left stick is throttle and yaw, the right stick pitch and roll. The throttle is zero with the left stick at rest in the middle, and rises as you push it up.
 - R1 arms and disarms. It turns itself off whenever the Quad disarms, so the next press always arms. Hold L1 for Crash Flip.
 - Options pauses, and Create resets the Quad.
-- It has no Flight Mode switch, so it flies Acro.
+- It has no Flight Mode switch, so it flies the Flight Mode setting: Acro, for now.
 
 **On the keyboard:** R resets the Quad, and Esc pauses and goes on. The up and down arrows change the Camera Tilt, and the right and left arrows change the FOV (see [The camera](#the-camera)).
 

@@ -85,6 +85,9 @@ set tpa_rate = 70                      # diff; percent
 set tpa_breakpoint = 1350              # 4.3 default; µs
 set throttle_boost = 5                 # 4.3 default; 0 is off
 set motor_output_limit = 100           # 4.3 default; percent
+set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
+set angle_limit = 55                   # 4.3 default (was level_limit); degrees
+set horizon_level_strength = 50        # 4.3 default
 # PID Tuning, CLI only
 set pidsum_limit = 500                 # 4.3 default; 1000 is the whole motor range
 set pidsum_limit_yaw = 400             # 4.3 default
@@ -98,6 +101,14 @@ set tpa_low_rate = 0                   # ADR-0008; percent; 0 is off
 set tpa_low_breakpoint = 1050          # 2026.6 default; µs
 set tpa_low_always = OFF               # 2026.6 default
 set throttle_boost_cutoff = 15         # 4.3 default; Hz
+set angle_feedforward = 50             # 2026.6 default
+set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
+set angle_earth_ref = 0                # ADR-0008; percent
+set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
+set horizon_limit_degrees = 135        # 2026.6 default; degrees
+set horizon_ignore_sticks = OFF        # 2026.6 default
+set horizon_delay_ms = 500             # 2026.6 default; ms
+set level_race_mode = OFF              # 4.3 default
 
 # PID Tuning, filters
 set gyro_lpf1_type = PT1               # 4.3 default
@@ -154,17 +165,6 @@ set dyn_notch_count = 2                # diff; not simulated yet (waits for gyro
 set failsafe_switch_mode = STAGE1      # 4.3 default
 set failsafe_throttle_low_delay = 100  # 4.3 default; tenths of a second
 set failsafe_stick_threshold = 30      # 4.3 default; percent
-# PID Tuning
-set angle_p_gain = 50                  # 4.3 default (was angle_level_strength)
-set angle_limit = 55                   # 4.3 default (was level_limit); degrees
-set horizon_level_strength = 50        # 4.3 default
-set angle_feedforward = 50             # 2026.6 default
-set angle_feedforward_smoothing_ms = 80 # 2026.6 default; ms
-set angle_earth_ref = 0                # ADR-0008; percent
-set horizon_limit_sticks = 75          # 4.3 default (was horizon_transition)
-set horizon_limit_degrees = 135        # 2026.6 default; degrees
-set horizon_ignore_sticks = OFF        # 2026.6 default
-set horizon_delay_ms = 500             # 2026.6 default; ms
 # PID Tuning, filters
 set dyn_notch_q = 350                  # diff
 set dyn_notch_min_hz = 130             # diff; Hz
