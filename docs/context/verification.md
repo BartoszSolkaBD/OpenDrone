@@ -15,7 +15,7 @@ A Scenario in which the Flight Controller and the physics fly the Quad together.
 _Avoid_: rig, setup (pilots use both words for their gear)
 
 **Thrust Stand Scenario**:
-A Scenario in which the Quad is held still and its motors are scripted, to check motors and props against makers' thrust sheets. Or, with the Quad still held still, our Flight Controller drives the motors from the pilot's sticks and switches, as when a motor spun backwards in Crash Flip is checked against its Quad's reverse shares.
+A Scenario in which the Quad is held still and its motors are scripted, to check motors and props against makers' thrust sheets. Or the Quad is held still just the same, and our Flight Controller drives the motors from the pilot's sticks and switches, as when a motor spun backwards in Crash Flip is checked against its Quad's reverse shares.
 
 **Flight Controller Scenario**:
 A Scenario that runs the Flight Controller alone, fed recorded stick and sensor readings or a table of cases.
