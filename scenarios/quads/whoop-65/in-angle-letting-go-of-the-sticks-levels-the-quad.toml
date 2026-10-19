@@ -63,7 +63,7 @@ basis = "rule: in Angle, full stick asks for a tilt of angle_limit, 55° on the 
 what  = "roll"
 over  = "1.5 s to 2 s"
 mean  = "50.0° ± 0.5°"
-basis = "observed: it settles a little short of 55°, as the levelling's push fades the closer it gets"
+basis = "observed: over this stretch the Quad is still closing in on 55°, as the I term builds against the ducts' drag: roll is 45.1° at 1.5 s and 52.6° at 2 s, and reaches 55.0° by 5 s with the stick held"
 
 [[expect]]
 what    = "roll"

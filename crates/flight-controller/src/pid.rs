@@ -272,8 +272,9 @@ impl Pid {
 
     /// One loop. `setpoint` is each axis's setpoint after RC smoothing and
     /// any levelling, `gyro` the filtered gyro and `feedforward` each axis's
-    /// feedforward, after RC smoothing (0 on an axis Angle holds); `shaping` is what the mixer worked out from its
-    /// throttle the loop before, and `modes` what else the loop is told.
+    /// feedforward, after RC smoothing (0 on an axis Angle holds);
+    /// `shaping` is what the mixer worked out from its throttle the loop
+    /// before, and `modes` what else the loop is told.
     pub fn step(
         &mut self,
         setpoint: [f64; 3],
