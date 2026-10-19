@@ -150,4 +150,8 @@ impl FlightControllerSeam for OurFlightController {
             }
         }
     }
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
+    }
 }

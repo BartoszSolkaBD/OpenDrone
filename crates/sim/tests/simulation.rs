@@ -3,7 +3,7 @@
 //! Scenarios in `scenarios/`.
 
 use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, PilotRates, Vec3};
-use opendrone_maths::{Fingerprinter, functions};
+use opendrone_maths::{Fingerprint, Fingerprinter, functions};
 use opendrone_sim::{
     BatteryParameters, Channel, Channels, Drag, DuctRings, EscParameters, EscState,
     FlightControllerSeam, FlightInput, GroundAndCeiling, InputDeviceFacts, MapShape, MotorCommands,
@@ -321,6 +321,7 @@ fn each_tick_reports_every_motor_and_its_esc_and_the_battery() {
 
 /// A stand-in for the Flight Controller that writes down the tick of every
 /// Radio Link frame it is handed, and the frame's roll Channel.
+#[derive(Clone)]
 struct Listener {
     heard: Rc<RefCell<Vec<(u64, u16)>>>,
 }
@@ -343,6 +344,10 @@ impl FlightControllerSeam for Listener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
+    }
 }
 
 /// Runs a Quad with a [`Listener`] for `ticks` steps at `physics_hz`, with
@@ -661,6 +666,7 @@ fn the_flight_controller_hears_whether_the_escs_have_beeped_ready() {
 
 /// A stand-in for the Flight Controller that writes down, each tick,
 /// whether the sensor readings said the ESCs were ready.
+#[derive(Clone)]
 struct EscListener {
     heard: Rc<RefCell<Vec<bool>>>,
 }
@@ -679,6 +685,10 @@ impl FlightControllerSeam for EscListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
+    }
 }
 
 #[test]
@@ -827,6 +837,7 @@ fn each_quad_flickers_its_own_way_and_the_seed_decides_how() {
 
 /// A stand-in for the Flight Controller that writes down every Radio Link
 /// frame it is handed, whole, with its step.
+#[derive(Clone)]
 struct FrameListener {
     heard: Rc<RefCell<Vec<(u64, Channels)>>>,
 }
@@ -847,6 +858,10 @@ impl FlightControllerSeam for FrameListener {
     fn power_up(&mut self, _readings: &SensorReadings) {}
 
     fn write_fingerprint(&self, _f: &mut Fingerprinter) {}
+
+    fn clone_box(&self) -> Box<dyn FlightControllerSeam> {
+        Box::new(self.clone())
+    }
 }
 
 /// Runs a Quad set up by `set` (10 m up, Radio Link at 250 Hz) for `ticks`
@@ -993,4 +1008,248 @@ fn the_input_devices_facts_come_with_the_set_up_and_lock_the_radio_link_to_its_b
     }
     sim.step();
     assert!(sim.quad_output(0).radio_link.lost);
+}
+
+/// A whoop on our Flight Controller, armed and flying 1 m over a floor, with
+/// Prop Wash, Input smoothing and a device that reports at rest: every part
+/// of a Quad's state that a copy has to carry is doing something.
+fn eventful_quad(height: f64) -> QuadSetUp {
+    let mut quad = quad_at(height);
+    quad.parameters.prop_wash = PropWash {
+        strength: 0.2,
+        flicker: 15.0,
+    };
+    quad.launch_spot.position = Vec3::new(0.0, 0.0, 0.010);
+    quad.motors = StartingMotors::Settled;
+    quad.input_smoothing = true;
+    quad.input_device = Some(InputDeviceFacts {
+        report_rate: ReportRate::from_hz(250),
+        reports_at_rest: true,
+    });
+    quad.flight_controller = Box::new(OurFlightController::new(
+        tune(),
+        Rates::BETAFLIGHT_DEFAULT,
+        PhysicsRate::from_hz(8000).unwrap(),
+        PacketRate::from_hz(250).unwrap(),
+        true,
+        false,
+        &sensor_readings(&quad.start, false, quad.parameters.gyro_range),
+    ));
+    quad
+}
+
+fn over_a_floor(seed: u64, quads: Vec<QuadSetUp>) -> SetUp {
+    let mut set_up = set_up(8000, seed, quads);
+    set_up.map = vec![MapShape::Box {
+        centre: Vec3::new(0.0, 0.0, -1.0),
+        size: Vec3::new(200.0, 200.0, 2.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    }];
+    set_up
+}
+
+/// What a pilot does with one Quad over 6 000 steps (0.75 s): the device
+/// reports every 32 steps with the sticks wandering (`phase` makes each
+/// pilot's wander different), it is lost at step 3 000 and back at 3 400, and
+/// Reset comes at 4 000.
+fn pilot(phase: u64) -> Vec<(u64, FlightInput)> {
+    let mut inputs: Vec<(u64, FlightInput)> = (0..6_000 / 32)
+        .map(|k| {
+            let channels = Channels {
+                roll: Channel::from_stick(0.04 * ((k + phase) % 17) as f64 - 0.3),
+                pitch: Channel::from_stick(0.2 - 0.02 * ((k * 3 + phase) % 11) as f64),
+                throttle: Channel::from_throttle(0.35 + 0.01 * ((k + phase) % 9) as f64),
+                arm: Channel::HIGH,
+                ..Channels::RESTING
+            };
+            (32 * k, FlightInput::Channels(channels))
+        })
+        .collect();
+    inputs.push((3_000, FlightInput::InputDeviceLost));
+    inputs.push((3_400, FlightInput::InputDeviceBack));
+    inputs.push((4_000, FlightInput::Reset));
+    inputs.sort_by_key(|(tick, _)| *tick);
+    inputs
+}
+
+/// Steps `sim` from its present step to `until`, giving each Quad's pilot's
+/// Flight Inputs as their steps come, and writing down the Simulation's
+/// fingerprint after every step.
+fn fly(sim: &mut Simulation, pilots: &[Vec<(u64, FlightInput)>], until: u64) -> Vec<Fingerprint> {
+    let mut fingerprints = Vec::new();
+    while sim.time().ticks() < until {
+        let now = sim.time().ticks();
+        for (quad, inputs) in pilots.iter().enumerate() {
+            for (_, input) in inputs.iter().filter(|(tick, _)| *tick == now) {
+                sim.flight_input(quad, sim.time(), *input);
+            }
+        }
+        sim.step();
+        fingerprints.push(sim.fingerprint());
+    }
+    fingerprints
+}
+
+#[test]
+fn restoring_a_copy_and_replaying_the_same_flight_inputs_gives_the_same_fingerprint_at_every_step()
+{
+    // Basis: Rule (#58: a restored copy, given the same Flight Inputs, is in
+    // bit-identical states). A copy at step 2 500, mid-flight on a whoop with
+    // a live Flight Controller, Input smoothing, Prop Wash and a Radio Link
+    // locked to its device; then the device is lost and comes back, and
+    // Reset follows, so the copy must carry everything those touch.
+    let pilots = [pilot(0)];
+    let mut sim = Simulation::new(over_a_floor(5, vec![eventful_quad(1.0)])).unwrap();
+    fly(&mut sim, &pilots, 2_500);
+    let copy = sim.snapshot();
+    assert_eq!(copy.time(), SimulationTime::from_ticks(2_500));
+    let copied_at = sim.fingerprint();
+    let first = fly(&mut sim, &pilots, 6_000);
+    let ended = sim.quad_output(0);
+    assert_ne!(sim.fingerprint(), copied_at);
+
+    sim.restore(&copy);
+    assert_eq!(sim.time(), copy.time());
+    assert_eq!(sim.fingerprint(), copied_at);
+    let again = fly(&mut sim, &pilots, 6_000);
+    assert_eq!(again, first);
+    assert_eq!(sim.quad_output(0), ended);
+
+    // The same copy can be put back again, and still gives the same flight.
+    sim.restore(&copy);
+    assert_eq!(fly(&mut sim, &pilots, 6_000), first);
+}
+
+#[test]
+fn a_copy_fits_any_simulation_built_from_the_same_set_up_and_carries_the_whole_state() {
+    // Basis: Rule (#58). A Simulation that has only just been built, with a
+    // copy put into it, flies on as the original did: nothing the copy needs
+    // lives outside it, the seed and the random generators included.
+    let pilots = [pilot(3)];
+    let mut sim = Simulation::new(over_a_floor(9, vec![eventful_quad(1.0)])).unwrap();
+    fly(&mut sim, &pilots, 3_100);
+    let copy = sim.snapshot();
+    let copied_at = sim.fingerprint();
+    let first = fly(&mut sim, &pilots, 5_000);
+
+    let mut other = Simulation::new(over_a_floor(9, vec![eventful_quad(1.0)])).unwrap();
+    other.restore(&copy);
+    assert_eq!(other.fingerprint(), copied_at);
+    assert_eq!(fly(&mut other, &pilots, 5_000), first);
+
+    let mut other_seed = Simulation::new(over_a_floor(10, vec![eventful_quad(1.0)])).unwrap();
+    other_seed.restore(&copy);
+    assert_eq!(other_seed.fingerprint(), copied_at);
+    assert_eq!(fly(&mut other_seed, &pilots, 5_000), first);
+}
+
+#[test]
+fn taking_a_copy_changes_nothing() {
+    // Basis: Rule (#58).
+    let pilots = [pilot(1)];
+    let run = |copying: bool| {
+        let mut sim = Simulation::new(over_a_floor(2, vec![eventful_quad(1.0)])).unwrap();
+        let mut fingerprints = Vec::new();
+        for until in (1..=40).map(|k| k * 100) {
+            fingerprints.extend(fly(&mut sim, &pilots, until));
+            if copying {
+                let _ = sim.snapshot();
+            }
+        }
+        fingerprints
+    };
+    assert_eq!(run(true), run(false));
+}
+
+#[test]
+fn flight_inputs_still_waiting_when_the_copy_is_taken_wait_again_when_it_is_restored() {
+    // Basis: Rule (#58: the copy is the whole state, and a Flight Input given
+    // for a later step is part of it). Roll is given for step 100; the copy
+    // comes at step 50.
+    let roll = FlightInput::Channels(Channels {
+        roll: Channel::HIGH,
+        ..Channels::RESTING
+    });
+    let mut sim = Simulation::new(over_a_floor(1, vec![eventful_quad(1.0)])).unwrap();
+    sim.flight_input(0, SimulationTime::from_ticks(100), roll);
+    for _ in 0..50 {
+        sim.step();
+    }
+    let copy = sim.snapshot();
+    for _ in 0..450 {
+        sim.step();
+    }
+    let ended = sim.fingerprint();
+
+    sim.restore(&copy);
+    for _ in 0..450 {
+        sim.step();
+    }
+    assert_eq!(sim.fingerprint(), ended);
+
+    // Without the waiting input the flight is another one, so the copy
+    // really held it.
+    let mut without = Simulation::new(over_a_floor(1, vec![eventful_quad(1.0)])).unwrap();
+    for _ in 0..500 {
+        without.step();
+    }
+    assert_ne!(without.fingerprint(), ended);
+}
+
+/// SplitMix64's step: each Quad's flicker is seeded from the Simulation's
+/// seed in turn, so the seed that gives a Quad flying alone the second Quad's
+/// flicker is the Simulation's seed moved on by one step.
+const SEED_STEP: u64 = 0x9e37_79b9_7f4a_7c15;
+
+#[test]
+fn two_quads_in_one_simulation_each_fly_exactly_as_they_would_alone() {
+    // Basis: Rule (#58, and #37: Quads are stepped in a fixed order and don't
+    // touch each other). Two pilots fly two different whoops (one 1 m up, one
+    // 2 m) with different sticks, each through the whole of `pilot`: lost and
+    // back, and Reset. Each Quad's whole state, its Flight Controller's
+    // memory included, matches the same Quad alone at every step. The second
+    // Quad alone gets the seed that gives it the flicker it has in the pair.
+    let seed = 77_u64;
+    let pilots = [pilot(0), pilot(5)];
+    let quads = vec![eventful_quad(1.0), eventful_quad(2.0)];
+    let mut pair = Simulation::new(over_a_floor(seed, quads)).unwrap();
+    let mut first = Simulation::new(over_a_floor(seed, vec![eventful_quad(1.0)])).unwrap();
+    let mut second = Simulation::new(over_a_floor(
+        seed.wrapping_add(SEED_STEP),
+        vec![eventful_quad(2.0)],
+    ))
+    .unwrap();
+    assert_eq!(pair.quad_count(), 2);
+    for tick in 0..6_000_u64 {
+        fly(&mut pair, &pilots, tick + 1);
+        fly(&mut first, &pilots[..1], tick + 1);
+        fly(&mut second, &pilots[1..], tick + 1);
+        assert_eq!(
+            pair.quad_fingerprint(0),
+            first.quad_fingerprint(0),
+            "first Quad, step {tick}"
+        );
+        assert_eq!(
+            pair.quad_fingerprint(1),
+            second.quad_fingerprint(0),
+            "second Quad, step {tick}"
+        );
+    }
+    assert_eq!(pair.quad_output(0), first.quad_output(0));
+    assert_eq!(pair.quad_output(1), second.quad_output(0));
+    // The two flew differently, or the check would prove nothing.
+    assert_ne!(pair.quad_fingerprint(0), pair.quad_fingerprint(1));
+}
+
+#[test]
+fn a_copy_of_two_quads_brings_back_both() {
+    // Basis: Rule (#58).
+    let pilots = [pilot(0), pilot(5)];
+    let quads = vec![eventful_quad(1.0), eventful_quad(2.0)];
+    let mut sim = Simulation::new(over_a_floor(4, quads)).unwrap();
+    fly(&mut sim, &pilots, 2_000);
+    let copy = sim.snapshot();
+    let first = fly(&mut sim, &pilots, 5_000);
+    sim.restore(&copy);
+    assert_eq!(fly(&mut sim, &pilots, 5_000), first);
 }
