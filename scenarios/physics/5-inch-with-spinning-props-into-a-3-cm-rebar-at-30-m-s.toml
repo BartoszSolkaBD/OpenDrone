@@ -92,5 +92,5 @@ basis   = "source: Bluejay v0.21.0, as for motor 2: prop 4 is left turning backw
 [[expect]]
 what  = "speed east"
 at    = "0.1 s"
-value = "-1.74 m/s ± 0.3 m/s"
-basis = "observed: its rubbing props slow and the stub squeezes between them, then the stub reaches its frame at about 11.5 m/s, and it bounces back, tipping nose up"
+value = "-1.79 m/s ± 0.3 m/s"
+basis = "observed: its rubbing props slow and the stub squeezes between them, then the stub reaches its frame at about 11.5 m/s, and it bounces back, tipping nose up (re-centred from -1.74 m/s, which was off by 0.05 m/s: it measures -1.79 m/s)"

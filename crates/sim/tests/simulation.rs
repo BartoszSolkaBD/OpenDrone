@@ -835,6 +835,42 @@ fn each_quad_flickers_its_own_way_and_the_seed_decides_how() {
     assert_ne!(flown(2), [first, second]);
 }
 
+#[test]
+fn reset_carries_each_rotors_prop_wash_flicker_on() {
+    // Basis: Rule (Reset puts the Quad back on its Launch Spot, but the
+    // flicker belongs to the air, not the Quad, so it goes on where it was:
+    // flying with a Reset at 0.5 s and flying without one give the same
+    // flicker at every step).
+    let flown = |reset: bool| {
+        let mut sim = Simulation::new(set_up(
+            8000,
+            1,
+            vec![whoop_sinking_through_its_own_air(0.0)],
+        ))
+        .unwrap();
+        if reset {
+            sim.flight_input(0, SimulationTime::from_ticks(4000), FlightInput::Reset);
+        }
+        let start = sim.quad_flicker(0);
+        let mut after_reset = Vec::new();
+        for tick in 0..6000 {
+            sim.step();
+            if tick >= 4000 && tick % 500 == 0 {
+                after_reset.push(sim.quad_flicker(0));
+            }
+        }
+        (start, after_reset)
+    };
+    let (start, with_reset) = flown(true);
+    let (_, without) = flown(false);
+    assert_eq!(with_reset.len(), 4);
+    assert_eq!(with_reset, without);
+    // Not the flicker starting over: after 0.5 s it is somewhere else.
+    for values in with_reset {
+        assert_ne!(values, start);
+    }
+}
+
 /// A stand-in for the Flight Controller that writes down every Radio Link
 /// frame it is handed, whole, with its step.
 #[derive(Clone)]

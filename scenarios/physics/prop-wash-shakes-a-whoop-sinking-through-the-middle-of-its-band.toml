@@ -117,14 +117,14 @@ basis   = "rule: 7.139 gf × (1 ± 0.1911), 5.774 to 8.504 gf, as above: Prop Wa
 [[expect]]
 what   = "motor 1 thrust"
 over   = "0 s to 0.5 s"
-lowest = "5.83 gf ± 0.3 gf"
-basis  = "observed: how far down the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz"
+lowest = "5.81 gf ± 0.3 gf"
+basis  = "observed: how far down the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz (re-centred from 5.83 gf: it hadn't moved when the flicker began to draw per rotor)"
 
 [[expect]]
 what    = "motor 1 thrust"
 over    = "0 s to 0.5 s"
-highest = "7.93 gf ± 0.3 gf"
-basis   = "observed: how far up the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz"
+highest = "8.04 gf ± 0.3 gf"
+basis   = "observed: how far up the flicker takes motor 1's thrust in half a second, from the Whoop 65's 20% strength and 15 Hz (re-centred from 7.93 gf: it hadn't moved when the flicker began to draw per rotor)"
 
 [[expect]]
 what  = "roll"
@@ -141,5 +141,5 @@ basis = "observed: and pitched it 4.18° nose up (was 13.7° nose down: the flic
 [[expect]]
 what  = "vertical speed"
 at    = "0.5 s"
-value = "-4.92 m/s ± 0.1 m/s"
-basis = "observed: on average its settled motors still hold the descent, a little slower as it tips"
+value = "-4.98 m/s ± 0.1 m/s"
+basis = "observed: on average its settled motors still hold the descent, a little slower as it tips (re-centred from -4.92 m/s: it hadn't moved when the flicker began to draw per rotor)"

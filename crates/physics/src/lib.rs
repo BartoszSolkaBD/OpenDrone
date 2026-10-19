@@ -836,6 +836,8 @@ impl QuadBody {
             world.air_density,
             world.gravity,
         );
+        // The push's thrusts are what Prop Wash left each rotor, and the gain
+        // multiplies that thrust (not momentum theory's, before Prop Wash).
         ground_and_ceiling::add_lift(&mut push, gains, &self.positions);
         self.thrusts = push.thrusts;
 

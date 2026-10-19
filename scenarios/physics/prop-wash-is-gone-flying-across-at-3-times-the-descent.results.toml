@@ -41,6 +41,18 @@ expected = "10.5 m/s ± 0.001 m/s"
 measured = "10.5 m/s"
 
 [[expect]]
+what     = "roll rate at 1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
+what     = "pitch rate at 1 s, how far from the same run with random seed 2"
+basis    = "Rule"
+expected = "0 °/s ± 0 °/s"
+measured = "0 °/s"
+
+[[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
 basis    = "Rule"
 expected = "none broken"

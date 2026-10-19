@@ -197,6 +197,37 @@ fn at_50_hz_a_locked_frame_carries_five_dualsense_reports_and_leaves_after_the_f
 }
 
 #[test]
+fn a_1_khz_device_locked_at_500_333_and_100_hz_gets_a_frame_every_2_3_and_10_ms() {
+    // Basis: Source (ADR-0020, "Which rates lock": the Pocket at 1 kHz locks
+    // at 500, 333 and 100 Hz; 333 Hz counts as a frame every 3 ms), and Rule
+    // for the rest: a frame carries the reports since the last one, 2, 3 or 10
+    // of them, and leaves 0.75 ms (6 steps) after the last is due, so the
+    // frames are 16, 24 and 80 steps apart, exactly. The reports are due every
+    // 8 steps from step 5, each 0 to 2 steps late.
+    let late = [0, 1, 0, 2, 1, 0, 2];
+    for (hz, per_frame, apart) in [(500, 2, 16), (333, 3, 24), (100, 10, 80)] {
+        let reports = reports(5, 8, &late, 2000);
+        let mut link = link(hz, device(1000, false));
+        assert!(link.is_locked(), "{hz} Hz");
+        let frames = run(&mut link, &reports, 16_000);
+        // The first frame carries the first report; each after it the next
+        // `per_frame` reports, so it carries the last of them.
+        assert_eq!(frames[0].0, 5 + 6, "{hz} Hz");
+        assert_eq!(frames[0].1.reports, 1, "{hz} Hz");
+        assert_eq!(frames.len(), 1 + (16_000 - 11) / apart as usize, "{hz} Hz");
+        for (k, (tick, frame)) in frames.iter().enumerate().skip(1) {
+            assert_eq!(*tick, 5 + apart * k as u64 + 6, "{hz} Hz, frame {k}");
+            assert_eq!(frame.reports, per_frame, "{hz} Hz, frame {k}");
+            assert_eq!(
+                frame.channels,
+                reports[per_frame as usize * k].1,
+                "{hz} Hz, frame {k}"
+            );
+        }
+    }
+}
+
+#[test]
 fn on_its_own_clock_a_frame_that_lands_in_the_wobble_catches_some_reports_and_misses_others() {
     // Basis: Rule (ADR-0020, why it locks: a free-running 250 Hz clock that
     // lands within the arrival wobble gives frames with no fresh report and

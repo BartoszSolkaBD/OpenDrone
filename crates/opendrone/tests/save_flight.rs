@@ -269,15 +269,15 @@ fn a_game_that_fingerprints_nothing_but_the_end_still_saves_a_flight_the_runner_
 }
 
 #[test]
-fn the_saved_input_track_holds_the_reset_and_the_unplug_as_events() {
-    let mut game = Game::new("whoop-65", folder("events"));
+fn the_saved_input_track_holds_the_reset_and_the_unplug_as_other_flight_inputs() {
+    let mut game = Game::new("whoop-65", folder("other-flight-inputs"));
     game.fly();
     let files = flight_files(&game.plan, &game.flight, "flight.csv").unwrap();
     let rows: Vec<&str> = files.track.lines().collect();
-    let events = |word: &str| rows.iter().filter(|r| r.ends_with(word)).count();
-    assert_eq!(events(",reset"), 1);
-    assert_eq!(events(",input device lost"), 1);
-    assert_eq!(events(",input device back"), 1);
+    let entries = |word: &str| rows.iter().filter(|r| r.ends_with(word)).count();
+    assert_eq!(entries(",reset"), 1);
+    assert_eq!(entries(",input device lost"), 1);
+    assert_eq!(entries(",input device back"), 1);
     // The Scenario says when the Reset was and when the Arm switch went on,
     // so Expectations can name the stretch since then.
     assert!(

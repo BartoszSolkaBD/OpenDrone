@@ -49,7 +49,7 @@ measured = "0%"
 [[expect]]
 what     = "speed east at 0.1 s"
 basis    = "Observed"
-expected = "-1.74 m/s ± 0.3 m/s"
+expected = "-1.79 m/s ± 0.3 m/s"
 measured = "-1.79 m/s"
 
 [[expect]]
