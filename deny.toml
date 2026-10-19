@@ -87,4 +87,9 @@ ignore = [
     # ab_glyph, owned_ttf_parser) to draw the window's title bar. Decided by
     # the maintainer in #62. Revisit it at the next Bevy upgrade.
     { id = "RUSTSEC-2026-0192", reason = "ttf-parser is unmaintained, not vulnerable; only Bevy's window library reaches it, to draw the Linux window's title bar. Revisit at the next Bevy upgrade (#62)" },
+    # ruzstd 0.8.3 has a decompression-bomb denial of service (fixed in
+    # 0.9.1). Only bevy_image 0.20.0 depends on it (`cargo tree -i ruzstd`),
+    # and the Bevy 0.20 pin holds it back. The game loads only its own
+    # bundled images. Revisit it at the next Bevy upgrade (#62).
+    { id = "RUSTSEC-2026-0344", reason = "decompression-bomb denial of service in ruzstd 0.8.3; only Bevy's image loader reaches it, on our own bundled images. Revisit at the next Bevy upgrade (#62)" },
 ]
