@@ -170,7 +170,7 @@ Everything else the author needs is on the ticket and in the brief. That way a f
      ```
 
      CI then passes the Review check on the commit the fifth Verdict reviewed, takes `needs-triage` off, and links the issue in the Review Report.
-  3. **Merge** when every merge condition below holds. A later commit, such as main merged in, needs a fresh Verdict as usual. A failed round after the triage needs a triage of its own.
+  3. **Merge** when every merge condition below holds. A later commit, such as main merged in, needs a fresh Verdict as usual. A failed round after the triage needs a triage of its own. The commit a triage covers counts as reviewed, so for main merged in, the Light merge-only update check is enough, as after a pass. A full Reviewer after a triage doesn't block again on what the triage issue holds.
 
   The Red Flag gate is separate: what it holds still waits for the maintainer.
 

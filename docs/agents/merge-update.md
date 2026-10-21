@@ -1,6 +1,6 @@
 # Checking a merge-only update
 
-A PR got `Verdict: pass` on a commit, R. Since then, main was merged into the PR's branch, so CI could run on the two together. A **merge-only update** is such a branch where the only changes since R are main's own changes, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. Every new commit needs a fresh Verdict ([The Reviewer and the Verdict](reviewer.md)). This page is the short check for that case. A fresh agent on the Light tier runs it ([the Delegator](delegator.md#model-tiers)).
+A PR got `Verdict: pass` on a commit, R, or a triage turned its failed Verdict on R into a pass ([after five failed rounds](reviewer.md#starting-a-reviewer)). Either way, R counts as reviewed. Since then, main was merged into the PR's branch, so CI could run on the two together. A **merge-only update** is such a branch where the only changes since R are main's own changes, clashes resolved in `Cargo.lock` or docs text, and Results fingerprints. Every new commit needs a fresh Verdict ([The Reviewer and the Verdict](reviewer.md)). This page is the short check for that case. A fresh agent on the Light tier runs it ([the Delegator](delegator.md#model-tiers)).
 
 Your job is small and mechanical: confirm the update brought in main's changes and nothing else. Don't change code, push, merge or edit labels.
 
@@ -14,7 +14,15 @@ Your job is small and mechanical: confirm the update brought in main's changes a
    git fetch origin <headRefName> main
    ```
 
-   If there's no Verdict, or the newest one isn't a pass, stop: this check doesn't apply.
+   - **The newest Verdict says pass:** go on.
+   - **It says changes needed:** a triage may cover it. Read the Review check's description:
+
+     ```sh
+     gh pr checks <PR> -R BartoszSolkaBD/OpenDrone --json name,description --jq '.[] | select(.name == "Review check") | .description'
+     ```
+
+     If it ends with `the triage covers ` and R's first 7 characters, CI counted a triage comment for R, so R counts as reviewed: go on. The problems that Verdict found are in the triage issue, and aren't yours to judge.
+   - **Otherwise,** with no Verdict, or a failed one that no triage covers, stop: this check doesn't apply.
 2. **List the commits after R.** First check that R is in H's history, then list the branch's own line of commits. `--first-parent` leaves out the commits that came in from main.
 
    ```sh
@@ -79,7 +87,7 @@ Your job is small and mechanical: confirm the update brought in main's changes a
 ```text
 Reviewed commit <H, all 40 characters>
 
-Merge-only update after the pass on <R>: main merged in, <no conflicts | conflicts resolved only in …, both sides kept>, <no fingerprint commits | fingerprint commits with no value changed>, CI green.
+Merge-only update after the <pass | triage> on <R>: main merged in, <no conflicts | conflicts resolved only in …, both sides kept>, <no fingerprint commits | fingerprint commits with no value changed>, CI green.
 
 Verdict: pass
 ```
