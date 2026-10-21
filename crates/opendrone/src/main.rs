@@ -374,11 +374,12 @@ fn run_with_screens(start: ScreensRun) -> ExitCode {
         screen,
         settings_folder,
     } = start;
-    // The pilot's own game reads the usual folder; a screenshot of a screen
-    // reads none unless it was told where.
-    let folder = match (&mode, settings_folder) {
-        (_, Some(folder)) => Some(folder),
-        (Mode::Game, None) => {
+    // The pilot's own game reads the usual folder. Opening on one screen with
+    // `--screen`, or taking a screenshot, reads and writes no file unless it
+    // was told where.
+    let folder = match (&mode, screen, settings_folder) {
+        (_, _, Some(folder)) => Some(folder),
+        (Mode::Game, None, None) => {
             let usual = SettingsFile::usual_folder();
             if usual.is_none() {
                 eprintln!(
