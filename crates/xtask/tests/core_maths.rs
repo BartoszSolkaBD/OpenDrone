@@ -325,6 +325,64 @@ fn a_table_written_as_std_acos_fails_even_beside_an_allowed_call_at_every_opt_le
 }
 
 #[test]
+fn a_table_written_as_std_acos_in_a_module_called_debug_fails_even_beside_an_allowed_call() {
+    // Linux puts each static in a section named after it, so this table's
+    // section name holds `debug`. Only the sections that hold debug
+    // information or unwind tables are skipped, and this one is neither.
+    let parry = "pub mod debug { pub static ANGLES: [fn(f64) -> f64; 1] = [f64::acos]; }\n\
+                 pub struct TriMesh;\n\
+                 impl TriMesh {\n\
+                     #[inline(never)] pub fn compute_pseudo_normals(&self, x: f64) -> f64 { x.acos() }\n\
+                 }";
+    for (case, optimised) in [
+        ("table-in-debug-at-0", false),
+        ("table-in-debug-at-3", true),
+    ] {
+        let fixture = Fixture::new(case)
+            .outside_module("parry3d-f64", "shape::trimesh", parry)
+            .member("opendrone-maths", &[], "")
+            .member("opendrone-physics", &["opendrone-maths", "parry3d-f64"], "");
+        let outcome = if optimised {
+            fixture.optimise("parry3d-f64").check()
+        } else {
+            fixture.check()
+        };
+        assert!(!outcome.passed, "{case}: {}", outcome.output);
+        outcome
+            .says("- `parry3d-f64` calls the operating system's `acos` (Rust's `f64::acos`) from ");
+        outcome.says(
+            "`parry3d_f64::shape::trimesh::debug::ANGLES`, data outside any function (in section `",
+        );
+        outcome.says(
+            "No allowance can cover a reference from outside any function, such as a table of \
+             function pointers",
+        );
+    }
+}
+
+#[test]
+fn debug_information_and_unwind_tables_pointing_at_std_acos_never_count_as_a_table_on_any_os() {
+    // Unoptimised, the allowed call goes through std's `f64::acos`, copied
+    // into the crate, and the copy's debug information and unwind tables
+    // point at it from outside any function. Nothing in them runs, so the
+    // allowance still covers the call.
+    let parry = "pub struct TriMesh;\n\
+                 impl TriMesh {\n\
+                     #[inline(never)] pub fn compute_pseudo_normals(&self, x: f64) -> f64 { x.acos() }\n\
+                 }";
+    let outcome = Fixture::new("allowed-call-unoptimised")
+        .outside_module("parry3d-f64", "shape::trimesh", parry)
+        .member("opendrone-maths", &[], "")
+        .member("opendrone-physics", &["opendrone-maths", "parry3d-f64"], "")
+        .check();
+    assert!(outcome.passed, "{}", outcome.output);
+    outcome.says(
+        "- Allowed by crates/xtask/walls.toml: `parry3d-f64` calls `acos` (from \
+         <parry3d_f64::shape::trimesh::TriMesh>::compute_pseudo_normals)",
+    );
+}
+
+#[test]
 fn running_the_check_again_with_other_programs_never_reads_a_program_built_with_other_features() {
     // The Scenario runner turns glamx's `std` on, so the game's compiled code
     // calls `acos` only when both are built together. Running the full

@@ -197,19 +197,39 @@ impl Code {
 /// Whether a section holds debug information or the information that unwinds
 /// the stack when a function panics. It points at every function, but nothing
 /// in it runs or calls anything.
+///
+/// It goes by the section's whole name, never by a part of it: Linux names a
+/// static's section after the static, so a table in a module called `debug`
+/// sits in a section whose name holds `debug`, and still counts.
 fn is_information_about_code(section: &object::Section<'_, '_>) -> bool {
     let name = section.name().unwrap_or_default();
-    [
-        "debug",
-        "unwind",
-        "eh_frame",
-        "pdata",
-        "xdata",
-        "gcc_except_table",
-    ]
-    .iter()
-    .any(|part| name.contains(part))
+    DEBUG_INFORMATION
+        .iter()
+        .any(|start| name.starts_with(start))
+        || UNWIND_INFORMATION.iter().any(|family| {
+            name.strip_prefix(family)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with(['.', '$']))
+        })
 }
+
+/// How the names of the sections holding debug information start: DWARF on
+/// Linux (`.debug_info`) and macOS (`__debug_info`), and CodeView on Windows
+/// (`.debug$S`).
+const DEBUG_INFORMATION: [&str; 3] = [".debug_", "__debug_", ".debug$"];
+
+/// The sections that unwind the stack, by name: Linux's `.eh_frame` and
+/// `.gcc_except_table`, macOS's `__eh_frame` and `__compact_unwind`, and
+/// Windows's `.pdata` and `.xdata`. Linux may give each function its own
+/// copy, named with a dot and the function (`.gcc_except_table.<function>`),
+/// and Windows with a `$` (`.pdata$<function>`).
+const UNWIND_INFORMATION: [&str; 6] = [
+    ".eh_frame",
+    ".gcc_except_table",
+    "__eh_frame",
+    "__compact_unwind",
+    ".pdata",
+    ".xdata",
+];
 
 /// The symbols a reference points at, by name. ELF points at a function only
 /// one file uses through its section, so a section counts as its function
