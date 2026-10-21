@@ -1,7 +1,8 @@
 # In Angle, I-term relax's threshold is a fifth of Acro's, 8 °/s instead of
 # 40 °/s, as in Betaflight 2026.6.2 (`applyItermRelax`, src/main/flight/pid.c:
 # with `FLIGHT_MODE(ANGLE_MODE)` the threshold is `ITERM_RELAX_SETPOINT_
-# THRESHOLD` × 0.2, L854-L857; the Betaflight research §3). i-term-relax.toml shows the 40 °/s of Acro.
+# THRESHOLD` × 0.2, L854-L857; the Betaflight research §3). i-term-relax.toml
+# shows the 40 °/s of Acro.
 #
 # - The setpoint I-term relax watches is the one the PID loop works to: in
 #   Angle, the levelling's, how far the true attitude is from the tilt the
@@ -24,13 +25,14 @@
 # 4000 loops, at 0.5 s, it is 0.48016.
 #
 # At 0.5 s the attitude reads a roll of 4°, which the levelling answers with
-# a setpoint of (0.00982° − 4°) × 5 + 0.0000188 = -19.9509 °/s, 20 °/s from where it was.
+# a setpoint of (0.00982° − 4°) × 5 + 0.0000188 = -19.9509 °/s, 20 °/s from
+# where it was.
 # It doesn't jump there: the levelling's setpoint passes through a third-order
 # low-pass at 50 Hz (a PT3 with k = 0.0715176 a loop), so it rises over about
 # 10 ms, and I-term relax's own low-pass (k = 0.0116438) lags behind it. How
 # far the setpoint is from that low-pass peaks at 11.99 °/s, at the 64th loop
 # after the jump. That is far less than Acro's 40 °/s, where I would go on
-# growing at about half its pace, but more than Angle's 8 °/s: so I stops
+# growing at 70% or more of its pace, but more than Angle's 8 °/s: so I stops
 # growing in the 34th loop, when the setpoint is first 8.26 °/s from its
 # low-pass, and holds for 86 loops, until the 120th, when it is 7.91 °/s from
 # it, and then grows again, by about -19.9509 × 0.244381 × 80 ÷ 8000 × (1 −

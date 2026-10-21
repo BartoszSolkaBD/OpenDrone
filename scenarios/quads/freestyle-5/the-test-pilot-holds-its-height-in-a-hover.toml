@@ -21,7 +21,7 @@
 #   Unloaded, a motor turns at its KV × the volts it is given: 1750 KV × a
 #   fresh 6S pack's 25 V is about 43,800 RPM at full throttle, so 9,453 RPM
 #   asks for about 22% of the throttle, and a little more for what the
-#   winding's 0.19 Ω and the ESC take. The run measures 24.8%, inside 15% to
+#   winding's 0.19 Ω takes. The run measures 24.8%, inside 15% to
 #   30%. (It isn't 32%, the 9,430 RPM as a share of 29,447 RPM, because
 #   T-Motor's full-throttle point is a loaded one, at 34.6 A, where the motor
 #   turns slower than it does unloaded.)
@@ -30,8 +30,8 @@
 #   ρ A), with the weight m g = 652 g × 9.81 m/s² = 6.40 N, air at 1.225
 #   kg/m³ and the four 129.5 mm props' disc area A = 4 × π × (64.75 mm)² =
 #   527 cm²: 45.0 W. That is the open-rotor bound, and the Freestyle 5″'s
-#   props are open (a ducted rotor can beat it by up to 1/√2). The Freestyle
-#   5″ draws about twice that.
+#   props are open (as #146 notes, a ducted rotor can beat it by up to
+#   1/√2). The Freestyle 5″ draws about twice that.
 format = 2
 name   = "The Test Pilot holds the Freestyle 5″'s height, with its motors at about 25% and its power above the physical minimum"
 

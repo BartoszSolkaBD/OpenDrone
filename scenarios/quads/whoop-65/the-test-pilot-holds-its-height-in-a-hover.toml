@@ -21,11 +21,11 @@
 #   ρ A), with the weight m g = 31.2 g × 9.81 m/s² = 0.306 N, air at 1.225
 #   kg/m³ and the four 35 mm props' disc area A = 4 × π × (17.5 mm)² = 38.5
 #   cm²: 1.74 W. That is the open-rotor bound. A ducted rotor, as the Whoop
-#   65's are, can beat it, by up to a factor of 1/√2, because the duct carries
-#   some of the load (1.74 W × 0.7071 = 1.23 W). So the Rule's range starts at
-#   the open-rotor 1.74 W, which a Whoop 65's real power, nearly 3 times as
-#   much, stays well above. It draws that much as a real rotor's losses and a
-#   motor's and an ESC's efficiency make it.
+#   65's are, can beat it, by up to a factor of 1/√2 (#146; 1.74 W × 0.7071 =
+#   1.23 W). The Rule's range still starts at the open-rotor 1.74 W, which a
+#   Whoop 65's real power, about 3 times as much, stays well above. It draws
+#   that much as a real rotor's losses and a motor's and an ESC's efficiency
+#   make it.
 format = 2
 name   = "The Test Pilot holds the Whoop 65's height, with its motors at about 40% and its power above the physical minimum"
 
