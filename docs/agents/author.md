@@ -51,12 +51,22 @@ Two kinds of reference sit outside the repo:
   - Change only what the ticket's "What to build" needs. If you must change another Lane's code, say so in your report and in the PR.
   - In the shared files (`CONTEXT.md`, `docs/SUMMARY.md` and the deep dives), add rather than rewrite.
 - **Builds:**
-  - Keep each build in your worktree's own `target/`.
+  - Use the shared target folder and the lighter debug settings, as [Setting up a build](#setting-up-a-build) says.
   - Don't build the game crate unless your ticket is in the Game lane.
 - **Docs:** write plain-language docs for anything a pilot or the maintainer meets. The maintainer doesn't read Rust.
 - **Scope:** do exactly the ticket.
   - If a criterion is impossible or wrong, do the closest faithful thing, and say so plainly in the PR and your report.
   - Never leave a stub that pretends to be done.
+
+## Setting up a build
+
+Every worktree used to build its own `target/` folder, 17 to 18 GB each, and the disk filled up. So all worktrees share one, built with less debug info. Do this before your first `cargo` command, in each new shell:
+
+1. **Check the free space.** Run `df -h /`. If under 10 GB is free, stop before you build, and say so in your report.
+2. **Share one target folder.** Run `export CARGO_TARGET_DIR="$HOME/.cache/opendrone-target"`. Every worktree then shares one build of Bevy and the dependency tree. The cost is that parallel cargo runs wait for each other's file lock. If cargo prints "Blocking waiting for file lock", another run holds the lock, so don't kill yours: it is only waiting.
+3. **Build with less debug info.** Run `export CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0`. Agents don't use debuggers, and this shrinks the build a lot and drops the 1 GB incremental folder.
+
+Don't delete the shared folder: other agents may be building in it. The [Delegator](delegator.md#merging) clears it when it grows too big.
 
 ## Save tokens
 

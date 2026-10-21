@@ -94,6 +94,10 @@ In round 2 and later, start from the earlier Verdicts:
 
 - **CI has already run every check** on all three operating systems. Run something locally only to test a specific claim, and cut long output with `| tail -n 40`.
 - **Don't build the game crate** unless the PR changes it.
+- **Before you run any `cargo` command,** set up the build as the author does ([Setting up a build](author.md#setting-up-a-build)):
+  1. Run `df -h /`, and stop and say so if under 10 GB is free.
+  2. Run `export CARGO_TARGET_DIR="$HOME/.cache/opendrone-target"`, so all worktrees share one build. Parallel cargo runs wait for each other's file lock ("Blocking waiting for file lock"), so don't kill a run that is only waiting.
+  3. Run `export CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0`.
 - **Don't start subagents.**
 
 ## The Verdict format
