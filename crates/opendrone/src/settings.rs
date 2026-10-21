@@ -8,10 +8,11 @@ use opendrone_sim::{PacketRate, PhysicsRate, Rates};
 pub const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
 
 /// The Maps the game flies, by the name `--map` takes, with the id each
-/// means: the Skate Park from the built-in Pack, and the Test Map `flat-floor`
-/// with its grid, for a place with nothing to hit.
-pub const MAPS: [(&str, &str); 2] = [
+/// means: the Skate Park and Bando from the built-in Pack, and the Test Map
+/// `flat-floor` with its grid, for a place with nothing to hit.
+pub const MAPS: [(&str, &str); 3] = [
     ("skate-park", "opendrone/skate-park"),
+    ("bando", "opendrone/bando"),
     ("flat-floor", "test/flat-floor"),
 ];
 

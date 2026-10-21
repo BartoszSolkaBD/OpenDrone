@@ -20,8 +20,9 @@ Launch Spot of the Skate Park.
 
   opendrone                       fly the Whoop 65 on the Skate Park
   opendrone --quad freestyle-5    fly the Freestyle 5\u{2033} (or --quad whoop-65)
+  opendrone --map bando           fly Bando, the unfinished tower, instead (or
+                                  --map skate-park, the default)
   opendrone --map flat-floor      fly over a grid floor with nothing to hit
-                                  instead (or --map skate-park, the default)
   opendrone --look digital        see the Digital Video Look (or analog, the
                                   default)
   opendrone --aspect 16:9         a 16:9 picture that crops the top and bottom

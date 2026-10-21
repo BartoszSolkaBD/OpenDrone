@@ -138,6 +138,25 @@ class MapBuilder:
         above, turned to a compass heading."""
         return self.box(name, (sx, sy, z1 - z0), (x, y, (z0 + z1) / 2.0), material, heading=heading, **kw)
 
+    def wall(self, name, p0, p1, z0, height, thick, material, openings=(), **kw):
+        """A straight wall of boxes along the line from `p0` to `p1` (x, y),
+        which runs north-south or east-west, standing on `z0`, centred on the
+        line. Each opening is `(u0, u1, v0, v1)`: from `u0` to `u1` metres
+        along the wall from `p0`, and from `v0` to `v1` metres above `z0`.
+        The boxes round the openings are cut by `odgeom.rect_subtract`, in a
+        fixed order."""
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        assert dx == 0 or dy == 0, f"{name}: a wall runs along x or along y"
+        run = abs(dx) + abs(dy)
+        sign = (1.0 if dx >= 0 else -1.0, 1.0 if dy >= 0 else -1.0)
+        holes = [(u0, v0, u1, v1) for u0, u1, v0, v1 in openings]
+        for a0, b0, a1, b1 in g.rect_subtract((0.0, 0.0, run, height), holes):
+            mid = (a0 + a1) / 2.0
+            if dx != 0:
+                self.box_h(name, p0[0] + sign[0] * mid, p0[1], a1 - a0, thick, z0 + b0, z0 + b1, material, **kw)
+            else:
+                self.box_h(name, p0[0], p0[1] + sign[1] * mid, thick, a1 - a0, z0 + b0, z0 + b1, material, **kw)
+
     def beam(self, name, p0, p1, w, h, material, collider="box", **kw):
         """A square bar from one point to another."""
         pose = g.aiming(p0, p1)

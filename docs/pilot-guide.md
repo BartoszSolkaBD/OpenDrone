@@ -6,19 +6,22 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 ## Your first flight
 
-The first flight is a test: either Quad on the Skate Park, or over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no OSD and no Breakup yet, and the settings are fixed. You hear the Quad's motors, but no beeps yet.
+The first flight is a test: either Quad on the Skate Park or Bando, or over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no OSD and no Breakup yet, and the settings are fixed. You hear the Quad's motors, but no beeps yet.
 
 **Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
 
 ```sh
 cargo run --release -p opendrone                        # the Whoop 65 on the Skate Park
 cargo run --release -p opendrone -- --quad freestyle-5  # the Freestyle 5″
+cargo run --release -p opendrone -- --map bando         # Bando, the unfinished tower
 cargo run --release -p opendrone -- --map flat-floor    # the grid floor, with nothing to hit
 ```
 
 The first build takes a few minutes. `--release` matters: without it the picture is slow.
 
 **The Skate Park.** An outdoor concrete park, 62 × 40 m, sunk into the ground: a pool bowl, a round cradle, a snake run that winds along the south side, a full pipe, and on the east a street corner with stairs, handrails, a ring and a pergola with slats to fly between, all at real-world size. The Quad starts on the flat deck between the two bowls, facing the pool. Everything solid is solid: there are no invisible walls, and the ground runs to the horizon. Its surfaces are real concrete, steel, plywood and grass pictures (CC0, from Poly Haven and ambientCG), which `cargo xtask textures` downloads the first time; without them the Map is drawn in flat colours, and flies the same. [Building a Map](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/building-a-map.md) says where they come from.
+
+**Bando.** A five-floor concrete frame on a 70 × 50 m building site where work stopped, inside city blocks. The frame is 24 × 15 m and 16.9 m tall, with 3.1 m under each ceiling and holes 2 to 5 m across in every floor, one of them a collapsed bay. The west half of the two lowest floors is brick: four rooms a floor off a corridor, with doorways, one smashed gap and windows to fly through, while the three floors above stay open. An open lift shaft is a 17 m dive from the roof to the ground, and a tower crane stands beside the building with a hook hanging on a thin cable. The yard has shipping containers (one stacked), rubble, a site office, a dirt mound and the site fence. The Quad starts in the yard, 17 m south of the building, facing it. Everything solid is solid, thin parts included: the handrails and fence rails are 6 cm across, the crane's hook cable 5 cm and the rebar on the roof 3 cm, and a Quad never passes through them, even at 30 m/s. Inside the building, concrete and brick stand between the Quad and you: the Video Signal, when it arrives, will weaken there.
 
 **Picking your Input Device.** Plug it in before or after starting. Then move a stick on the device you want to fly with: it becomes the Flying Input Device, and the flight starts afresh, with the Quad landed on the Map's Launch Spot. The window's title says which device flies, whether the Quad is armed or what stops it arming, Failsafe, and Pause.
 
@@ -45,7 +48,7 @@ The first build takes a few minutes. `--release` matters: without it the picture
 
 **The sound** is made live from the simulated motors, never played from recordings: each of the four motors has its own voice, so you hear the throttle, the Flight Controller's corrections and Prop Wash as the motors warble. You hear it On the Quad, as a camera's microphone on board would: wind on the mic grows with your speed and with the props' downwash, and a punch-out swells for an instant before the camera's compressor pulls it back. Pause silences the Quad, and going on brings it back. It keeps playing when the window is in the background. The voice isn't final: it's being tuned by ear. If you have no sound device, the game runs silent and the window's title says so; if your headphones go, the sound moves to your computer's new default device without pausing. The ESCs' start-up tones and the buzzer's beeps, Where you stand, crash sounds and the volume settings come later.
 
-**What's a placeholder:** the light. The Skate Park is lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
+**What's a placeholder:** the light. The Skate Park and Bando are lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
 
 ### The camera
 
