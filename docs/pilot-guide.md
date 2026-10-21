@@ -6,7 +6,7 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 ## Your first flight
 
-The first flight is a test: either Quad on the Skate Park, or over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no sound, no OSD and no Breakup yet, and the settings are fixed.
+The first flight is a test: either Quad on the Skate Park, or over a flat floor with a grid, through the Quad's FPV Camera. There are no menus, no OSD and no Breakup yet, and the settings are fixed. You hear the Quad's motors, but no beeps yet.
 
 **Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
 
@@ -42,6 +42,8 @@ The first build takes a few minutes. `--release` matters: without it the picture
 **On the keyboard:** R resets the Quad, and Esc pauses and goes on. The up and down arrows change the Camera Tilt, and the right and left arrows change the FOV (see [The camera](#the-camera)).
 
 **The fixed settings, for now:** a 250 Hz Packet Rate, Betaflight 2026.6's default Rates (Actual, 70 °/s at centre and 670 °/s at full stick), Acro for a device with no Flight Mode switch, every Assist off (so the battery runs down: Reset gives a fresh one), and your device uncalibrated, on its profile's starting values.
+
+**The sound** is made live from the simulated motors, never played from recordings: each of the four motors has its own voice, so you hear the throttle, the Flight Controller's corrections and Prop Wash as the motors warble. You hear it On the Quad, as a camera's microphone on board would: wind on the mic grows with your speed and with the props' downwash, and a punch-out swells for an instant before the camera's compressor pulls it back. Pause silences the Quad, and going on brings it back. It keeps playing when the window is in the background. The voice isn't final: it's being tuned by ear. If you have no sound device, the game runs silent and the window's title says so; if your headphones go, the sound moves to your computer's new default device without pausing. The ESCs' start-up tones and the buzzer's beeps, Where you stand, crash sounds and the volume settings come later.
 
 **What's a placeholder:** the light. The Skate Park is lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD and the screens arrive.
 

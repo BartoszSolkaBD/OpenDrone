@@ -14,6 +14,8 @@
 //!   Input Device, and the Actions Reset and Pause;
 //! - [`set_up`]: the flight set up from the built-in Pack and the
 //!   [`settings`], fixed until the screens ticket;
+//! - [`sound`](mod@sound): the Quad's sound On the Quad, on the sound's own
+//!   thread, silent when there's no sound device (#74);
 //! - [`drawing`]: the Map and the Quad drawn from their solid parts, a grid
 //!   on a Test Map's floor, and the FPV Camera on the Quad's frame;
 //! - [`camera`]: the FPV Camera (#66): the Quad's fisheye Lens, the Analog and
@@ -46,6 +48,7 @@ pub mod reference;
 pub mod save;
 pub mod set_up;
 pub mod settings;
+pub mod sound;
 pub mod status;
 pub mod stepping;
 pub mod watch;
@@ -62,6 +65,7 @@ use crate::camera::CameraPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pilot::{KeyboardPlugin, Pilot, PilotPlugin};
 use crate::set_up::FlightPlan;
+use crate::sound::SoundPlugin;
 use crate::status::StatusPlugin;
 use crate::stepping::{Flight, SteppingPlugin};
 use crate::watch::WatchedScenario;
@@ -69,7 +73,7 @@ use crate::watch::WatchedScenario;
 pub use crate::developer::{measure_camera_cost, screenshot_after};
 
 /// The game in its window: the flight, the pilot's Input Devices and the
-/// keyboard, drawn with no pipelining and no VSync.
+/// keyboard, drawn with no pipelining and no VSync, and the Quad's sound.
 pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
     let flight = Flight::new(plan.simulation(None)?)?;
     Ok(window_game(plan, pilot, flight))
@@ -111,6 +115,7 @@ fn window_game(plan: FlightPlan, pilot: Pilot, flight: Flight) -> App {
         DrawingPlugin,
         CameraPlugin,
         StatusPlugin,
+        SoundPlugin,
     ))
     .insert_resource(plan)
     .insert_non_send(flight)
@@ -122,9 +127,10 @@ fn window_game(plan: FlightPlan, pilot: Pilot, flight: Flight) -> App {
 #[derive(Resource)]
 struct HeadlessFor(Duration);
 
-/// The game with no window, no picture and no sound: the flight and the
-/// Input Devices only, for `seconds` of the computer's time. CI's smoke run
-/// uses it on machines with no screen and no sound device.
+/// The game with no window and no picture: the flight, the Input Devices
+/// and the Quad's sound, for `seconds` of the computer's time. CI's smoke
+/// run uses it on machines with no screen and no sound device, where the
+/// sound runs silent.
 pub fn headless(plan: FlightPlan, pilot: Pilot, seconds: f64) -> Result<App, String> {
     let flight = Flight::new(plan.simulation(None)?)?;
     let mut app = App::new();
@@ -135,6 +141,7 @@ pub fn headless(plan: FlightPlan, pilot: Pilot, seconds: f64) -> Result<App, Str
         LogPlugin::default(),
         SteppingPlugin,
         PilotPlugin,
+        SoundPlugin,
     ))
     .insert_resource(plan)
     .insert_non_send(flight)

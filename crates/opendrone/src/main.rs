@@ -29,9 +29,10 @@ Launch Spot of the Skate Park.
   opendrone --tilt 45 --fov 140   start at this Camera Tilt (0 to 80\u{b0}) and
                                   FOV (90 to 170\u{b0}) instead of the Quad's own
   opendrone --headless [--seconds N]
-                                  run with no window and no sound for N seconds
-                                  (3 if not given), then say how far the
-                                  Simulation stepped
+                                  run with no window for N seconds (3 if not
+                                  given), then say how far the Simulation
+                                  stepped; the sound plays if there's a sound
+                                  device, and runs silent if not
   opendrone --reference SCENARIO...
                                   fly each Scenario through the game's own
                                   stepping and check its fingerprint matches
