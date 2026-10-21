@@ -516,6 +516,117 @@ fn there_is_nothing_to_save_before_an_input_device_has_started_the_flight() {
     assert!(problem.contains("no flight to save"), "{problem}");
 }
 
+/// A flight on a DualSense-like device with its Flight Inputs kept up to
+/// `cap`, and the Channels it sends: sticks at rest, or the Arm switch on.
+fn capped_flight(plan: &FlightPlan, cap: usize) -> Flight {
+    let device = InputDeviceFacts {
+        report_rate: None,
+        reports_at_rest: false,
+    };
+    Flight::keeping_at_most(plan.simulation(Some(device)).unwrap(), device, cap)
+        .unwrap()
+        .checking_every_step()
+}
+
+fn rest_with_arm(on: bool) -> Channels {
+    Channels {
+        roll: Channel::CENTRE,
+        pitch: Channel::CENTRE,
+        throttle: Channel::LOW,
+        yaw: Channel::CENTRE,
+        arm: if on { Channel::HIGH } else { Channel::LOW },
+        flight_mode: Channel::LOW,
+        crash_flip: Channel::LOW,
+    }
+}
+
+#[test]
+fn after_a_very_long_flight_with_many_resets_and_arms_the_recorder_holds_no_more_than_its_span() {
+    // Basis: Rule (#187). Save Flight can only write a flight from its start,
+    // because Reset and arming don't start the Simulation afresh (#168), so
+    // the span the recorder keeps is the flight's first MAX_KEPT_INPUTS Flight
+    // Inputs, however many Resets and arms come after them.
+    let plan = common::plan("whoop-65");
+    let cap = 400;
+    let mut flight = capped_flight(&plan, cap);
+    flight.input(
+        SimulationTime::START,
+        FlightInput::Channels(rest_with_arm(false)),
+    );
+    let mut most_held = 0;
+    for tick in 1..=6_000_u64 {
+        let at = SimulationTime::from_ticks(tick * 8);
+        let input = match tick % 10 {
+            0 => FlightInput::Reset,
+            _ => FlightInput::Channels(rest_with_arm(tick % 20 < 10)),
+        };
+        flight.input(at, input);
+        flight.tick();
+        most_held = most_held.max(flight.kept().unwrap().inputs.len());
+    }
+    assert!(
+        most_held <= cap,
+        "the recorder held {most_held} Flight Inputs at most, of {cap}"
+    );
+    assert!(flight.kept().unwrap().inputs.is_empty());
+    let problem = flight_files(&plan, &flight, "flight.csv").unwrap_err();
+    assert!(problem.contains("too long to save"), "{problem}");
+}
+
+#[test]
+fn the_default_recorder_holds_at_most_a_million_flight_inputs_however_many_it_is_handed() {
+    // Basis: Rule (#187): about 24 MB at most.
+    let plan = common::plan("whoop-65");
+    let device = InputDeviceFacts {
+        report_rate: None,
+        reports_at_rest: false,
+    };
+    let mut flight = Flight::keeping(plan.simulation(Some(device)).unwrap(), device).unwrap();
+    assert_eq!(opendrone::stepping::MAX_KEPT_INPUTS, 1_000_000);
+    for _ in 0..=opendrone::stepping::MAX_KEPT_INPUTS {
+        flight.input(
+            SimulationTime::START,
+            FlightInput::Channels(rest_with_arm(false)),
+        );
+    }
+    assert!(flight.kept().unwrap().inputs.len() <= opendrone::stepping::MAX_KEPT_INPUTS);
+}
+
+#[test]
+fn a_flight_that_fills_the_recorder_exactly_still_saves_and_flies_again_to_the_same_fingerprint() {
+    // Basis: Rule (ADR-0001): inside the span, nothing is left out.
+    let plan = common::plan("whoop-65");
+    let cap = 100;
+    let mut flight = capped_flight(&plan, cap);
+    for n in 0..cap as u64 {
+        flight.input(
+            SimulationTime::from_ticks(n * 80),
+            FlightInput::Channels(rest_with_arm(n % 2 == 1)),
+        );
+        for _ in 0..10 {
+            flight.tick();
+        }
+    }
+    assert_eq!(flight.kept().unwrap().inputs.len(), cap);
+    let files = flight_files(&plan, &flight, "flight.csv").unwrap();
+    assert_eq!(
+        files.track.lines().filter(|l| !l.starts_with('#')).count(),
+        cap + 1,
+        "the header and a row for each Flight Input"
+    );
+    let again = flown_again(&files, "the saved flight");
+    assert_eq!(Some(again.outcome.run_fingerprint()), files.run_fingerprint);
+
+    // One more and it's too long, and says so instead of saving a flight
+    // that starts late.
+    flight.input(
+        SimulationTime::from_ticks(cap as u64 * 80),
+        FlightInput::Reset,
+    );
+    assert_eq!(flight.kept().unwrap().inputs.len(), 0);
+    assert!(flight_files(&plan, &flight, "flight.csv").is_err());
+}
+
 #[test]
 fn the_save_flight_action_writes_a_scenario_and_its_input_track_and_never_overwrites_one() {
     let saves = folder("action");

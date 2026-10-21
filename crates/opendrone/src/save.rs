@@ -23,6 +23,11 @@
 //! Scenario's comment says when the last Reset was and when the Arm switch
 //! went on, so Expectations can name the stretch since then.
 //!
+//! **How long.** The recorder keeps at most [`MAX_KEPT_INPUTS`] Flight
+//! Inputs, so a long session doesn't use more and more memory. Because a saved
+//! flight has to start where the Simulation did, a flight past that has
+//! nothing it could save from, and Save Flight says it is too long.
+//!
 //! **Expectations are added afterwards**, but the Scenario reader refuses a
 //! Scenario with none. So the Scenario carries one honest Observed
 //! Expectation, the Quad's height at the end of the flight, which also ends
@@ -38,7 +43,7 @@ use opendrone_sim::{Channel, Channels, FlightInput, SimulationTime};
 
 use crate::set_up::FlightPlan;
 use crate::settings::Settings;
-use crate::stepping::Flight;
+use crate::stepping::{Flight, MAX_KEPT_INPUTS};
 
 /// How far from the written height the saved Expectation lets the Quad be:
 /// wide enough that the height written to four decimals holds.
@@ -117,6 +122,12 @@ pub fn flight_files(
     let kept = flight.kept().ok_or_else(|| {
         "there is no flight to save yet: move a stick on an Input Device to start one".to_string()
     })?;
+    if let Some(at) = kept.outgrown_at {
+        return Err(format!(
+            "the flight is too long to save: it passed {MAX_KEPT_INPUTS} Flight Inputs at {} s, and a saved flight has to start where the Simulation did, so the game stopped keeping them",
+            seconds_short(at.ticks(), plan.settings.physics_rate.hz())
+        ));
+    }
     if kept.steps == 0 {
         return Err("the flight hasn't taken a step yet".to_string());
     }

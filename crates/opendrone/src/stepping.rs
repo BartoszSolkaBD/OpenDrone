@@ -20,6 +20,15 @@ use opendrone_sim::{FlightInput, InputDeviceFacts, QuadState, Simulation, Simula
 /// Bevy's fixed timestep: 1,000 ticks a second.
 pub const TICK_HZ: u32 = 1000;
 
+/// The most Flight Inputs Save Flight's recorder keeps: a million, about
+/// 24 MB. That is the first 16 minutes of a flight on a 1 kHz Input Device,
+/// or over an hour on a 250 Hz one. A saved flight has to start where the
+/// Simulation did (Reset and arming don't start it afresh), so the recorder
+/// can't drop the old entries and keep the new: past this, it lets go of
+/// everything it held, keeps nothing more, and Save Flight says the flight is
+/// too long to save.
+pub const MAX_KEPT_INPUTS: usize = 1_000_000;
+
 /// The flight: the Simulation and what steps it.
 ///
 /// It lives on the main thread (a non-send resource): the Simulation holds its
@@ -85,12 +94,25 @@ impl Flight {
 
     /// A flight the pilot flies with the Input Device whose facts are given,
     /// keeping what Save Flight needs to write it out as a Scenario: every
-    /// Flight Input it takes. That costs next to nothing.
+    /// Flight Input it takes, up to [`MAX_KEPT_INPUTS`]. That costs next to
+    /// nothing.
     pub fn keeping(simulation: Simulation, device: InputDeviceFacts) -> Result<Flight, String> {
+        Flight::keeping_at_most(simulation, device, MAX_KEPT_INPUTS)
+    }
+
+    /// As [`Flight::keeping`], keeping at most `most` Flight Inputs rather
+    /// than [`MAX_KEPT_INPUTS`].
+    pub fn keeping_at_most(
+        simulation: Simulation,
+        device: InputDeviceFacts,
+        most: usize,
+    ) -> Result<Flight, String> {
         let mut flight = Flight::new(simulation)?;
         flight.kept = Some(Kept {
             device,
             inputs: Vec::new(),
+            most,
+            outgrown_at: None,
             run: None,
         });
         Ok(flight)
@@ -116,6 +138,7 @@ impl Flight {
         Some(KeptFlight {
             device: kept.device,
             inputs: &kept.inputs,
+            outgrown_at: kept.outgrown_at,
             steps: self.simulation.time().ticks(),
             state_fingerprint: self.simulation.fingerprint(),
             run_fingerprint: kept.run.as_ref().map(Fingerprinter::finish),
@@ -139,8 +162,16 @@ impl Flight {
         if let Some(kept) = &mut self.kept {
             // In the order the Simulation takes them: by moment, and in the
             // order given within one.
-            let place = kept.inputs.partition_point(|(time, _)| *time <= at);
-            kept.inputs.insert(place, (at, input));
+            if kept.outgrown_at.is_none() {
+                if kept.inputs.len() == kept.most {
+                    // Too long to save from its start: let go of it all.
+                    kept.inputs = Vec::new();
+                    kept.outgrown_at = Some(at);
+                } else {
+                    let place = kept.inputs.partition_point(|(time, _)| *time <= at);
+                    kept.inputs.insert(place, (at, input));
+                }
+            }
         }
         if input == FlightInput::Reset {
             self.resets_due.push(at);
@@ -232,6 +263,11 @@ impl Flight {
 struct Kept {
     device: InputDeviceFacts,
     inputs: Vec<(SimulationTime, FlightInput)>,
+    /// The most Flight Inputs it keeps.
+    most: usize,
+    /// When the flight outgrew `most` inputs, the Simulation Time of the one
+    /// that didn't fit: `inputs` was let go then, and stays empty.
+    outgrown_at: Option<SimulationTime>,
     /// The run's fingerprint so far, when asked for
     /// ([`Flight::checking_every_step`]).
     run: Option<Fingerprinter>,
@@ -247,6 +283,10 @@ pub struct KeptFlight<'f> {
     /// them, each stamped with the Simulation Time it arrives at. The ones
     /// stamped at or after [`KeptFlight::steps`] haven't arrived yet.
     pub inputs: &'f [(SimulationTime, FlightInput)],
+    /// When the flight grew past [`MAX_KEPT_INPUTS`] Flight Inputs, the
+    /// Simulation Time of the one that didn't fit. The recorder let go of
+    /// every input then, so `inputs` is empty and the flight can't be saved.
+    pub outgrown_at: Option<SimulationTime>,
     /// How many steps the Simulation has taken.
     pub steps: u64,
     /// The fingerprint of the Simulation's whole state now, after
