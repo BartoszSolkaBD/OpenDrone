@@ -39,8 +39,10 @@ pub struct Flight {
     /// The Quad's state after the tick before the last, and after the last.
     before: QuadState,
     after: QuadState,
-    /// A Reset arrives during the next tick: draw no motion across it.
-    reset_in_last_tick: bool,
+    /// When each Reset that hasn't arrived yet will: the Simulation Time
+    /// it's stamped with. It can be a frame ahead of the Simulation, so the
+    /// Reset arrives in a later tick than the one after it is handed in.
+    resets_due: Vec<SimulationTime>,
     /// The last tick moved the Quad at once (Reset): the picture shows no
     /// motion across it.
     jumped: bool,
@@ -66,7 +68,7 @@ impl Flight {
             kept: None,
             before: state,
             after: state,
-            reset_in_last_tick: false,
+            resets_due: Vec::new(),
             jumped: false,
         })
     }
@@ -140,7 +142,9 @@ impl Flight {
             let place = kept.inputs.partition_point(|(time, _)| *time <= at);
             kept.inputs.insert(place, (at, input));
         }
-        self.reset_in_last_tick |= input == FlightInput::Reset;
+        if input == FlightInput::Reset {
+            self.resets_due.push(at);
+        }
         self.simulation.flight_input(0, at, input);
     }
 
@@ -156,7 +160,9 @@ impl Flight {
             let now = self.simulation.time();
             if let Some(script) = &mut self.script {
                 for input in script.at(now, self.simulation.quad_state(0)) {
-                    self.reset_in_last_tick |= input == FlightInput::Reset;
+                    if input == FlightInput::Reset {
+                        self.resets_due.push(now);
+                    }
                     self.simulation.flight_input(0, now, input);
                 }
             }
@@ -174,8 +180,12 @@ impl Flight {
         }
         self.after = *self.simulation.quad_state(0);
         // Reset moves the Quad to its Launch Spot at once: no motion to draw
-        // across it.
-        self.jumped = std::mem::take(&mut self.reset_in_last_tick);
+        // across it. It arrived in this tick if its moment has been stepped
+        // (the step at a Reset's moment is the one that takes it).
+        let stepped_to = self.simulation.time();
+        let before_reset = self.resets_due.len();
+        self.resets_due.retain(|at| *at >= stepped_to);
+        self.jumped = self.resets_due.len() < before_reset;
         if self.jumped {
             self.before = self.after;
         }

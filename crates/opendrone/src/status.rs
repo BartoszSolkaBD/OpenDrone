@@ -1,17 +1,20 @@
 //! What the pilot needs to know, in the window's title until the OSD and the
 //! screens arrive: the Quad, the Flying Input Device or how to pick one,
-//! whether the Quad is armed or what blocks arming, Failsafe and Pause, and
-//! the brief readout after a Camera Tilt or FOV change, and what Save Flight
-//! said. When a Scenario is being watched, its name stands in for the Input
-//! Device, and the title says where it is in its run.
+//! whether the Quad is armed or what blocks arming, Failsafe and Pause, that
+//! there's no sound device (which the Hub will say instead), the brief readout
+//! after a Camera Tilt or FOV change, and what Save Flight said. When a
+//! Scenario is being watched, its name stands in for the Input Device, and the
+//! title says where it is in its run.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use opendrone_input::Lost;
+use opendrone_sound::Device;
 
 use crate::camera::CameraReadout;
 use crate::pilot::Pilot;
 use crate::set_up::FlightPlan;
+use crate::sound::QuadSoundPlaying;
 use crate::stepping::Flight;
 use crate::watch::Watching;
 
@@ -30,6 +33,7 @@ fn show_the_status(
     pilot: Res<Pilot>,
     flight: NonSend<Flight>,
     game_clock: Res<Time<Virtual>>,
+    sound: Option<Res<QuadSoundPlaying>>,
     readout: Res<CameraReadout>,
     real: Res<Time<Real>>,
     watching: Option<Res<Watching>>,
@@ -77,6 +81,9 @@ fn show_the_status(
     }
     if game_clock.is_paused() {
         parts.push("paused (Esc goes on)".to_string());
+    }
+    if sound.is_none_or(|s| matches!(s.device(), Device::None(_))) {
+        parts.push("no sound device: running silent".to_string());
     }
     if let Some(text) = readout.text(real.elapsed()) {
         parts.push(text.to_string());
