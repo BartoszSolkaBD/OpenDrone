@@ -10,6 +10,11 @@
 //!   DualSense whose motion sensors run: each one enters the Simulation as
 //!   Channels, changed or not, so the Radio Link hears its beat and its
 //!   silence (ADR-0020). Other devices send Channels when they change.
+//! - **While paused,** the Flight Inputs wait, and a run of Channels with
+//!   nothing between them shrinks to the latest. A resting DualSense reports
+//!   250 times a second, and without this all of them would land on the
+//!   first step after flying goes on. Lost and back, and Reset, keep their
+//!   place and still arrive.
 //! - **Lost and back:** an unplug and a plug-in enter as the Flying Input
 //!   Device lost and back. Silence doesn't need to: the Radio Link counts it
 //!   itself, from the reports.
@@ -84,6 +89,11 @@ pub struct Pilot {
     watching: bool,
     /// The flight keeps the run's fingerprint too: for the readable checks.
     checking_every_step: bool,
+    /// The Flight Inputs that came while the game was paused, each with its
+    /// moment on the input thread's clock, waiting to go on to the flight.
+    /// Of a run of Channels with nothing between them, only the latest is
+    /// kept.
+    while_paused: Vec<(Duration, FlightInput)>,
 }
 
 impl Pilot {
@@ -127,6 +137,7 @@ impl Pilot {
             notice: None,
             watching: false,
             checking_every_step: false,
+            while_paused: Vec::new(),
         }
     }
 
@@ -166,6 +177,9 @@ impl Pilot {
     /// itself off.
     pub fn read(&mut self, batches: Vec<Batch>, now: Duration, world: &mut FlightWorld<'_>) {
         self.clock.follow(now, world.game_clock.elapsed());
+        if !world.game_clock.is_paused() {
+            self.go_on(world);
+        }
 
         let armed = world
             .flight
@@ -371,6 +385,8 @@ impl Pilot {
             }
         };
         *world.flight = flight;
+        // What waited belonged to the old flight.
+        self.while_paused.clear();
         self.clock.start_flight(world.fixed_clock);
         self.flying = Some(device);
         self.silent = false;
@@ -409,8 +425,32 @@ impl Pilot {
         flight_channels(channels, self.flight_mode)
     }
 
-    fn forward(&self, world: &mut FlightWorld<'_>, at: Duration, input: FlightInput) {
-        world.flight.input(self.clock.simulation_time(at), input);
+    /// Hands the flight a Flight Input, unless the game is paused: then it
+    /// waits, and a Channels input replaces a Channels input right before it
+    /// ([`Pilot::go_on`]).
+    fn forward(&mut self, world: &mut FlightWorld<'_>, at: Duration, input: FlightInput) {
+        if world.game_clock.is_paused() {
+            let replaces = matches!(input, FlightInput::Channels(_))
+                && matches!(
+                    self.while_paused.last(),
+                    Some((_, FlightInput::Channels(_)))
+                );
+            if replaces {
+                self.while_paused.pop();
+            }
+            self.while_paused.push((at, input));
+        } else {
+            self.go_on(world);
+            world.flight.input(self.clock.simulation_time(at), input);
+        }
+    }
+
+    /// Flying goes on: hands the flight what waited during the pause, in
+    /// order.
+    fn go_on(&mut self, world: &mut FlightWorld<'_>) {
+        for (at, input) in std::mem::take(&mut self.while_paused) {
+            world.flight.input(self.clock.simulation_time(at), input);
+        }
     }
 
     /// Fires an Action.
@@ -421,7 +461,12 @@ impl Pilot {
                 info!("Reset");
                 self.forward(world, at, FlightInput::Reset);
             }
-            Action::Pause => toggle_pause(world.game_clock),
+            Action::Pause => {
+                toggle_pause(world.game_clock);
+                if !world.game_clock.is_paused() {
+                    self.go_on(world);
+                }
+            }
             Action::SaveFlight => {
                 let said = if self.watching {
                     "a watched Scenario has no flight to save".to_string()

@@ -16,7 +16,7 @@ use opendrone::stepping::Flight;
 use opendrone_input::controls::{PadAxis, PadButton};
 use opendrone_input::profile::Connection;
 use opendrone_input::{Batch, DeviceInfo, DeviceState, Lost, Raw, SdlId};
-use opendrone_sim::{Channel, EscState, QuadOutput};
+use opendrone_sim::{Channel, EscState, FlightInput, QuadOutput};
 
 const POCKET: SdlId = SdlId(1);
 const DUALSENSE: SdlId = SdlId(2);
@@ -268,4 +268,99 @@ fn the_dualsenses_options_button_pauses_and_create_resets() {
     game.frames(2504, 2600, 4, &reports);
     assert!(!game.game_clock.is_paused());
     assert!(game.steps() > paused_at);
+}
+
+/// Options, pressed and let go in two frames at `ms` and `ms + 1`: Pause.
+fn press_options(game: &mut Game, ms: u64) {
+    let options = |down| Raw::PadButton {
+        device: DUALSENSE,
+        button: PadButton::Start,
+        down,
+    };
+    game.frame(ms, vec![options(true)]);
+    game.frame(ms + 1, vec![options(false)]);
+}
+
+/// A DualSense flight, paused with Options, resting its sticks for 600 ms of
+/// pause, then flying on. `many_reports` says what the pad sends while
+/// paused: a right-stick position every 4 ms with a heartbeat report between
+/// (many reports), or only the last two (the latest report alone). Either
+/// way the last stick position is 12000 (about 37% of full). Returns the game
+/// 100 ms after it flew on.
+fn paused_with_reports(many_reports: bool) -> Game {
+    let mut game = flown_by_a_dualsense();
+    let reports = [Raw::Report { device: DUALSENSE }];
+    let stick = |value| Raw::PadAxis {
+        device: DUALSENSE,
+        axis: PadAxis::RightX,
+        value,
+    };
+    game.frames(8, 2000, 4, &reports);
+    press_options(&mut game, 2004);
+    assert!(game.game_clock.is_paused());
+
+    if many_reports {
+        // The stick swings between the ends while the game stands still.
+        for (i, ms) in (2012..2600).step_by(4).enumerate() {
+            let value = if i % 2 == 0 { 30000 } else { -30000 };
+            game.frame(ms, vec![stick(value)]);
+            game.frame(ms + 1, reports.to_vec());
+        }
+    }
+    game.frame(2600, vec![stick(12000)]);
+    game.frame(2602, reports.to_vec());
+    assert!(game.game_clock.is_paused());
+
+    press_options(&mut game, 2604);
+    assert!(!game.game_clock.is_paused());
+    game.frames(2605, 2705, 4, &reports);
+    game
+}
+
+#[test]
+fn after_a_pause_with_many_reports_the_first_step_flies_on_the_latest_report_alone() {
+    let many = paused_with_reports(true);
+    let alone = paused_with_reports(false);
+    assert_eq!(many.steps(), alone.steps());
+    let (many_kept, alone_kept) = (many.flight.kept().unwrap(), alone.flight.kept().unwrap());
+    assert_eq!(
+        many_kept.inputs.len(),
+        alone_kept.inputs.len(),
+        "the Simulation was handed no more Flight Inputs than the latest report's"
+    );
+    assert_eq!(
+        many_kept.state_fingerprint, alone_kept.state_fingerprint,
+        "the Simulation's whole state matches after 100 ms of flying on"
+    );
+    assert_eq!(
+        many.output().radio_link.last_frame,
+        alone.output().radio_link.last_frame
+    );
+}
+
+#[test]
+fn unplugging_and_plugging_in_the_flying_input_device_during_a_pause_still_reaches_the_radio_link()
+{
+    let mut game = flown_by_a_dualsense();
+    let reports = [Raw::Report { device: DUALSENSE }];
+    game.frames(8, 2000, 4, &reports);
+    press_options(&mut game, 2004);
+    assert!(game.game_clock.is_paused());
+    let before = game.flight.kept().unwrap().inputs.len();
+
+    game.frames(2008, 2100, 4, &reports);
+    game.frame(2104, vec![Raw::Removed { device: DUALSENSE }]);
+    game.frames(2104, 2200, 4, &[]);
+    game.frame(2204, vec![dualsense()]);
+    game.frames(2204, 2300, 4, &reports);
+
+    // Flying on: the unplug and the plug-in both arrive, in that order.
+    press_options(&mut game, 2304);
+    assert!(!game.game_clock.is_paused());
+    let kept = game.flight.kept().unwrap();
+    let arrived: Vec<FlightInput> = kept.inputs[before..].iter().map(|(_, i)| *i).collect();
+    let position = |wanted| arrived.iter().position(|i| *i == wanted);
+    let lost = position(FlightInput::InputDeviceLost).expect("the unplug arrives");
+    let back = position(FlightInput::InputDeviceBack).expect("the plug-in arrives");
+    assert!(lost < back, "{arrived:?}");
 }
