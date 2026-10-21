@@ -4,7 +4,7 @@
 # Trimmed and converted by `cargo xtask tii-logs`: see NOTICE.md beside it.
 #
 # flight-01a-ellipse from 15.300 s to 15.500 s: each motor's command as Betaflight sent it, times
-# its trim, its share of the four's mean in the still hover from 3 s to 6 s
+# its trim, the four's mean command over its own in the still hover from 3 s to 6 s
 # (1.0393, 0.9532, 0.9615, 1.0541), which held this quad level and straight. The Scenario's Test Quad
 # is level and straight with all four equal.
 time (s),motor 1 (%),motor 2 (%),motor 3 (%),motor 4 (%)

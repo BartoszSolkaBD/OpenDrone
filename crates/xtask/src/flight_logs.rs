@@ -211,9 +211,10 @@ fn find(folder: &Path, name: &str) -> Result<PathBuf, String> {
 /// One TII flight at 500 Hz, in OpenDrone's axes.
 struct TiiFlight {
     rows: Vec<TiiRow>,
-    /// Each motor's command over the still hover, as a share of the four's
-    /// mean: the trim the Flight Controller gave this quad to hold it level
-    /// and straight.
+    /// Each motor's trim: the four's mean command over this motor's own mean
+    /// command in the still hover, so a motor that ran low gets a trim above
+    /// one. Multiplied into the commands, it makes this quad's four equal, as
+    /// the Test Quad's are.
     trim: [f64; 4],
     /// The accelerometer's forward and left reading in the still hover,
     /// where the quad's true felt acceleration has neither: it sits about a
@@ -326,7 +327,7 @@ impl TiiFlight {
         let at = |r: &TiiRow| ((r.time - first.time) * 500.0).round() / 500.0;
 
         let mut motors = format!(
-            "{TII_CREDIT}\n#\n# {} from {} s to {} s: each motor's command as Betaflight sent it, times\n# its trim, its share of the four's mean in the still hover from {} s to {} s\n# ({}), which held this quad level and straight. The Scenario's Test Quad\n# is level and straight with all four equal.\n{}\n",
+            "{TII_CREDIT}\n#\n# {} from {} s to {} s: each motor's command as Betaflight sent it, times\n# its trim, the four's mean command over its own in the still hover from {} s to {} s\n# ({}), which held this quad level and straight. The Scenario's Test Quad\n# is level and straight with all four equal.\n{}\n",
             window.flight,
             fixed(window.start, 3),
             fixed(window.start + window.length, 3),

@@ -181,7 +181,7 @@ The Freestyle 5″ is checked by data alone (#10 §7). TII's *Race Against the M
 
 **How the logs read.** Checked against the motion capture: the gyro and accelerometer are in OpenDrone's body axes (forward, left, up); the motion capture's x, y and z are east, north and up; TII writes its attitude matrix column by column; and `thrust[0]` to `thrust[3]` are Betaflight's motors 1 to 4, props in: more on the right pair rolls it left, more on the front pair pitches it up, more on motors 1 and 4 yaws it nose left. Two things are taken off by the converter, `cargo xtask tii-logs`, as each file's comments say:
 
-- **The motors' trim.** Hovering still, this quad needs its four commands about 5% apart (1.04, 0.95, 0.96, 1.05 of their mean, the same in both runs): mostly a yaw trim, the real quad's own unevenness. The Test Quad is even, so each command is multiplied by its trim.
+- **The motors' trim.** Hovering still, this quad needs its four commands about 5% apart (about 0.96, 1.05, 1.04, 0.95 of their mean, the same in both runs): mostly a yaw trim, the real quad's own unevenness. The Test Quad is even, so each command is multiplied by its trim, the four's mean over that motor's own: 1.04, 0.95, 0.96, 1.05.
 - **The accelerometer's offset.** Hovering still it reads −0.17 m/s² forward and +0.06 to +0.11 m/s² left, where the true felt acceleration has neither: it sits about a degree off the thrust's axis.
 
 The accelerometer is logged after Betaflight's 10 Hz low-pass (`acc_lpf_hz`, its 4.3 default), so about 22 ms late, and the voltage only to 0.1 V.
