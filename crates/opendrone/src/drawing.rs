@@ -235,7 +235,7 @@ fn draw_the_grid(plan: Res<FlightPlan>, mut gizmos: Gizmos) {
 
 /// The Quad from its collision shapes, as the physics builds them (the body,
 /// the pack, a prop disc per motor and, on a whoop, the duct rings), with
-/// the placeholder camera at the Quad's camera position and Camera Tilt.
+/// the FPV Camera at the Quad's camera position and Camera Tilt.
 fn draw_the_quad(
     plan: Res<FlightPlan>,
     flight: NonSend<Flight>,

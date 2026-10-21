@@ -194,11 +194,11 @@ pub fn simulation(
 ) -> Result<(Simulation, ScenarioInputs), Problems> {
     let Found { quad, map, tune } = find(scenario, packs)?;
     let Some(map) = map.filter(|_| scenario.start.kind != Kind::FlightController) else {
-        return Err(Problems(vec![Problem {
-            file: scenario.file.clone(),
-            line: 0,
-            sentence: "a Flight Controller Scenario runs the Flight Controller alone, with no Simulation to set up".to_string(),
-        }]));
+        // No line: the refusal is about the whole Scenario, not one line of it.
+        return Err(Problems::of_file(
+            scenario.file.clone(),
+            "a Flight Controller Scenario runs the Flight Controller alone, with no Simulation to set up",
+        ));
     };
     let plan = Plan::this_run(scenario);
     let (simulation, feed) = set_up(scenario, &quad, &map, tune.as_ref(), &plan)?;

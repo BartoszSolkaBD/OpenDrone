@@ -25,10 +25,12 @@ use opendrone::camera::params::FrameInputs;
 use opendrone::camera::pose::{DIGITAL_DELAY, MAX_EDGE_DELAY, Pose, PoseHistory, picture_delay};
 use opendrone::camera::{NEAR, drawn_moment};
 use opendrone::reference;
-use opendrone::set_up::repo_folder;
+use opendrone::set_up::{FlightPlan, repo_folder};
+use opendrone::settings::Settings;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::Action;
 use opendrone_maths::Vec3 as Vec3d;
+use opendrone_sim::{Channel, Channels, FlightInput, InputDeviceFacts, SimulationTime};
 
 fn close(a: f64, b: f64, within: f64) -> bool {
     (a - b).abs() <= within
@@ -786,25 +788,73 @@ fn the_history_forgets_what_is_too_old_to_draw_and_before_the_first_pose_shows_t
 fn the_late_picture_never_enters_the_simulation() {
     // Basis: Rule. The camera and the video are outside the Simulation (the
     // Camera and video deep dive): recording poses and drawing them late leaves
-    // a flight's fingerprint exactly as it was.
-    let plan = common::plan("whoop-65");
-    let mut plain = Flight::new(plan.simulation(None).unwrap()).unwrap();
-    let mut watched = Flight::new(plan.simulation(None).unwrap()).unwrap();
+    // a flight's fingerprint exactly as it was. The history is checked on the
+    // way: Analog shows the Quad's newest pose, and Digital with an edge
+    // delay of 20 ms shows where the Quad was 35 ms (35 ticks at 1 kHz)
+    // earlier, so a history that kept, shifted or smeared its poses shows in
+    // the position drawn.
+    // The Quad climbs and rolls (with Auto-arm on), so it is moving while the
+    // history is read: a Quad at rest would pass whatever the history did.
+    let mut settings = Settings::tracer("whoop-65");
+    settings.auto_arm = true;
+    let plan = FlightPlan::from_packs(&common::packs(), settings).unwrap();
+    let device = InputDeviceFacts {
+        report_rate: None,
+        reports_at_rest: false,
+    };
+    let mut plain = Flight::new(plan.simulation(Some(device)).unwrap()).unwrap();
+    let mut watched = Flight::new(plan.simulation(Some(device)).unwrap()).unwrap();
+    let mut sticks = Channels::RESTING;
+    plain.input(SimulationTime::START, FlightInput::Channels(sticks));
+    watched.input(SimulationTime::START, FlightInput::Channels(sticks));
     let mut history = PoseHistory::new();
-    for tick in 0..300u32 {
+    let mut flown: Vec<Vec3> = Vec::new();
+    for tick in 0..4000u32 {
+        if tick == 2200 || tick == 3000 {
+            // The first raise after the ESCs' ready beep, which Auto-arm arms
+            // on, and then a roll.
+            if tick == 2200 {
+                sticks.throttle = Channel::from_micros(1500.0);
+            } else {
+                sticks.roll = Channel::from_micros(1731.4);
+            }
+            let at = SimulationTime::from_ticks(u64::from(tick + 1) * 8);
+            plain.input(at, FlightInput::Channels(sticks));
+            watched.input(at, FlightInput::Channels(sticks));
+        }
         plain.tick();
         watched.tick();
         let (_, after) = watched.drawn_between();
         let at = f64::from(tick + 1) / 1000.0;
+        let position = Vec3::new(
+            after.position.x as f32,
+            after.position.y as f32,
+            after.position.z as f32,
+        );
+        flown.push(position);
         history.push(
             at,
             Pose {
-                position: Vec3::new(after.position.x as f32, after.position.z as f32, 0.0),
+                position,
                 rotation: Quat::IDENTITY,
             },
         );
-        let _ = history.shown(at, VideoLook::Digital, 0.02);
+        let newest = history.shown(at, VideoLook::Analog, 0.0).expect("a pose");
+        assert_eq!(newest.position, position, "Analog at tick {tick}");
+        if tick >= 35 {
+            let late = history.shown(at, VideoLook::Digital, 0.02).expect("a pose");
+            let before = flown[(tick - 35) as usize];
+            assert!(
+                (late.position - before).length() < 1e-4,
+                "Digital at tick {tick}: {} and not {before}",
+                late.position
+            );
+        }
     }
+    assert!(
+        (flown[3999] - flown[2999]).length() > 0.05,
+        "the Quad has to move for the history to be tested"
+    );
     assert_eq!(
         plain.simulation().fingerprint(),
         watched.simulation().fingerprint()
@@ -812,15 +862,20 @@ fn the_late_picture_never_enters_the_simulation() {
 }
 
 // ---------------------------------------------------------------------------
-// Where the lens sits on the Whoop 65
+// Where the camera sits on the Whoop 65
 
 #[test]
-fn after_a_level_nose_first_hit_into_a_wall_the_whoops_lens_is_not_inside_the_wall_by_more_than_the_near_plane()
- {
-    // Basis: Rule. The picture draws nothing nearer than the near plane, so a
-    // lens inside the wall by more than that shows through it (#208). The
-    // Scenario flies the Whoop 65 level, nose first, at 10 m/s east into the
-    // Wall Test Map's wall, whose face is 5 m east. Metres.
+fn after_a_level_nose_first_hit_into_a_wall_the_whoops_near_plane_stays_short_of_the_wall() {
+    // Basis: Rule. The picture draws nothing nearer than the near plane, so
+    // the picture shows through a wall once any part of the near plane is
+    // past the wall's face (#208). The near plane is a flat rectangle, NEAR
+    // ahead of the camera along its axis, as wide and tall as the flat render
+    // reaches (`Lens::flat_reach`): on a 160° FOV its bottom edge reaches much
+    // nearer a wall than straight ahead does. The Scenario flies the Whoop 65
+    // level, nose first, at 10 m/s east into the Wall Test Map's wall, whose
+    // face is 5 m east, and the check takes the near plane's four corners
+    // every tick, at the default Camera Tilt and FOV, under both Video Looks'
+    // Lens curves. Metres.
     const WALL_FACE: f64 = 5.0;
     let repo = repo_folder();
     let loaded = reference::load(
@@ -831,28 +886,50 @@ fn after_a_level_nose_first_hit_into_a_wall_the_whoops_lens_is_not_inside_the_wa
     let (simulation, inputs) = opendrone_scenario::simulation(&loaded.scenario, &loaded.packs)
         .unwrap_or_else(|problems| panic!("{problems}"));
     let mut flight = Flight::scripted(simulation, inputs).unwrap();
-    let [forward, left, up] = common::plan("whoop-65").quad.camera.position;
+
+    let camera = common::plan("whoop-65").quad.camera;
+    let [forward, left, up] = camera.position;
+    let at = Vec3d::new(forward, left, up);
+    let tilt = camera.camera_tilt;
+    let axis = Vec3d::new(tilt.cos(), 0.0, tilt.sin());
+    let side = Vec3d::new(0.0, 1.0, 0.0);
+    let above = Vec3d::new(-tilt.sin(), 0.0, tilt.cos());
+    let picture = Picture::in_window(UVec2::new(1280, 720), Aspect::FourThree);
+    let reaches: Vec<_> = [STOCK_CURVE, GENTLE_CURVE]
+        .iter()
+        .map(|curve| Lens::new(camera.fov.to_degrees() as f32, *curve).flat_reach(&picture))
+        .collect();
+    let near = f64::from(NEAR);
+
     let mut deepest = f64::NEG_INFINITY;
     let mut bounced = false;
     while !flight.finished() {
         flight.tick();
         let state = flight.simulation().quad_state(0);
-        let lens = state.position + state.attitude.body_to_world(Vec3d::new(forward, left, up));
-        deepest = deepest.max(lens.x - WALL_FACE);
+        for reach in &reaches {
+            for (across, high) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)] {
+                let corner = at
+                    + (axis
+                        + side * (across * f64::from(reach.x))
+                        + above * (high * f64::from(reach.y)))
+                        * near;
+                let corner = state.position + state.attitude.body_to_world(corner);
+                deepest = deepest.max(corner.x - WALL_FACE);
+            }
+        }
         bounced |= state.velocity.x < 0.0;
     }
     assert!(bounced, "the whoop never hit the wall and bounced back");
     assert!(
-        deepest <= f64::from(NEAR),
-        "the lens got {:.2} mm past the wall's face; the near plane is {:.2} mm",
-        deepest * 1000.0,
-        f64::from(NEAR) * 1000.0
+        deepest < 0.0,
+        "the near plane's corner got {:.2} mm past the wall's face",
+        deepest * 1000.0
     );
 }
 
 #[test]
-fn the_whoops_lens_sits_above_the_top_of_its_duct_rings() {
-    // Basis: Rule. A lens below the ring tops sees their front tips in the
+fn the_whoops_camera_sits_above_the_top_of_its_duct_rings() {
+    // Basis: Rule. A camera below the ring tops sees their front tips in the
     // top corners of the picture once the Camera Tilt reaches about 43° (#208).
     // Metres, up from the centre of mass.
     let plan = common::plan("whoop-65");
@@ -860,14 +937,14 @@ fn the_whoops_lens_sits_above_the_top_of_its_duct_rings() {
     let rings = shape.duct_rings.expect("the Whoop 65 has duct rings");
     let top = shape.rotor_height + rings.height / 2.0;
     let up = plan.quad.camera.position[2];
-    assert!(up >= top, "the lens is {up} m up, the ring tops {top} m");
+    assert!(up >= top, "the camera is {up} m up, the ring tops {top} m");
 }
 
 #[test]
 fn the_whoops_picture_at_its_default_tilt_and_fov_shows_none_of_its_front_duct_rings() {
     // Basis: Rule. The picture reaches as far off the axis as half the FOV, at
     // its corners (#14 §2). A ring point is out of the picture when it is
-    // further than that from the lens's axis. Checked on the front rings'
+    // further than that from the camera's axis. Checked on the front rings'
     // outer walls, top and bottom edges, every degree round. Degrees.
     let plan = common::plan("whoop-65");
     let shape = &plan.quad.parameters.shape;
@@ -897,6 +974,6 @@ fn the_whoops_picture_at_its_default_tilt_and_fov_shows_none_of_its_front_duct_r
     }
     assert!(
         nearest > reach,
-        "a ring point is {nearest}° off the lens's axis; the picture reaches {reach}°"
+        "a ring point is {nearest}° off the camera's axis; the picture reaches {reach}°"
     );
 }

@@ -106,16 +106,19 @@ impl Game {
         }
     }
 
-    fn frame(&mut self, ms: u64, events: Vec<Raw>) {
+    fn frame(&mut self, ms: u64, reports: Vec<Raw>) {
         let at = Duration::from_millis(ms);
         if !self.game_clock.is_paused() {
             self.game_clock.advance_by(at - self.real);
         }
         self.real = at;
-        let batches = if events.is_empty() {
+        let batches = if reports.is_empty() {
             Vec::new()
         } else {
-            vec![Batch { at, events }]
+            vec![Batch {
+                at,
+                events: reports,
+            }]
         };
         let mut world = FlightWorld {
             flight: &mut self.flight,

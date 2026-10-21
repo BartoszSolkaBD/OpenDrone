@@ -63,13 +63,14 @@ The Review check is a commit status on the PR's latest commit, set only for PRs 
 - the PR was opened by the maintainer's account or by Dependabot, from a branch in this repo;
 - fewer than 5 review rounds have failed, or a triage comment covers the newest failed one.
 
-It **waits** while no Verdict covers the latest commit. It **fails** otherwise. Only comments from the maintainer's account count as Verdicts. Each Verdict of changes needed is one failed review round, and the Report shows them out of 5, such as "Failed review rounds: 2 of 5."
+It **waits** while no Verdict covers the latest commit. It **fails** otherwise. Only comments from the maintainer's account count as Verdicts. Each Verdict of changes needed is one failed review round, and the Report shows them out of 5, such as "Failed review rounds: 2 of 5." After a sixth, it gives the count alone, and says each failed round after the fifth needs a triage of its own.
 
 **After 5 failed rounds,** the PR doesn't wait for you. The Review check fails, and the PR gets the `needs-triage` label. The Delegator files what still blocks as its own issue, to be fixed in a later run. Then it posts a triage comment from your account: one whose first line is exactly `Triaged to #<issue>`, naming that issue.
 
 - **It counts** only when it comes from your account, after the newest failed Verdict, once 5 have failed, and names an open issue in this repo. CI looks the issue up each time it works out the Review check. A closed issue, a missing one or a pull request's number counts for nothing, and the Report says so.
 - **It turns the newest failed Verdict into a pass** on the commit that Verdict reviewed. On that commit the Review check passes, the `needs-triage` label comes off, and the Report links the issue.
 - **A later commit needs a fresh Verdict,** as usual. A later failed round needs a triage comment of its own, after it.
+- **The triaged commit counts as reviewed.** So when main is merged in after a triage, the short [merge-only update check](agents/merge-update.md) can give the fresh Verdict, as after a pass. A full Reviewer doesn't block again on the problems already in the triage issue.
 
 Running out of rounds never adds `needs-maintainer`. The Red Flag gate is separate: what it holds still waits for you.
 

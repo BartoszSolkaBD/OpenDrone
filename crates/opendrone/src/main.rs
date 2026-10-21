@@ -39,9 +39,10 @@ Launch Spot of the Skate Park.
                                   the headless Scenario runner's
   opendrone --screenshot FILE.bmp [--seconds N] [--size WxH]
                                   a developer command: fly as usual, save the
-                                  picture after N seconds (5 if not given),
-                                  then quit. The picture is 1280x720 unless
-                                  --size says otherwise
+                                  camera's picture after N seconds (5 if not
+                                  given), then quit. The camera draws into a
+                                  picture of its own, not the window's: it is
+                                  1280x720 unless --size says otherwise
   opendrone --camera-cost [--seconds N] [--size WxH]
                                   a developer command: say what the FPV
                                   Camera's own steps cost a frame on the GPU,

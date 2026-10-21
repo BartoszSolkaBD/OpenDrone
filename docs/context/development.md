@@ -58,7 +58,7 @@ _Avoid_: FPS test, perf test
 - Every PR gets a Reviewer before it merges, and every new commit needs a fresh Verdict. A PR gets up to five review rounds, each with a new Reviewer. A PR never waits for the maintainer because its rounds ran out (decided on 8 October 2026, [#120](https://github.com/BartoszSolkaBD/OpenDrone/issues/120)):
   - After the fifth failed round, the Review check fails and the PR gets the `needs-triage` label. The Delegator files what still blocks as its own issue, to be fixed in a later run.
   - A comment from the maintainer's account whose first line is `Triaged to #<issue>`, naming that open issue, then counts as a pass Verdict on the commit the fifth Verdict reviewed. The label comes off.
-  - A later commit needs a fresh Verdict as usual. A further failed round needs a triage of its own.
+  - A later commit needs a fresh Verdict as usual. A further failed round needs a triage of its own. The commit a triage covers counts as reviewed, so main merged in after it needs only the merge-only update check, and the problems in the triage issue don't block again.
   - The Red Flag gate is separate: what it holds still waits for the maintainer.
 - Main merged into a PR that already passed needs only the short [merge-only update check](../agents/merge-update.md), not a full review, when nothing but main's own changes, clashes in `Cargo.lock` or docs text, and Results fingerprints changed. Anything more needs a fresh Reviewer.
 - Agents never merge past a failing check. The one exception is the Red Flag gate, once the maintainer has cleared what it holds and asked for the merge. The next Review Report names any merge that went past a check.

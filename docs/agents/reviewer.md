@@ -19,6 +19,8 @@ A PR gets up to 5 review rounds. A pass in round 4 or 5 passes the Review check 
 
 That comment counts as a pass Verdict on the commit the fifth Verdict reviewed. CI then takes the `needs-triage` label off. A later commit still needs a fresh Verdict, and a sixth failed round needs a triage comment of its own, posted after it.
 
+The commit a triage covers counts as reviewed, just like one with a pass. So when main is merged in after a triage, the shorter [merge-only update check](merge-update.md) can give the fresh Verdict, as it can after a pass. When a full Reviewer runs after a triage instead, the problems already in the triage issue don't block again (see [What blocks](#what-blocks)).
+
 ## For the Reviewer: what to read
 
 Read only these. Never read the author's notes or conversation.
@@ -27,6 +29,7 @@ Read only these. Never read the author's notes or conversation.
 - **The change:** the PR's description (`gh pr view <PR> -R BartoszSolkaBD/OpenDrone`) and its diff (`gh pr diff <PR> -R BartoszSolkaBD/OpenDrone`).
 - **The Review Report** on the PR: its Red Flags and What moved.
 - **In round 2 and later,** the PR's earlier Verdicts (see "Later rounds").
+- **After a triage,** the issue that each `Triaged to #<issue>` comment on the PR names: `gh issue view <issue> -R BartoszSolkaBD/OpenDrone`.
 - **`AGENTS.md`**, the **`CONTEXT.md` map**, and only the deep dives and ADRs the change touches.
 
 ## What to check
@@ -64,6 +67,8 @@ Block only when one of these is true:
 - the docs or the PR's text mislead;
 - a Red Flag left to you doesn't hold up.
 
+**A problem already in a triage issue doesn't block again,** even if it's still there: it gets fixed under that issue, in a later run. Say in one line that the triage issue holds it. Blocking on it again would cost another failed round and another triage for the same problem. A new problem blocks as usual.
+
 Everything else goes under a heading **Follow-ups (not blocking)**. The Delegator files those for the maintainer to sort. That covers edge cases beyond the ticket, hardening ideas, wording and taste.
 
 Review tooling, the checkers and xtask, during the alpha: block only if a wrong change could get through unnoticed, or if CI breaks. Hardening against unlikely inputs is a follow-up.
@@ -72,7 +77,7 @@ Review tooling, the checkers and xtask, during the alpha: block only if a wrong 
 
 In round 2 and later, start from the earlier Verdicts:
 
-1. **Check that each blocking problem is fixed.**
+1. **Check that each blocking problem is fixed.** After a triage, the newest failed Verdict's problems are in the triage issue instead, and don't need fixing here.
 2. **Review what changed since the last reviewed commit.** Authors merge main rather than rebase, so that commit stays in the branch's history. First list the branch's own commits since then. A merge shows two parents after its own SHA:
 
    ```sh
@@ -134,6 +139,8 @@ Each `Verdict: changes needed` counts as one failed round. A triage comment turn
 - it comes after the newest failed Verdict, once 5 have failed;
 - the issue it names is open, and is an issue in this repo, not a pull request.
 
-Otherwise it changes nothing. CI looks the issue up each time it works out the Review check. The Review Report shows the failed rounds out of 5, and links the triage issue when there is one.
+Otherwise it changes nothing. CI looks the issue up each time it works out the Review check. The Review Report shows the failed rounds out of 5, and links the triage issue when there is one. After a sixth failed round, it gives the count alone, and says each failed round after the fifth needs a triage of its own.
+
+While main merged in after a triage waits for a fresh Verdict, the Review check's description ends with `the triage covers` and that commit's first 7 characters. That is how the [merge-only update check](merge-update.md) knows the commit counts as reviewed.
 
 Running out of rounds never adds `needs-maintainer`. The Red Flag gate is separate: whatever it holds for the maintainer still waits for them.
