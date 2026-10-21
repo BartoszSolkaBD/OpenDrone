@@ -288,7 +288,7 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
 - **When only part of the PR waits, split it off.** Start a fix round that takes that part out, if the rest stands on its own. Examples are an edit to an existing ADR, or a Source Expectation the ticket doesn't need changed. File what came out as its own `ready-for-agent` issue, labelled `needs-maintainer`, with the question moved there. The rest goes on through review and merge.
 - **When the whole PR waits,** for example on Red Flags it can't do without, it steps out of its Lane. Leave it open with `needs-maintainer`, and let the Lane's next PR go into review.
   - When the maintainer answers, it takes the Lane again as soon as the Lane is free, ahead of any new ticket.
-  - You then bring main in, as under [Merging](#merging): `gh pr update-branch` and the Light merge-only update check, or a fix round and a fresh Reviewer when Results must be written again or code moved.
+  - You then bring main in, as under [Merging](#merging): `gh pr update-branch` and the Light merge-only update check, or a fix round and a fresh Reviewer when Results must be written again or code moved. For a PR whose cleared Red Flag gate still fails, skip the Light check and use a fresh Reviewer instead, as under [Clearing the Red Flag gate](#when-a-pr-waits-for-the-maintainer) below.
   - If the Red Flags after that are the same ones the maintainer cleared, the clearance still holds.
 - **Clearing the Red Flag gate.** Nothing in the repo clears the gate: it keeps failing until the PR merges. The maintainer can merge the PR by hand, or tell you to. When they tell you, in the session or on the PR, that they clear what it holds:
   1. Record the decision on the PR.

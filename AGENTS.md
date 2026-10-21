@@ -24,4 +24,4 @@ One PR per ticket. Every PR gets a Reviewer, a fresh agent with none of the auth
 
 ### Delegating tickets
 
-A **delegator** session works through the ready tickets. It starts an author for each ticket and a Reviewer for each PR, each on the model its job needs, keeps one PR in review per Lane, and merges what passes. To run a batch, start a session and point it at `docs/agents/delegator.md`. Authors follow `docs/agents/author.md`. After main is merged into a PR that already passed, a short check is enough: `docs/agents/merge-update.md`.
+A **Delegator** session works through the ready tickets. It starts an author for each ticket and a Reviewer for each PR, each on the model its job needs, keeps one PR in review per Lane, and merges what passes. To run a batch, start a session and point it at `docs/agents/delegator.md`. Authors follow `docs/agents/author.md`. After main is merged into a PR that already passed, a short check is enough: `docs/agents/merge-update.md`.
