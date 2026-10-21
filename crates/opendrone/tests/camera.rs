@@ -24,8 +24,11 @@ use opendrone::camera::look::{
 };
 use opendrone::camera::params::FrameInputs;
 use opendrone::camera::pose::{DIGITAL_DELAY, MAX_EDGE_DELAY, Pose, PoseHistory, picture_delay};
+use opendrone::set_up::FlightPlan;
+use opendrone::settings::Settings;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::Action;
+use opendrone_sim::{Channel, Channels, FlightInput, InputDeviceFacts, SimulationTime};
 
 fn close(a: f64, b: f64, within: f64) -> bool {
     (a - b).abs() <= within
@@ -783,25 +786,73 @@ fn the_history_forgets_what_is_too_old_to_draw_and_before_the_first_pose_shows_t
 fn the_late_picture_never_enters_the_simulation() {
     // Basis: Rule. The camera and the video are outside the Simulation (the
     // Camera and video deep dive): recording poses and drawing them late leaves
-    // a flight's fingerprint exactly as it was.
-    let plan = common::plan("whoop-65");
-    let mut plain = Flight::new(plan.simulation(None).unwrap()).unwrap();
-    let mut watched = Flight::new(plan.simulation(None).unwrap()).unwrap();
+    // a flight's fingerprint exactly as it was. The history is checked on the
+    // way: Analog shows the Quad's newest pose, and Digital with an edge
+    // delay of 20 ms shows where the Quad was 35 ms (35 ticks at 1 kHz)
+    // earlier, so a history that kept, shifted or smeared its poses shows in
+    // the position drawn.
+    // The Quad climbs and rolls (with Auto-arm on), so it is moving while the
+    // history is read: a Quad at rest would pass whatever the history did.
+    let mut settings = Settings::tracer("whoop-65");
+    settings.auto_arm = true;
+    let plan = FlightPlan::from_packs(&common::packs(), settings).unwrap();
+    let device = InputDeviceFacts {
+        report_rate: None,
+        reports_at_rest: false,
+    };
+    let mut plain = Flight::new(plan.simulation(Some(device)).unwrap()).unwrap();
+    let mut watched = Flight::new(plan.simulation(Some(device)).unwrap()).unwrap();
+    let mut sticks = Channels::RESTING;
+    plain.input(SimulationTime::START, FlightInput::Channels(sticks));
+    watched.input(SimulationTime::START, FlightInput::Channels(sticks));
     let mut history = PoseHistory::new();
-    for tick in 0..300u32 {
+    let mut flown: Vec<Vec3> = Vec::new();
+    for tick in 0..4000u32 {
+        if tick == 2200 || tick == 3000 {
+            // The first raise after the ESCs' ready beep, which Auto-arm arms
+            // on, and then a roll.
+            if tick == 2200 {
+                sticks.throttle = Channel::from_micros(1500.0);
+            } else {
+                sticks.roll = Channel::from_micros(1731.4);
+            }
+            let at = SimulationTime::from_ticks(u64::from(tick + 1) * 8);
+            plain.input(at, FlightInput::Channels(sticks));
+            watched.input(at, FlightInput::Channels(sticks));
+        }
         plain.tick();
         watched.tick();
         let (_, after) = watched.drawn_between();
         let at = f64::from(tick + 1) / 1000.0;
+        let position = Vec3::new(
+            after.position.x as f32,
+            after.position.y as f32,
+            after.position.z as f32,
+        );
+        flown.push(position);
         history.push(
             at,
             Pose {
-                position: Vec3::new(after.position.x as f32, after.position.z as f32, 0.0),
+                position,
                 rotation: Quat::IDENTITY,
             },
         );
-        let _ = history.shown(at, VideoLook::Digital, 0.02);
+        let newest = history.shown(at, VideoLook::Analog, 0.0).expect("a pose");
+        assert_eq!(newest.position, position, "Analog at tick {tick}");
+        if tick >= 35 {
+            let late = history.shown(at, VideoLook::Digital, 0.02).expect("a pose");
+            let before = flown[(tick - 35) as usize];
+            assert!(
+                (late.position - before).length() < 1e-4,
+                "Digital at tick {tick}: {} and not {before}",
+                late.position
+            );
+        }
     }
+    assert!(
+        (flown[3999] - flown[2999]).length() > 0.05,
+        "the Quad has to move for the history to be tested"
+    );
     assert_eq!(
         plain.simulation().fingerprint(),
         watched.simulation().fingerprint()
