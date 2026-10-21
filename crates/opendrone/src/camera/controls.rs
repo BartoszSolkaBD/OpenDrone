@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use bevy::prelude::Resource;
+use bevy::prelude::{ButtonInput, KeyCode, Resource};
 use opendrone_input::profile::Action;
 use opendrone_pack::Camera;
 
@@ -41,6 +41,33 @@ pub const CAMERA_ACTIONS: [Action; 4] = [
     Action::FovWider,
     Action::FovNarrower,
 ];
+
+/// The keys that act as the camera's Actions.
+pub const CAMERA_KEYS: [(KeyCode, Action); 4] = [
+    (KeyCode::ArrowUp, Action::CameraTiltUp),
+    (KeyCode::ArrowDown, Action::CameraTiltDown),
+    (KeyCode::ArrowRight, Action::FovWider),
+    (KeyCode::ArrowLeft, Action::FovNarrower),
+];
+
+/// What the keyboard did to the camera's Actions in one frame: the Actions
+/// whose key is down now, and the Actions whose key went down during the
+/// frame. A key pressed and let go between two frames isn't down any more
+/// when the frame looks, so it shows only in the second list: it still counts
+/// as a press.
+pub fn camera_keys(keys: &ButtonInput<KeyCode>) -> (Vec<Action>, Vec<Action>) {
+    let mut held = Vec::new();
+    let mut tapped = Vec::new();
+    for (key, action) in CAMERA_KEYS {
+        if keys.pressed(key) {
+            held.push(action);
+        }
+        if keys.just_pressed(key) {
+            tapped.push(action);
+        }
+    }
+    (held, tapped)
+}
 
 /// One Quad's Camera Tilt and FOV as the pilot has them, in degrees.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -146,8 +173,29 @@ impl Repeater {
     /// Takes what is held at `now` and gives the Actions to act on, in the
     /// order they fall due. An Action not held any more starts afresh.
     pub fn update(&mut self, now: Duration, held: &[Action]) -> Vec<Action> {
+        self.update_with_taps(now, held, &[])
+    }
+
+    /// Like [`Repeater::update`], and also takes the Actions pressed since
+    /// the last call (`tapped`). A tapped Action that isn't held any more was
+    /// pressed and let go within the frame: it acts once. A tapped Action
+    /// that is still held was pressed afresh, so it acts at once and waits
+    /// a second again, even if it was already held before the frame.
+    pub fn update_with_taps(
+        &mut self,
+        now: Duration,
+        held: &[Action],
+        tapped: &[Action],
+    ) -> Vec<Action> {
         self.next.retain(|action, _| held.contains(action));
         let mut due = Vec::new();
+        for &action in tapped {
+            if held.contains(&action) {
+                self.next.remove(&action);
+            } else if !due.iter().any(|&(_, due_action)| due_action == action) {
+                due.push((now, action));
+            }
+        }
         for &action in held {
             let next = self.next.entry(action).or_insert_with(|| {
                 due.push((now, action));
