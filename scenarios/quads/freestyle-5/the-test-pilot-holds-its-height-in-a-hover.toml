@@ -11,12 +11,27 @@
 # - A Quad that holds its height has thrust equal to its weight: the
 #   Freestyle 5″'s 652 g (419 g dry, 233 g pack).
 # - The motor command in a hover is about 15-30% (#10 §6): the weight is a
-#   small share of what four 5″ motors on a 6S pack can lift.
-# - Power never drops below the physical minimum: no rotor lifts a weight for
-#   less power than momentum theory's ideal hover, P = (m g)^1.5 / sqrt(2 ρ A),
-#   with the weight m g = 652 g × 9.81 m/s² = 6.40 N, air at 1.225 kg/m³ and
-#   the four 129.5 mm props' disc area A = 4 × π × (64.75 mm)² = 527 cm²:
-#   45.0 W. The Freestyle 5″ draws about twice that.
+#   small share of what four 5″ motors on a 6S pack can lift. The working, to
+#   a first order: a hover's 652 g is 163 g a motor, 0.102 of T-Motor's
+#   1,591 g for the Velox V2207 V3 1750KV with its T5147 prop at full
+#   throttle, and thrust grows with the speed squared, so a hover turns the
+#   props at √0.102 × 29,447 RPM = 9,430 RPM (the Quad's own thrust
+#   coefficient gives 9,453 RPM: "Two rotor radii over the floor, a
+#   Freestyle 5″'s rotors give 10.6% more thrust" works it out).
+#   Unloaded, a motor turns at its KV × the volts it is given: 1750 KV × a
+#   fresh 6S pack's 25 V is about 43,800 RPM at full throttle, so 9,453 RPM
+#   asks for about 22% of the throttle, and a little more for what the
+#   winding's 0.19 Ω and the ESC take. The run measures 24.8%, inside 15% to
+#   30%. (It isn't 32%, the 9,430 RPM as a share of 29,447 RPM, because
+#   T-Motor's full-throttle point is a loaded one, at 34.6 A, where the motor
+#   turns slower than it does unloaded.)
+# - Power never drops below the physical minimum: no open rotor lifts a weight
+#   for less power than momentum theory's ideal hover, P = (m g)^1.5 / sqrt(2
+#   ρ A), with the weight m g = 652 g × 9.81 m/s² = 6.40 N, air at 1.225
+#   kg/m³ and the four 129.5 mm props' disc area A = 4 × π × (64.75 mm)² =
+#   527 cm²: 45.0 W. That is the open-rotor bound, and the Freestyle 5″'s
+#   props are open (a ducted rotor can beat it by up to 1/√2). The Freestyle
+#   5″ draws about twice that.
 format = 2
 name   = "The Test Pilot holds the Freestyle 5″'s height, with its motors at about 25% and its power above the physical minimum"
 
@@ -51,7 +66,6 @@ quickrates_rc_expo = "off"
 [inputs]
 timeline = [
   { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
-  { at = "30 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
 ]
 
 [[expect]]
@@ -89,6 +103,36 @@ what  = "heading"
 at    = "30 s"
 value = "0° ± 2°"
 basis = "rule: the Test Pilot's hold heading job, asked for 0°"
+
+[[expect]]
+what    = "roll"
+over    = "0 s to 30 s"
+lowest  = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold level job, checked on the other side of what the roll's highest checks"
+
+[[expect]]
+what    = "pitch"
+over    = "0 s to 30 s"
+highest = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold level job, checked on the other side of what the pitch's lowest checks"
+
+[[expect]]
+what    = "tilt"
+over    = "0 s to 30 s"
+highest = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold level job: however the Quad leans, roll and pitch together, it stays within 2° of upright"
+
+[[expect]]
+what    = "heading"
+over    = "5 s to 30 s"
+lowest  = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold heading job, asked for 0°, checked over a stretch and not only at 30 s"
+
+[[expect]]
+what    = "heading"
+over    = "5 s to 30 s"
+highest = "0° ± 2°"
+basis   = "rule: the Test Pilot's hold heading job, asked for 0°, checked over a stretch and not only at 30 s"
 
 [[expect]]
 what  = "total thrust"

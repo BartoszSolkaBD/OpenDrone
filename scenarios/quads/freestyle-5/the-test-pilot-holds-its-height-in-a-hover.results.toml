@@ -41,6 +41,36 @@ expected = "0° ± 2°"
 measured = "0.116°"
 
 [[expect]]
+what     = "roll, lowest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.00000000101°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "-0.000000000941°"
+
+[[expect]]
+what     = "tilt, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.166°"
+
+[[expect]]
+what     = "heading, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.106°"
+
+[[expect]]
+what     = "heading, highest over 5 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.117°"
+
+[[expect]]
 what     = "total thrust, mean over 10 s to 30 s"
 basis    = "Rule"
 expected = "652 gf ± 10 gf"
@@ -79,16 +109,16 @@ measured = "none broken"
 [fingerprints]
 quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "a01870a3d851e28d"   # the whole state after each of 240000 steps at 8000 Hz, in order
+run  = "6d718c9761e28e04"   # the whole state after each of 240000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"3 s" = "97cf81ac712df2f2"
-"6 s" = "f6e4ea8ebe750820"
-"9 s" = "452cce2f5cdef23e"
-"12 s" = "d7de376e7ef2228b"
-"15 s" = "eed35ac1f5e457e6"
-"18 s" = "66d66f06ca6e8b88"
-"21 s" = "42b1e168c5a71999"
-"24 s" = "a4ecd1d5886a4d73"
-"27 s" = "e028114876e36b3c"
-"30 s" = "01301bbac10040b1"
+"3 s" = "bfa5dc1c0a13b64f"
+"6 s" = "96c40887b207dc95"
+"9 s" = "31dd4b58da36eabf"
+"12 s" = "ced4a677b1e0ab8e"
+"15 s" = "7987abf675eefdeb"
+"18 s" = "2c4a90afc1b8c945"
+"21 s" = "c43faf9f85a05adc"
+"24 s" = "46d66fd719fe3bba"
+"27 s" = "76232147701293cd"
+"30 s" = "e11687d57412e468"

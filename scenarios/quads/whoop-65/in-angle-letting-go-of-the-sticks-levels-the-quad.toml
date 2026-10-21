@@ -7,9 +7,12 @@
 # gives Angle `angle_limit` 55° and `angle_p_gain` 50 (its 4.3 defaults,
 # translated from `level_limit` and `angle_level_strength`). At 1 s the
 # roll stick goes to full right, which asks for the angle limit, 55°, and
-# the Quad leans over and holds there: in Angle full stick is a tilt, not a
-# rotation. At 2 s the stick is let go, and the Quad rolls back to level and
-# stays there, sinking and drifting, but upright.
+# the Quad leans over towards it: in Angle full stick is a tilt, not a
+# rotation. It is still closing in on 55° at 2 s (45.1° at 1.5 s, 52.6° at
+# 2 s), when the stick is let go and the Quad rolls back to level and stays
+# there, sinking and drifting, but upright. "In Angle, holding full stick
+# leans the Whoop 65 to the angle limit" holds the stick for longer, to show
+# the tilt reaching 55°.
 format = 2
 name   = "In Angle, the Whoop 65 holds the tilt full stick asks for, and levels itself when the stick is let go"
 

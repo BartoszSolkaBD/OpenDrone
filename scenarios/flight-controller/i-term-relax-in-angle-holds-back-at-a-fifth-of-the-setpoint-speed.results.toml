@@ -1,0 +1,64 @@
+# Results of i-term-relax-in-angle-holds-back-at-a-fifth-of-the-setpoint-speed.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "In Angle, I-term relax holds roll's I back until the setpoint is within 8 °/s of its low-pass"
+
+[[expect]]
+what     = "roll PID setpoint at 0.4 s"
+basis    = "Source"
+expected = "0.04912 °/s ± 0.00001 °/s"
+measured = "0.0491 °/s"
+
+[[expect]]
+what     = "roll I term at 0.5 s"
+basis    = "Source"
+expected = "0.48016 ± 0.0001"
+measured = "0.480"
+
+[[expect]]
+what     = "roll PID setpoint at 0.51 s"
+basis    = "Source"
+expected = "-18.720 °/s ± 0.001 °/s"
+measured = "-18.7 °/s"
+
+[[expect]]
+what     = "roll I term at 0.51 s"
+basis    = "Source"
+expected = "0.38821 ± 0.0001"
+measured = "0.388"
+
+[[expect]]
+what     = "roll I term at 0.514 s"
+basis    = "Source"
+expected = "0.38821 ± 0.0001"
+measured = "0.388"
+
+[[expect]]
+what     = "roll I term at 0.53 s"
+basis    = "Source"
+expected = "-2.3261 ± 0.001"
+measured = "-2.33"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "600287fa7636b925"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+map  = "none"   # the Flight Controller runs alone, with no Map
+run  = "cf823c2d3c2b13b5"   # the whole state after each of 4240 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.053 s" = "d39cf5224976f548"
+"0.106 s" = "c560efb67441d904"
+"0.159 s" = "0d976b9c129cafc8"
+"0.212 s" = "d5d8c31139a778b3"
+"0.265 s" = "88a2e635d5221120"
+"0.318 s" = "9d97c59eb8180369"
+"0.371 s" = "c366f6fe7d870d25"
+"0.424 s" = "bb878a00c2cbb3ec"
+"0.477 s" = "1b4589058f558e2e"
+"0.53 s" = "611e18c3da5a9592"

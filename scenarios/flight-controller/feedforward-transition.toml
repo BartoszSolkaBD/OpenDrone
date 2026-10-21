@@ -1,8 +1,8 @@
 # Feedforward's transition follows Betaflight 2026.6.2
 # (`calculateFeedforward`, src/main/fc/rc.c): with `feedforward_transition`
-# 50, roll and pitch's feedforward is scaled by the stick's deflection ÷ 0.5
-# while the stick is less than halfway out, so it fades in from centre
-# stick.
+# 50, each axis's feedforward (yaw's too, not only roll and pitch's) is
+# scaled by the stick's deflection ÷ 0.5 while the stick is less than halfway
+# out, so it fades in from centre stick. This Scenario moves the roll stick.
 #
 # The same ramp as feedforward-at-250-hz.toml's, on the Test Quad
 # test/freestyle-5-feedforward-transition: its feedforward_transition is 50,

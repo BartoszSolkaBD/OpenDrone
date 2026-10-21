@@ -302,8 +302,36 @@ fn stopped_motors_are_only_for_scenarios_that_script_their_motors() {
     let found = failures(&report(&file, ResultsFile::Write));
     assert!(
         found.iter().any(|line| line.ends_with(
-            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; where the Flight Controller runs, a start at rest with a \"fresh\" Flight Controller is Reset, whose ESCs power up first: write \"powering up\""
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios (a Thrust Stand Scenario may script its motors or fly the Flight Controller); where the Flight Controller flies a Flight Scenario's Quad, a start at rest with a \"fresh\" Flight Controller is Reset, whose ESCs power up first: write \"powering up\""
         )),
+        "{found:#?}"
+    );
+}
+
+#[test]
+fn a_thrust_stand_timeline_that_forgets_motors_is_told_about_motors() {
+    // A Thrust Stand Scenario either scripts its motors or flies the Flight
+    // Controller from the sticks; a first moment with neither used to be
+    // told only that it set no stick and no switch.
+    let text = free_fall()
+        .replacen(
+            "kind              = \"physics\"",
+            "kind              = \"thrust stand\"",
+            1,
+        )
+        .replacen("{ at = \"0 s\", motors = \"0%\" }", "{ at = \"0 s\" }", 1);
+    let found = failures(&report(
+        &fixture("thrust-stand-no-motors", &text),
+        ResultsFile::Write,
+    ));
+    assert!(
+        found.iter().any(|line| line.ends_with(
+            "a Thrust Stand Scenario's Timeline starts with a moment at 0 s that either scripts the `motors` (one command for all four, or four in motor order), or sets every stick, the Arm switch and the Crash Flip switch to fly the Flight Controller (ADR-0002); this one does neither"
+        )),
+        "{found:#?}"
+    );
+    assert!(
+        !found.iter().any(|line| line.contains("doesn't set")),
         "{found:#?}"
     );
 }

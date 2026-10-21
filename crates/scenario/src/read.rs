@@ -636,7 +636,7 @@ fn read_start(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Start> {
         && let Some(item) = start.get("motors")
     {
         problems.push(item.problem(
-            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios, which script their motors; where the Flight Controller runs, a start at rest with a \"fresh\" Flight Controller is Reset, whose ESCs power up first: write \"powering up\"",
+            "motors \"stopped\" (at rest, with the ESCs already ready) are only for Physics and Thrust Stand Scenarios (a Thrust Stand Scenario may script its motors or fly the Flight Controller); where the Flight Controller flies a Flight Scenario's Quad, a start at rest with a \"fresh\" Flight Controller is Reset, whose ESCs power up first: write \"powering up\"",
         ));
     }
     let reset_start =
@@ -1327,7 +1327,15 @@ impl Reader<'_> {
             Some(moment) => Problem::of(self.file.clone(), moment.line, sentence),
             None => inputs.problem(sentence),
         };
-        if !missing.is_empty() {
+        if self.kind == Kind::ThrustStand && missing.len() == 6 {
+            // Neither motors nor any stick or switch: it isn't clear which
+            // way this Thrust Stand Scenario goes, and `motors` is the
+            // likelier thing forgotten.
+            let found = problem(
+                "a Thrust Stand Scenario's Timeline starts with a moment at 0 s that either scripts the `motors` (one command for all four, or four in motor order), or sets every stick, the Arm switch and the Crash Flip switch to fly the Flight Controller (ADR-0002); this one does neither".to_string(),
+            );
+            self.problems.push(found);
+        } else if !missing.is_empty() {
             let found = problem(format!(
                 "the Timeline starts with a moment at 0 s that sets every stick, the Arm switch and the Crash Flip switch (ADR-0002); it doesn't set {}",
                 missing

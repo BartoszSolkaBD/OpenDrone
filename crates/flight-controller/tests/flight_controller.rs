@@ -539,7 +539,7 @@ fn yaw_spin_recovery_on_starts_at_the_tunes_threshold_and_off_never_starts() {
 
 #[test]
 fn a_fresh_flight_controller_has_detected_the_packet_rate_and_tuned_rc_smoothing_to_it() {
-    // Basis: Rule (#37: power-up leaves the link-rate estimate settled) and
+    // Basis: Rule (#37: power-up leaves the Packet Rate detection settled) and
     // Source (Betaflight 2026.6.2's `rcSmoothingSetFilterCutoffs`: the
     // automatic cutoff is the rate × 1.5 ÷ (1 + 30 ÷ 10), never below 15 Hz,
     // kept in whole Hz: 93.75 Hz is 93 Hz at 250 Hz, 18.75 Hz is 18 Hz at

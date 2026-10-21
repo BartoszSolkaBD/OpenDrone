@@ -85,16 +85,16 @@ measured = "none broken"
 [fingerprints]
 quad = "78df6ea38e99bc8e"   # test/freestyle-5-filters-and-shaping-off: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "aa15dec3762b9d14"   # the whole state after each of 88800 steps at 8000 Hz, in order
+run  = "273afee97cf29dc7"   # the whole state after each of 88800 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"1.11 s" = "7a594d06fecc4685"
-"2.22 s" = "bb5ecd44307cf578"
-"3.33 s" = "65a0800de89ad64d"
-"4.44 s" = "dee64acb2481ed6e"
-"5.55 s" = "dbe7a811bfa67f1a"
-"6.66 s" = "b56eeb158272aeb5"
-"7.77 s" = "158fc6102018bc52"
-"8.88 s" = "30d9313798f4ab8b"
-"9.99 s" = "c80c2945eb48d418"
-"11.1 s" = "56a8d04e5e402b7c"
+"1.11 s" = "da3f87263e4b12b4"
+"2.22 s" = "1f05db34187c2111"
+"3.33 s" = "5a64011516fd2e58"
+"4.44 s" = "f3698771c392103f"
+"5.55 s" = "d4c3c3e72577cfa3"
+"6.66 s" = "a6c46b7ec302a6f0"
+"7.77 s" = "cc983c40540b09cb"
+"8.88 s" = "f84b5df5b4bb193e"
+"9.99 s" = "bdee11c7df247be5"
+"11.1 s" = "56815ff9d81dad39"

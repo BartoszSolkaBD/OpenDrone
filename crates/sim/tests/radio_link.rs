@@ -90,7 +90,8 @@ fn every_packet_rate_a_pilot_can_pick_sends_that_many_frames_a_second_on_its_own
 fn the_packet_rates_that_lock_are_those_that_divide_the_devices_report_rate() {
     // Basis: Source (ADR-0020, "Which rates lock": the DualSense over USB at
     // 250 Hz locks at 250 and 50 Hz, the Pocket at 1 kHz at 1000, 500, 333,
-    // 250, 100 and 50 Hz; 333 Hz counts as a frame every 3 ms).
+    // 250, 100 and 50 Hz), and Rule: 333 Hz counts as a frame every 3 ms (the
+    // Radio Link's own choice, 1000 ÷ 3 Hz, which the ADR doesn't give).
     let spans = |report_hz: u32| -> Vec<(u32, Option<u32>)> {
         PacketRate::ALL
             .iter()
@@ -199,11 +200,12 @@ fn at_50_hz_a_locked_frame_carries_five_dualsense_reports_and_leaves_after_the_f
 #[test]
 fn a_1_khz_device_locked_at_500_333_and_100_hz_gets_a_frame_every_2_3_and_10_ms() {
     // Basis: Source (ADR-0020, "Which rates lock": the Pocket at 1 kHz locks
-    // at 500, 333 and 100 Hz; 333 Hz counts as a frame every 3 ms), and Rule
-    // for the rest: a frame carries the reports since the last one, 2, 3 or 10
-    // of them, and leaves 0.75 ms (6 steps) after the last is due, so the
-    // frames are 16, 24 and 80 steps apart, exactly. The reports are due every
-    // 8 steps from step 5, each 0 to 2 steps late.
+    // at 500, 333 and 100 Hz), and Rule for the rest: 333 Hz counts as a
+    // frame every 3 ms (the Radio Link's own choice, 1000 ÷ 3 Hz, which the
+    // ADR doesn't give), so a frame carries the reports since the last one,
+    // 2, 3 or 10 of them, and leaves 0.75 ms (6 steps) after the last is due,
+    // so the frames are 16, 24 and 80 steps apart, exactly. The reports are
+    // due every 8 steps from step 5, each 0 to 2 steps late.
     let late = [0, 1, 0, 2, 1, 0, 2];
     for (hz, per_frame, apart) in [(500, 2, 16), (333, 3, 24), (100, 10, 80)] {
         let reports = reports(5, 8, &late, 2000);
