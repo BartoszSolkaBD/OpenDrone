@@ -218,6 +218,12 @@ fn the_game_run_with_cargo_finds_the_repo_at_or_above_the_working_folder() {
     let program = root.join("target").join("release").join("opendrone");
     let here = repo.join("crates").join("opendrone");
     fs::create_dir_all(&here).unwrap();
-    assert_eq!(find_repo_folder(Some(&program), Some(&here)), Some(repo));
-    assert_eq!(find_repo_folder(Some(&program), Some(&root)), None);
+    assert_eq!(
+        find_repo_folder(Some(&program), Some(&here)),
+        Some(repo.clone())
+    );
+    // Started beside the repo, not inside it, the game doesn't find it.
+    // (What it finds instead depends on where the scratch folder is: inside
+    // a checkout's own target/ folder, that checkout.)
+    assert_ne!(find_repo_folder(Some(&program), Some(&root)), Some(repo));
 }

@@ -19,7 +19,7 @@ use std::process::ExitCode;
 
 use serde_json::{Value, json};
 use zip::write::SimpleFileOptions;
-use zip::{CompressionMethod, ZipWriter};
+use zip::{CompressionMethod, System, ZipWriter};
 
 use crate::materials;
 use crate::review::markdown::{code, plain};
@@ -291,7 +291,11 @@ pub fn package(
     let zip_path = out.join(format!("{top}.zip"));
     let file = fs::File::create(&zip_path).map_err(|e| format!("{}: {e}", zip_path.display()))?;
     let mut zip = ZipWriter::new(std::io::BufWriter::new(file));
-    let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+    // Unix permissions whichever system makes the zip, so a Windows-made zip
+    // still lets the game run on macOS and Linux.
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Deflated)
+        .system(System::Unix);
     let problem = |e: &dyn std::fmt::Display| format!("{}: {e}", zip_path.display());
 
     let mut folders: Vec<String> = vec![String::new()];
