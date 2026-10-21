@@ -184,7 +184,15 @@ fn a_failed_round_after_the_triage_needs_a_triage_of_its_own() {
         .issue(200, "open")
         .update();
     failed_again.check_is("failure", &out_of_rounds(6));
-    failed_again.says("Failed review rounds: 6 of 5.");
+    failed_again.says(
+        "Failed review rounds: 6. A PR gets 5, and each failed round after the fifth needs a \
+         triage of its own.",
+    );
+    assert!(
+        !failed_again.comment.contains("of 5."),
+        "{}",
+        failed_again.comment
+    );
     failed_again.adds_label("needs-triage");
 
     let triaged_again = Pr::new("triaged-again")
@@ -199,6 +207,50 @@ fn a_failed_round_after_the_triage_needs_a_triage_of_its_own() {
         "success",
         "Triaged to #201 after 6 failed review rounds: passes on 1111111",
     );
+    triaged_again.says(
+        "Failed review rounds: 6. A PR gets 5, and each failed round after the fifth needs a \
+         triage of its own. What still blocked is triaged to [#201]",
+    );
+}
+
+#[test]
+fn a_triaged_commit_counts_as_reviewed_so_main_merged_in_after_it_needs_only_the_merge_only_check()
+{
+    // Main was merged in after the triage, so the latest commit is newer than
+    // the one the triage covers. The Review check names that commit: the
+    // merge-only update check reads it as the reviewed commit.
+    for failed in [5, 6] {
+        let merged = Pr::new(&format!("triaged-then-main-merged-in-{failed}"))
+            .failed_rounds(failed, OLDER)
+            .comment(MAINTAINER, "Triaged to #200")
+            .issue(200, "open")
+            .update();
+        merged.check_is(
+            "pending",
+            "Waiting for a fresh Verdict on 1111111; the triage covers 2222222",
+        );
+        merged.says("counts as a pass Verdict on `2222222`");
+        merged.does_not_add_label("needs-triage");
+
+        // The merge-only update check's pass on the latest commit is enough.
+        let checked = Pr::new(&format!("triaged-then-merge-only-pass-{failed}"))
+            .failed_rounds(failed, OLDER)
+            .comment(MAINTAINER, "Triaged to #200")
+            .comment(MAINTAINER, &verdict(HEAD, "pass"))
+            .issue(200, "open")
+            .update();
+        checked.check_is("success", "The Reviewer's Verdict on 1111111 says pass");
+        checked.does_not_add_label("needs-triage");
+    }
+
+    // A triage that doesn't count covers no commit, so the Review check
+    // names none, and the merge-only update check stops.
+    let not_counted = Pr::new("triage-not-counted-then-main-merged-in")
+        .failed_rounds(5, OLDER)
+        .comment(MAINTAINER, "Triaged to #200")
+        .issue(200, "closed")
+        .update();
+    not_counted.check_is("failure", &out_of_rounds(5));
 }
 
 #[test]
@@ -287,6 +339,19 @@ fn a_triaged_to_comment_naming_a_closed_or_missing_issue_changes_nothing() {
         }))
         .update();
     moved.check_is("failure", &out_of_rounds(5));
+    // The same number in another repo: only the address shows it moved.
+    let moved_with_its_number = Pr::new("triage-names-an-issue-in-another-repo")
+        .failed_rounds(5, HEAD)
+        .comment(MAINTAINER, "Triaged to #202")
+        .issue_record(json!({
+            "number": 202,
+            "state": "open",
+            "html_url": "https://github.com/someone/elsewhere/issues/202",
+        }))
+        .update();
+    moved_with_its_number.check_is("failure", &out_of_rounds(5));
+    moved_with_its_number
+        .says("`Triaged to #202` doesn't count: #202 isn't an open issue in this repo.");
 }
 
 #[test]

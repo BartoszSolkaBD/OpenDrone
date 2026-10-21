@@ -359,7 +359,15 @@ pub fn review_check(pr: &PullRequest, comments: &[Comment], issues: &[Issue]) ->
             format!("[#{issue}]({}/issues/{issue})", pr.repo_url)
         }
     };
-    let mut rounds = format!("Failed review rounds: {failed_rounds} of {ROUNDS}.");
+    // Past the fifth, "6 of 5" would be untrue: say what a later round needs.
+    let mut rounds = if failed_rounds > ROUNDS {
+        format!(
+            "Failed review rounds: {failed_rounds}. A PR gets {ROUNDS}, and each failed round \
+             after the fifth needs a triage of its own."
+        )
+    } else {
+        format!("Failed review rounds: {failed_rounds} of {ROUNDS}.")
+    };
     if let Some(triage) = &triage {
         rounds.push_str(&format!(
             " What still blocked is triaged to {}.",
