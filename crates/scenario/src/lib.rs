@@ -48,6 +48,7 @@ mod measure;
 mod osd;
 mod rates;
 mod read;
+mod recorded;
 mod results;
 mod run;
 mod track;
@@ -63,13 +64,14 @@ pub use opendrone_sim::StartingMotors;
 pub use osd::{OsdExpectation, OsdExpected, OsdSection, OsdWhen};
 pub use rates::{AxisRates, Rates, RatesType, ThrottleLimitType};
 pub use read::{
-    Assists, Basis, BasisKind, Case, Compared, Comparison, Expectation, Expecting, FlightMode,
-    InputDevice, InputTrack, Inputs, Kind, Named, OtherRun, PilotChanges, PilotEntry, Scenario,
-    Start, StartingFlightController, Statistic, Stick, When, read_scenario,
+    Assists, Basis, BasisKind, Case, Compared, Comparison, DOWNLOADED_DATA, Expectation, Expecting,
+    FlightMode, InputDevice, InputTrack, Inputs, Kind, MotorTrack, Named, OtherRun, PilotChanges,
+    PilotEntry, Scenario, Start, StartingFlightController, Statistic, Stick, When, read_scenario,
 };
+pub use recorded::{RecordedColumn, RecordedFlight};
 pub use results::{fingerprints_text, read_fingerprints, results_text};
 pub use run::{Measured, Outcome, Received, ScenarioInputs, run, simulation};
-pub use track::INPUT_TRACK_HEADER;
+pub use track::{INPUT_TRACK_HEADER, MOTOR_TRACK_HEADER};
 
 /// The ending of every Results file, beside its Scenario.
 pub const RESULTS_ENDING: &str = ".results.toml";
@@ -213,6 +215,9 @@ pub struct Report {
     /// The Scenario's name, once it could be read.
     pub name: Option<String>,
     pub checks: Vec<(bool, String)>,
+    /// True when it was skipped, because the downloaded data it needs
+    /// is missing (`downloaded` in the Scenario).
+    pub skipped: bool,
 }
 
 impl Report {
@@ -248,6 +253,7 @@ pub fn run_one(
         label: file.label(),
         name: None,
         checks: Vec::new(),
+        skipped: false,
     };
     let problems = |report: &mut Report, problems: Problems| {
         for problem in problems.0 {
@@ -268,14 +274,51 @@ pub fn run_one(
             return report;
         }
     };
+    let beside = |name: &str| match file.relative.rsplit_once('/') {
+        Some((folder, _)) => format!("scenarios/{folder}/{name}"),
+        None => format!("scenarios/{name}"),
+    };
+    // Data that may not be committed is downloaded when it's needed; a
+    // Scenario whose downloaded files are missing is skipped, and never
+    // blocks (docs/data-policy.md).
+    if let Some(data) = &scenario.downloaded {
+        let missing: Vec<String> = scenario
+            .input_track()
+            .into_iter()
+            .chain(scenario.recorded_flight_file())
+            .filter(|name| !file.path.with_file_name(name).is_file())
+            .map(&beside)
+            .collect();
+        if !missing.is_empty() {
+            report.name = Some(scenario.name.clone());
+            report.skipped = true;
+            report.check(
+                true,
+                format!(
+                    "skipped: its {data} files aren't here ({}), so it doesn't block; `cargo xtask download {}` downloads them",
+                    missing.join(", "),
+                    data.to_lowercase()
+                ),
+            );
+            return report;
+        }
+    }
     if let Some(name) = scenario.input_track().map(str::to_string) {
-        let label = match file.relative.rsplit_once('/') {
-            Some((folder, _)) => format!("scenarios/{folder}/{name}"),
-            None => format!("scenarios/{name}"),
-        };
+        let label = beside(&name);
         let read = fs::read_to_string(file.path.with_file_name(&name))
             .map_err(|error| Problems::of_file(&label, format!("can't be read: {error}")))
             .and_then(|track| scenario.read_input_track(&label, &track));
+        if let Err(found) = read {
+            report.name = Some(scenario.name.clone());
+            problems(&mut report, found);
+            return report;
+        }
+    }
+    if let Some(name) = scenario.recorded_flight_file().map(str::to_string) {
+        let label = beside(&name);
+        let read = fs::read_to_string(file.path.with_file_name(&name))
+            .map_err(|error| Problems::of_file(&label, format!("can't be read: {error}")))
+            .and_then(|recorded| scenario.read_recorded_flight(&label, &recorded));
         if let Err(found) = read {
             report.name = Some(scenario.name.clone());
             problems(&mut report, found);

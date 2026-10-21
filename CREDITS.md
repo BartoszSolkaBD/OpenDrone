@@ -1,6 +1,6 @@
 # Credits
 
-This file lists every outside asset and dataset in OpenDrone, each with its source, its licence and a checksum ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). **It is generated** from the texture manifest, [`assets-src/materials.toml`](assets-src/materials.toml), by `cargo xtask credits`; don't edit it by hand. CI checks it is up to date. Only CC0 assets and CC BY data enter the repo.
+This file lists every outside asset and dataset in OpenDrone, each with its source, its licence and a checksum ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). **It is generated** from the texture manifest, [`assets-src/materials.toml`](assets-src/materials.toml), and the list of datasets, [`assets-src/datasets.toml`](assets-src/datasets.toml), by `cargo xtask credits`; don't edit it by hand. CI checks it is up to date. Only CC0 assets and CC BY data enter the repo.
 
 ## Textures
 
@@ -35,11 +35,33 @@ Poly Haven and ambientCG pictures, all CC0 1.0: anyone may use them for any purp
 | [rusty_metal_02](https://polyhaven.com/a/rusty_metal_02) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9` |
 |  |  |  |  | normal | `995197a62cac6fbb000e6e6591a3330a3b77ef069c4ac58f505b586b9bdbd97b` |
 
+## Datasets
+
+Outside data under CC BY 4.0, committed only as trimmed CSV files, each folder with its attribution notice beside the files ([the data policy](docs/data-policy.md)). Anyone may use them for any purpose, crediting their makers as the notice says. Data with no licence, such as NeuroBEM, is downloaded when it's needed and never committed, so it isn't listed here.
+
+| Dataset | By | Licence | File | SHA-256 |
+|---|---|---|---|---|
+| [Race Against the Machine](https://github.com/tii-racing/drone-racing-dataset) | TII Racing: Bosello, Aguiari, Keuter, Pallotta, Kiade, Caminati, Pinzarrone, Halepota, Panerati and Pau | CC-BY-4.0 | [`hovering-in-flight-01a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/hovering-in-flight-01a-motors.csv) | `b4edc45f5732020fcc090c1a223e8732677bcd62f941ee0ad6029b9c17084933` |
+|  |  |  | [`hovering-in-flight-01a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/hovering-in-flight-01a-recorded.csv) | `df6c20f681998577e566d5a052c34381361de9f1ee986f5c4f40017fea44b4d5` |
+|  |  |  | [`hovering-in-flight-04a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/hovering-in-flight-04a-motors.csv) | `663304ba0a9a98e6a8f24ba8114faf32d32d2f996c326f70bc75e19c56b77747` |
+|  |  |  | [`hovering-in-flight-04a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/hovering-in-flight-04a-recorded.csv) | `a5ce822dd38d5f3f5af1b3026eac8a7ab6aa07420a010de7ac72241e43344c54` |
+|  |  |  | [`punching-out-in-flight-01a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/punching-out-in-flight-01a-motors.csv) | `e5100d5bba9f824857c5f56eaddf3e5b1bd4aa26f0b9449550f5cfb973aa19ff` |
+|  |  |  | [`punching-out-in-flight-01a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/punching-out-in-flight-01a-recorded.csv) | `a5c5536436fe38e8673e653b40278269d873b11e62658a4557f816bbde11528c` |
+|  |  |  | [`punching-out-in-flight-04a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/punching-out-in-flight-04a-motors.csv) | `78d66acb47e15bdc13da3d392a1c6d008e138911ab423ca59d5d03e073479864` |
+|  |  |  | [`punching-out-in-flight-04a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/punching-out-in-flight-04a-recorded.csv) | `2c8e6d8114eb992554eaa65cc3d9ab09fbef0fbb5983efe393792df5bdc57039` |
+|  |  |  | [`slowing-from-3-m-s-in-flight-01a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-3-m-s-in-flight-01a-motors.csv) | `bf7af9fc7666eddd56cad248e3c36a81f3b9aa0fcaaa1fd1b5a979a38f147407` |
+|  |  |  | [`slowing-from-3-m-s-in-flight-01a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-3-m-s-in-flight-01a-recorded.csv) | `3e00a5e54a12ec7633d2b7c43e2312a8e265f89e3861db40a32a66225be74590` |
+|  |  |  | [`slowing-from-3-m-s-in-flight-04a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-3-m-s-in-flight-04a-motors.csv) | `e7163903c5b5bb2e610638c48d2e798964f09ef0ad73442112a1915fc6dd5516` |
+|  |  |  | [`slowing-from-3-m-s-in-flight-04a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-3-m-s-in-flight-04a-recorded.csv) | `3b67ebef29ad1801399398bae1503494a103928e49fbfc947538fe649e414048` |
+|  |  |  | [`slowing-from-5-m-s-in-flight-01a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-5-m-s-in-flight-01a-motors.csv) | `c7feb8f427496a354525e3f5cddef97c51b13a0ff49c56b5f624c4ff20bddd1f` |
+|  |  |  | [`slowing-from-5-m-s-in-flight-01a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-5-m-s-in-flight-01a-recorded.csv) | `3795288edb844ce0f85554abb5257be435081a35b04a9b7f04b2ff83327fe896` |
+|  |  |  | [`slowing-from-5-m-s-in-flight-04a-motors.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-5-m-s-in-flight-04a-motors.csv) | `bfcd3f21a22db7be2b4ea86b89e6c553c4ca267a3a3d3572d00a071774072c7f` |
+|  |  |  | [`slowing-from-5-m-s-in-flight-04a-recorded.csv`](scenarios/quads/freestyle-5/tii-logs/slowing-from-5-m-s-in-flight-04a-recorded.csv) | `812bfbdfd1460a806f727fa081a751661c52e847a8ed0ff5a13a731c4d88ce3b` |
+
 ## Not yet
 
 - Sound files: the CC0 hit and menu clips, and each Map's Background Sound, are listed here the same way once they are in the repo.
 - Outside fonts (OFL-1.1), if any are used. The OSD fonts are OpenDrone's own, under CC0.
-- Reference datasets under CC BY.
 
 Nothing else from outside is in the repo.
 

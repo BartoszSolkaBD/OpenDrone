@@ -271,7 +271,7 @@ fn an_input_track_comes_with_its_devices_facts_and_a_timeline_has_none() {
 }
 
 #[test]
-fn an_input_track_names_a_csv_file_beside_its_scenario_and_feeds_only_a_pilots_scenario() {
+fn an_input_track_names_a_csv_file_beside_its_scenario_and_only_a_pilots_comes_from_a_device() {
     let text = locked().replace("\"dualsense-at-rest.csv\"", "\"../traces/dualsense.csv\"");
     let found = failures(&report(&fixture("elsewhere", &text, None)));
     assert_eq!(found.len(), 1, "{found:#?}");
@@ -295,7 +295,7 @@ fn an_input_track_names_a_csv_file_beside_its_scenario_and_feeds_only_a_pilots_s
     let found = failures(&report(&fixture("physics-track", &physics, Some(&track()))));
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].ends_with(
-        "an Input Track holds a pilot's Flight Inputs, so it feeds a Flight or Flight Controller Scenario; a Physics or Thrust Stand Scenario scripts its motors in a Timeline"
+        "a Physics or Thrust Stand Scenario's Input Track holds recorded motor commands, which no Input Device sent, so it has no `input_device`"
     ));
 }
 

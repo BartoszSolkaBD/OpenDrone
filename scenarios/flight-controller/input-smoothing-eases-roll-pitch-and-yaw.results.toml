@@ -53,7 +53,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "0d3c101d670191df"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
 run  = "e0bd22ed67ae801b"   # the whole state after each of 8801 steps at 8000 Hz, in order
 

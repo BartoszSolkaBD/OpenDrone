@@ -1,0 +1,16 @@
+# The outside datasets whose files are in the repo (ADR-0014,
+# docs/data-policy.md). Only CC BY data enters it, trimmed to CSV files, each
+# folder with a NOTICE.md beside the files that credits their makers.
+# `cargo xtask credits` writes CREDITS.md from this list and the texture
+# manifest, with the SHA-256 of every CSV file in each folder; CI checks it is
+# up to date, so a changed data file needs CREDITS.md written again.
+#
+# Data with no licence, such as NeuroBEM, is never committed and isn't listed
+# here: `cargo xtask download neurobem` fetches it when it's needed.
+
+[[dataset]]
+name    = "Race Against the Machine"
+page    = "https://github.com/tii-racing/drone-racing-dataset"
+by      = "TII Racing: Bosello, Aguiari, Keuter, Pallotta, Kiade, Caminati, Pinzarrone, Halepota, Panerati and Pau"
+licence = "CC-BY-4.0"
+folder  = "scenarios/quads/freestyle-5/tii-logs"

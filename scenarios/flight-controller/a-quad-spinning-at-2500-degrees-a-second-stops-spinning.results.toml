@@ -26,7 +26,7 @@ measured = "0"
 what     = "yaw spin recovery ends, first over 0 s to 2 s"
 basis    = "Observed"
 expected = "0.145 s ± 0.02 s"
-measured = "0.146 s"
+measured = "0.158 s"
 
 [[expect]]
 what     = "yaw rate at 2 s"
@@ -47,18 +47,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "f0719d5edf4c32f5"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
+quad = "2dcfdbfa00ca4b08"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "369023c0f45e03f3"   # the whole state after each of 16000 steps at 8000 Hz, in order
+run  = "c9fa7ca3299a82b8"   # the whole state after each of 16000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.2 s" = "b0d2b43848e93387"
-"0.4 s" = "57e9ac2547973c8b"
-"0.6 s" = "a0a954c8d3f59a32"
-"0.8 s" = "27d72692fb1f00b1"
-"1 s" = "b37ed6cfb1772a9a"
-"1.2 s" = "90564048805bc09e"
-"1.4 s" = "af2e68ec2c59304b"
-"1.6 s" = "8fe8483e42d1da5e"
-"1.8 s" = "3b916a969cdd8644"
-"2 s" = "1118e099ffa04334"
+"0.2 s" = "f3f7135efe81fdba"
+"0.4 s" = "76bdc4a7fda075e0"
+"0.6 s" = "e5b2c55d1982fc2b"
+"0.8 s" = "3ff7344bd186df3c"
+"1 s" = "eeeb9b7fcfe4b300"
+"1.2 s" = "92a60bc9b5a85f8d"
+"1.4 s" = "861062c7f9da05a5"
+"1.6 s" = "ee2093ce11cdff47"
+"1.8 s" = "7602f356f6e2225d"
+"2 s" = "773b89662b66c428"

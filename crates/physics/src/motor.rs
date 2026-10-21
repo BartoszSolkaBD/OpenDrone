@@ -204,6 +204,39 @@ impl Model {
     }
 }
 
+/// The drive, from 0 to 1, that keeps a motor spinning the normal way on a
+/// recorded speed: at `speed` (rad/s) and gaining `speed_change` (rad/s²),
+/// from a battery steady at `volts`, in air of `air_density` (kg/m³).
+///
+/// It undoes the motor model's first lag and its steady speed: the lag
+/// moves towards a target speed at the spin-up time (the slow-down time
+/// when slowing), so a motor gaining `speed_change` now has the target
+/// `speed + time constant × speed_change`, and the drive is the voltage
+/// that holds that target steady, as a share of `volts`, never more than
+/// full drive. A Physics Scenario that plays back a log of motor speeds, not
+/// commands, has its motor commands made this way, before the Simulation
+/// runs (`cargo xtask download neurobem`).
+pub fn drive_holding(
+    motor: &MotorParameters,
+    prop: &PropParameters,
+    air_density: f64,
+    speed: f64,
+    speed_change: f64,
+    volts: f64,
+) -> f64 {
+    let model = Model::new(motor, prop, air_density);
+    let time_constant = if speed_change >= 0.0 {
+        model.spin_up
+    } else {
+        model.slow_down
+    };
+    let target = functions::max(speed + time_constant * speed_change, 0.0);
+    if volts <= 0.0 {
+        return 0.0;
+    }
+    functions::min(model.steady_voltage(target) / volts, 1.0)
+}
+
 /// One motor's state.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Motor {

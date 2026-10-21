@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use opendrone_scenario::agreement::{self, Computer};
-use opendrone_scenario::{Repo, Report, ResultsFile, ScenarioFile, run_one};
+use opendrone_scenario::{Repo, Report, ResultsFile, ScenarioFile, read_scenario, run_one};
 
 const USAGE: &str = "\
 Usage: cargo scenarios <command>
@@ -18,7 +18,12 @@ Commands:
       What CI runs: run every Scenario twice (the repeat check), check each
       Expectation, and check every Results file is up to date, changing
       nothing. With --fingerprints, write the fingerprint after every step of
-      every Scenario into <folder>, for the agreement check.
+      every Scenario into <folder>, for the agreement check. A Scenario whose
+      downloaded data is missing (`downloaded` in it) is skipped.
+  check --downloaded
+      The nightly job: check only the Scenarios that need downloaded data,
+      which may not be committed (docs/data-policy.md). Here a missing file
+      fails instead of being skipped: `cargo xtask download <data>` first.
   agree <folder> <folder> [<folder>...]
       The agreement check: compare the fingerprints that `check
       --fingerprints` wrote on several computers, and name the Scenario and
@@ -66,6 +71,11 @@ fn run(args: &[String]) -> Result<bool, String> {
 }
 
 fn check(args: &[String]) -> Result<bool, String> {
+    if let [flag] = args
+        && flag == "--downloaded"
+    {
+        return check_downloaded();
+    }
     let fingerprints = match args {
         [] => None,
         [flag, folder] if flag == "--fingerprints" => Some(PathBuf::from(folder)),
@@ -84,6 +94,31 @@ fn check(args: &[String]) -> Result<bool, String> {
     Ok(passed)
 }
 
+/// The nightly check of the Scenarios that need downloaded data: each must
+/// find its files, rather than be skipped, and pass.
+fn check_downloaded() -> Result<bool, String> {
+    let repo = repo()?;
+    let files: Vec<ScenarioFile> = all_scenarios(&repo)?
+        .into_iter()
+        .filter(|file| {
+            std::fs::read_to_string(&file.path)
+                .ok()
+                .and_then(|text| read_scenario(&file.label(), &text).ok())
+                .is_some_and(|scenario| scenario.downloaded.is_some())
+        })
+        .collect();
+    if files.is_empty() {
+        return Err("No Scenario in scenarios/ needs downloaded data.".to_string());
+    }
+    let (passed, skipped) = run_all_counting(&repo, &files, ResultsFile::Check, None)?;
+    if skipped > 0 {
+        println!(
+            "The downloaded data is missing for {skipped} of them: run `cargo xtask download <data>` first."
+        );
+    }
+    Ok(passed && skipped == 0)
+}
+
 fn all_scenarios(repo: &Repo) -> Result<Vec<ScenarioFile>, String> {
     let files = repo
         .scenario_files()
@@ -100,25 +135,45 @@ fn run_all(
     results: ResultsFile,
     fingerprints: Option<&Path>,
 ) -> Result<bool, String> {
+    run_all_counting(repo, files, results, fingerprints).map(|(passed, _)| passed)
+}
+
+/// Runs the Scenarios, and says whether all passed and how many were
+/// skipped.
+fn run_all_counting(
+    repo: &Repo,
+    files: &[ScenarioFile],
+    results: ResultsFile,
+    fingerprints: Option<&Path>,
+) -> Result<(bool, usize), String> {
     let packs = repo.packs().map_err(|problems| {
         format!("The Packs can't be read, so no Scenario can run:\n{problems}")
     })?;
     let mut failed = 0;
+    let mut skipped = 0;
     for file in files {
         let report = run_one(file, &packs, results, fingerprints);
         print_report(&report);
         if !report.passed() {
             failed += 1;
         }
+        if report.skipped {
+            skipped += 1;
+        }
     }
     let count = files.len();
     let scenarios = if count == 1 { "Scenario" } else { "Scenarios" };
+    let skips = match skipped {
+        0 => String::new(),
+        1 => " One was skipped: the downloaded data it needs isn't here.".to_string(),
+        n => format!(" {n} were skipped: the downloaded data they need isn't here."),
+    };
     if failed == 0 {
-        println!("All {count} {scenarios} passed.");
+        println!("All {count} {scenarios} passed.{skips}");
     } else {
-        println!("{failed} of {count} {scenarios} failed.");
+        println!("{failed} of {count} {scenarios} failed.{skips}");
     }
-    Ok(failed == 0)
+    Ok((failed == 0, skipped))
 }
 
 fn print_report(report: &Report) {

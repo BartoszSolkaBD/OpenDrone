@@ -26,7 +26,7 @@ measured = "0.476 s"
 what     = "tilt at 3.6 s"
 basis    = "Observed"
 expected = "0° ± 1°"
-measured = "0.000000162°"
+measured = "0.0000000541°"
 
 [[expect]]
 what     = "tilt at 5.9 s"
@@ -44,7 +44,7 @@ measured = "0.473 s"
 what     = "tilt at 8.5 s"
 basis    = "Observed"
 expected = "0° ± 1°"
-measured = "0.00000000267°"
+measured = "0.00000000589°"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -53,18 +53,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "0d3c101d670191df"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "08974a712157e762"   # the whole state after each of 72000 steps at 8000 Hz, in order
+run  = "0a71600938de95b4"   # the whole state after each of 72000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.9 s" = "9aaec65a5a81ea61"
 "1.8 s" = "e8119885e4257333"
-"2.7 s" = "cdddc342e7bf2bcc"
-"3.6 s" = "bd8a2a16fa2e0432"
+"2.7 s" = "81e26ea3992a17da"
+"3.6 s" = "287358d7755099f0"
 "4.5 s" = "2d55cda79284d998"
 "5.4 s" = "a00742be85af6ef3"
 "6.3 s" = "09ec0d6fbd16bdd0"
-"7.2 s" = "747cbdc21eaf0994"
-"8.1 s" = "928250dd57b4da56"
-"9 s" = "1542611a0865e8cc"
+"7.2 s" = "c0fddf6b58aabc89"
+"8.1 s" = "691de76134dc75d1"
+"9 s" = "936b612a3341ee5d"

@@ -16,9 +16,12 @@
 # wall.
 #
 # It starts as that Scenario does: 2 m up on test/wall (the wall's face 5 m
-# east, facing west), level and armed, its motors "settled", flying east at
-# 10 m/s with the sticks centred and the throttle at 30%. A mid-air start is
-# a fresh Flight Controller, as just after arming.
+# east, facing west), 0.21 m west of the Map's origin, level and armed, its
+# motors "settled", flying east at 10 m/s with the sticks centred and the
+# throttle at 30%. A mid-air start is a fresh Flight Controller, as just
+# after arming. (It starts 0.21 m further back since the Freestyle 5″'s rotor
+# drag was fitted to the TII logs, #47, from 0.4 to 0.26 s⁻¹: with less drag
+# it would reach the wall sooner, and this keeps the hit at about 0.555 s.)
 format = 2
 name   = "A Quad pinned against a wall right after arming disarms, as runaway takeoff prevention does"
 
@@ -26,7 +29,7 @@ name   = "A Quad pinned against a wall right after arming disarms, as runaway ta
 kind              = "flight"
 quad              = "opendrone/freestyle-5"
 map               = "test/wall"
-position          = "0 m east, 0 m north, 2 m up"
+position          = "-0.21 m east, 0 m north, 2 m up"
 attitude          = "level, heading 90°"
 speed             = "10 m/s east, 0 m/s north, 0 m/s up"
 rotation          = "0 °/s"

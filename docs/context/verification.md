@@ -43,6 +43,10 @@ _Avoid_: script
 A separate file of recorded inputs that a Scenario plays back, such as a flight saved in the sim or a Betaflight log.
 _Avoid_: recording, replay
 
+**Recorded flight**:
+A separate file of what a real Quad did, such as its accelerometer's readings in a flight log, that a Scenario's Expectations compare the run with: the "matches a recorded flight" Expectations, which measure the gap between the run and the recording over a stretch. A Physics Scenario plays the same log's motor commands from an Input Track.
+_Avoid_: ground truth, reference data
+
 **Save Flight**:
 A developer Action with no default key and no menu entry that writes the flight so far as a Flight Scenario, starting landed at the Launch Spot, plus an Input Track of every Flight Input, so that a flight the maintainer cares about becomes a test. Flown again by the headless runner, it gives the fingerprint it had in the game. Expectations are added afterwards.
 _Avoid_: recording, replay
@@ -89,4 +93,6 @@ _Avoid_: Changelog, tuning notes
 - Rust and maths-library updates count as behaviour changes, and each one gets its own PR.
 - To test one effect alone, a Scenario uses a Test Quad. The physics has no hidden switches that turn effects off.
 - A Test Quad is written as the Quad it's based on, plus only the numbers and Tune settings it changes, and why. A change to the real Quad carries into its Test Quads.
-- Every Estimate a Feel Test moves is logged beside its Quad: the date, the old and new value, and the reason. It stays inside its range.
+- Every Estimate a Feel Test moves is logged beside its Quad: the date, the old and new value, and the reason. It stays inside its range. An Estimate fitted to real flight logs instead, as the Freestyle 5″'s are to TII's (#10 §7), is logged the same way.
+- Only CC BY flight logs are committed, trimmed, with their credit beside them; a Scenario that plays data with no licence names it with `downloaded`, gets its files downloaded when needed, and skips without them, so it never blocks a merge. A nightly job runs it ([the data policy](../data-policy.md)).
+- A replay of a real flight log is open-loop: the logged commands answer the real quad's own motion, so a Scenario compares only short stretches, before the run drifts away from the flight.

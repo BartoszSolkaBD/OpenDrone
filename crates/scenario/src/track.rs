@@ -33,7 +33,7 @@
 //! reports, or another Flight Input comes.
 
 use opendrone_pack::{Problem, Problems};
-use opendrone_sim::{Channel, Channels, FlightInput, PhysicsRate, SimulationTime};
+use opendrone_sim::{Channel, Channels, FlightInput, MotorCommands, PhysicsRate, SimulationTime};
 
 /// The header every Input Track starts with, after its comments.
 pub const INPUT_TRACK_HEADER: &str = "time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (µs),crash flip (µs),other flight input";
@@ -281,8 +281,158 @@ fn read_row<'r>(
     })
 }
 
+/// The header of a motor Input Track, after its comments: the recorded motor
+/// commands a Physics or Thrust Stand Scenario plays back, such as a real
+/// flight log's.
+pub const MOTOR_TRACK_HEADER: &str = "time (s),motor 1 (%),motor 2 (%),motor 3 (%),motor 4 (%)";
+
+/// Reads a motor Input Track, naming it `file` in problems: every change of
+/// the four motor commands, at its step, in order. Every problem is listed at
+/// once.
+///
+/// ```text
+/// time (s),motor 1 (%),motor 2 (%),motor 3 (%),motor 4 (%)
+/// 0,23.04,25.12,24.9,22.71
+/// 0.002,23.1,,,
+/// ```
+///
+/// - **`time`** is Simulation Time from the Scenario's start, in seconds, a
+///   whole number of physics steps.
+/// - **The motor commands** are in Betaflight's motor order, each from 0% to
+///   100%: the ESC's drive, as in a Timeline's `motors`. A row gives only the
+///   commands that changed; an empty cell holds the last value. The first
+///   row, at 0 s, gives all four.
+pub(crate) fn read_motor_track(
+    file: &str,
+    text: &str,
+    rate: PhysicsRate,
+) -> Result<Vec<(SimulationTime, MotorCommands)>, Problems> {
+    let mut problems = Problems::new();
+    let mut rows = text
+        .lines()
+        .enumerate()
+        .map(|(n, line)| (n + 1, line.trim()))
+        .filter(|(_, line)| !line.is_empty() && !line.starts_with('#'));
+    match rows.next() {
+        Some((_, header)) if header == MOTOR_TRACK_HEADER => {}
+        Some((line, header)) => {
+            return Err(Problems(vec![Problem::of(
+                file,
+                line,
+                format!(
+                    "a motor Input Track's first line after its comments is its header, \"{MOTOR_TRACK_HEADER}\", not \"{header}\""
+                ),
+            )]));
+        }
+        None => {
+            return Err(Problems::of_file(
+                file,
+                format!(
+                    "a motor Input Track needs its header, \"{MOTOR_TRACK_HEADER}\", and a row at 0 s"
+                ),
+            ));
+        }
+    }
+    let hz = f64::from(rate.hz());
+    let mut timeline: Vec<(SimulationTime, MotorCommands)> = Vec::new();
+    let mut current: Option<[f64; 4]> = None;
+    let mut last_tick = 0;
+    for (line, row) in rows {
+        let mut problem = |sentence: String| problems.push(Problem::of(file, line, sentence));
+        let cells: Vec<&str> = row.split(',').map(str::trim).collect();
+        if cells.len() != 5 {
+            problem(format!(
+                "a row has 5 cells, as the header does (the time and four motor commands), not {}",
+                cells.len()
+            ));
+            continue;
+        }
+        let Some(tick) = moment(cells[0], hz) else {
+            problem(format!(
+                "\"{}\" isn't a time OpenDrone can use here: write seconds from the Scenario's start, such as 0.002, each a whole number of physics steps (at {} Hz one step is {} s)",
+                cells[0],
+                rate.hz(),
+                1.0 / hz
+            ));
+            continue;
+        };
+        let mut values: [Option<f64>; 4] = [None; 4];
+        let mut fine = true;
+        for (value, cell) in values.iter_mut().zip(&cells[1..]) {
+            if cell.is_empty() {
+                continue;
+            }
+            match percent(cell) {
+                Some(share) => *value = Some(share),
+                None => {
+                    problem(format!(
+                        "\"{cell}\" isn't a motor command OpenDrone can read: write a percent from 0 to 100, such as 23.04"
+                    ));
+                    fine = false;
+                }
+            }
+        }
+        if !fine {
+            continue;
+        }
+        let next = match current {
+            None => match (tick, values) {
+                (0, [Some(a), Some(b), Some(c), Some(d)]) => [a, b, c, d],
+                _ => {
+                    problem(
+                        "a motor Input Track's first row is at 0 s and gives all four motor commands"
+                            .to_string(),
+                    );
+                    return Err(problems);
+                }
+            },
+            Some(held) => {
+                let mut next = held;
+                for (n, value) in next.iter_mut().zip(values) {
+                    if let Some(value) = value {
+                        *n = value;
+                    }
+                }
+                next
+            }
+        };
+        if current.is_some() && tick <= last_tick {
+            problem(format!(
+                "rows go in time order, one row a moment, but {} s comes after {} s",
+                tick as f64 / hz,
+                last_tick as f64 / hz
+            ));
+            continue;
+        }
+        last_tick = tick;
+        current = Some(next);
+        let mut commands = MotorCommands::STOPPED;
+        for (command, share) in commands.0.iter_mut().zip(next) {
+            command.throttle = share;
+        }
+        timeline.push((SimulationTime::from_ticks(tick), commands));
+    }
+    if current.is_none() && problems.is_empty() {
+        problems.push(Problem::of(
+            file,
+            0,
+            "a motor Input Track needs a row at 0 s that gives all four motor commands",
+        ));
+    }
+    problems.or(timeline)
+}
+
+/// A motor command in percent, from 0 to 100, as a share from 0 to 1.
+fn percent(text: &str) -> Option<f64> {
+    if !text.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return None;
+    }
+    let value: f64 = text.parse().ok()?;
+    (0.0..=100.0).contains(&value).then_some(value / 100.0)
+}
+
 /// Seconds as a whole number of steps at `hz` steps a second.
-fn moment(text: &str, hz: f64) -> Option<u64> {
+pub(crate) fn moment(text: &str, hz: f64) -> Option<u64> {
     if text.is_empty() || !text.chars().all(|c| c.is_ascii_digit() || c == '.') {
         return None;
     }

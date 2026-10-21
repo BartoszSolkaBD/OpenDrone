@@ -1,0 +1,64 @@
+# Results of rolling-out-of-a-hover.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "NeuroBEM's quad rolls out of a hover as its measured inertia says"
+
+[[expect]]
+what     = "roll rate, root-mean-square gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 °/s ± 6 °/s"
+measured = "3.76 °/s"
+
+[[expect]]
+what     = "motor 1 speed, mean gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 RPM ± 150 RPM"
+measured = "-67.9 RPM"
+
+[[expect]]
+what     = "motor 2 speed, mean gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 RPM ± 150 RPM"
+measured = "-93.7 RPM"
+
+[[expect]]
+what     = "motor 3 speed, mean gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 RPM ± 150 RPM"
+measured = "-29.9 RPM"
+
+[[expect]]
+what     = "motor 4 speed, mean gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 RPM ± 150 RPM"
+measured = "80.7 RPM"
+
+[[expect]]
+what     = "felt acceleration up, mean gap from the recorded flight over 0.1 s to 0.5 s"
+basis    = "Source"
+expected = "0 m/s² ± 0.5 m/s²"
+measured = "0.125 m/s²"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "58eea8b4422fba9f"   # test/freestyle-5-neurobem-quad: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "f394b5d29965dbfc"   # the whole state after each of 4000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.05 s" = "2e4b51d4ebe50251"
+"0.1 s" = "081e3e608ab87cff"
+"0.15 s" = "939e1928c8eaf7f7"
+"0.2 s" = "cac9005d6c3fbbcb"
+"0.25 s" = "143d9ed129a82448"
+"0.3 s" = "fb3bb2ed670db8d7"
+"0.35 s" = "e79ec0de6ddb9120"
+"0.4 s" = "6e10c952add05c5a"
+"0.45 s" = "2c130310f3522c77"
+"0.5 s" = "329e62987b304a01"

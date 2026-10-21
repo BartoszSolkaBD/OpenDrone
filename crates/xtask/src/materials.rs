@@ -198,12 +198,12 @@ pub fn repo() -> Result<PathBuf, String> {
         })
 }
 
-/// `CREDITS.md`, generated from the manifest.
-pub fn credits(manifest: &Manifest) -> String {
+/// `CREDITS.md`, generated from the manifest and the list of datasets.
+pub fn credits(manifest: &Manifest, datasets: &[crate::datasets::Dataset]) -> String {
     let mut out = String::new();
     out.push_str(
         "# Credits\n\n\
-This file lists every outside asset and dataset in OpenDrone, each with its source, its licence and a checksum ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). **It is generated** from the texture manifest, [`assets-src/materials.toml`](assets-src/materials.toml), by `cargo xtask credits`; don't edit it by hand. CI checks it is up to date. Only CC0 assets and CC BY data enter the repo.\n\n\
+This file lists every outside asset and dataset in OpenDrone, each with its source, its licence and a checksum ([ADR-0014](docs/adr/0014-licences-for-libraries-and-assets.md)). **It is generated** from the texture manifest, [`assets-src/materials.toml`](assets-src/materials.toml), and the list of datasets, [`assets-src/datasets.toml`](assets-src/datasets.toml), by `cargo xtask credits`; don't edit it by hand. CI checks it is up to date. Only CC0 assets and CC BY data enter the repo.\n\n\
 ## Textures\n\n\
 Poly Haven and ambientCG pictures, all CC0 1.0: anyone may use them for any purpose, with no credit needed, and they are credited here all the same. They are not in the repo: `cargo xtask textures` downloads each into `assets-src/textures/`, and refuses a file whose SHA-256 differs from the one below. A Map's `.glb` carries only a material's name; the game swaps the pictures in by name.\n\n\
 | Texture | Source | By | Licence | File | SHA-256 |\n|---|---|---|---|---|---|\n",
@@ -231,11 +231,17 @@ Poly Haven and ambientCG pictures, all CC0 1.0: anyone may use them for any purp
             );
         }
     }
+    out.push_str(&crate::datasets::credits(datasets));
     out.push_str(
         "\n## Not yet\n\n\
 - Sound files: the CC0 hit and menu clips, and each Map's Background Sound, are listed here the same way once they are in the repo.\n\
-- Outside fonts (OFL-1.1), if any are used. The OSD fonts are OpenDrone's own, under CC0.\n\
-- Reference datasets under CC BY.\n\n\
+- Outside fonts (OFL-1.1), if any are used. The OSD fonts are OpenDrone's own, under CC0.\n",
+    );
+    if datasets.is_empty() {
+        out.push_str("- Reference datasets under CC BY.\n");
+    }
+    out.push_str(
+        "\n\
 Nothing else from outside is in the repo.\n\n\
 The Rust libraries OpenDrone uses aren't listed here: their licences are checked by cargo-deny against [`deny.toml`](deny.toml).\n",
     );

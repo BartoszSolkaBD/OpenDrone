@@ -14,7 +14,8 @@ use crate::format::{SCENARIO_FORMAT, SCENARIO_STEPS};
 use crate::measure::Measure;
 use crate::osd::{self, OsdExpectation, OsdExpected, OsdSection, OsdWhen};
 use crate::rates::{self, Rates};
-use crate::track::{TrackRules, read_input_track};
+use crate::recorded::{RecordedFlight, read_recorded_flight};
+use crate::track::{TrackRules, read_input_track, read_motor_track};
 use opendrone_flight_controller::osd::{OsdLayout, OsdReading};
 
 /// A Scenario, read and checked.
@@ -40,6 +41,14 @@ pub struct Scenario {
     pub other_runs: Vec<OtherRun>,
     /// Its `[osd]` section, if it expects OSD text (ADR-0022).
     pub osd: Option<OsdSection>,
+    /// The recorded flight its "matches a recorded flight" Expectations
+    /// compare with, if it has one: a CSV file beside it.
+    pub recorded_flight: Option<RecordedFlight>,
+    /// The outside data set its Input Track and recorded flight come from,
+    /// when they may not be committed, so they are downloaded when needed
+    /// (`docs/data-policy.md`): `downloaded = "NeuroBEM"`. The runner skips
+    /// it when they are missing.
+    pub downloaded: Option<String>,
 }
 
 impl Scenario {
@@ -48,14 +57,105 @@ impl Scenario {
     pub fn input_track(&self) -> Option<&str> {
         match &self.inputs {
             Inputs::Track(track) => Some(&track.file),
+            Inputs::MotorTrack(track) => Some(&track.file),
             Inputs::Motors(_) | Inputs::Pilot(_) => None,
         }
+    }
+
+    /// The recorded flight file its Expectations compare with, as it names
+    /// it: a CSV file beside it.
+    pub fn recorded_flight_file(&self) -> Option<&str> {
+        self.recorded_flight.as_ref().map(|r| r.file.as_str())
+    }
+
+    /// Reads the recorded flight its Expectations compare with from its
+    /// file's text, naming the file `file` in problems. Every Expectation
+    /// that compares with it must find its column there.
+    pub fn read_recorded_flight(&mut self, file: &str, text: &str) -> Result<(), Problems> {
+        let Some(recorded) = &mut self.recorded_flight else {
+            return Ok(());
+        };
+        let kind = self.start.kind;
+        let measurable = |measure: Measure| {
+            let scripted = matches!(self.inputs, Inputs::Motors(_) | Inputs::MotorTrack(_));
+            (scripted && (measure.of_the_flight_controller() || measure.of_the_radio_link()))
+                .then(|| {
+                    format!(
+                        "{} is our Flight Controller's or its Radio Link's, but this Scenario's motors are scripted",
+                        measure.name()
+                    )
+                })
+                .or_else(|| {
+                    (kind == Kind::FlightController
+                        && !measure.of_the_flight_controller()
+                        && !measure.of_the_radio_link())
+                    .then(|| {
+                        format!(
+                            "a Flight Controller Scenario runs the Flight Controller alone, so it can't measure {}",
+                            measure.name()
+                        )
+                    })
+                })
+        };
+        let columns = read_recorded_flight(file, text, self.start.physics_rate, &measurable)?;
+        let mut problems = Problems::new();
+        for e in &self.expectations {
+            if let When::Over {
+                statistic: Statistic::MeanGap | Statistic::RmsGap,
+                from,
+                to,
+            } = e.when
+            {
+                match columns.iter().find(|c| c.measure == e.measure) {
+                    None => problems.push(Problem::of(
+                        self.file.clone(),
+                        e.line,
+                        format!(
+                            "{} has no column in the recorded flight {}, so this run can't be compared with it",
+                            e.measure.name(),
+                            recorded.file
+                        ),
+                    )),
+                    Some(column)
+                        if !column
+                            .values
+                            .iter()
+                            .any(|(tick, _)| from < *tick && *tick <= to) =>
+                    {
+                        problems.push(Problem::of(
+                            self.file.clone(),
+                            e.line,
+                            format!(
+                                "the recorded flight {} has no {} in this stretch, so there's nothing to compare with",
+                                recorded.file,
+                                e.measure.name()
+                            ),
+                        ));
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+        if !problems.is_empty() {
+            return Err(problems);
+        }
+        recorded.columns = columns;
+        recorded.read = true;
+        Ok(())
     }
 
     /// Reads the Input Track it plays back from its file's text, naming the
     /// file `file` in problems. The run then lasts at least to its last row.
     /// A Scenario with a Timeline is left as it is.
     pub fn read_input_track(&mut self, file: &str, text: &str) -> Result<(), Problems> {
+        if let Inputs::MotorTrack(_) = &self.inputs {
+            let timeline = read_motor_track(file, text, self.start.physics_rate)?;
+            if let Some((last, _)) = timeline.last() {
+                self.length = self.length.max(*last);
+            }
+            self.inputs = Inputs::Motors(timeline);
+            return Ok(());
+        }
         let Inputs::Track(track) = &mut self.inputs else {
             return Ok(());
         };
@@ -84,6 +184,20 @@ pub enum Inputs {
     Pilot(Vec<PilotEntry>),
     /// A Flight or Flight Controller Scenario's recorded Input Track.
     Track(InputTrack),
+    /// A Physics or Thrust Stand Scenario's motor Input Track, not read yet:
+    /// [`Scenario::read_input_track`] reads it into [`Inputs::Motors`].
+    MotorTrack(MotorTrack),
+}
+
+/// A motor Input Track a Physics or Thrust Stand Scenario plays back: the
+/// recorded motor commands, from a CSV file beside the Scenario. The format
+/// is in `track.rs` and in `docs/verification/reading-a-scenario.md`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MotorTrack {
+    /// The file, as the Scenario names it.
+    pub file: String,
+    /// The Scenario's line that names it.
+    pub line: usize,
 }
 
 /// A recorded Input Track a Scenario plays back (#11 §2): the Flight Inputs
@@ -351,16 +465,30 @@ pub enum Statistic {
     /// For something that happens: how long after the stretch's start it
     /// first does.
     First,
+    /// Matching a recorded flight: this run less the recording, averaged
+    /// over the recorded moments in the stretch.
+    MeanGap,
+    /// Matching a recorded flight: the root mean square of this run less the
+    /// recording over the recorded moments in the stretch, so a few big
+    /// misses count more than many small ones.
+    RmsGap,
 }
 
 impl Statistic {
-    const ALL: [(&'static str, Statistic); 5] = [
+    const ALL: [(&'static str, Statistic); 7] = [
         ("mean", Statistic::Mean),
         ("lowest", Statistic::Lowest),
         ("highest", Statistic::Highest),
         ("final", Statistic::Final),
         ("first", Statistic::First),
+        ("mean_gap", Statistic::MeanGap),
+        ("rms_gap", Statistic::RmsGap),
     ];
+
+    /// True for the two that compare the run with a recorded flight.
+    pub fn is_a_gap(self) -> bool {
+        matches!(self, Statistic::MeanGap | Statistic::RmsGap)
+    }
 
     pub fn word(self) -> &'static str {
         Statistic::ALL
@@ -398,7 +526,17 @@ impl BasisKind {
     }
 }
 
-const TOP: &[&str] = &["format", "name", "start", "inputs", "expect", "case", "osd"];
+const TOP: &[&str] = &[
+    "format",
+    "name",
+    "downloaded",
+    "recorded_flight",
+    "start",
+    "inputs",
+    "expect",
+    "case",
+    "osd",
+];
 const START: &[&str] = &[
     "kind",
     "quad",
@@ -436,6 +574,36 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
     let root = doc.root();
     root.refuse_unknown(TOP, &mut problems);
     let name = root.text("name", &mut problems).map(|(n, _)| n.to_string());
+    let recorded_flight = root.get("recorded_flight").and_then(|item| {
+        let name = item.text(&mut problems)?;
+        if !plain_csv_name(name) {
+            problems.push(item.problem(format!(
+                "`recorded_flight` names a CSV file beside the Scenario, such as \"tii-flight-01a-hover-recorded.csv\", not \"{name}\""
+            )));
+            return None;
+        }
+        Some(RecordedFlight {
+            file: name.to_string(),
+            line: item.line(),
+            columns: Vec::new(),
+            read: false,
+        })
+    });
+    let downloaded = root.get("downloaded").and_then(|item| {
+        let name = item.text(&mut problems)?;
+        if !DOWNLOADED_DATA.contains(&name) {
+            problems.push(item.problem(format!(
+                "`downloaded` names the outside data set a Scenario's files are downloaded from, because they may not be committed (docs/data-policy.md): {}, not \"{name}\"",
+                DOWNLOADED_DATA
+                    .iter()
+                    .map(|d| format!("\"{d}\""))
+                    .collect::<Vec<_>>()
+                    .join(" or ")
+            )));
+            return None;
+        }
+        Some(name.to_string())
+    });
     let start_table = root.table("start", &mut problems);
     let start = start_table
         .as_ref()
@@ -466,6 +634,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         other_runs: Vec::new(),
         track: false,
         scripted: kind.scripts_motors(),
+        recorded: recorded_flight.is_some(),
     };
     let has_cases = root.get("case").is_some();
     let inputs = if kind == Kind::FlightController && has_cases {
@@ -506,7 +675,7 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         Inputs::Motors(timeline) => timeline.iter().map(|(time, _)| time.ticks()).max(),
         Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
         // Read with the file, beside the Scenario.
-        Inputs::Track(_) => None,
+        Inputs::Track(_) | Inputs::MotorTrack(_) => None,
     };
     let length = last_input
         .into_iter()
@@ -536,7 +705,21 @@ pub fn read_scenario(file: &str, text: &str) -> Result<Scenario, Problems> {
         length: SimulationTime::from_ticks(length),
         other_runs,
         osd,
+        recorded_flight,
+        downloaded,
     })
+}
+
+/// The outside data sets whose files may not be committed, so a Scenario
+/// that uses one has them downloaded when needed (`docs/data-policy.md`).
+pub const DOWNLOADED_DATA: &[&str] = &["NeuroBEM"];
+
+/// A CSV file's name, beside the Scenario: no folders, not hidden.
+fn plain_csv_name(name: &str) -> bool {
+    name.len() > 4
+        && name.ends_with(".csv")
+        && !name.starts_with('.')
+        && !name.contains(['/', '\\'])
 }
 
 fn kind(start: &Table<'_, '_>, problems: &mut Problems) -> Option<Kind> {
@@ -1039,6 +1222,8 @@ struct Reader<'p> {
     /// Scenario, and in a Thrust Stand Scenario whose Timeline gives
     /// `motors` rather than a pilot's sticks and switches.
     scripted: bool,
+    /// True when the Scenario names a recorded flight to compare with.
+    recorded: bool,
 }
 
 impl Reader<'_> {
@@ -1089,7 +1274,7 @@ impl Reader<'_> {
             }
             return self
                 .input_track(&inputs, &track)
-                .map_or(Inputs::Motors(Vec::new()), Inputs::Track);
+                .unwrap_or(Inputs::Motors(Vec::new()));
         }
         if let Some(device) = inputs.get("input_device") {
             self.problems.push(device.problem(
@@ -1223,20 +1408,11 @@ impl Reader<'_> {
     /// `input_track`, a CSV file beside the Scenario, and `input_device`, the
     /// facts of the Input Device it was recorded from: its Report Rate (or
     /// "unknown") and whether it reports at rest.
-    fn input_track(&mut self, inputs: &Table<'_, '_>, track: &Item<'_, '_>) -> Option<InputTrack> {
-        if self.kind.scripts_motors() {
-            self.problems.push(track.problem(
-                "an Input Track holds a pilot's Flight Inputs, so it feeds a Flight or Flight Controller Scenario; a Physics or Thrust Stand Scenario scripts its motors in a Timeline",
-            ));
-            return None;
-        }
+    fn input_track(&mut self, inputs: &Table<'_, '_>, track: &Item<'_, '_>) -> Option<Inputs> {
         self.track = true;
         let name = track.text(self.problems);
         let named = name.filter(|name| {
-            let plain = name.len() > 4
-                && name.ends_with(".csv")
-                && !name.starts_with('.')
-                && !name.contains(['/', '\\']);
+            let plain = plain_csv_name(name);
             if !plain {
                 self.problems.push(track.problem(format!(
                     "`input_track` names a CSV file beside the Scenario, such as \"dualsense-at-rest.csv\", not \"{name}\""
@@ -1244,6 +1420,19 @@ impl Reader<'_> {
             }
             plain
         });
+        // A Physics or Thrust Stand Scenario plays recorded motor commands,
+        // from no Input Device.
+        if self.kind.scripts_motors() {
+            if let Some(device) = inputs.get("input_device") {
+                self.problems.push(device.problem(
+                    "a Physics or Thrust Stand Scenario's Input Track holds recorded motor commands, which no Input Device sent, so it has no `input_device`",
+                ));
+            }
+            return Some(Inputs::MotorTrack(MotorTrack {
+                file: named?.to_string(),
+                line: track.line(),
+            }));
+        }
         let device = inputs
             .table("input_device", self.problems)
             .and_then(|device| {
@@ -1285,13 +1474,13 @@ impl Reader<'_> {
                     reports_at_rest: at_rest?,
                 })
             });
-        Some(InputTrack {
+        Some(Inputs::Track(InputTrack {
             file: named?.to_string(),
             line: track.line(),
             device: device?,
             inputs: Vec::new(),
             read: false,
-        })
+        }))
     }
 
     /// A pilot's Timeline must set every stick and both switches at 0 s, so
@@ -1870,7 +2059,7 @@ impl Reader<'_> {
         table.refuse_unknown(
             &[
                 "what", "at", "value", "over", "mean", "lowest", "highest", "final", "first",
-                "against", "compare", "basis",
+                "mean_gap", "rms_gap", "against", "compare", "basis",
             ],
             self.problems,
         );
@@ -1887,7 +2076,7 @@ impl Reader<'_> {
         ) {
             (Some(_), Some(_)) | (None, None) => {
                 self.problems.push(table.problem(
-                        "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens)",
+                        "an Expectation says either `at` a moment, with `value`, or `over` a stretch, with one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens, or `mean_gap` or `rms_gap`, to compare with a recorded flight)",
                     ));
                 return None;
             }
@@ -1918,12 +2107,25 @@ impl Reader<'_> {
                     .collect();
                 let [(statistic, word, item)] = statistics.as_slice() else {
                     self.problems.push(table.problem(
-                            "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens)",
+                            "an Expectation over a stretch gives exactly one of `mean`, `lowest`, `highest` or `final` (or `first`, for something that happens, or `mean_gap` or `rms_gap`, to compare with a recorded flight)",
                         ));
                     return None;
                 };
                 let text = item.text(self.problems)?;
                 let ((from, to), (from_time, to_time)) = stretch?;
+                if statistic.is_a_gap() && !self.recorded {
+                    self.problems.push(item.problem(format!(
+                        "`{word}` compares this run with a recorded flight, so the Scenario names one: `recorded_flight = \"<file>.csv\"`, a CSV file beside it"
+                    )));
+                    return None;
+                }
+                let words = match statistic {
+                    Statistic::MeanGap => "mean gap from the recorded flight".to_string(),
+                    Statistic::RmsGap => {
+                        "root-mean-square gap from the recorded flight".to_string()
+                    }
+                    _ => word.to_string(),
+                };
                 (
                     When::Over {
                         from,
@@ -1932,7 +2134,7 @@ impl Reader<'_> {
                     },
                     (from_time.value, Some(to_time.value), over.line()),
                     (text, item.clone()),
-                    format!("{word} over {} to {}", from_time.text(), to_time.text()),
+                    format!("{words} over {} to {}", from_time.text(), to_time.text()),
                 )
             }
         };
@@ -2019,6 +2221,23 @@ impl Reader<'_> {
                 _ => format!("{} is {}", measure.name(), measure.dimension().described()),
             }));
             return None;
+        }
+        if let When::Over { statistic, .. } = when
+            && statistic.is_a_gap()
+        {
+            if compared.is_some() {
+                self.problems.push(table.problem(
+                    "an Expectation compares this run with a recorded flight or with another run, not both",
+                ));
+                return None;
+            }
+            if measure.is_an_angle() {
+                self.problems.push(table.problem(format!(
+                    "{} is an angle, which wraps round, so it can't be compared with a recorded flight yet; compare its rate instead",
+                    measure.name()
+                )));
+                return None;
+            }
         }
         if compared.is_some() && measure.is_an_angle() {
             self.problems.push(table.problem(format!(
@@ -2269,7 +2488,7 @@ impl Reader<'_> {
         let length = match &inputs {
             Inputs::Motors(timeline) => timeline.iter().map(|(t, _)| t.ticks()).max(),
             Inputs::Pilot(entries) => entries.iter().map(|e| e.at.ticks()).max(),
-            Inputs::Track(_) => None,
+            Inputs::Track(_) | Inputs::MotorTrack(_) => None,
         }
         .unwrap_or(0);
         self.other_runs.push(OtherRun {

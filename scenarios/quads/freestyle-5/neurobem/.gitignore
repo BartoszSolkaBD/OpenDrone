@@ -1,0 +1,4 @@
+# NeuroBEM states no licence, so its data is never committed
+# (docs/data-policy.md): `cargo xtask download neurobem` writes these files
+# beside the Scenarios that play them, and the Scenarios skip without them.
+*.csv
