@@ -55,7 +55,7 @@ In the pull request that brings the item:
 3. **Run it:** `cargo xtask migrate add-auto-arm`. It lists every file it rewrote.
 4. **Check nothing moved:** `cargo scenarios check` must find every Results file up to date, and after a Pack step `cargo xtask packs` must pass. Then run the rest of the checks in [Setup and CI](book/contributing.md).
 5. **Update the docs that show the format,** such as the starting-state table in [Reading a Scenario](verification/reading-a-scenario.md) or a section in [Checking a Pack](verification/checking-a-pack.md).
-6. **Say so in the pull request:** the step's name, and that no Result moved.
+6. **Say so in the pull request:** the step's name, and that no Result moved. CI's Review Report doesn't know the step until it is on main, so it lists each new input the step wrote into Flight Controller Scenarios' cases for the Reviewer, rather than flagging every Expectation in those cases ([Format steps](review-report.md#format-steps)).
 
 ## What the tool does
 
@@ -68,7 +68,7 @@ In the pull request that brings the item:
 ## Older files
 
 - **A pilot's older Pack** is upgraded in memory every time it's read, one format at a time, by the very same steps: every Pack reader does this, for manifests, Quad definitions, Test Quads, Maps (the built-in Test Maps too) and Input Device profiles. The pilot's files on disk aren't changed. A Pack in a newer format than the game knows is refused: it "needs a newer OpenDrone" ([Checking a Pack](verification/checking-a-pack.md#file-formats)).
-- **An older Scenario** is refused, naming the step that brings it up to date, for example on a branch started before the step arrived. Scenarios are never upgraded in memory, because a Scenario's file must show everything it depends on.
+- **An older Scenario** is refused, naming the step that brings it up to date, for example on a branch started before the step arrived. Scenarios are never upgraded in memory, because a Scenario's file must show everything it depends on. The Review Report is the one exception: to compare a PR's Scenarios with main's, it reads both sides upgraded in memory by the same steps, and changes no file ([Format steps](review-report.md#format-steps)).
 - **The Feel Test log rules** read the version before a change through the same upgrade, so a Pack step's new item doesn't count as a moved number.
 
 ## How it's proved
