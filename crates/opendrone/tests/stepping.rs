@@ -128,3 +128,101 @@ fn a_flight_input_stamped_with_a_moment_already_stepped_still_reaches_the_flight
         Some(sticks)
     );
 }
+
+/// A flight on the Whoop 65 with Auto-arm on, climbing and rolling for 4 s
+/// (4,000 ticks), so the Quad is well away from its Launch Spot.
+fn flight_away_from_the_launch_spot() -> (opendrone::set_up::FlightPlan, Flight) {
+    let mut settings = opendrone::settings::Settings::tracer("whoop-65");
+    settings.auto_arm = true;
+    let plan = opendrone::set_up::FlightPlan::from_packs(&common::packs(), settings).unwrap();
+    let device = opendrone_sim::InputDeviceFacts {
+        report_rate: None,
+        reports_at_rest: false,
+    };
+    let mut flight = Flight::new(plan.simulation(Some(device)).unwrap()).unwrap();
+    let mut sticks = Channels::RESTING;
+    flight.input(SimulationTime::START, FlightInput::Channels(sticks));
+    for tick in 1..=4000_u64 {
+        if tick == 2200 {
+            // The first raise after the ESCs' ready beep, which Auto-arm arms on.
+            sticks.throttle = Channel::from_micros(1500.0);
+            flight.input(
+                SimulationTime::from_ticks(tick * 8),
+                FlightInput::Channels(sticks),
+            );
+        }
+        if tick == 3000 {
+            sticks.roll = Channel::from_micros(1731.4);
+            flight.input(
+                SimulationTime::from_ticks(tick * 8),
+                FlightInput::Channels(sticks),
+            );
+        }
+        flight.tick();
+    }
+    let away = flight.simulation().quad_state(0).position - plan.launch_spot().position;
+    assert!(
+        away.length() > 0.05,
+        "the Quad is {} m from the spot",
+        away.length()
+    );
+    (plan, flight)
+}
+
+/// Runs `ticks` ticks, and says how far the picture moves the Quad across
+/// each tick, in metres, the most of them.
+fn the_most_the_picture_moves_the_quad_in_a_tick(flight: &mut Flight, ticks: u32) -> f64 {
+    let mut most: f64 = 0.0;
+    for _ in 0..ticks {
+        flight.tick();
+        let (before, after) = flight.drawn_between();
+        most = most.max((after.position - before.position).length());
+    }
+    most
+}
+
+#[test]
+fn the_first_picture_after_a_reset_shows_the_quad_on_the_launch_spot_with_no_streak_from_the_old_place()
+ {
+    // Basis: Rule (#184: after a Reset the picture shows the Quad at the
+    // Launch Spot with no streak between frames). The Reset reaches the
+    // Simulation in the next tick.
+    let (plan, mut flight) = flight_away_from_the_launch_spot();
+    let now = flight.simulation().time();
+    flight.input(now, FlightInput::Reset);
+    flight.tick();
+    assert!(flight.jumped_in_last_tick());
+    let (before, after) = flight.drawn_between();
+    assert_eq!(before.position, after.position);
+    assert_eq!(before.attitude, after.attitude);
+    let off = after.position - plan.launch_spot().position;
+    assert!(
+        off.length() < 0.01,
+        "{} m (a 0.01 m bound) off the spot",
+        off.length()
+    );
+}
+
+#[test]
+fn a_reset_stamped_ahead_of_the_simulation_is_drawn_with_no_streak_when_it_arrives() {
+    // Basis: Rule (#184). The input thread stamps a key press with the
+    // computer's clock, which can be a frame (about 16 ms) ahead of the
+    // Simulation; the Reset then arrives in a later tick, and that tick is
+    // the one the picture must not draw motion across. The Quad moves less
+    // than 0.1 m (a bound: 1 ms at under 100 m/s) across any tick of its
+    // own.
+    let (plan, mut flight) = flight_away_from_the_launch_spot();
+    let ahead = SimulationTime::from_ticks(flight.simulation().time().ticks() + 16 * 8);
+    flight.input(ahead, FlightInput::Reset);
+    let most = the_most_the_picture_moves_the_quad_in_a_tick(&mut flight, 40);
+    assert!(
+        most < 0.1,
+        "the picture moved the Quad {most} m across one tick"
+    );
+    let off = flight.simulation().quad_state(0).position - plan.launch_spot().position;
+    assert!(
+        off.length() < 0.01,
+        "the Reset did happen: {} m off the spot",
+        off.length()
+    );
+}
