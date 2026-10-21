@@ -57,15 +57,17 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
-      - name: Install the Linux packages SDL's source build and Bevy's window need
+      - name: Install the Linux packages SDL's source build, Bevy's window and the sound need
         # opendrone-input builds SDL 3.4 from source with CMake (preinstalled
         # on every runner) as a no-window console build, so no X11 or Wayland
         # headers (ADR-0018). libudev's headers let SDL notice Input Devices
         # being plugged in and out through udev. The game's window (Bevy's
         # winit, #62) links Wayland's client library, so it needs its
-        # headers; X11 it loads while running, with no headers.
+        # headers; X11 it loads while running, with no headers. The sound
+        # (Firewheel through cpal, ADR-0023) links the system's alsa-lib,
+        # which deny.toml names, so it needs libasound2-dev.
         if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev libasound2-dev pkg-config
 
       - name: Reuse the build cache
         if: steps.changes.outputs.rust == 'true'
@@ -143,8 +145,9 @@ jobs:
 
       - name: The game starts and steps headless, with no sound device
         # GitHub's machines have no screen and no sound device. The game runs
-        # with no window for 3 s, with its input thread, and fails if the
-        # Simulation didn't step (ADR-0003, "Checks in CI").
+        # with no window for 3 s, with its input thread and its sound's
+        # thread, which finds no device and runs silent, and fails if the
+        # Simulation didn't step (ADR-0003, "Checks in CI"; ADR-0023).
         if: steps.changes.outputs.rust == 'true'
         run: cargo run --locked --quiet --package opendrone -- --headless --seconds 3
 
@@ -401,11 +404,12 @@ jobs:
         shell: bash
         run: rustup toolchain install
 
-      - name: Install the Linux packages SDL's source build and Bevy's window need
+      - name: Install the Linux packages SDL's source build, Bevy's window and the sound need
         # rustdoc builds opendrone-input, which builds SDL 3.4 from source
-        # (ADR-0018), and the game, whose window links Wayland's client
-        # library (#62), as the Rust job does.
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev pkg-config
+        # (ADR-0018), the game, whose window links Wayland's client library
+        # (#62), and opendrone-sound, which links alsa-lib (ADR-0023), as the
+        # Rust job does.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev libasound2-dev pkg-config
 
       - name: Reuse the build cache
         uses: Swatinem/rust-cache@v2
