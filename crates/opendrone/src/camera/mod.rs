@@ -56,9 +56,15 @@ use self::params::FrameInputs;
 use self::pose::{Pose, PoseHistory};
 use self::render::{FpvDisplay, FpvFrame, FpvRenderPlugin, SOURCE_VIEW, SourceTexture};
 
-/// The nearest distance the flat render draws, in metres: the Whoop 65's
-/// camera sits 15 mm from its front.
-const NEAR: f32 = 0.001;
+/// The nearest distance the flat render draws, in metres, measured along the
+/// camera's axis. Its near plane is a flat rectangle, as wide and tall as the
+/// flat render reaches, so at the picture's corners it reaches nearer a wall
+/// than straight ahead does, by 2.6 mm at the Whoop 65's default Camera Tilt
+/// and FOV. A wall the Quad is pressed against has to stay beyond all of it,
+/// or the picture shows through the wall: the Whoop 65's camera sits behind
+/// its front duct rings, which touch the wall first, and the check in
+/// `tests/camera.rs` takes the near plane's four corners.
+pub const NEAR: f32 = 0.001;
 
 /// How far the flat render draws, in metres.
 const FAR: f32 = 3000.0;
