@@ -43,8 +43,9 @@ use bevy::render::texture::ManualTextureViews;
 use bevy::render::view::Tonemapping;
 use bevy::window::PrimaryWindow;
 
-use crate::drawing::{View, point, turn};
+use crate::drawing::{View, WorldDrawing, point, turn};
 use crate::pilot::Pilot;
+use crate::screens::model::InputMode;
 use crate::set_up::FlightPlan;
 use crate::stepping::{Flight, TICK_HZ, step_the_flight};
 
@@ -170,6 +171,8 @@ fn spawn_the_display_camera(mut commands: Commands, view: Res<View>) {
     commands.spawn((
         FpvDisplay,
         Camera2d,
+        // The screens draw on it too, whatever it draws into.
+        bevy::ui::IsDefaultUiCamera,
         Camera {
             order: 1,
             clear_color: ClearColorConfig::Custom(Color::BLACK),
@@ -224,6 +227,10 @@ fn read_the_camera_keys(
     mut settings: ResMut<CameraSettings>,
     mut readout: ResMut<CameraReadout>,
 ) {
+    // In a menu the arrows move the cursor, so the camera keeps still.
+    if pilot.input_mode() != InputMode::Flight {
+        return;
+    }
     let mut held = pilot.actions_held();
     let (keys_held, tapped) = camera_keys(&keys);
     for action in keys_held {
@@ -286,6 +293,7 @@ struct ExposureAssets {
 fn set_up_the_camera(
     plan: Res<FlightPlan>,
     settings: Res<CameraSettings>,
+    world: Res<WorldDrawing>,
     output: Res<Output>,
     real: Res<Time<Real>>,
     device: Option<Res<RenderDevice>>,
@@ -300,6 +308,11 @@ fn set_up_the_camera(
     mut commands: Commands,
 ) {
     if output.size.x == 0 || output.size.y == 0 {
+        return;
+    }
+    // With no world drawn (a menu on the Hub), there is no picture to show.
+    if !world.is_drawn() {
+        frame.source = None;
         return;
     }
     let Some(device) = device else { return };

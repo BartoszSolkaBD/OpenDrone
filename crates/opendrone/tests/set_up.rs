@@ -47,7 +47,7 @@ fn on_the_skate_park_the_quad_starts_landed_on_its_launch_spot_facing_its_headin
     for quad in ["whoop-65", "freestyle-5"] {
         let plan = FlightPlan::from_packs(
             &common::packs(),
-            Settings::tracer(quad).on_map("opendrone/skate-park"),
+            Settings::defaults(quad).on_map("opendrone/skate-park"),
         )
         .expect("the Skate Park is in the built-in Pack");
         let spot = plan
@@ -74,7 +74,7 @@ fn a_quad_set_up_on_the_skate_park_stays_landed_on_the_launch_spot() {
     // landed-*-stays-still-on-the-skate-parks-launch-spot.toml prove headless).
     let plan = FlightPlan::from_packs(
         &common::packs(),
-        Settings::tracer("whoop-65").on_map("opendrone/skate-park"),
+        Settings::defaults("whoop-65").on_map("opendrone/skate-park"),
     )
     .unwrap();
     let mut flight = Flight::new(plan.simulation(None).unwrap()).unwrap();

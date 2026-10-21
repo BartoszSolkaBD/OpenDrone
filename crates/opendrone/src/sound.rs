@@ -34,9 +34,34 @@ pub struct QuadSoundPlaying {
     /// Whether the game has said where the sound plays, or that there's no
     /// sound device: it says so once.
     said: bool,
+    /// The Quad whose sound it is.
+    quad: String,
 }
 
 impl QuadSoundPlaying {
+    /// Starts the sound of the plan's Quad on its own thread. `None` when
+    /// the Quad definition's sound can't be made, so the game runs silent.
+    /// Starting another drops the old one, which lets go of the device: a
+    /// swap to another Quad does that (#68).
+    pub fn start(plan: &FlightPlan) -> Option<QuadSoundPlaying> {
+        match quad_sound(&plan.quad, plan.map.world.air_density) {
+            Ok(quad) => Some(QuadSoundPlaying {
+                sound: Sound::start(quad),
+                said: false,
+                quad: plan.quad.id.clone(),
+            }),
+            Err(problem) => {
+                warn!("the Quad's sound can't play, so the game runs silent: {problem}");
+                None
+            }
+        }
+    }
+
+    /// The id of the Quad whose sound plays.
+    pub fn quad(&self) -> &str {
+        &self.quad
+    }
+
     /// Where the sound plays, or why it's silent.
     pub fn device(&self) -> Device {
         self.sound.device()
@@ -44,12 +69,8 @@ impl QuadSoundPlaying {
 }
 
 fn start_the_sound(plan: Res<FlightPlan>, mut commands: Commands) {
-    match quad_sound(&plan.quad, plan.map.world.air_density) {
-        Ok(quad) => commands.insert_resource(QuadSoundPlaying {
-            sound: Sound::start(quad),
-            said: false,
-        }),
-        Err(problem) => warn!("the Quad's sound can't play, so the game runs silent: {problem}"),
+    if let Some(playing) = QuadSoundPlaying::start(&plan) {
+        commands.insert_resource(playing);
     }
 }
 

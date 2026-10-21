@@ -9,25 +9,55 @@ use opendrone::camera::lens::Aspect;
 use opendrone::camera::look::VideoLook;
 use opendrone::drawing::View;
 use opendrone::pilot::Pilot;
+use opendrone::screens::{Screen, Screens};
 use opendrone::set_up::{FlightPlan, open_packs, repo_folder};
-use opendrone::settings::{MAPS, QUADS, Settings};
+use opendrone::settings::Settings;
+use opendrone::settings_file::{Loaded, PilotSettings, SettingsFile};
 use opendrone::watch::open_scenario;
-use opendrone::{game, headless, measure_camera_cost, reference, screenshot_after, watching_game};
+use opendrone::{
+    game, headless, measure_camera_cost, reference, screens_game, screenshot_after, watching_game,
+};
+
+/// The Quads `--quad` takes, by the id after `opendrone/`.
+const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
+
+/// The Maps `--map` takes, with the id each means. The Test Map `flat-floor`
+/// is a developer's: it flies at once, with no screens and nothing saved.
+const MAPS: [(&str, &str); 2] = [
+    ("skate-park", "opendrone/skate-park"),
+    ("flat-floor", "test/flat-floor"),
+];
+
+/// The screens `--screen` can open on, for a developer to look at one.
+const SCREENS: [(&str, Screen); 6] = [
+    ("first-launch", Screen::FirstLaunch),
+    ("input-device", Screen::InputDeviceStep),
+    ("hub", Screen::Hub),
+    ("loading", Screen::Loading),
+    ("pause", Screen::PauseMenu),
+    ("settings", Screen::Settings),
+];
 
 const HELP: &str = "\
-OpenDrone, the first flight: fly a Quad through its FPV Camera, from the
-Launch Spot of the Skate Park.
+OpenDrone: fly a Quad through its FPV Camera. A new install opens on First
+Launch; after that you land on the Hub, and FLY takes you to the Launch Spot.
 
-  opendrone                       fly the Whoop 65 on the Skate Park
-  opendrone --quad freestyle-5    fly the Freestyle 5\u{2033} (or --quad whoop-65)
-  opendrone --map flat-floor      fly over a grid floor with nothing to hit
-                                  instead (or --map skate-park, the default)
+  opendrone                       open the screens: First Launch the first
+                                  time, then the Hub
+  opendrone --quad freestyle-5    pick this Quad (or --quad whoop-65), and
+                                  keep the choice in your settings
+  opendrone --map skate-park      pick this Map, and keep the choice (the
+                                  Skate Park is the only Map so far)
   opendrone --look digital        see the Digital Video Look (or analog, the
-                                  default)
+                                  default), and keep the choice
   opendrone --aspect 16:9         a 16:9 picture that crops the top and bottom
-                                  (or 4:3, the default)
-  opendrone --tilt 45 --fov 140   start at this Camera Tilt (0 to 80\u{b0}) and
-                                  FOV (90 to 170\u{b0}) instead of the Quad's own
+                                  (or 4:3, the default), and keep the choice
+  opendrone --tilt 45 --fov 140   set this Camera Tilt (0 to 80\u{b0}) and FOV
+                                  (90 to 170\u{b0}) for the Quad, and keep them
+  opendrone --settings-folder DIR use the settings file (settings.toml) in
+                                  this folder, and keep saved flights there;
+                                  without it the game uses the usual folder
+                                  for your computer
   opendrone --headless [--seconds N]
                                   run with no window for N seconds (3 if not
                                   given), then say how far the Simulation
@@ -37,12 +67,26 @@ Launch Spot of the Skate Park.
                                   fly each Scenario through the game's own
                                   stepping and check its fingerprint matches
                                   the headless Scenario runner's
+  opendrone --no-screens          a developer command: fly at once with the
+                                  starting settings, as the first test flight
+                                  did, and read and write no settings file
+  opendrone --map flat-floor      a developer command: fly at once over a grid
+                                  floor with nothing to hit (a Test Map), with
+                                  no screens and no settings file
   opendrone --screenshot FILE.bmp [--seconds N] [--size WxH]
                                   a developer command: fly as usual, save the
                                   camera's picture after N seconds (5 if not
                                   given), then quit. The camera draws into a
                                   picture of its own, not the window's: it is
                                   1280x720 unless --size says otherwise
+  opendrone --screen NAME         a developer command: open on one screen
+                                  (first-launch, input-device, hub, loading,
+                                  pause or settings), alone or with
+                                  --screenshot. Loading makes the flight as
+                                  FLY does, and flies on from there. It uses
+                                  the starting settings and writes none,
+                                  unless --settings-folder names where they
+                                  are
   opendrone --camera-cost [--seconds N] [--size WxH]
                                   a developer command: say what the FPV
                                   Camera's own steps cost a frame on the GPU,
@@ -58,14 +102,20 @@ Launch Spot of the Skate Park.
                                   it. Esc pauses. It goes with --screenshot,
                                   --look, --aspect, --tilt, --fov and --chase
 
-Move a stick on the Input Device you want to fly with: it becomes the Flying
-Input Device. R resets, Esc pauses. The up and down arrows change the Camera
+On every screen a Radio moves with its right stick, a flick of yaw to the
+right selects and a flick to the left goes back. A Gamepad moves with its
+D-pad or left stick; \u{2715} selects, \u{25cb} goes back, and L1 and R1 switch tabs. The
+keyboard moves with the arrows, selects with Enter and goes back with
+Backspace. FLY with a device and that device flies; with the keyboard or the
+mouse, the device you used last, or the only one plugged in. In flight, R
+resets and Esc opens the Pause Menu. The up and down arrows change the Camera
 Tilt, and the right and left arrows change the FOV, 1\u{b0} a press, repeating
 while held.
 
 Save Flight is an Action with no default key: bind it to a button or a switch
 in an Input Device profile (save_flight). It writes the flight so far as a
-Scenario and its Input Track into scenarios/saved/.";
+Scenario and its Input Track into the saved-flights folder beside your
+settings file.";
 
 enum Mode {
     Game,
@@ -77,15 +127,18 @@ enum Mode {
 
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
-    let mut quad = QUADS[0].to_string();
-    let mut map = MAPS[0].1.to_string();
+    let mut quad: Option<String> = None;
+    let mut map: Option<(String, String)> = None;
     let mut mode = Mode::Game;
     let mut view = View::Fpv;
-    let mut camera = CameraSettings::default();
+    let mut look: Option<VideoLook> = None;
+    let mut aspect: Option<Aspect> = None;
     let (mut tilt, mut fov) = (None, None);
     let mut size = None;
     let mut scenario: Option<PathBuf> = None;
-    let mut quad_given = false;
+    let mut no_screens = false;
+    let mut screen: Option<Screen> = None;
+    let mut settings_folder: Option<PathBuf> = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -93,17 +146,14 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--quad" => match args.next() {
-                Some(name) if QUADS.contains(&name.as_str()) => {
-                    quad = name;
-                    quad_given = true;
-                }
+                Some(name) if QUADS.contains(&name.as_str()) => quad = Some(name),
                 _ => return usage(&format!("--quad takes one of {}", QUADS.join(", "))),
             },
             "--map" => match args
                 .next()
                 .and_then(|name| MAPS.iter().find(|(n, _)| *n == name))
             {
-                Some((_, id)) => map = (*id).to_string(),
+                Some((name, id)) => map = Some(((*name).to_string(), (*id).to_string())),
                 None => {
                     let names: Vec<&str> = MAPS.iter().map(|(n, _)| *n).collect();
                     return usage(&format!("--map takes one of {}", names.join(", ")));
@@ -134,13 +184,13 @@ fn main() -> ExitCode {
                 }
             },
             "--look" => match args.next().as_deref() {
-                Some("analog") => camera.look = VideoLook::Analog,
-                Some("digital") => camera.look = VideoLook::Digital,
+                Some("analog") => look = Some(VideoLook::Analog),
+                Some("digital") => look = Some(VideoLook::Digital),
                 _ => return usage("--look takes analog or digital"),
             },
             "--aspect" => match args.next().as_deref() {
-                Some("4:3") => camera.aspect = Aspect::FourThree,
-                Some("16:9") => camera.aspect = Aspect::SixteenNine,
+                Some("4:3") => aspect = Some(Aspect::FourThree),
+                Some("16:9") => aspect = Some(Aspect::SixteenNine),
                 _ => return usage("--aspect takes 4:3 or 16:9"),
             },
             "--tilt" => match args.next().and_then(|s| s.parse::<f64>().ok()) {
@@ -160,6 +210,21 @@ fn main() -> ExitCode {
                 Some(path) => scenario = Some(PathBuf::from(path)),
                 None => return usage("--scenario takes the Scenario file to watch"),
             },
+            "--no-screens" => no_screens = true,
+            "--screen" => match args
+                .next()
+                .and_then(|name| SCREENS.iter().find(|(n, _)| *n == name))
+            {
+                Some((_, which)) => screen = Some(*which),
+                None => {
+                    let names: Vec<&str> = SCREENS.iter().map(|(n, _)| *n).collect();
+                    return usage(&format!("--screen takes one of {}", names.join(", ")));
+                }
+            },
+            "--settings-folder" => match args.next() {
+                Some(folder) => settings_folder = Some(PathBuf::from(folder)),
+                None => return usage("--settings-folder takes a folder"),
+            },
             "--reference" => mode = Mode::Reference(Vec::new()),
             path => match &mut mode {
                 Mode::Reference(paths) => paths.push(PathBuf::from(path)),
@@ -177,13 +242,56 @@ fn main() -> ExitCode {
             "--scenario opens a window: it goes with --screenshot, but not with --headless, --camera-cost or --reference",
         );
     }
-    if scenario.is_some() && quad_given {
+    if scenario.is_some() && quad.is_some() {
         return usage("--scenario names its own Quad, so it doesn't go with --quad");
     }
+    // A Test Map, a chase view and a watched Scenario are the developers':
+    // they fly at once, with no screens.
+    let test_map = map.as_ref().is_some_and(|(_, id)| id.starts_with("test/"));
+    let direct = no_screens || test_map || scenario.is_some() || view == View::Chase;
+    if screen.is_some() && (direct || !matches!(mode, Mode::Game | Mode::Screenshot { .. })) {
+        return usage(
+            "--screen goes with the screens: not with --no-screens, a Test Map, --scenario, --chase, --headless or --camera-cost",
+        );
+    }
+    // The screens open for the pilot's game, and for a screenshot of one.
+    let with_screens = !direct
+        && (matches!(mode, Mode::Game)
+            || (screen.is_some() && matches!(mode, Mode::Screenshot { .. })));
     let packs = match open_packs(&repo) {
         Ok(packs) => packs,
         Err(problems) => return fail(&format!("the Packs can't be read:\n{problems}")),
     };
+    let profiles = packs.input_devices().into_iter().cloned().collect();
+
+    if with_screens {
+        return run_with_screens(ScreensRun {
+            repo,
+            packs,
+            profiles,
+            mode,
+            quad,
+            map: map.map(|(_, id)| id),
+            look,
+            aspect,
+            tilt,
+            fov,
+            size,
+            screen,
+            settings_folder,
+        });
+    }
+
+    // Flying at once: the starting settings, and no settings file.
+    let quad = quad.unwrap_or_else(|| QUADS[0].to_string());
+    let map = map.map_or_else(|| MAPS[0].1.to_string(), |(_, id)| id);
+    let mut camera = CameraSettings::default();
+    if let Some(look) = look {
+        camera.look = look;
+    }
+    if let Some(aspect) = aspect {
+        camera.aspect = aspect;
+    }
     let watched = match &scenario {
         Some(path) => match open_scenario(&repo, path) {
             Ok(watched) => Some(watched),
@@ -193,12 +301,11 @@ fn main() -> ExitCode {
     };
     let plan = match &watched {
         Some(watched) => watched.plan.clone(),
-        None => match FlightPlan::from_packs(&packs, Settings::tracer(&quad).on_map(&map)) {
+        None => match FlightPlan::from_packs(&packs, Settings::defaults(&quad).on_map(&map)) {
             Ok(plan) => plan,
             Err(problem) => return fail(&problem),
         },
     };
-    let profiles = packs.input_devices().into_iter().cloned().collect();
     let pilot = Pilot::start(&plan, profiles);
     // A window flying the pilot's own flight, or watching the Scenario.
     let window = |plan, pilot| match watched {
@@ -229,6 +336,145 @@ fn main() -> ExitCode {
         }),
         _ => window(plan, pilot),
     };
+    run(app, view, camera)
+}
+
+/// What the game with its screens starts from.
+struct ScreensRun {
+    repo: PathBuf,
+    packs: opendrone_pack::Packs,
+    profiles: Vec<opendrone_input::InputDeviceProfile>,
+    mode: Mode,
+    quad: Option<String>,
+    map: Option<String>,
+    look: Option<VideoLook>,
+    aspect: Option<Aspect>,
+    tilt: Option<f64>,
+    fov: Option<f64>,
+    size: Option<UVec2>,
+    screen: Option<Screen>,
+    settings_folder: Option<PathBuf>,
+}
+
+/// The game with its screens: the pilot's settings file, read first and
+/// written whenever a setting changes.
+fn run_with_screens(start: ScreensRun) -> ExitCode {
+    let ScreensRun {
+        repo,
+        packs,
+        profiles,
+        mode,
+        quad,
+        map,
+        look,
+        aspect,
+        tilt,
+        fov,
+        size,
+        screen,
+        settings_folder,
+    } = start;
+    // The pilot's own game reads the usual folder; a screenshot of a screen
+    // reads none unless it was told where.
+    let folder = match (&mode, settings_folder) {
+        (_, Some(folder)) => Some(folder),
+        (Mode::Game, None) => {
+            let usual = SettingsFile::usual_folder();
+            if usual.is_none() {
+                eprintln!(
+                    "OpenDrone can't tell where your computer keeps settings, so it keeps none this time."
+                );
+            }
+            usual
+        }
+        _ => None,
+    };
+    let (mut loaded, store) = match folder {
+        Some(folder) => {
+            let mut file = SettingsFile::in_folder(folder);
+            (file.load(), Some(file))
+        }
+        None => (
+            Loaded {
+                settings: PilotSettings::default(),
+                existed: false,
+                problems: Vec::new(),
+            },
+            None,
+        ),
+    };
+    for problem in &loaded.problems {
+        eprintln!("settings: {problem}");
+    }
+    // The flags set the pilot's settings, which are kept.
+    let settings = &mut loaded.settings;
+    let mut flagged = false;
+    if let Some(quad) = quad {
+        settings.quad = format!("opendrone/{quad}");
+        flagged = true;
+    }
+    if let Some(map) = map {
+        settings.map = map;
+        flagged = true;
+    }
+    if let Some(look) = look {
+        settings.camera.look = look;
+        flagged = true;
+    }
+    if let Some(aspect) = aspect {
+        settings.camera.aspect = aspect;
+        flagged = true;
+    }
+    if tilt.is_some() || fov.is_some() {
+        match packs.quad(&settings.quad) {
+            Ok(definition) => {
+                let own = settings.camera.quad(&definition.id, &definition.camera);
+                settings.camera.set_quad(
+                    &definition.id,
+                    QuadCamera {
+                        tilt: tilt.unwrap_or(own.tilt),
+                        fov: fov.unwrap_or(own.fov),
+                    },
+                );
+                flagged = true;
+            }
+            Err(problem) => {
+                return fail(&format!(
+                    "can't use the Quad \"{}\":\n{problem}",
+                    settings.quad
+                ));
+            }
+        }
+    }
+    if flagged
+        && let Some(store) = &store
+        && let Err(problem) = store.save(settings)
+    {
+        eprintln!("settings: can't save {}: {problem}", store.path().display());
+    }
+
+    let screens = Screens::new(loaded, store, packs, &repo, screen);
+    let plan = match screens.first_plan() {
+        Ok(plan) => plan,
+        Err(problem) => return fail(&problem),
+    };
+    let mut pilot = Pilot::start(&plan, profiles);
+    if let Some(folder) = screens.saved_flights_folder() {
+        pilot = pilot.saving_to(folder);
+    }
+    let camera = screens.settings().camera.clone();
+    let app = screens_game(plan, pilot, screens).map(|mut app| {
+        if let Mode::Screenshot { path, seconds } = mode {
+            let size = size.unwrap_or(UVec2::new(1280, 720));
+            screenshot_after(&mut app, seconds, path, size);
+        }
+        app
+    });
+    run(app, View::Fpv, camera)
+}
+
+/// Runs the app, and turns how it ended into an exit code.
+fn run(app: Result<bevy::app::App, String>, view: View, camera: CameraSettings) -> ExitCode {
     match app {
         Ok(mut app) => {
             app.insert_resource(view).insert_resource(camera);

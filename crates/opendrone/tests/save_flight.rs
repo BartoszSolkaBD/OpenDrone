@@ -365,7 +365,7 @@ fn every_setting_of_the_flight_comes_back_from_the_saved_scenario_and_flies_the_
     ];
     let packs = common::packs();
     for (i, rates) in cases.into_iter().enumerate() {
-        let mut settings = Settings::tracer("whoop-65");
+        let mut settings = Settings::defaults("whoop-65");
         settings.rates = rates.clone();
         settings.packet_rate = PacketRate::from_hz(500).unwrap();
         settings.input_smoothing = i % 2 == 0;
