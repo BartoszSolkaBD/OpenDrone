@@ -6,13 +6,14 @@ OpenDrone is a free FPV simulator for pilots who want to practise, or who can't 
 
 ## Your first flight
 
-The first flight is a test: either Quad on the Skate Park, through the Quad's FPV Camera. There are screens to get you into the air (see [The screens](#the-screens)), but not yet the whole Settings drawer, no OSD and no Breakup. You hear the Quad's motors, but no beeps yet.
+The first flight is a test: either Quad on the Skate Park or Bando, through the Quad's FPV Camera. There are screens to get you into the air (see [The screens](#the-screens)), but not yet the whole Settings drawer, no OSD and no Breakup. You hear the Quad's motors, but no beeps yet.
 
 **Starting it.** From the OpenDrone folder, with Rust installed (see [Contributing](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/CONTRIBUTING.md)):
 
 ```sh
 cargo run --release -p opendrone                        # First Launch the first time, then the Hub
 cargo run --release -p opendrone -- --quad freestyle-5  # pick the Freestyle 5″, and keep the choice
+cargo run --release -p opendrone -- --map bando         # pick Bando, the unfinished tower, and keep the choice
 cargo run --release -p opendrone -- --no-screens        # developer command: fly at once, no screens
 cargo run --release -p opendrone -- --map flat-floor    # developer command: fly at once over a grid floor, nothing to hit
 ```
@@ -36,6 +37,8 @@ The first build takes a few minutes. `--release` matters: without it the picture
 **Your settings** are kept in one file, `settings.toml`, saved the moment a setting changes: in `~/Library/Application Support/OpenDrone` on macOS, `%APPDATA%\OpenDrone` on Windows, and `~/.config/opendrone` on Linux. Saved flights go beside it, in `saved-flights/`. `--settings-folder DIR` uses another folder. If the file can't be read, the game keeps it aside as `settings.broken.toml`, tells you, and starts fresh.
 
 **The Skate Park.** An outdoor concrete park, 62 × 40 m, sunk into the ground: a pool bowl, a round cradle, a snake run that winds along the south side, a full pipe, and on the east a street corner with stairs, handrails, a ring and a pergola with slats to fly between, all at real-world size. The Quad starts on the flat deck between the two bowls, facing the pool. Everything solid is solid: there are no invisible walls, and the ground runs to the horizon. Its surfaces are real concrete, steel, plywood and grass pictures (CC0, from Poly Haven and ambientCG), which `cargo xtask textures` downloads the first time; without them the Map is drawn in flat colours, and flies the same. [Building a Map](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/building-a-map.md) says where they come from.
+
+**Bando.** A five-floor concrete frame on a 70 × 50 m building site where work stopped, inside city blocks. The frame is 24 × 15 m and 16.9 m tall, with 3.1 m under each ceiling and holes 2 to 5 m across in every floor, one of them a collapsed bay. The west half of the two lowest floors is brick: four rooms a floor off a corridor, with doorways, one smashed gap and windows to fly through, while the three floors above stay open. An open lift shaft is a 17 m dive from the roof to the ground, and a tower crane stands beside the building with a hook hanging on a thin cable. The yard has shipping containers (one stacked), rubble, a site office, a dirt mound and the site fence. The Quad starts in the yard, 17 m south of the building, facing it. Everything solid is solid, thin parts included: the handrails and fence rails are 6 cm across, the crane's hook cable 5 cm and the rebar on the roof 3 cm, and a Quad never passes through them, even at 30 m/s. Inside the building, concrete and brick stand between the Quad and you: the Video Signal, when it arrives, will weaken there.
 
 **Picking your Input Device.** Plug it in before or after starting. The device that selects FLY is the one that flies: a Radio with a flick of yaw to the right, a Gamepad with ✕. If you press FLY with the keyboard or the mouse, the device you last moved a menu with flies, or the only one plugged in. If there are several and you used none, the Quad waits on the Launch Spot until you move a stick on the device you want to fly with, and the flight starts afresh with it. Either way it is the Flying Input Device, and it never changes in flight. During a flight the window's title says which device flies, whether the Quad is armed or what stops it arming, and Failsafe.
 
@@ -62,7 +65,7 @@ The first build takes a few minutes. `--release` matters: without it the picture
 
 **The sound** is made live from the simulated motors, never played from recordings: each of the four motors has its own voice, so you hear the throttle, the Flight Controller's corrections and Prop Wash as the motors warble. You hear it On the Quad, as a camera's microphone on board would: wind on the mic grows with your speed and with the props' downwash, and a punch-out swells for an instant before the camera's compressor pulls it back. Pause silences the Quad, and going on brings it back. It keeps playing when the window is in the background. The voice isn't final: it's being tuned by ear. If you have no sound device, the game runs silent and the Hub says so once, in a short notice (a game started with `--no-screens` or `--scenario` has no Hub, and just runs silent); if your headphones go, the sound moves to your computer's new default device without pausing. The ESCs' start-up tones and the buzzer's beeps, Where you stand, crash sounds and the volume settings come later.
 
-**What's a placeholder:** the light. The Skate Park is lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD arrives. The screens' look is a placeholder too: plain dark panels in a plain font.
+**What's a placeholder:** the light. The Skate Park and Bando are lit by a plain sun with shadows and some sky light, not yet by the baked light that gives it real shade. The OSD and Breakup, the picture falling apart as the Video Signal weakens, come later too. The Camera Tilt and FOV readout shows in the window's title for a moment, until the OSD arrives. The screens' look is a placeholder too: plain dark panels in a plain font.
 
 ### The camera
 

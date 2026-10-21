@@ -16,6 +16,8 @@ Poly Haven and ambientCG pictures, all CC0 1.0: anyone may use them for any purp
 |  |  |  |  | normal | `18b91c2a6d83a8fbaa8d7fe84e80a66bd6451e4ec2774a09bf4429498c8f3912` |
 | [bark_brown_02](https://polyhaven.com/a/bark_brown_02) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `920fa0bed0c9d78c1d530e99795113afd532d7db746de440f4a85d7c83ed0f1a` |
 |  |  |  |  | normal | `0d5e691e8ad8bcd093a3587887fda2a6b4a948b5708a4f256f7919584c6eb857` |
+| [brown_mud_dry](https://polyhaven.com/a/brown_mud_dry) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `a56281b644de614787340f3db45e28d2f72ec32fc19a442f99002bae0ab11398` |
+|  |  |  |  | normal | `4dd82ecb3e810d4de49d34c7d6cc30152129434a58b3bd786bc9952bc8874877` |
 | [concrete_floor_worn_001](https://polyhaven.com/a/concrete_floor_worn_001) | Poly Haven | Dimitrios Savva, Rico Cilliers | CC0-1.0 | diffuse | `6e40c0fc908f4d66431836f5abe203f3a4eb064e88824378a91a46a26e2f464c` |
 |  |  |  |  | normal | `523bd94a1be5dd2f11c2ae2b7d7c77445cf5bd9e41604db515a7c8364dcba067` |
 | [concrete_wall_008](https://polyhaven.com/a/concrete_wall_008) | Poly Haven | Dario Barresi, Charlotte Baglioni | CC0-1.0 | diffuse | `a203166d280d3cfc6a91bbc9ffdae406eb9555b4a4f658cd92619063eb17c147` |
@@ -28,6 +30,8 @@ Poly Haven and ambientCG pictures, all CC0 1.0: anyone may use them for any purp
 |  |  |  |  | normal | `c0a41dc06e33072ec1156d89f3bd4b481a479616791d4e9df6c5ee7b3283db82` |
 | [plywood](https://polyhaven.com/a/plywood) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `800905650fc6cab2fe7c77c41851f8ea89669f1287ad5ce67c48f435654c0af8` |
 |  |  |  |  | normal | `a0d8459eb2586435790225440319586775c9b7dff8441062e077501fd0811e53` |
+| [red_brick](https://polyhaven.com/a/red_brick) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `6dea3a2b5a3185ff48d299d182c405a9f787129d79677792db6de4afd81c47f6` |
+|  |  |  |  | normal | `99bd2c60dfdb02b011cc3551bd9ab51d9b0be2807e3ba8f7a53c8a4c945b2f87` |
 | [rusty_metal_02](https://polyhaven.com/a/rusty_metal_02) | Poly Haven | Rob Tuytel | CC0-1.0 | diffuse | `adaf094391518b6afe787a123942110aa88ef521c844f970b124420f5ed5d3d9` |
 |  |  |  |  | normal | `995197a62cac6fbb000e6e6591a3330a3b77ef069c4ac58f505b586b9bdbd97b` |
 

@@ -41,29 +41,31 @@ fn the_tracer_flies_the_flat_floor_with_the_quad_landed_at_its_origin() {
 }
 
 #[test]
-fn on_the_skate_park_the_quad_starts_landed_on_its_launch_spot_facing_its_heading() {
-    // Basis: Rule (#63): a Quad starts, and Reset puts it, on the Map's
-    // Launch Spot, landed on the ground there, facing the spot's heading.
-    for quad in ["whoop-65", "freestyle-5"] {
-        let plan = FlightPlan::from_packs(
-            &common::packs(),
-            Settings::defaults(quad).on_map("opendrone/skate-park"),
-        )
-        .expect("the Skate Park is in the built-in Pack");
-        let spot = plan
-            .map
-            .launch_spot
-            .expect("the Skate Park has a Launch Spot");
-        let start = plan.launch_spot();
-        let landed = landed_height(&plan.quad.parameters.shape);
-        assert_eq!(
-            start.position,
-            spot.position + Vec3::new(0.0, 0.0, landed),
-            "{quad}"
-        );
-        let heading = start.attitude.pilot_angles().heading / DEGREE;
-        assert!((heading - 270.0).abs() < 1e-9, "{quad} faces {heading}°");
-        assert_eq!(start.velocity, Vec3::ZERO);
+fn on_each_built_in_map_the_quad_starts_landed_on_its_launch_spot_facing_its_heading() {
+    // Basis: Rule (#63, #64): a Quad starts, and Reset puts it, on the Map's
+    // Launch Spot, landed on the ground there, facing the spot's heading: west
+    // into the pool on the Skate Park, north at the tower on Bando.
+    for (map, facing) in [("opendrone/skate-park", 270.0), ("opendrone/bando", 0.0)] {
+        for quad in ["whoop-65", "freestyle-5"] {
+            let plan =
+                FlightPlan::from_packs(&common::packs(), Settings::defaults(quad).on_map(map))
+                    .unwrap_or_else(|_| panic!("{map} is in the built-in Pack"));
+            let spot = plan
+                .map
+                .launch_spot
+                .unwrap_or_else(|| panic!("{map} has a Launch Spot"));
+            let start = plan.launch_spot();
+            let landed = landed_height(&plan.quad.parameters.shape);
+            assert_eq!(
+                start.position,
+                spot.position + Vec3::new(0.0, 0.0, landed),
+                "{quad} on {map}"
+            );
+            let heading = start.attitude.pilot_angles().heading / DEGREE;
+            let off = (heading - facing + 180.0).rem_euclid(360.0) - 180.0;
+            assert!(off.abs() < 1e-9, "{quad} on {map} faces {heading}°");
+            assert_eq!(start.velocity, Vec3::ZERO);
+        }
     }
 }
 

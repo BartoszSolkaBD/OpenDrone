@@ -217,6 +217,20 @@ fn the_built_in_skate_park_has_a_mesh_for_every_part_it_draws() {
     assert!(triangles > 40_000, "{triangles} triangles");
 }
 
+#[test]
+fn the_built_in_bando_has_a_mesh_for_every_part_it_draws() {
+    let packs = common::packs();
+    let map = packs.map("opendrone/bando").unwrap();
+    let triangles: usize = map.drawing.iter().map(|p| p.triangles.len()).sum();
+    let vertices: usize = map
+        .drawing
+        .iter()
+        .map(|p| part_mesh(p).count_vertices())
+        .sum();
+    assert_eq!(vertices, triangles * 3);
+    assert!(triangles > 10_000, "{triangles} triangles");
+}
+
 /// A scratch repo with a material library of one material, and, if
 /// `pictures`, files where its pictures would be.
 fn scratch_repo(case: &str, pictures: bool) -> std::path::PathBuf {
