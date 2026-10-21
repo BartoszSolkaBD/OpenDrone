@@ -56,7 +56,7 @@ You fly through the Quad's FPV Camera, bolted to its frame, as on a real quad.
 - **Analog or Digital.** `--look analog` (the default) is a soft picture with a little grain and colour that bleeds sideways, like analog goggles. Each Quad's own camera sets how soft it is: the Whoop 65's is the softest. `--look digital` is clean and sharp, with a gentler fisheye, and it shows the picture 15 ms later than Analog, as real digital systems do. That delay is in the picture only: the sticks and the flight are untouched.
 - **4:3 or 16:9.** `--aspect 16:9` crops the top and bottom of the picture and never stretches it. 4:3 is the default.
 - **Light.** The camera adapts to light as a real one does, over about a second: flying into a dark room starts near black, then the room shows within a second, with its windows blown out; flying back out blows out to white before the picture recovers. Each camera holds only so many stops of light between black and white (7 on the Whoop 65, 8.5 on the Freestyle 5″, 10 on Digital), so bright things blow out and dark things sink to black.
-- **Your own Quad.** The Whoop 65's ducts and the props of both Quads show where the Camera Tilt and FOV let you see them.
+- **Your own Quad.** The camera sits at the very front of the Quad, ahead of the Whoop 65's front ducts, as on a real tinywhoop, so the Whoop's picture shows no duct walls. The props of both Quads show only where the Camera Tilt and FOV let you see them.
 
 Pick the Video Look and the picture's shape when you start the game: `cargo run --release -p opendrone -- --look digital --aspect 16:9`. The screens ticket adds menus for them.
 
