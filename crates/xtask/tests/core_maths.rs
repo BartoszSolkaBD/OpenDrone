@@ -423,6 +423,56 @@ fn running_the_check_again_with_other_programs_never_reads_a_program_built_with_
 }
 
 #[test]
+fn running_the_check_again_with_nothing_to_build_still_finds_the_call() {
+    // The second run compiles nothing: cargo finds every build still fresh.
+    // The check still reads the libraries' compiled code, so it can't pass
+    // just because nothing was compiled.
+    let fixture = Fixture::new("nothing-to-build").member(
+        "opendrone-maths",
+        &[],
+        "pub fn wobble(x: f64) -> f64 { x.cos() }",
+    );
+    let first = fixture.check();
+    assert!(!first.passed, "{}", first.output);
+    let again = fixture.check_again_with(&[]);
+    assert!(
+        !again.output.contains("Compiling"),
+        "the second run compiled something:\n{}",
+        again.output
+    );
+    assert!(!again.passed, "{}", again.output);
+    again.says(
+        "- `opendrone-maths` calls the operating system's `cos` (Rust's `f64::cos`) from \
+         opendrone_maths::wobble.",
+    );
+}
+
+#[test]
+fn a_check_never_reads_the_build_of_another_workspace_laid_out_alike() {
+    // Two workspaces with the same crates in the same places, as two
+    // worktrees of the repo have. Cargo names their builds alike, so in one
+    // shared target folder the second workspace's build counts as fresh for
+    // the first, whose files are older, and the first would be checked with
+    // the second's code. Each check builds in its own workspace's folder.
+    let clean = Fixture::new("laid-out-alike-clean").member(
+        "opendrone-maths",
+        &[],
+        "pub fn half(x: f64) -> f64 { x / 2.0 }",
+    );
+    let calls_cos = Fixture::new("laid-out-alike-calls-cos").member(
+        "opendrone-maths",
+        &[],
+        "pub fn half(x: f64) -> f64 { x.cos() }",
+    );
+    let first = clean.check();
+    assert!(first.passed, "{}", first.output);
+    let other = calls_cos.check();
+    assert!(!other.passed, "{}", other.output);
+    let again = clean.check_again_with(&[]);
+    assert!(again.passed, "{}", again.output);
+}
+
+#[test]
 fn the_acos_allowance_names_every_clippy_ban_that_keeps_it_unreachable() {
     let walls = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("walls.toml"))
         .expect("can read walls.toml");
@@ -860,7 +910,16 @@ impl Fixture {
         command
             .arg("--manifest-path")
             .arg(workspace.join("Cargo.toml"))
-            .env("CARGO_NET_OFFLINE", "true");
+            .env("CARGO_NET_OFFLINE", "true")
+            // Each workspace builds in its own folder, even when the tests run
+            // with a target folder shared between worktrees: cargo names the
+            // builds of crates laid out alike the same, so another fixture's
+            // or worktree's build could count as fresh here, and be read.
+            .env("CARGO_TARGET_DIR", workspace.join("target"))
+            // Built as CI builds it, with debug information, which the check
+            // must skip.
+            .env_remove("CARGO_PROFILE_DEV_DEBUG")
+            .env_remove("CARGO_INCREMENTAL");
         let output = command.output().expect("the xtask program runs");
         let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
         text.push_str(&String::from_utf8_lossy(&output.stderr));
