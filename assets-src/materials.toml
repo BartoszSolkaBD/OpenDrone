@@ -69,6 +69,41 @@ colour    = [0.55, 0.57, 0.62]
 roughness = 0.90
 texture   = "plastered_wall_04"
 
+[materials.concrete_dark]
+colour    = [0.28, 0.28, 0.29]
+roughness = 0.92
+texture   = "concrete_wall_008"
+
+[materials.brick]
+colour    = [0.50, 0.27, 0.20]
+roughness = 0.90
+texture   = "red_brick"
+
+[materials.steel_rusty]
+colour    = [0.42, 0.24, 0.13]
+roughness = 0.75
+texture   = "rusty_metal_02"
+
+[materials.container_blue]
+colour    = [0.12, 0.27, 0.47]
+roughness = 0.60
+texture   = "corrugated_iron"
+
+[materials.container_red]
+colour    = [0.52, 0.14, 0.10]
+roughness = 0.60
+texture   = "corrugated_iron"
+
+[materials.dirt]
+colour    = [0.36, 0.27, 0.19]
+roughness = 0.97
+texture   = "brown_mud_dry"
+
+[materials.rubble]
+colour    = [0.45, 0.43, 0.40]
+roughness = 0.95
+texture   = "concrete_floor_worn_001"
+
 # No picture: leaves are a flat colour.
 [materials.foliage]
 colour    = [0.10, 0.24, 0.07]
@@ -174,3 +209,21 @@ licence = "CC0-1.0"
 size    = "3.2 m"
 diffuse = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plastered_wall_04/plastered_wall_04_diff_1k.jpg", sha256 = "52d789111bbe93d311c22e49d28b56256593c8f84c75742642403da857a36503" }
 normal  = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/plastered_wall_04/plastered_wall_04_nor_gl_1k.jpg", sha256 = "c0a41dc06e33072ec1156d89f3bd4b481a479616791d4e9df6c5ee7b3283db82" }
+
+[textures.red_brick]
+source  = "Poly Haven"
+page    = "https://polyhaven.com/a/red_brick"
+author  = "Rob Tuytel"
+licence = "CC0-1.0"
+size    = "1.4 m"
+diffuse = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_diff_1k.jpg", sha256 = "6dea3a2b5a3185ff48d299d182c405a9f787129d79677792db6de4afd81c47f6" }
+normal  = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/red_brick/red_brick_nor_gl_1k.jpg", sha256 = "99bd2c60dfdb02b011cc3551bd9ab51d9b0be2807e3ba8f7a53c8a4c945b2f87" }
+
+[textures.brown_mud_dry]
+source  = "Poly Haven"
+page    = "https://polyhaven.com/a/brown_mud_dry"
+author  = "Rob Tuytel"
+licence = "CC0-1.0"
+size    = "1.3 m"
+diffuse = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_diff_1k.jpg", sha256 = "a56281b644de614787340f3db45e28d2f72ec32fc19a442f99002bae0ab11398" }
+normal  = { url = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_mud_dry/brown_mud_dry_nor_gl_1k.jpg", sha256 = "4dd82ecb3e810d4de49d34c7d6cc30152129434a58b3bd786bc9952bc8874877" }

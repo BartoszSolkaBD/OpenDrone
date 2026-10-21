@@ -1,0 +1,65 @@
+# The Freestyle 5″ flies level at 30 m/s, 25 m up, straight at the hook cable of
+# Bando's tower crane. The cable is 5 cm across and hangs from the trolley under
+# the jib, at 35.5 m, down to the hook block at 20.6 m, 2 m west and 2 m north of
+# the Map's origin: over the building, so the 5″ flies in from the west across
+# the roof. Its motors are stopped, their ESCs letting the props turn freely. Its
+# front prop discs meet the cable first: the cable is wider than the 29.5 mm gap
+# between them. Proves the thin-rail half of E29 in #10 on the Map the crane is
+# on: a Quad never passes through a thin part, even at 30 m/s (#64).
+format = 2
+name   = "A 5-inch at 30 m/s never passes through Bando's crane hook cable"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "opendrone/bando"
+position          = "-3 m east, 2 m north, 25 m up"
+attitude          = "level, heading 90°"
+speed             = "30 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 0.25 s"
+highest = "between -3 m and -2.025 m"
+basis   = "rule: the cable's near side is -2 m - 2.5 cm = -2.025 m east. Flying free, the 5-inch's centre would pass it at 0.0325 s and be 4.5 m east by 0.25 s. Its centre is inside its shape, so only passing through the cable could take its centre past -2.025 m: the cable hangs from 20.6 m to 35.5 m, so it can't go under it (a 4 m drop) nor over it (a 10 m climb), and it has no sideways speed to go round it"
+
+[[expect]]
+what  = "speed east"
+at    = "0.1 s"
+value = "-0.91 m/s ± 0.3 m/s"
+basis = "observed: free to turn, its front prop discs roll on the cable and stop the 5-inch dead from 30 m/s within about a millisecond, and it comes back off it at about 0.9 m/s"
+
+[[expect]]
+what  = "distance east"
+at    = "0.25 s"
+value = "-2.32 m ± 0.1 m"
+basis = "observed: it stops 0.1 m short of the cable's near side, where its front prop discs meet it, and drifts back 0.2 m by 0.25 s"

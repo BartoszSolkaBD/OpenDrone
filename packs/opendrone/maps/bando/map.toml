@@ -1,0 +1,22 @@
+# Bando, "Unfinished Tower, with rooms" (#17, #64): a five-floor concrete frame
+# on a building site where work stopped, with brick rooms, an open lift shaft
+# and a tower crane, in sunny early afternoon. Its `.glb` is built from
+# assets-src/maps/bando/build.py by `cargo xtask maps`; never edit it by hand.
+format      = 1
+name        = "Bando"
+description = "An unfinished tower with brick rooms, an open lift shaft and a tower crane. Fly the yard, the floors and the dive."
+model       = "bando.glb"
+preview     = "preview.png"
+
+[world]
+# Sea level, calm air. Wind comes later, as another world value.
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+# The Background Sound slot: an Ogg loop in this folder and how loud it plays,
+# for example
+#   [background_sound]
+#   file  = "background.ogg"
+#   level = "+9 dB"
+# Bando's recording arrives with the sound ticket's clips (#32); until then it
+# has none and plays nothing.

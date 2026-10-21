@@ -1,0 +1,106 @@
+# Results of landed-whoop-stays-still-on-bandos-launch-spot.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A landed whoop stays still on Bando's Launch Spot"
+
+[[expect]]
+what     = "height, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "height, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0.01 m ± 0.000001 m"
+measured = "0.0100 m"
+
+[[expect]]
+what     = "distance east, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
+what     = "distance north, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "-17 m ± 0.000001 m"
+measured = "-17.0 m"
+
+[[expect]]
+what     = "distance north, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "-17 m ± 0.000001 m"
+measured = "-17.0 m"
+
+[[expect]]
+what     = "speed, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0 m/s ± 0.000001 m/s"
+measured = "0 m/s"
+
+[[expect]]
+what     = "roll, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "roll, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, lowest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "heading, highest over 0 s to 10 s"
+basis    = "Rule"
+expected = "0° ± 0.001°"
+measured = "0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "036b39cf96c66fe4"   # test/whoop-65-no-drag: what the Simulation receives from it
+map  = "c814a4c38dbd11d4"   # opendrone/bando
+run  = "a238a83c2a3300c1"   # the whole state after each of 80000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"1 s" = "795c170113232a84"
+"2 s" = "b971c47b1921ba03"
+"3 s" = "9d7ea273772e3652"
+"4 s" = "f707c05774ed1a09"
+"5 s" = "3ebb308cc28f035a"
+"6 s" = "0ffa533b78958229"
+"7 s" = "a443c6d0d53edf46"
+"8 s" = "beaf11525ce5d329"
+"9 s" = "b5195d50aff35c7a"
+"10 s" = "b101950bce353094"

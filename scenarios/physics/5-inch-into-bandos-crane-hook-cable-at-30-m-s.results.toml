@@ -1,0 +1,46 @@
+# Results of 5-inch-into-bandos-crane-hook-cable-at-30-m-s.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A 5-inch at 30 m/s never passes through Bando's crane hook cable"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.25 s"
+basis    = "Rule"
+expected = "between -3 m and -2.025 m"
+measured = "-2.12 m"
+
+[[expect]]
+what     = "speed east at 0.1 s"
+basis    = "Observed"
+expected = "-0.91 m/s ± 0.3 m/s"
+measured = "-0.910 m/s"
+
+[[expect]]
+what     = "distance east at 0.25 s"
+basis    = "Observed"
+expected = "-2.32 m ± 0.1 m"
+measured = "-2.32 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "46fa555d153898a1"   # test/freestyle-5-no-drag: what the Simulation receives from it
+map  = "c814a4c38dbd11d4"   # opendrone/bando
+run  = "3c6eec2ac8c79665"   # the whole state after each of 2000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.025 s" = "b245ecd8beab869f"
+"0.05 s" = "3841a8216aedf8e4"
+"0.075 s" = "422d04bab0a25ec9"
+"0.1 s" = "cea79fc41a45fabb"
+"0.125 s" = "1c9fa18bb38dec35"
+"0.15 s" = "d936960b27c5a8cb"
+"0.175 s" = "68db1a96f7a8e686"
+"0.2 s" = "8a60467533b00053"
+"0.225 s" = "00349ca82ffdc2e9"
+"0.25 s" = "868bb4cf3ab7d6ab"
