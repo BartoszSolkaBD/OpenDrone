@@ -13,10 +13,30 @@
 
 #![allow(dead_code)]
 
+pub mod glb;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use opendrone_pack::Packs;
+
+/// The files of the fixture Map `fixture/yard`, which [`Fixture::with_map`]
+/// adds, as problems name them.
+pub const MAP_TOML: &str = "packs/fixture/maps/yard/map.toml";
+pub const MAP_GLB: &str = "packs/fixture/maps/yard/yard.glb";
+pub const MAP_PREVIEW: &str = "packs/fixture/maps/yard/preview.png";
+
+/// The fixture Map's `map.toml`.
+pub const YARD_TOML: &str = r#"format      = 1
+name        = "Yard"
+description = "A small yard to check Maps with."
+model       = "yard.glb"
+preview     = "preview.png"
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+"#;
 
 /// The quad file of the good fixture, as problems name it.
 pub const QUAD: &str = "packs/fixture/quads/ducted/quad.toml";
@@ -59,6 +79,30 @@ impl Fixture {
         );
         self.write(file, &text.replacen(old, new, 1));
         self
+    }
+
+    /// Adds the Map `fixture/yard`: the given `.glb`, a plain `map.toml` and
+    /// a PNG picture (the Quad's own).
+    pub fn with_map(self, glb: Vec<u8>) -> Fixture {
+        self.write(MAP_TOML, YARD_TOML);
+        self.write_bytes(MAP_GLB, &glb);
+        let picture = fs::read(self.root.join("packs/fixture/quads/ducted/picture.png")).unwrap();
+        self.write_bytes(MAP_PREVIEW, &picture);
+        self
+    }
+
+    pub fn write_bytes(&self, file: &str, bytes: &[u8]) {
+        let path = self.root.join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+
+    /// The problems that kept the fixture's Map, `fixture/yard`, out.
+    pub fn map_problems(&self) -> Vec<String> {
+        match self.packs().map("fixture/yard") {
+            Ok(_) => Vec::new(),
+            Err(problems) => problems.0.iter().map(ToString::to_string).collect(),
+        }
     }
 
     pub fn read(&self, file: &str) -> String {

@@ -1,0 +1,22 @@
+# The Skate Park, "Bowl Park + Street Corner" (#17, #63): an outdoor concrete
+# park of sunken bowls and street pieces, in sunny early afternoon. Its
+# `.glb` is built from assets-src/maps/skate-park/build.py by `cargo xtask
+# maps`; never edit it by hand.
+format      = 1
+name        = "Skate Park"
+description = "Open concrete with bowls, a snake run and a street corner. Room to learn."
+model       = "skate-park.glb"
+preview     = "preview.png"
+
+[world]
+# Sea level, calm air. Wind comes later, as another world value.
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+# The Background Sound slot: an Ogg loop in this folder and how loud it plays,
+# for example
+#   [background_sound]
+#   file  = "background.ogg"
+#   level = "-12 dB"
+# The Skate Park's recording arrives with the sound ticket's clips (#32); until
+# then it has none and plays nothing.

@@ -1,18 +1,20 @@
 //! The Pack checker: reads Pack folders, refuses anything that breaks the
 //! Pack rules, and hands the Simulation checked content with its fingerprints
 //! (#16, ADR-0011). It also pulls colliders and the Launch Spot out of each
-//! Map's `.glb`, once Maps arrive (#63).
+//! Map's `.glb` (#63).
 //!
 //! An edge crate ([ADR-0003]): it reads files, and hands the Simulation
 //! checked plain data.
 //!
 //! - [`Packs::open`] checks every Pack in a folder: each one's manifest
 //!   ([`read_manifest`]), and every item, found by its folder and named
-//!   `<pack>/<item>`. So far the items are Quads: `quads/<id>/` holds
-//!   `quad.toml` ([`read_quad_file`], [`check_quad`]), `tune.txt`
-//!   ([`read_tune`]), `picture.png` and the Feel Test log, `feel-tests.md`
-//!   ([`feel_tests`]); `input-devices/<id>.toml` holds an Input Device
-//!   profile ([`input_device`]).
+//!   `<pack>/<item>`. `quads/<id>/` holds `quad.toml` ([`read_quad_file`],
+//!   [`check_quad`]), `tune.txt` ([`read_tune`]), `picture.png` and the Feel
+//!   Test log, `feel-tests.md` ([`feel_tests`]); `maps/<id>/` holds
+//!   `map.toml` ([`read_map_file`]), the Map's `.glb` ([`glb`]: its solid
+//!   parts, its one Launch Spot and what to draw), its preview picture and,
+//!   if it has one, its Background Sound; `input-devices/<id>.toml` holds an
+//!   Input Device profile ([`input_device`]).
 //! - Every problem names its file, its line and a plain sentence
 //!   ([`Problems`]), and all of them are listed at once. A broken item is
 //!   skipped and the rest of its Pack loads; a broken manifest skips the
@@ -44,6 +46,7 @@
 
 pub mod document;
 pub mod feel_tests;
+pub mod glb;
 pub mod input_device;
 mod manifest;
 mod map;
@@ -60,13 +63,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
+pub use glb::{Collider, DrawnPart, LaunchSpot, MapModel};
 pub use input_device::{
     InputDeviceProfile, read_input_device_file, read_input_device_file_with_steps,
 };
 pub use manifest::{LicenceOverride, Manifest, Retired, is_an_id, read_manifest};
 pub use map::{
-    MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps, test_map,
-    test_map_ids,
+    BackgroundSound, MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps,
+    test_map, test_map_ids,
 };
 pub use quad::{
     Battery, Board, Camera, Chemistry, Collision, Confidence, Ducts, Feel, Frame, Motors,
@@ -78,12 +82,14 @@ pub use tune::{Tune, TuneSetting, read_tune};
 use quad::{ReadInFull, check_quad_as_read, read_quad_file_as_far_as_it_goes};
 use tune::read_tune_as_far_as_it_goes;
 
-/// The kinds of item a Pack may hold, each in its own folder. Maps are known,
-/// but not read yet (#63).
+/// The kinds of item a Pack may hold, each in its own folder.
 const KINDS: &[&str] = &["quads", "maps", "input-devices"];
 
 /// The first bytes of every PNG file.
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
+
+/// The first bytes of every Ogg file, a Background Sound's.
+const OGG_SIGNATURE: &[u8] = b"OggS";
 
 /// Why the Pack checker refuses a folder whose name starts with a dot,
 /// anywhere it checks. Skipping one would let a Pack, or a Quad, quietly
@@ -146,6 +152,8 @@ pub struct Packs {
     packs: Vec<OpenPack>,
     /// Every Quad by id.
     quads: BTreeMap<String, QuadItem>,
+    /// Every Map by id, checked or with its problems.
+    maps: BTreeMap<String, Result<MapDefinition, Problems>>,
     /// Every Input Device profile by id, checked or with its problems.
     input_devices: BTreeMap<String, Result<InputDeviceProfile, Problems>>,
     /// Packs skipped because their manifest is broken.
@@ -202,6 +210,15 @@ impl Folder {
             return Err(Problems::of_file(&self.label, REFUSED_LINK));
         }
         fs::read_to_string(&self.path)
+            .map_err(|error| Problems::of_file(&self.label, format!("can't be read: {error}")))
+    }
+
+    /// The file's bytes. A symbolic link is refused, not followed.
+    fn read_bytes(&self) -> Result<Vec<u8>, Problems> {
+        if self.is_link() {
+            return Err(Problems::of_file(&self.label, REFUSED_LINK));
+        }
+        fs::read(&self.path)
             .map_err(|error| Problems::of_file(&self.label, format!("can't be read: {error}")))
     }
 
@@ -267,6 +284,7 @@ impl Packs {
         let mut packs = Packs {
             packs: Vec::new(),
             quads: BTreeMap::new(),
+            maps: BTreeMap::new(),
             input_devices: BTreeMap::new(),
             skipped: Vec::new(),
             problems: dot_folders_and_links(folder, label),
@@ -353,6 +371,7 @@ impl Packs {
             }
             match name.as_str() {
                 "quads" => self.open_quads(&kind, pack),
+                "maps" => self.open_maps(&kind, pack),
                 "input-devices" => self.open_input_devices(&kind, pack),
                 known if KINDS.contains(&known) => {}
                 other => self.problems.extend(Problems::of_file(
@@ -404,6 +423,40 @@ impl Packs {
                 self.problems.extend(found.clone());
             }
             self.input_devices.insert(id, checked);
+        }
+    }
+
+    /// Reads every Map in a Pack's `maps/`, each a folder holding `map.toml`
+    /// and the files it names.
+    fn open_maps(&mut self, maps: &Folder, pack: &str) {
+        let names = match maps.names() {
+            Ok(names) => names,
+            Err(found) => return self.problems.extend(found),
+        };
+        for name in names {
+            let folder = maps.child(&name);
+            if !folder.path.is_dir() {
+                self.problems.extend(Problems::of_file(
+                    &folder.label,
+                    "every Map is a folder in maps/, holding its map.toml, its .glb and its preview picture",
+                ));
+                continue;
+            }
+            if !is_an_id(&name) {
+                self.problems.extend(Problems::of_file(
+                    &folder.label,
+                    format!(
+                        "the folder's name is the Map's id, so \"{name}\" must be lowercase words joined by dashes, such as \"skate-park\""
+                    ),
+                ));
+                continue;
+            }
+            let id = format!("{pack}/{name}");
+            let checked = read_map_folder(&folder, &id);
+            if let Err(found) = &checked {
+                self.problems.extend(found.clone());
+            }
+            self.maps.insert(id, checked);
         }
     }
 
@@ -658,21 +711,146 @@ impl Packs {
         }
     }
 
-    /// The Map with this id. So far only the built-in Test Maps exist.
-    pub fn map(&self, id: &str) -> Result<MapDefinition, Problems> {
-        if let Some(name) = id.strip_prefix("test/")
-            && let Some(map) = test_map(name)
-        {
-            return map;
-        }
-        Err(Problems::of_file(
-            id,
-            format!(
-                "there's no Map with this id; so far only the built-in Test Maps exist: {}",
-                test_map_ids().join(", ")
-            ),
-        ))
+    /// Every Map that passed the checker, in id order. The Test Maps aren't
+    /// among them: they are built into the code ([`test_map_ids`]).
+    pub fn maps(&self) -> Vec<&MapDefinition> {
+        self.maps
+            .values()
+            .filter_map(|checked| checked.as_ref().ok())
+            .collect()
     }
+
+    /// The checked Map with this id, such as `opendrone/skate-park`, or a
+    /// Test Map such as `test/flat-floor`; or the problems that kept it out.
+    pub fn map(&self, id: &str) -> Result<MapDefinition, Problems> {
+        if let Some(name) = id.strip_prefix("test/") {
+            return test_map(name).unwrap_or_else(|| {
+                Err(Problems::of_file(
+                    id,
+                    format!(
+                        "there's no Test Map with this id; the built-in Test Maps are {}",
+                        test_map_ids().join(", ")
+                    ),
+                ))
+            });
+        }
+        let (pack, name) = self.find(id)?;
+        match self.maps.get(id) {
+            Some(checked) => checked.clone(),
+            None => Err(Problems::of_file(
+                id,
+                format!(
+                    "there's no Map here: {}/maps/{name}/map.toml doesn't exist",
+                    pack.folder.label
+                ),
+            )),
+        }
+    }
+}
+
+/// Reads one Map's folder: `map.toml`, then the `.glb` it names, its preview
+/// picture and its Background Sound, if it has one. Every file is read as far
+/// as it goes, so all of the Map's problems are listed at once.
+fn read_map_folder(folder: &Folder, id: &str) -> Result<MapDefinition, Problems> {
+    let toml = folder.child("map.toml");
+    if !toml.path.is_file() && !toml.is_link() {
+        return Err(Problems::of_file(
+            &folder.label,
+            "every Map's folder holds a map.toml, but this one has none",
+        ));
+    }
+    let mut map = toml
+        .read()
+        .and_then(|text| read_map_file(id, &toml.label, &text))?;
+    let mut problems = Problems::new();
+    match map.model.clone() {
+        None => problems.push(Problem::of(
+            &toml.label,
+            0,
+            "every Map names its .glb with `model`, such as model = \"skate-park.glb\", but this one doesn't",
+        )),
+        Some(name) => {
+            if let Some(file) = in_the_map_folder(folder, &toml.label, "model", &name, ".glb", &mut problems) {
+                match file.read_bytes() {
+                    Ok(bytes) => match glb::read_model(&file.label, &bytes) {
+                        Ok(model) => {
+                            map.solid_names = model.solids.iter().map(|(n, _)| n.clone()).collect();
+                            map.shapes = model.solids.into_iter().map(|(_, s)| s).collect();
+                            map.launch_spot = model.launch_spot;
+                            map.drawing = model.drawing;
+                        }
+                        Err(found) => problems.extend(found),
+                    },
+                    Err(found) => problems.extend(found),
+                }
+            }
+        }
+    }
+    match map.preview.clone() {
+        None => problems.push(Problem::of(
+            &toml.label,
+            0,
+            "every Map names its preview picture with `preview`, such as preview = \"preview.png\", but this one doesn't",
+        )),
+        Some(name) => {
+            if let Some(file) = in_the_map_folder(folder, &toml.label, "preview", &name, ".png", &mut problems) {
+                match file.read_bytes() {
+                    Ok(bytes) if bytes.starts_with(PNG_SIGNATURE) => {}
+                    Ok(_) => problems.extend(Problems::of_file(&file.label, "isn't a PNG picture")),
+                    Err(found) => problems.extend(found),
+                }
+            }
+        }
+    }
+    if let Some(sound) = map.background_sound.clone()
+        && let Some(file) = in_the_map_folder(
+            folder,
+            &toml.label,
+            "background_sound.file",
+            &sound.file,
+            ".ogg",
+            &mut problems,
+        )
+    {
+        match file.read_bytes() {
+            Ok(bytes) if bytes.starts_with(OGG_SIGNATURE) => {}
+            Ok(_) => problems.extend(Problems::of_file(&file.label, "isn't an Ogg sound file")),
+            Err(found) => problems.extend(found),
+        }
+    }
+    problems.or(map)
+}
+
+/// A file `map.toml` names in `key`, which must be in the Map's own folder,
+/// end with `suffix` and exist; or a problem.
+fn in_the_map_folder(
+    folder: &Folder,
+    toml: &str,
+    key: &str,
+    name: &str,
+    suffix: &str,
+    problems: &mut Problems,
+) -> Option<Folder> {
+    if name.contains(['/', '\\']) || name.starts_with('.') || !name.ends_with(suffix) {
+        problems.push(Problem::of(
+            toml,
+            0,
+            format!(
+                "`{key}` names a {suffix} file in the Map's own folder, such as \"map{suffix}\", not \"{name}\""
+            ),
+        ));
+        return None;
+    }
+    let file = folder.child(name);
+    if !file.is_link() && !file.path.is_file() {
+        problems.push(Problem::of(
+            &file.label,
+            0,
+            format!("doesn't exist, but map.toml's `{key}` names it"),
+        ));
+        return None;
+    }
+    Some(file)
 }
 
 /// Reads one Quad's folder. Every file is read as far as it goes, so all of

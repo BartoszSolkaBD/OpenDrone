@@ -1,1 +1,6 @@
 /target
+# Textures are fetched from assets-src/materials.toml by `cargo xtask
+# textures`, never committed (ADR-0014).
+/assets-src/textures/
+# Python's own leftovers from running the Map scripts.
+__pycache__/

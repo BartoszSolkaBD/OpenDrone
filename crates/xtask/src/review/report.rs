@@ -101,8 +101,10 @@ impl Review {
         self.areas_touched(&mut text);
         let _ = writeln!(
             text,
-            "### Renders\n\nNo Map renders yet. Renders of every changed Map arrive with the \
-             asset pipeline (#63).\n"
+            "### Renders\n\nWhen `assets-src/` or a Pack's `maps/` changes, the Maps check renders \
+             every Map: a plan, a three-quarter view and what each Quad's camera sees from the \
+             Launch Spot and from a few places to fly. They are the `map-previews` download of \
+             that check, on this PR's Checks tab. A PR that changes no Map has none.\n"
         );
         let _ = writeln!(
             text,

@@ -7,6 +7,14 @@ use opendrone_sim::{PacketRate, PhysicsRate, Rates};
 /// The Quads the tracer flies, by the id after `opendrone/`.
 pub const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
 
+/// The Maps the game flies, by the name `--map` takes, with the id each
+/// means: the Skate Park from the built-in Pack, and the Test Map `flat-floor`
+/// with its grid, for a place with nothing to hit.
+pub const MAPS: [(&str, &str); 2] = [
+    ("skate-park", "opendrone/skate-park"),
+    ("flat-floor", "test/flat-floor"),
+];
+
 /// What a flight starts from: the pilot's settings that belong to the
 /// Simulation (ADR-0003), and which Quad on which Map.
 #[derive(Clone, Debug)]
@@ -34,6 +42,12 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// The same settings on another Map, by id.
+    pub fn on_map(mut self, map: &str) -> Settings {
+        self.map = map.to_string();
+        self
+    }
+
     /// The fixed defaults, flying the Quad `quad` (an id after `opendrone/`).
     pub fn tracer(quad: &str) -> Settings {
         Settings {

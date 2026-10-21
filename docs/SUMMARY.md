@@ -89,6 +89,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 - [Working on OpenDrone](book/working-on-opendrone.md)
 - [Setup and CI](book/contributing.md)
 - [Changing a file format](format-migration.md)
+- [Building a Map](building-a-map.md)
 - [The agent workflow](book/agents.md)
   - [Issue tracker](agents/issue-tracker.md)
   - [Triage labels](agents/triage-labels.md)

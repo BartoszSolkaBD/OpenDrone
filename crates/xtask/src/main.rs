@@ -29,6 +29,12 @@
 //!   and their stamps ([`input_monitor`]).
 //! - `import-tune`: imports a quad's Betaflight `diff all` as a Quad
 //!   definition's `tune.txt` ([`import_tune`]).
+//! - `maps`: builds the built-in Pack's Maps with the pinned Blender, or
+//!   checks the committed `.glb` files are what it builds ([`maps`]).
+//! - `textures`: downloads the CC0 textures the material library lists and
+//!   checks each against its checksum ([`textures`]).
+//! - `credits`: writes `CREDITS.md` from the material library, or checks it
+//!   is up to date ([`textures`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -38,10 +44,13 @@ mod book;
 mod core_maths;
 mod import_tune;
 mod input_monitor;
+mod maps;
+mod materials;
 mod migrate;
 mod packs;
 mod review;
 mod scenario_catalogue;
+mod textures;
 mod walls;
 
 const USAGE: &str = "\
@@ -88,6 +97,21 @@ Commands:
       the game reads it: what was found and its profile, its Channels in µs,
       its raw values, and how often they change. Runs until Ctrl+C, or for
       the seconds given.
+  maps [--check] [--previews <folder> [--update-preview]]
+      Build the built-in Pack's Maps with Blender, the exact version pinned in
+      assets-src/blender-version.toml: each assets-src/maps/<id>/build.py
+      writes packs/opendrone/maps/<id>/<id>.glb. --check builds into
+      target/maps-check/ instead and says whether the committed .glb files are
+      those bytes (CI does this on Linux). --previews renders pictures of each
+      Map into <folder>, and --update-preview copies its preview.png render
+      into the Pack as the Map's picture.
+  textures [--pin]
+      Download the CC0 textures assets-src/materials.toml lists into
+      assets-src/textures/ (git ignores it) and refuse any file whose SHA-256
+      differs from the manifest's. --pin writes the checksum of a new file.
+  credits [--check]
+      Write CREDITS.md from assets-src/materials.toml, or with --check say
+      whether it is up to date.
   import-tune <export file> (<quad folder> | --print)
       Import a quad's Betaflight diff all (diff bare on 4.3 and 4.4, or a
       dump, from Betaflight 4.3 or newer) as the Quad's tune.txt, in
@@ -123,6 +147,9 @@ fn main() -> ExitCode {
         "merge-check" => review::run_merge_check(rest),
         "input-monitor" => input_monitor::run(rest),
         "import-tune" => import_tune::run(rest),
+        "maps" => maps::run(rest),
+        "textures" => textures::run_textures(rest),
+        "credits" => textures::run_credits(rest),
         _ => {
             eprintln!("{USAGE}\n{}", review::usage());
             ExitCode::from(2)
