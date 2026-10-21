@@ -479,6 +479,129 @@ fn renaming_a_scenario_of_cases_and_loosening_a_rule_expectation_in_a_case_waits
     );
 }
 
+// Format steps that add an input to every case.
+
+#[test]
+fn a_format_step_that_adds_an_input_to_every_case_raises_no_red_flag() {
+    // Main held mixer.toml in format 1; the pull request ran
+    // add-crash-flip-switch, which wrote `crash_flip = "off"` into each case.
+    let pull_request =
+        PullRequest::new("format-step-in-cases").on_main_as(MIXER, "mixer-format-1.toml.txt");
+    // Read from two folders, and from two git commits, as CI reads them.
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(review.gate_passed, "{}", review.output);
+        review.has_no_red_flags();
+    }
+}
+
+#[test]
+fn a_changed_source_expectation_in_a_case_still_waits_after_a_format_step() {
+    let review = PullRequest::new("format-step-and-source-changed")
+        .on_main_as(MIXER, "mixer-format-1.toml.txt")
+        .edit(
+            MIXER,
+            "value = \"158 ± 1\"\nbasis = \"source: mixTable",
+            "value = \"160 ± 1\"\nbasis = \"source: mixTable",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; crash\\_flip off; \
+         pitch 0%; roll 0%; rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw \
+         0%\" went from `158 ± 1` to `160 ± 1`.",
+    );
+    assert_eq!(
+        review.json["red_flags"]
+            .as_array()
+            .expect("red_flags is a list")
+            .len(),
+        1,
+        "only that one Expectation changed:\n{}",
+        review.report
+    );
+}
+
+#[test]
+fn a_new_stick_in_a_case_still_waits_after_a_format_step() {
+    let review = PullRequest::new("format-step-and-input-changed")
+        .on_main_as(MIXER, "mixer-format-1.toml.txt")
+        .edit(
+            MIXER,
+            "throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\n\n[[case.expect]]",
+            "throttle = \"10%\"\narm      = \"on\"\ncrash_flip = \"off\"\n\n[[case.expect]]",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "`scenarios/flight-controller/mixer.toml`: \"motor 1 DShot, in the case with arm on; crash\\_flip off; \
+         pitch 0%; roll 0%; throttle 0%; yaw 0%\" (`158 ± 1`) was removed, or now measures \
+         something else.",
+    );
+}
+
+#[test]
+fn a_format_step_main_does_not_know_yet_puts_its_new_case_input_to_the_reviewer() {
+    // The pull request that brings a step is judged by main's xtask, which
+    // doesn't have the step yet. Its new input in every case is for the
+    // Reviewer, as a new starting-state item is, and leaves every case's
+    // Expectations unchanged.
+    let pull_request =
+        PullRequest::new("unknown-format-step-in-cases").with_an_unknown_format_step(MIXER);
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(review.gate_passed, "{}", review.output);
+        review.reviewer_decides(
+            "A Scenario's setup changed under its Source or Rule Expectations",
+            "`scenarios/flight-controller/mixer.toml`: `case.beeper` (new in its cases, in format ",
+        );
+        assert_eq!(
+            review.json["red_flags"]
+                .as_array()
+                .expect("red_flags is a list")
+                .len(),
+            1,
+            "no Expectation changed:\n{}",
+            review.report
+        );
+    }
+}
+
+#[test]
+fn a_changed_source_expectation_in_a_case_still_waits_beside_a_format_step_main_does_not_know() {
+    let review = PullRequest::new("unknown-format-step-and-source-changed")
+        .with_an_unknown_format_step(MIXER)
+        .edit(
+            MIXER,
+            "value = \"158 ± 1\"\nbasis = \"source: mixTable",
+            "value = \"160 ± 1\"\nbasis = \"source: mixTable",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "went from `158 ± 1` to `160 ± 1`.",
+    );
+}
+
+#[test]
+fn a_new_input_in_cases_without_a_new_format_still_waits() {
+    // Without a newer format, a new input in a case is a new case, as before.
+    let review = PullRequest::new("new-case-input-same-format")
+        .edit(
+            MIXER,
+            "throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\n\n[[case.expect]]",
+            "throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\nbeeper = \"off\"\n\n[[case.expect]]",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "\"motor 1 DShot, in the case with arm on; crash\\_flip off; pitch 0%; roll 0%; throttle \
+         0%; yaw 0%\" (`158 ± 1`) was removed, or now measures something else.",
+    );
+}
+
 // ADRs, Bevy and wgpu.
 
 #[test]
@@ -1451,6 +1574,40 @@ impl PullRequest {
         );
         let edited = text.replace(from, to);
         self.write(path, &edited)
+    }
+
+    /// The base's `path` becomes the fixture `changes/<fixture>`: main held
+    /// it that way, and the head keeps the fixture repo's own.
+    fn on_main_as(self, path: &str, fixture: &str) -> PullRequest {
+        let text = fs::read_to_string(fixtures().join("changes").join(fixture))
+            .unwrap_or_else(|_| panic!("the fixture {fixture} exists"));
+        let target = self.root.join("base").join(path);
+        fs::create_dir_all(target.parent().expect("a folder")).expect("can make the folder");
+        fs::write(target, text).expect("can write the file");
+        self
+    }
+
+    /// The head's `path` as a format step the Report doesn't know yet would
+    /// leave it: `beeper = "off"` after `crash_flip` in every `[[case]]`,
+    /// and its `format` one newer.
+    fn with_an_unknown_format_step(self, path: &str) -> PullRequest {
+        let text = fs::read_to_string(self.head(path)).expect("the file exists");
+        let format = text
+            .lines()
+            .find_map(|line| line.strip_prefix("format = "))
+            .and_then(|n| n.trim().parse::<i64>().ok())
+            .expect("the Scenario has a `format = N` line");
+        let stepped = text
+            .replacen(
+                &format!("format = {format}\n"),
+                &format!("format = {}\n", format + 1),
+                1,
+            )
+            .replace(
+                "crash_flip = \"off\"\n",
+                "crash_flip = \"off\"\nbeeper = \"off\"\n",
+            );
+        self.write(path, &stepped)
     }
 
     /// A file already on main: the same in the base and the head.

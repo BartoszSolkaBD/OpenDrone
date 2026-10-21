@@ -19,10 +19,20 @@
 //! every field but its Expectations and the cases they sit in, and the Test
 //! Quad it flies. When a deleted Scenario's Expectations went to several new
 //! files, each new file's setup is compared with the old one.
+//!
+//! Both sides are read in the newest Scenario format this xtask knows: an
+//! older file is upgraded in memory by `SCENARIO_STEPS` first, so a format
+//! step that writes a new input into every case changes no case (#189). A
+//! newer format than it knows, as in the pull request that brings a step,
+//! has its new case inputs left out of the match and listed as a setup
+//! change for the Reviewer.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
+use opendrone_pack::migration::{FileKind, upgraded_with};
 use opendrone_pack::units::{Dimension, Expected, Tolerance, parse_expected, parse_quantity};
+use opendrone_scenario::{SCENARIO_FORMAT, SCENARIO_STEPS};
 
 use super::changes::Changes;
 use super::flags::{Level, RedFlag};
@@ -54,15 +64,32 @@ pub fn is_scenario(path: &str) -> bool {
 /// A Scenario file as far as Red Flags need it.
 struct ScenarioFile {
     name: Option<String>,
+    /// Its `format`, once upgraded as far as [`SCENARIO_STEPS`] go.
+    format: Option<i64>,
     expectations: Vec<Expectation>,
     /// Everything that sets up the flight: every field but the Expectations
     /// (with the cases they sit in), the name and the format, by dotted
     /// name, such as `start.physics_rate`.
     setup: BTreeMap<String, toml::Value>,
+    /// The inputs of the cases its Expectations sit in, by dotted name, such
+    /// as `case.throttle`.
+    case_inputs: BTreeSet<String>,
 }
 
 impl ScenarioFile {
+    /// Reads a Scenario in the newest format this xtask knows. An older one
+    /// is first upgraded in memory by the steps `cargo xtask migrate` runs,
+    /// so the items a format step writes in match on both sides. A file that
+    /// can't be upgraded is read as it is.
     fn read(text: &str) -> Option<ScenarioFile> {
+        let text = upgraded_with(
+            "scenario",
+            text,
+            FileKind::Scenario,
+            SCENARIO_FORMAT,
+            SCENARIO_STEPS,
+        )
+        .unwrap_or(Cow::Borrowed(text));
         let table: toml::Table = text.parse().ok()?;
         let mut expectations = Vec::new();
         collect(&table, &Place::default(), &mut expectations);
@@ -70,14 +97,35 @@ impl ScenarioFile {
         flatten(&table, "", &mut setup);
         setup.remove("name");
         setup.remove("format");
+        let case_inputs = expectations.iter().flat_map(|e| e.place.inputs()).collect();
         Some(ScenarioFile {
             name: table
                 .get("name")
                 .and_then(toml::Value::as_str)
                 .map(str::to_string),
+            format: table.get("format").and_then(toml::Value::as_integer),
             expectations,
             setup,
+            case_inputs,
         })
+    }
+
+    /// The case inputs `newer` brings in a newer format than this file's,
+    /// such as `case.crash_flip`: inputs that none of this file's cases has.
+    /// Only a format step this xtask doesn't know leaves any, such as the one
+    /// the pull request itself brings: a step it knows wrote them into this
+    /// file too. They're left out when a case's Expectations are matched, and
+    /// listed as a setup change for the Reviewer. Without a newer format
+    /// there are none, so a new input in a case makes it another case.
+    fn new_case_inputs(&self, newer: &ScenarioFile) -> BTreeSet<String> {
+        match (self.format, newer.format) {
+            (Some(before), Some(after)) if after > before => newer
+                .case_inputs
+                .difference(&self.case_inputs)
+                .cloned()
+                .collect(),
+            _ => BTreeSet::new(),
+        }
     }
 }
 
@@ -156,9 +204,20 @@ struct Place {
     /// each as the Report shows it: its key and its own fields, such as
     /// `case with arm on; pitch 0%; …`.
     cases: Vec<String>,
-    /// What it's matched by: the same, with each case's fields read as
-    /// values where they're numbers, so `0%` and `0.0 %` are the same stick.
-    read: String,
+    /// What it's matched by, from the top down: each section and each case,
+    /// with each case's fields read as values where they're numbers, so `0%`
+    /// and `0.0 %` are the same stick.
+    path: Vec<Part>,
+}
+
+/// One step of a [`Place`]'s path.
+#[derive(Clone, Debug, PartialEq)]
+enum Part {
+    /// A section, by its key.
+    Section(String),
+    /// One table of an array of tables, such as one `[[case]]`: the array's
+    /// dotted name, such as `case`, and the table's fields as read values.
+    Case(String, BTreeMap<String, String>),
 }
 
 impl Place {
@@ -171,10 +230,12 @@ impl Place {
                 format!("{outer}.{key}")
             }
         };
+        let mut path = self.path.clone();
+        path.push(Part::Section(key.to_string()));
         Place {
             section: join(&self.section),
             cases: self.cases.clone(),
-            read: format!("{}/{key}", self.read),
+            path,
         }
     }
 
@@ -195,24 +256,64 @@ impl Place {
                 )
             })
             .collect();
-        let read: Vec<String> = fields
+        let read: BTreeMap<String, String> = fields
             .iter()
-            .map(|(name, value)| match value.as_str() {
-                Some(text) => format!("{name} {}", read_values(text)),
-                None => format!("{name} {value}"),
+            .map(|(name, value)| {
+                let read = match value.as_str() {
+                    Some(text) => read_values(text),
+                    None => value.to_string(),
+                };
+                (name.clone(), read)
             })
             .collect();
+        let array = self.section(key).section;
         let mut cases = self.cases.clone();
-        cases.push(format!(
-            "{} with {}",
-            self.section(key).section,
-            shown.join("; ")
-        ));
+        cases.push(format!("{array} with {}", shown.join("; ")));
+        let mut path = self.path.clone();
+        path.push(Part::Case(array, read));
         Place {
             section: self.section.clone(),
             cases,
-            read: format!("{}/{key}[{}]", self.read, read.join("; ")),
+            path,
         }
+    }
+
+    /// The inputs of the cases it sits in, by dotted name, such as
+    /// `case.throttle`.
+    fn inputs(&self) -> Vec<String> {
+        self.path
+            .iter()
+            .flat_map(|part| match part {
+                Part::Section(_) => Vec::new(),
+                Part::Case(array, fields) => fields
+                    .keys()
+                    .map(|name| format!("{array}.{name}"))
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Whether two places are the same, leaving out the case inputs in
+    /// `new`, which a newer format brought.
+    fn same(&self, other: &Place, new: &BTreeSet<String>) -> bool {
+        let without = |place: &Place| -> Vec<Part> {
+            place
+                .path
+                .iter()
+                .map(|part| match part {
+                    Part::Section(_) => part.clone(),
+                    Part::Case(array, fields) => Part::Case(
+                        array.clone(),
+                        fields
+                            .iter()
+                            .filter(|(name, _)| !new.contains(&format!("{array}.{name}")))
+                            .map(|(name, value)| (name.clone(), value.clone()))
+                            .collect(),
+                    ),
+                })
+                .collect()
+        };
+        without(self) == without(other)
     }
 }
 
@@ -349,9 +450,10 @@ impl Expectation {
 
     /// Two Expectations are the same check if they measure the same thing at
     /// the same moment or with the same statistic over the same stretch, in
-    /// the same section and the same case.
-    fn same_check(&self, other: &Expectation) -> bool {
-        self.place.read == other.place.read
+    /// the same section and the same case, leaving out the case inputs in
+    /// `new`, which a newer format brought.
+    fn same_check(&self, other: &Expectation, new: &BTreeSet<String>) -> bool {
+        self.place.same(&other.place, new)
             && self.text("what") == other.text("what")
             && self.when("at") == other.when("at")
             && self.when("over") == other.when("over")
@@ -360,8 +462,8 @@ impl Expectation {
 
     /// The same check with the same expected value, Basis and every other
     /// field, however its moment is spelled.
-    fn same_as(&self, other: &Expectation) -> bool {
-        self.same_check(other)
+    fn same_as(&self, other: &Expectation, new: &BTreeSet<String>) -> bool {
+        self.same_check(other, new)
             && self
                 .table
                 .keys()
@@ -437,9 +539,10 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                 // was split: every added file that holds one of them, each
                 // with its own setup.
                 for (now, head) in &candidates {
+                    let new = base.new_case_inputs(head);
                     let holds_a_locked_one = base.expectations.iter().any(|before| {
                         before.basis().locked()
-                            && head.expectations.iter().any(|e| e.same_check(before))
+                            && head.expectations.iter().any(|e| e.same_check(before, &new))
                     });
                     if holds_a_locked_one {
                         setup_changed(path, now, &base, head, &test_quads, &mut flags);
@@ -546,6 +649,16 @@ fn setup_changed(
     {
         changed.push(format!("the Test Quad {}", code(&id)));
     }
+    // A newer format's new inputs in the cases, which the Expectations in
+    // them were matched without.
+    if let Some(format) = head.format {
+        for input in base.new_case_inputs(head) {
+            changed.push(format!(
+                "{} (new in its cases, in format {format})",
+                code(&input)
+            ));
+        }
+    }
     if changed.is_empty() {
         return;
     }
@@ -580,16 +693,24 @@ fn compare(
     flags: &mut Vec<RedFlag>,
 ) -> bool {
     let mut all_found = true;
-    let find = |test: &dyn Fn(&Expectation) -> bool| {
-        candidates
-            .iter()
-            .find_map(|(p, file)| file.expectations.iter().find(|e| test(e)).map(|e| (*p, e)))
+    // Each candidate with the case inputs its newer format brought, if any.
+    let candidates: Vec<(&str, &ScenarioFile, BTreeSet<String>)> = candidates
+        .iter()
+        .map(|(p, file)| (*p, *file, base.new_case_inputs(file)))
+        .collect();
+    let find = |test: &dyn Fn(&Expectation, &BTreeSet<String>) -> bool| {
+        candidates.iter().find_map(|(p, file, new)| {
+            file.expectations
+                .iter()
+                .find(|e| test(e, new))
+                .map(|e| (*p, e))
+        })
     };
     for before in &base.expectations {
-        if find(&|e| e.same_as(before)).is_some() {
+        if find(&|e, new| e.same_as(before, new)).is_some() {
             continue;
         }
-        let after = find(&|e| e.same_check(before));
+        let after = find(&|e, new| e.same_check(before, new));
         all_found &= after.is_some();
         let basis = before.basis();
         let what = plain(&before.description());
