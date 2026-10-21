@@ -20,7 +20,7 @@ picture     = "picture.png"
 
 [camera]   # #14 and #28
 lens        = "fisheye"
-position    = "45 mm forward, 0 mm left, 12 mm up"   # in the gap between the front duct rings, just ahead of their outer edge (43 mm forward), as the C03 sits on the Meteor65 Pro in BetaFPV's photos: docs/research/quad-definitions.md
+position    = "40 mm forward, 0 mm left, 16 mm up"   # between the front duct rings, 3 mm behind their outer edge (43 mm forward) so a wall stops the rings before the lens, and just above their tops (15 mm up): docs/research/quad-definitions.md
 camera_tilt = "30°"     # the Meteor65 Pro's stock insert
 fov         = "160°"    # its C03 camera, corner to corner
 vtx_power   = "25 mW"   # what the maintainer's quads run

@@ -15,7 +15,6 @@ use bevy::time::{Fixed, Time};
 use opendrone::camera::controls::{
     CAMERA_KEYS, CameraSettings, QuadCamera, REPEAT_AFTER, REPEAT_EVERY, Repeater, camera_keys,
 };
-use opendrone::camera::drawn_moment;
 use opendrone::camera::exposure::{adaptation, compensation_points, curve_at, metering_mask};
 use opendrone::camera::lens::{Aspect, GENTLE_CURVE, Lens, Picture, STOCK_CURVE};
 use opendrone::camera::look::{
@@ -24,8 +23,12 @@ use opendrone::camera::look::{
 };
 use opendrone::camera::params::FrameInputs;
 use opendrone::camera::pose::{DIGITAL_DELAY, MAX_EDGE_DELAY, Pose, PoseHistory, picture_delay};
+use opendrone::camera::{NEAR, drawn_moment};
+use opendrone::reference;
+use opendrone::set_up::repo_folder;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::Action;
+use opendrone_maths::Vec3 as Vec3d;
 
 fn close(a: f64, b: f64, within: f64) -> bool {
     (a - b).abs() <= within
@@ -805,5 +808,95 @@ fn the_late_picture_never_enters_the_simulation() {
     assert_eq!(
         plain.simulation().fingerprint(),
         watched.simulation().fingerprint()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Where the lens sits on the Whoop 65
+
+#[test]
+fn after_a_level_nose_first_hit_into_a_wall_the_whoops_lens_is_not_inside_the_wall_by_more_than_the_near_plane()
+ {
+    // Basis: Rule. The picture draws nothing nearer than the near plane, so a
+    // lens inside the wall by more than that shows through it (#208). The
+    // Scenario flies the Whoop 65 level, nose first, at 10 m/s east into the
+    // Wall Test Map's wall, whose face is 5 m east. Metres.
+    const WALL_FACE: f64 = 5.0;
+    let repo = repo_folder();
+    let loaded = reference::load(
+        &repo,
+        &repo.join("scenarios/physics/whoop-hits-a-wall-nose-first-with-its-front-duct-rings.toml"),
+    )
+    .unwrap();
+    let (simulation, inputs) = opendrone_scenario::simulation(&loaded.scenario, &loaded.packs)
+        .unwrap_or_else(|problems| panic!("{problems}"));
+    let mut flight = Flight::scripted(simulation, inputs).unwrap();
+    let [forward, left, up] = common::plan("whoop-65").quad.camera.position;
+    let mut deepest = f64::NEG_INFINITY;
+    let mut bounced = false;
+    while !flight.finished() {
+        flight.tick();
+        let state = flight.simulation().quad_state(0);
+        let lens = state.position + state.attitude.body_to_world(Vec3d::new(forward, left, up));
+        deepest = deepest.max(lens.x - WALL_FACE);
+        bounced |= state.velocity.x < 0.0;
+    }
+    assert!(bounced, "the whoop never hit the wall and bounced back");
+    assert!(
+        deepest <= f64::from(NEAR),
+        "the lens got {:.2} mm past the wall's face; the near plane is {:.2} mm",
+        deepest * 1000.0,
+        f64::from(NEAR) * 1000.0
+    );
+}
+
+#[test]
+fn the_whoops_lens_sits_above_the_top_of_its_duct_rings() {
+    // Basis: Rule. A lens below the ring tops sees their front tips in the
+    // top corners of the picture once the Camera Tilt reaches about 43° (#208).
+    // Metres, up from the centre of mass.
+    let plan = common::plan("whoop-65");
+    let shape = &plan.quad.parameters.shape;
+    let rings = shape.duct_rings.expect("the Whoop 65 has duct rings");
+    let top = shape.rotor_height + rings.height / 2.0;
+    let up = plan.quad.camera.position[2];
+    assert!(up >= top, "the lens is {up} m up, the ring tops {top} m");
+}
+
+#[test]
+fn the_whoops_picture_at_its_default_tilt_and_fov_shows_none_of_its_front_duct_rings() {
+    // Basis: Rule. The picture reaches as far off the axis as half the FOV, at
+    // its corners (#14 §2). A ring point is out of the picture when it is
+    // further than that from the lens's axis. Checked on the front rings'
+    // outer walls, top and bottom edges, every degree round. Degrees.
+    let plan = common::plan("whoop-65");
+    let shape = &plan.quad.parameters.shape;
+    let rings = shape.duct_rings.expect("the Whoop 65 has duct rings");
+    let camera = &plan.quad.camera;
+    let lens = Vec3d::new(camera.position[0], camera.position[1], camera.position[2]);
+    let tilt = camera.camera_tilt;
+    let axis = Vec3d::new(tilt.cos(), 0.0, tilt.sin());
+    let reach = camera.fov.to_degrees() / 2.0;
+    let centre = shape.diagonal / 2.0 * core::f64::consts::FRAC_1_SQRT_2;
+    let outside = rings.inside_diameter / 2.0 + rings.wall;
+    let mut nearest = f64::INFINITY;
+    for side in [-1.0, 1.0] {
+        for degrees in 0..360 {
+            let round = f64::from(degrees).to_radians();
+            for edge in [-1.0, 1.0] {
+                let point = Vec3d::new(
+                    centre + outside * round.cos(),
+                    side * centre + outside * round.sin(),
+                    shape.rotor_height + edge * rings.height / 2.0,
+                );
+                let to = point - lens;
+                let angle = (to.dot(axis) / to.length()).acos().to_degrees();
+                nearest = nearest.min(angle);
+            }
+        }
+    }
+    assert!(
+        nearest > reach,
+        "a ring point is {nearest}° off the lens's axis; the picture reaches {reach}°"
     );
 }
