@@ -228,7 +228,11 @@ How you merge depends on what main has done since the PR's base:
 
 1. Post the author's notes for later tickets. Use one comment on each later ticket, starting "Notes from #N (PR #P):". If the PR has a "Delegator's hand-off:" comment, take the notes and follow-ups from it, and finish as under [Hand-offs](#hand-offs).
 2. Check that the ticket closed. `Closes #N` usually closes it.
-3. Remove the author's worktree with `git worktree remove <path>`, only once its PR has merged or closed. Never sooner: a later fix round needs it. Reviewer worktrees can go as soon as their Verdict is posted. If your permission settings block the removal, list the worktrees for the maintainer.
+3. Remove the author's worktree, only once its PR has merged or closed. Never sooner: a later fix round needs it. Reviewer worktrees can go as soon as their Verdict is posted. If your permission settings block the removal, list the worktrees for the maintainer. Authors and Reviewers build in a shared target folder ([Setting up a build](author.md#setting-up-a-build)), but a worktree may still hold a `target/` folder of its own, 17 to 18 GB, so clear it first:
+   1. Delete the worktree's `target/` folder if it has one: `rm -rf <path>/target`.
+   2. Run `git worktree remove --force <path>`.
+   3. If that still says "Directory not empty", run `rm -rf <path>`, then `git worktree prune`.
+4. Check the shared target folder with `du -sh ~/.cache/opendrone-target`. If it is over 40 GB, delete it between batches, when no agent is building: `rm -rf ~/.cache/opendrone-target`. The next build makes it again.
 
 ## Follow-ups
 
