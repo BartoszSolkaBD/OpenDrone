@@ -129,21 +129,34 @@ pub fn landed_height(shape: &QuadShape) -> f64 {
     -lowest
 }
 
-/// The repo's folder, for the built-in Pack and the Scenarios: the nearest
-/// folder at or above the working folder that holds both `packs/` and
-/// `scenarios/`, else the repo the game was built from. The alpha's game
-/// runs from the repo; a packaged build finds its Packs once the release
-/// ticket lays them out.
+/// The game's folder, for the built-in Pack, the Scenarios and the material
+/// library: see [`find_repo_folder`]. When neither the program's folder nor
+/// the working folder has them, it is the repo the game was built from.
 pub fn repo_folder() -> PathBuf {
-    let built_in = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    std::env::current_dir()
-        .ok()
-        .and_then(|here| {
-            here.ancestors()
-                .find(|f| f.join("packs").is_dir() && f.join("scenarios").is_dir())
+    let program = std::env::current_exe().ok();
+    let here = std::env::current_dir().ok();
+    find_repo_folder(program.as_deref(), here.as_deref())
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+}
+
+/// Where the game finds its files, a folder that holds both `packs/` and
+/// `scenarios/`:
+///
+/// - the folder the program itself is in, when it holds them: a downloaded
+///   build, which `cargo xtask package` lays out that way (#81), so it finds
+///   its own files wherever it's started from, by a double-click too;
+/// - else the nearest folder at or above the working folder that holds them:
+///   the repo, when the game runs with `cargo run`.
+pub fn find_repo_folder(program: Option<&Path>, here: Option<&Path>) -> Option<PathBuf> {
+    let holds_the_game = |f: &Path| f.join("packs").is_dir() && f.join("scenarios").is_dir();
+    program
+        .and_then(Path::parent)
+        .filter(|f| holds_the_game(f))
+        .map(Path::to_path_buf)
+        .or_else(|| {
+            here.and_then(|here| here.ancestors().find(|f| holds_the_game(f)))
                 .map(Path::to_path_buf)
         })
-        .unwrap_or(built_in)
 }
 
 /// The built-in Pack and the other Packs in the repo's `packs/` folder, each

@@ -1,0 +1,76 @@
+# Once a month, opens an "Upgrade to Bevy 0.N" ticket, labelled
+# `ready-for-agent`, when Bevy 0.N.0 has shipped: a final release newer than
+# the Bevy in Cargo.toml, never a release candidate (ADR-0021, #81).
+#
+# Its text is the fixed template .github/bevy-upgrade-issue.md, with only the
+# versions filled in (`cargo xtask bevy-upgrade`), so agents treat the issue
+# as the maintainer's words: the one exception ADR-0021 makes to ADR-0010.
+# That trust rests on only main's code running this: a schedule always runs
+# main's copy, and a run started by hand does nothing unless it's on main.
+#
+# It opens each version's issue once: if any issue, open or closed, already
+# has the title, it opens none.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Bevy upgrade
+
+on:
+  schedule:
+    # 06:00 UTC on the 1st of each month.
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    name: Open an "Upgrade to Bevy 0.N" ticket if 0.N.0 has shipped
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write # the ticket
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install the Linux packages the xtask build needs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
+      - name: Read Bevy's versions from crates.io's index
+        shell: bash
+        run: curl --fail --silent --show-error --location --output "$RUNNER_TEMP/bevy-index.json" https://index.crates.io/be/vy/bevy
+
+      - name: Work out the tickets to open
+        shell: bash
+        run: cargo xtask bevy-upgrade "$RUNNER_TEMP/bevy-index.json" > "$RUNNER_TEMP/issues.json"
+
+      - name: Open each one that isn't open or closed already
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count=$(jq length "$RUNNER_TEMP/issues.json")
+          echo "Bevy versions to upgrade to: $count"
+          for i in $(seq 0 $((count - 1))); do
+            title=$(jq -r --argjson i "$i" '.[$i].title' "$RUNNER_TEMP/issues.json")
+            jq -r --argjson i "$i" '.[$i].body' "$RUNNER_TEMP/issues.json" > "$RUNNER_TEMP/body.md"
+            same=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 100 \
+              --search "\"$title\" in:title" --json title \
+              | jq --arg title "$title" '[.[] | select(.title == $title)] | length')
+            if [[ "$same" != 0 ]]; then
+              echo "\"$title\" is already an issue."
+              continue
+            fi
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md" \
+              --label ready-for-agent --label "lane: Game" --label "lane: Repo rules"
+          done

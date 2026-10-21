@@ -1,0 +1,85 @@
+# Dependabot's updates, monthly (#15 §8, ADR-0021, #81). How to read them:
+# docs/builds-and-releases.md.
+#
+# - CI's actions come in one grouped PR, and the libraries outside the core
+#   (edge libraries) in another.
+# - Rust itself, libm, parry3d and every other library the core crates use
+#   each come in a PR of their own, so a change to the Simulation's results
+#   always has one cause.
+# - Bevy's and wgpu's patch releases each come in a PR of their own too. A
+#   Bevy 0.N jump and a wgpu major version are never offered: they never
+#   build without code changes, so the Bevy upgrade workflow opens an
+#   "Upgrade to Bevy 0.N" ticket instead (.github/workflows/bevy-upgrade.yml).
+#
+# The ticket asked for CI's actions and the edge libraries in one PR. That
+# needs Dependabot's multi-ecosystem groups, and a multi-ecosystem update
+# leaves out every library outside its group (dependabot-core's
+# updater/lib/dependabot/updater/operations/group_update_all_versions.rb runs
+# no ungrouped updates for one), so the core libraries would never be
+# offered. Dependabot also allows only one cargo entry for the repo's root.
+# So the actions and the edge libraries come as two grouped PRs.
+#
+# crates/xtask/tests/releases.rs checks the edge-libraries list against the
+# workspace's Cargo.toml: every outside library is either in it, or a core
+# library, Bevy, wgpu or the lexer.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      ci-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      # Every outside library the core crates don't use, in one PR. A library
+      # not listed here gets a PR of its own.
+      edge-libraries:
+        patterns:
+          - "audioadapter-buffers"
+          - "firewheel"
+          - "flate2"
+          - "object"
+          - "pulldown-cmark"
+          - "rustc-demangle"
+          - "sdl3-sys"
+          - "serde_json"
+          - "sha2"
+          - "toml"
+          - "toml_edit"
+          - "triple_buffer"
+          - "zip"
+    ignore:
+      # A Bevy 0.N jump needs a port: the monthly workflow opens its ticket.
+      # Patch releases (0.N.x) still come, each in its own PR.
+      - dependency-name: bevy
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      # wgpu's major versions come with Bevy's 0.N jumps. Its patch and minor
+      # releases still come, each in its own PR, and must re-apply the
+      # counting patch (ADR-0016).
+      - dependency-name: wgpu
+        update-types:
+          - version-update:semver-major
+      # The Review Report reads Rust with rustc's own lexer, byte for byte
+      # the pinned Rust's (Cargo.toml), so it moves only with Rust, in Rust's
+      # own PR.
+      - dependency-name: ra-ap-rustc_lexer
+
+  # Rust itself, rust-toolchain.toml's channel, in its own PR (ADR-0001).
+  - package-ecosystem: rust-toolchain
+    directory: /
+    schedule:
+      interval: monthly
