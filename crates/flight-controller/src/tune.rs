@@ -103,7 +103,7 @@ pub struct Tune {
     /// each axis's D to; at or below its D, Dynamic D is off on that axis.
     pub d_max: [u8; 3],
     /// `feedforward_transition`: below this stick deflection, in hundredths,
-    /// roll and pitch's feedforward fades towards centre (0: no fade).
+    /// each axis's feedforward (yaw's too) fades towards centre (0: no fade).
     pub feedforward_transition: u8,
     /// `feedforward_averaging`: how many frames' feedforward is averaged.
     pub feedforward_averaging: FeedforwardAveraging,
@@ -136,7 +136,8 @@ pub struct Tune {
     /// stick move from a slow one, in Hz.
     pub iterm_relax_cutoff: u8,
     /// `anti_gravity_gain`: how strongly a fast throttle change boosts I (and
-    /// a little P), in tenths (80 is 8.0; 0: off).
+    /// a little P). The code uses the number as it stands, 80 as 80; only
+    /// the Betaflight App shows it in tenths, as 8.0 (0: off).
     pub anti_gravity_gain: u8,
     /// `tpa_mode`: which terms TPA cuts.
     pub tpa_mode: TpaMode,
@@ -576,6 +577,10 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_breakpoint", Kind::Number(1000, 2000)),
     ("throttle_boost", Kind::Number(0, 100)),
     ("motor_output_limit", Kind::Number(1, 100)),
+    // The ranges below, from `angle_p_gain` down to `level_race_mode` (the
+    // Angle and Horizon settings, and the PID sum limits, feedforward, TPA and
+    // anti-gravity ones among them), were checked against Betaflight
+    // 2026.6.2's `settings.c` (#192).
     ("angle_p_gain", Kind::Number(0, 200)),
     ("angle_limit", Kind::Number(10, 80)),
     ("horizon_level_strength", Kind::Number(0, 100)),

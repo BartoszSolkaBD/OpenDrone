@@ -49,12 +49,12 @@ measured = "none broken"
 [fingerprints]
 quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "587d9fbb0b2ad6c5"   # the Flight Controller's whole state after each of 6 cases, in order
+run  = "7984165993237ad2"   # the Flight Controller's whole state after each of 6 cases, in order
 
 [fingerprints.checkpoints]   # the Flight Controller's whole state after each case
-"case 1" = "f9822f03a4d0eecb"
-"case 2" = "cc5956e3d058984f"
-"case 3" = "b2480189210388fe"
-"case 4" = "ca2d1c9dc0ee0ffc"
-"case 5" = "4c90a0564f059f9d"
-"case 6" = "5582571b003da9e1"
+"case 1" = "e2b36c8df5f1001a"
+"case 2" = "db659aa9ea98fe6a"
+"case 3" = "a48fad1e0c9d5ceb"
+"case 4" = "c6b59112fc5030f9"
+"case 5" = "4fc2e474ec8383fc"
+"case 6" = "459e0974fd80ebd4"

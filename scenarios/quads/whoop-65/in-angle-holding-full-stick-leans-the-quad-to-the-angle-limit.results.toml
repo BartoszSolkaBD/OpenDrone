@@ -1,0 +1,40 @@
+# Results of in-angle-holding-full-stick-leans-the-quad-to-the-angle-limit.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "In Angle, holding full stick leans the Whoop 65 to the angle limit"
+
+[[expect]]
+what     = "roll at 5 s"
+basis    = "Rule"
+expected = "55° ± 1°"
+measured = "55.0°"
+
+[[expect]]
+what     = "tilt at 5 s"
+basis    = "Rule"
+expected = "55° ± 1°"
+measured = "55.0°"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "689f5dbf459141b1"   # the whole state after each of 40000 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.5 s" = "fcd7424b6e15cdb3"
+"1 s" = "439872f91cb826d7"
+"1.5 s" = "80701f6da535ff3d"
+"2 s" = "df6c9110b8f5a5eb"
+"2.5 s" = "c5032c5631567c3b"
+"3 s" = "1b91245a022b0f54"
+"3.5 s" = "744fe0959f710751"
+"4 s" = "c90c0eef0599b90f"
+"4.5 s" = "380560fa5d6653d4"
+"5 s" = "3eda77921a037bff"

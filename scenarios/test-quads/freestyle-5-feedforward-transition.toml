@@ -1,9 +1,9 @@
 # The Freestyle 5″ with a feedforward transition of 50.    id: test/freestyle-5-feedforward-transition
 #
-# Betaflight 2026.6.2's `feedforward_transition` fades roll and pitch's
-# feedforward towards centre stick: below a deflection of the setting's
-# hundredths, feedforward is scaled by the deflection ÷ that (`calculateFeedforward`,
-# src/main/fc/rc.c). Its default, which the Freestyle 5″ keeps, is 0: no
+# Betaflight 2026.6.2's `feedforward_transition` fades each axis's feedforward
+# (yaw's too, not only roll and pitch's) towards centre stick: below a
+# deflection of the setting's hundredths, feedforward is scaled by the
+# deflection ÷ that (`calculateFeedforward`, src/main/fc/rc.c). Its default, which the Freestyle 5″ keeps, is 0: no
 # fade. This Test Quad sets it to 50, so a Flight Controller Scenario can
 # check the fade below half stick.
 #

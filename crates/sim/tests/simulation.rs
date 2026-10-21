@@ -321,9 +321,18 @@ fn each_tick_reports_every_motor_and_its_esc_and_the_battery() {
 
 /// A stand-in for the Flight Controller that writes down the tick of every
 /// Radio Link frame it is handed, and the frame's roll Channel.
-#[derive(Clone)]
 struct Listener {
     heard: Rc<RefCell<Vec<(u64, u16)>>>,
+}
+
+/// A copy has a log of its own, holding what the original had heard, so that
+/// nothing a step writes in one shows in the other (`clone_box`'s rule).
+impl Clone for Listener {
+    fn clone(&self) -> Self {
+        Listener {
+            heard: Rc::new(RefCell::new(self.heard.borrow().clone())),
+        }
+    }
 }
 
 impl FlightControllerSeam for Listener {
@@ -387,6 +396,41 @@ fn listen_to(
         sim.step();
     }
     heard.take()
+}
+
+#[test]
+fn restoring_a_copy_adds_nothing_to_the_log_of_the_flight_controller_it_replaced() {
+    // Basis: Rule (`FlightControllerSeam::clone_box`: a copy shares nothing
+    // with the original that a step could change). The Simulation's copy
+    // holds a clone of the Flight Controller; put back after more frames, it
+    // goes on writing its own log, and the log the test watches stops at what
+    // the original heard.
+    let heard = Rc::new(RefCell::new(Vec::new()));
+    let mut quad = quad_at(10.0);
+    quad.flight_controller = Box::new(Listener {
+        heard: Rc::clone(&heard),
+    });
+    let mut sim = Simulation::new(set_up(8000, 1, vec![quad])).unwrap();
+    sim.flight_input(
+        0,
+        SimulationTime::from_ticks(0),
+        FlightInput::Channels(rolled(992)),
+    );
+    for _ in 0..64 {
+        sim.step();
+    }
+    let copy = sim.snapshot();
+    for _ in 0..64 {
+        sim.step();
+    }
+    let heard_by_the_original = heard.borrow().len();
+    assert_eq!(heard_by_the_original, 4, "frames at steps 0, 32, 64 and 96");
+
+    sim.restore(&copy);
+    for _ in 0..64 {
+        sim.step();
+    }
+    assert_eq!(heard.borrow().len(), heard_by_the_original);
 }
 
 fn rolled(step: u16) -> Channels {
@@ -666,9 +710,18 @@ fn the_flight_controller_hears_whether_the_escs_have_beeped_ready() {
 
 /// A stand-in for the Flight Controller that writes down, each tick,
 /// whether the sensor readings said the ESCs were ready.
-#[derive(Clone)]
 struct EscListener {
     heard: Rc<RefCell<Vec<bool>>>,
+}
+
+/// A copy has a log of its own, holding what the original had heard, so that
+/// nothing a step writes in one shows in the other (`clone_box`'s rule).
+impl Clone for EscListener {
+    fn clone(&self) -> Self {
+        EscListener {
+            heard: Rc::new(RefCell::new(self.heard.borrow().clone())),
+        }
+    }
 }
 
 impl FlightControllerSeam for EscListener {
@@ -859,10 +912,15 @@ fn reset_carries_each_rotors_prop_wash_flicker_on() {
                 after_reset.push(sim.quad_flicker(0));
             }
         }
-        (start, after_reset)
+        (start, after_reset, sim.quad_state(0).position.z)
     };
-    let (start, with_reset) = flown(true);
-    let (_, without) = flown(false);
+    let (start, with_reset, height_with_reset) = flown(true);
+    let (_, without, height_without) = flown(false);
+    // The Reset happened: it put the Quad back on its Launch Spot, 100 m up,
+    // at rest, so 0.25 s later it has barely sunk, where the other Quad,
+    // sinking at 5 m/s all the while, is 3.7 m down.
+    assert!(height_with_reset > 99.0, "{height_with_reset}");
+    assert!(height_without < 97.0, "{height_without}");
     assert_eq!(with_reset.len(), 4);
     assert_eq!(with_reset, without);
     // Not the flicker starting over: after 0.5 s it is somewhere else.
@@ -873,9 +931,18 @@ fn reset_carries_each_rotors_prop_wash_flicker_on() {
 
 /// A stand-in for the Flight Controller that writes down every Radio Link
 /// frame it is handed, whole, with its step.
-#[derive(Clone)]
 struct FrameListener {
     heard: Rc<RefCell<Vec<(u64, Channels)>>>,
+}
+
+/// A copy has a log of its own, holding what the original had heard, so that
+/// nothing a step writes in one shows in the other (`clone_box`'s rule).
+impl Clone for FrameListener {
+    fn clone(&self) -> Self {
+        FrameListener {
+            heard: Rc::new(RefCell::new(self.heard.borrow().clone())),
+        }
+    }
 }
 
 impl FlightControllerSeam for FrameListener {

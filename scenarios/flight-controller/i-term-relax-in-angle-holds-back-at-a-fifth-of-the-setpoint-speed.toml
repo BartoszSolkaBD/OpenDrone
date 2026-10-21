@@ -1,0 +1,113 @@
+# In Angle, I-term relax's threshold is a fifth of Acro's, 8 °/s instead of
+# 40 °/s, as in Betaflight 2026.6.2 (`applyItermRelax`, src/main/flight/pid.c:
+# with `FLIGHT_MODE(ANGLE_MODE)` the threshold is `ITERM_RELAX_SETPOINT_
+# THRESHOLD` × 0.2, L854-L857; the Betaflight research §3). i-term-relax.toml
+# shows the 40 °/s of Acro.
+#
+# - The setpoint I-term relax watches is the one the PID loop works to: in
+#   Angle, the levelling's, how far the true attitude is from the tilt the
+#   sticks ask for, times `angle_p_gain` 50 ÷ 10 = 5 °/s for each degree (see
+#   angle-asks-for-a-tilt.toml).
+# - A first-order low-pass (PT1) at `iterm_relax_cutoff` 15 Hz follows that
+#   setpoint; the setpoint less it is how fast it is moving. It moves
+#   k = ω ÷ (ω + 1) = 0.0116438 of the way each loop, with ω = 2π × 15 Hz ÷
+#   8000.
+# - With `iterm_relax_type` SETPOINT, I grows by the error times
+#   max(0, 1 − that ÷ the threshold).
+#
+# On the Freestyle 5″'s Tune, with its Flight Controller in Angle, the sticks
+# centred, which ask for a tilt of 60° × 0.10966 ÷ 670 = 0.00982° and so a
+# setpoint of 0.0491015 °/s while the Quad is level, and the gyro reading 0 °/s
+# throughout. The earth reference adds 0.10966 °/s of yaw × sin(0.00982°) =
+# 0.0000188 °/s (angle_earth_ref 100, as angle-asks-for-a-tilt.toml notes), so
+# the setpoint is 0.0491203 °/s. Roll's I grows by 0.244381 × 80 × 0.0491203 ÷
+# 8000 = 0.00012004 a loop (the 0.244381 × 80 of i-term-relax.toml's), so by
+# 4000 loops, at 0.5 s, it is 0.48016.
+#
+# At 0.5 s the attitude reads a roll of 4°, which the levelling answers with
+# a setpoint of (0.00982° − 4°) × 5 + 0.0000188 = -19.9509 °/s, 20 °/s from
+# where it was.
+# It doesn't jump there: the levelling's setpoint passes through a third-order
+# low-pass at 50 Hz (a PT3 with k = 0.0715176 a loop), so it rises over about
+# 10 ms, and I-term relax's own low-pass (k = 0.0116438) lags behind it. How
+# far the setpoint is from that low-pass peaks at 11.99 °/s, at the 64th loop
+# after the jump. That is far less than Acro's 40 °/s, where I would go on
+# growing at 70% or more of its pace, but more than Angle's 8 °/s: so I stops
+# growing in the 34th loop, when the setpoint is first 8.26 °/s from its
+# low-pass, and holds for 86 loops, until the 120th, when it is 7.91 °/s from
+# it, and then grows again, by about -19.9509 × 0.244381 × 80 ÷ 8000 × (1 −
+# that ÷ 8) = -0.048756 × (1 − that ÷ 8) a loop, less and less held back (the
+# rate used is the target's, -19.9509 °/s, which the setpoint only reaches
+# later: at the 120th loop it is -19.82 °/s, so this is a first-order
+# estimate of the loop-by-loop numbers). The numbers come loop by loop (each
+# loop is 1/8000 s, the jump is the 1st loop, the 4001st of the run).
+#
+# It flies the Test Quad test/freestyle-5-loop-shaping-only: the Freestyle
+# 5″ with RC smoothing off, so the setpoint jumps in one loop, and the other
+# filters off. Its I-term relax is the 5″'s: RP, SETPOINT and 15 Hz.
+format = 2
+name   = "In Angle, I-term relax holds roll's I back until the setpoint is within 8 °/s of its low-pass"
+
+[start]
+kind              = "flight controller"
+quad              = "test/freestyle-5-loop-shaping-only"
+attitude          = "level, heading 0°"
+rotation          = "0 °/s"
+armed             = true
+flight_controller = "fresh"
+flight_mode       = "Angle"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+timeline = [
+  { at = "0 s",   roll = "0%", pitch = "0%", yaw = "0%", throttle = "50%", arm = "on", crash_flip = "off" },
+  { at = "0.5 s", attitude = "roll 4°, pitch 0°, heading 0°" },
+]
+
+[[expect]]
+what  = "roll PID setpoint"
+at    = "0.4 s"
+value = "0.04912 °/s ± 0.00001 °/s"
+basis = "source: pidLevel: the centred stick asks for 60° × 0.10966 ÷ 670 = 0.00982°; level, that is 0.00982° off, times 5 = 0.0491015 °/s, and the earth reference adds the yaw rate 0.10966 °/s × sin(0.00982°) = 0.0000188 °/s"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.5 s"
+value = "0.48016 ± 0.0001"
+basis = "source: pidController: the setpoint 0.0491203 °/s against a gyro at 0, 4000 loops: 0.244381 × 80 × 0.0491203 × 4000 ÷ 8000 = 0.48016"
+
+[[expect]]
+what  = "roll PID setpoint"
+at    = "0.51 s"
+value = "-18.720 °/s ± 0.001 °/s"
+basis = "source: pidLevel: the setpoint is heading for (0.00982° − 4°) × 5 + 0.0000188 = -19.9509 °/s through a PT3 at 50 Hz, k = 0.0715176, and 80 loops after the jump it is at -18.720 °/s"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.51 s"
+value = "0.38821 ± 0.0001"
+basis = "source: applyItermRelax, loop by loop: I grew only until the 33rd loop after the jump; from the 34th, when the setpoint was first 8.26 °/s from its low-pass, more than Angle's 8 °/s, it has held at 0.38821. In Acro, with 40 °/s, it would have fallen to -1.032 by now"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.514 s"
+value = "0.38821 ± 0.0001"
+basis = "source: applyItermRelax, loop by loop: 112 loops after the jump the setpoint, -19.747 °/s, is still 8.61 °/s from its low-pass, more than Angle's 8 °/s, so roll's I hasn't moved since 0.51 s"
+
+[[expect]]
+what  = "roll I term"
+at    = "0.53 s"
+value = "-2.3261 ± 0.001"
+basis = "source: applyItermRelax, loop by loop: from the 120th loop after the jump the setpoint is within 8 °/s of its low-pass and I grows again, by about -0.048756 × (1 − that ÷ 8) a loop (the target's rate; loop by loop it is a little less at first), to -2.3261 by 0.53 s (with Acro's 40 °/s: -7.697)"

@@ -137,6 +137,18 @@ lowest = "0 ± 0"
 basis  = "source: pidController: in yaw spin recovery roll and pitch's F is 0"
 
 [[expect]]
+what    = "roll F term"
+over    = "0.8 s to 1 s"
+highest = "0 ± 0"
+basis   = "source: pidController: in yaw spin recovery roll and pitch's F is 0 too, so the roll stick jumping back to 0% at 0.95 s brings no feedforward either: its frame reaches the Flight Controller at 0.952 s, inside this window"
+
+[[expect]]
+what   = "roll F term"
+over   = "0.8 s to 1 s"
+lowest = "0 ± 0"
+basis  = "source: pidController: in yaw spin recovery roll and pitch's F is 0, through the stick's jump back at 0.95 s (its frame arrives at 0.952 s)"
+
+[[expect]]
 what  = "roll PID sum"
 at    = "0.85 s"
 value = "0 ± 0"
