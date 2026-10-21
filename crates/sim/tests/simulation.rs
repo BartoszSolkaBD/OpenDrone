@@ -399,7 +399,7 @@ fn listen_to(
 }
 
 #[test]
-fn a_restored_copy_of_a_flight_controller_writes_its_own_log_and_not_the_originals() {
+fn restoring_a_copy_adds_nothing_to_the_log_of_the_flight_controller_it_replaced() {
     // Basis: Rule (`FlightControllerSeam::clone_box`: a copy shares nothing
     // with the original that a step could change). The Simulation's copy
     // holds a clone of the Flight Controller; put back after more frames, it

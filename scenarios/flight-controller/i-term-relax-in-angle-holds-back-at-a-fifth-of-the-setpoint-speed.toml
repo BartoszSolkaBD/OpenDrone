@@ -1,8 +1,7 @@
 # In Angle, I-term relax's threshold is a fifth of Acro's, 8 °/s instead of
 # 40 °/s, as in Betaflight 2026.6.2 (`applyItermRelax`, src/main/flight/pid.c:
 # with `FLIGHT_MODE(ANGLE_MODE)` the threshold is `ITERM_RELAX_SETPOINT_
-# THRESHOLD` × `ITERM_RELAX_SETPOINT_THRESHOLD_ANGLE_MULTIPLIER`; the
-# Betaflight research §3). i-term-relax.toml shows the 40 °/s of Acro.
+# THRESHOLD` × 0.2, L854-L857; the Betaflight research §3). i-term-relax.toml shows the 40 °/s of Acro.
 #
 # - The setpoint I-term relax watches is the one the PID loop works to: in
 #   Angle, the levelling's, how far the true attitude is from the tilt the
@@ -34,9 +33,12 @@
 # growing at about half its pace, but more than Angle's 8 °/s: so I stops
 # growing in the 34th loop, when the setpoint is first 8.26 °/s from its
 # low-pass, and holds for 86 loops, until the 120th, when it is 7.91 °/s from
-# it, and then grows again, by -19.9509 × 0.244381 × 80 ÷ 8000 × (1 − that ÷ 8)
-# = -0.048756 × (1 − that ÷ 8) a loop, less and less held back. The numbers
-# come loop by loop (each loop is 1/8000 s, the jump is the 4001st loop).
+# it, and then grows again, by about -19.9509 × 0.244381 × 80 ÷ 8000 × (1 −
+# that ÷ 8) = -0.048756 × (1 − that ÷ 8) a loop, less and less held back (the
+# rate used is the target's, -19.9509 °/s, which the setpoint only reaches
+# later: at the 120th loop it is -19.82 °/s, so this is a first-order
+# estimate of the loop-by-loop numbers). The numbers come loop by loop (each
+# loop is 1/8000 s, the jump is the 1st loop, the 4001st of the run).
 #
 # It flies the Test Quad test/freestyle-5-loop-shaping-only: the Freestyle
 # 5″ with RC smoothing off, so the setpoint jumps in one loop, and the other
@@ -94,7 +96,7 @@ basis = "source: pidLevel: the setpoint is heading for (0.00982° − 4°) × 5 
 what  = "roll I term"
 at    = "0.51 s"
 value = "0.38821 ± 0.0001"
-basis = "source: applyItermRelax, loop by loop: I grew only until the 33rd loop after the jump, when the setpoint was first 8.26 °/s from its low-pass, more than Angle's 8 °/s; since then it has held at 0.38821. In Acro, with 40 °/s, it would have fallen to -1.032 by now"
+basis = "source: applyItermRelax, loop by loop: I grew only until the 33rd loop after the jump; from the 34th, when the setpoint was first 8.26 °/s from its low-pass, more than Angle's 8 °/s, it has held at 0.38821. In Acro, with 40 °/s, it would have fallen to -1.032 by now"
 
 [[expect]]
 what  = "roll I term"
@@ -106,4 +108,4 @@ basis = "source: applyItermRelax, loop by loop: 112 loops after the jump the set
 what  = "roll I term"
 at    = "0.53 s"
 value = "-2.3261 ± 0.001"
-basis = "source: applyItermRelax, loop by loop: from the 120th loop after the jump the setpoint is within 8 °/s of its low-pass and I grows again, by -0.048756 × (1 − that ÷ 8) a loop, to -2.3261 by 0.53 s (with Acro's 40 °/s: -7.697)"
+basis = "source: applyItermRelax, loop by loop: from the 120th loop after the jump the setpoint is within 8 °/s of its low-pass and I grows again, by about -0.048756 × (1 − that ÷ 8) a loop (the target's rate; loop by loop it is a little less at first), to -2.3261 by 0.53 s (with Acro's 40 °/s: -7.697)"

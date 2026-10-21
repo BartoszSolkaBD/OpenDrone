@@ -48,7 +48,7 @@
 //! escape is a ratio of the two. The exponential also never reaches zero, so
 //! "gone at 2.75 times the descent" could not hold exactly, and it takes most
 //! of Prop Wash away well before the rule does (at twice the descent of 3.5
-//! m/s, the 2× Scenario's, with the Whoop 65's `v_h` of 5.75 m/s, it leaves
+//! m/s, the 2× Scenario's, with the 2× Scenario's `v_h` of 5.75 m/s (5.70 m/s above is a quarter of the weight before Prop Wash's loss; this is from the thrust after it), it leaves
 //! about 5% of the bump where the rule leaves 22%; at another descent the
 //! 5% would differ, as the rule's 22% at twice the descent would not).
 //! `(1 − r²)²` is 1 with no air across the disc, falls smoothly, and is

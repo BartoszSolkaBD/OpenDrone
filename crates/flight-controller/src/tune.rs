@@ -577,8 +577,10 @@ const SPECS: &[(&str, Kind)] = &[
     ("tpa_breakpoint", Kind::Number(1000, 2000)),
     ("throttle_boost", Kind::Number(0, 100)),
     ("motor_output_limit", Kind::Number(1, 100)),
-    // Angle and Horizon: each range below, down to `level_race_mode`, was
-    // checked against Betaflight 2026.6.2's `settings.c` (#192).
+    // The ranges below, from `angle_p_gain` down to `level_race_mode` (the
+    // Angle and Horizon settings, and the PID sum limits, feedforward, TPA and
+    // anti-gravity ones among them), were checked against Betaflight
+    // 2026.6.2's `settings.c` (#192).
     ("angle_p_gain", Kind::Number(0, 200)),
     ("angle_limit", Kind::Number(10, 80)),
     ("horizon_level_strength", Kind::Number(0, 100)),
