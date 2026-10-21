@@ -8,10 +8,12 @@ mod common;
 
 use std::time::Duration;
 
+use bevy::input::ButtonInput;
 use bevy::math::{Quat, UVec2, Vec3};
+use bevy::prelude::KeyCode;
 use bevy::time::{Fixed, Time};
 use opendrone::camera::controls::{
-    CameraSettings, QuadCamera, REPEAT_AFTER, REPEAT_EVERY, Repeater,
+    CAMERA_KEYS, CameraSettings, QuadCamera, REPEAT_AFTER, REPEAT_EVERY, Repeater, camera_keys,
 };
 use opendrone::camera::drawn_moment;
 use opendrone::camera::exposure::{adaptation, compensation_points, curve_at, metering_mask};
@@ -560,6 +562,104 @@ fn two_keys_held_together_repeat_on_their_own() {
         vec![Action::CameraTiltUp]
     );
     assert_eq!(repeater.update(Duration::from_millis(1500), &both).len(), 3);
+}
+
+/// One frame of the game's camera keys, as `read_the_camera_keys` runs it:
+/// what the keyboard did since the last frame, then what the Actions do.
+/// `now_ms` is the frame's moment.
+fn camera_frame(
+    keys: &mut ButtonInput<KeyCode>,
+    repeater: &mut Repeater,
+    now_ms: u64,
+    keyboard: impl FnOnce(&mut ButtonInput<KeyCode>),
+) -> Vec<Action> {
+    // Bevy clears last frame's presses before it reads this frame's events.
+    keys.clear();
+    keyboard(keys);
+    let (held, tapped) = camera_keys(keys);
+    repeater.update_with_taps(Duration::from_millis(now_ms), &held, &tapped)
+}
+
+#[test]
+fn a_key_pressed_and_let_go_within_one_frame_acts_once() {
+    // Basis: Rule. docs/context/input.md: an Action fires once when its key
+    // moves into the bound position. A tap shorter than a frame is down and
+    // up again by the time the frame looks (#164 item 6), and still counts.
+    let mut keys = ButtonInput::<KeyCode>::default();
+    let mut repeater = Repeater::new();
+    let tap = |keys: &mut ButtonInput<KeyCode>| {
+        keys.press(KeyCode::ArrowUp);
+        keys.release(KeyCode::ArrowUp);
+    };
+    assert_eq!(
+        camera_frame(&mut keys, &mut repeater, 0, tap),
+        vec![Action::CameraTiltUp]
+    );
+    // The frames after it have nothing to act on.
+    for now in [10, 20, 1500] {
+        assert!(camera_frame(&mut keys, &mut repeater, now, |_| {}).is_empty());
+    }
+    // Each of the four keys does it, and a second tap acts again.
+    for (key, action) in CAMERA_KEYS {
+        let tap = |keys: &mut ButtonInput<KeyCode>| {
+            keys.press(key);
+            keys.release(key);
+        };
+        assert_eq!(
+            camera_frame(&mut keys, &mut repeater, 2000, tap),
+            vec![action]
+        );
+        assert_eq!(
+            camera_frame(&mut keys, &mut repeater, 2010, tap),
+            vec![action]
+        );
+    }
+}
+
+#[test]
+fn a_held_key_acts_once_and_not_every_frame() {
+    // Basis: Rule. A key held down acts when it goes down, and then waits the
+    // repeat time (#14 §2): the frames in between don't act.
+    let mut keys = ButtonInput::<KeyCode>::default();
+    let mut repeater = Repeater::new();
+    let down = camera_frame(&mut keys, &mut repeater, 0, |keys| {
+        keys.press(KeyCode::ArrowRight)
+    });
+    assert_eq!(down, vec![Action::FovWider]);
+    for now in (10..1000).step_by(10) {
+        assert!(
+            camera_frame(&mut keys, &mut repeater, now, |_| {}).is_empty(),
+            "acted again at {now} ms"
+        );
+    }
+    let repeat = camera_frame(&mut keys, &mut repeater, 1000, |_| {});
+    assert_eq!(repeat, vec![Action::FovWider]);
+    // Let go within the frame after: nothing more.
+    let up = camera_frame(&mut keys, &mut repeater, 1010, |keys| {
+        keys.release(KeyCode::ArrowRight)
+    });
+    assert!(up.is_empty());
+}
+
+#[test]
+fn a_held_key_let_go_and_pressed_again_within_one_frame_acts_again_at_once() {
+    // Basis: Rule. The second press is a press: it acts at once and waits a
+    // second again.
+    let mut keys = ButtonInput::<KeyCode>::default();
+    let mut repeater = Repeater::new();
+    camera_frame(&mut keys, &mut repeater, 0, |keys| {
+        keys.press(KeyCode::ArrowLeft)
+    });
+    let again = camera_frame(&mut keys, &mut repeater, 500, |keys| {
+        keys.release(KeyCode::ArrowLeft);
+        keys.press(KeyCode::ArrowLeft);
+    });
+    assert_eq!(again, vec![Action::FovNarrower]);
+    assert!(camera_frame(&mut keys, &mut repeater, 1000, |_| {}).is_empty());
+    assert_eq!(
+        camera_frame(&mut keys, &mut repeater, 1500, |_| {}),
+        vec![Action::FovNarrower]
+    );
 }
 
 // ---------------------------------------------------------------------------

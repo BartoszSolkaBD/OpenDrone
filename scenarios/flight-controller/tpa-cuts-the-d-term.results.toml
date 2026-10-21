@@ -61,16 +61,16 @@ measured = "none broken"
 [fingerprints]
 quad = "600287fa7636b925"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "14b8de7598308668"   # the whole state after each of 5601 steps at 8000 Hz, in order
+run  = "276313350dd1f71c"   # the whole state after each of 5601 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.07 s" = "5f847baed2200fb0"
-"0.14 s" = "a9489b762a2e1843"
-"0.21 s" = "4362d64fd43d151c"
-"0.28 s" = "c8898b9cbb347723"
-"0.35 s" = "b8f7a78f768364ac"
-"0.42 s" = "26c93f815be48729"
-"0.49 s" = "d63b626c16509a24"
-"0.56 s" = "78ff29fe9961243d"
-"0.63 s" = "28f02231f37216d8"
-"0.700125 s" = "c1a5bcce0e7aaf9b"
+"0.07 s" = "d67406c8dffb2e65"
+"0.14 s" = "4525cc0e6fa096d6"
+"0.21 s" = "4a612277ec5a4159"
+"0.28 s" = "aae377b8adcb7df6"
+"0.35 s" = "2e6fe2e6bb2a6611"
+"0.42 s" = "ebe5286d3af70b5c"
+"0.49 s" = "fa4b4b3dc73c99ad"
+"0.56 s" = "4e92765055cdf7d8"
+"0.63 s" = "9aeec8400aa8e0e9"
+"0.700125 s" = "72852abf3e7fda42"

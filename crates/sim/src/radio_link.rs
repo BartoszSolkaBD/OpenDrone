@@ -59,21 +59,6 @@ pub enum FlightInput {
     Reset,
 }
 
-impl FlightInput {
-    /// Feeds the Flight Input into a fingerprint, in a fixed order.
-    pub fn write_fingerprint(&self, f: &mut Fingerprinter) {
-        match self {
-            FlightInput::Channels(channels) => {
-                f.write_u64(0);
-                channels.write_fingerprint(f);
-            }
-            FlightInput::InputDeviceLost => f.write_u64(1),
-            FlightInput::InputDeviceBack => f.write_u64(2),
-            FlightInput::Reset => f.write_u64(3),
-        }
-    }
-}
-
 /// How many times a second the Radio Link delivers a frame, as in ELRS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PacketRate {

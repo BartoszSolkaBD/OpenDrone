@@ -1,4 +1,6 @@
 /target
+# macOS's folder metadata, which got committed by accident once.
+.DS_Store
 # Textures are fetched from assets-src/materials.toml by `cargo xtask
 # textures`, never committed (ADR-0014).
 /assets-src/textures/

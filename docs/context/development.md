@@ -31,7 +31,7 @@ The last line of a Reviewer's comment, either pass or changes needed, together w
 _Avoid_: Approval (an approval is a GitHub review from a person)
 
 **Delegator**:
-The agent session that works through the ready tickets. It starts authors and Reviewers, each on the model its job needs, and merges what passes. It never writes or reviews code itself. Its rules: [The delegator](../agents/delegator.md).
+The agent session that works through the ready tickets. It starts authors and Reviewers, each on the model its job needs, and merges what passes. It never writes or reviews code itself. Its rules: [The Delegator](../agents/delegator.md).
 _Avoid_: Orchestrator, manager agent
 
 **Area**:

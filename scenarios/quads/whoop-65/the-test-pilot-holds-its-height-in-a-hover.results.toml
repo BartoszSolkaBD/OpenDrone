@@ -41,6 +41,36 @@ expected = "0° ± 2°"
 measured = "0.116°"
 
 [[expect]]
+what     = "roll, lowest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.00000000169°"
+
+[[expect]]
+what     = "pitch, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "-0.00000000131°"
+
+[[expect]]
+what     = "tilt, highest over 0 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.166°"
+
+[[expect]]
+what     = "heading, lowest over 5 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.103°"
+
+[[expect]]
+what     = "heading, highest over 5 s to 30 s"
+basis    = "Rule"
+expected = "0° ± 2°"
+measured = "0.117°"
+
+[[expect]]
 what     = "total thrust, mean over 10 s to 30 s"
 basis    = "Rule"
 expected = "31.2 gf ± 0.5 gf"
@@ -79,16 +109,16 @@ measured = "none broken"
 [fingerprints]
 quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "d598e0368e719507"   # the whole state after each of 240000 steps at 8000 Hz, in order
+run  = "e270123f87175146"   # the whole state after each of 240000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"3 s" = "ebae7d2cd775b314"
-"6 s" = "ade08216b087f9b8"
-"9 s" = "05bef69c9af165c5"
-"12 s" = "248f3262fffed175"
-"15 s" = "2efd29ac3e70626c"
-"18 s" = "5768dff58e13c2a4"
-"21 s" = "923f734814c36848"
-"24 s" = "283c0917a2f02033"
-"27 s" = "a2ccf55937c8e51a"
-"30 s" = "5ef2604bb9a55959"
+"3 s" = "f66c9082157a1d9d"
+"6 s" = "808febb8418b8ae9"
+"9 s" = "9139017cebeef968"
+"12 s" = "06717edafcb164d8"
+"15 s" = "5495839561d28529"
+"18 s" = "b19adb3c34c76bc9"
+"21 s" = "369494a0e620d595"
+"24 s" = "349d5ca3d1a10b56"
+"27 s" = "a131fadcf20e4ee7"
+"30 s" = "1033e52392f42a28"

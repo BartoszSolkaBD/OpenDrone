@@ -21,6 +21,14 @@
 #   throttle (nearly all of it by 70 s). Then the Quad can no longer lift its
 #   weight, and it sinks: from 20 m at 70 s to 12 m, falling 5 m/s, at 75 s.
 #
+# The working for "about half of the throttle at 3.2 V" (the Rule at 50 s): the
+# motors need the same speed for the same thrust whatever the pack, and a
+# motor's speed follows the command times the pack's voltage, to a first
+# order. The full pack hovers at 37.4% ("The Test Pilot holds the Whoop 65's
+# height ..."), with the pack at 4.35 V - 1.44 A × 29 mΩ = 4.31 V under load.
+# Just empty, the pack gives 3.23 V under the same load, so the command is
+# 37.4% × 4.31 V ÷ 3.23 V = 49.9%, about half. The run measures 49.6%.
+#
 # The current this hover draws, 1.44 A, is also the real Whoop 65's: a full
 # 320 mAh pack would last 320 mAh ÷ 1.44 A, about 13 minutes. The maintainer's
 # memory of the real whoop is about 4-6 minutes, so the Whoop 65's hover is
@@ -60,7 +68,6 @@ quickrates_rc_expo = "off"
 [inputs]
 timeline = [
   { at = "0 s", roll = "0%", pitch = "0%", yaw = "0%", throttle = "40%", arm = "on", crash_flip = "off", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
-  { at = "75 s", test_pilot = "hold height 20 m, hold level, hold heading 0°" },
 ]
 
 [[expect]]

@@ -71,6 +71,18 @@ expected = "0 ± 0"
 measured = "0"
 
 [[expect]]
+what     = "roll F term, highest over 0.8 s to 1 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
+what     = "roll F term, lowest over 0.8 s to 1 s"
+basis    = "Source"
+expected = "0 ± 0"
+measured = "0"
+
+[[expect]]
 what     = "roll PID sum at 0.85 s"
 basis    = "Source"
 expected = "0 ± 0"
@@ -115,16 +127,16 @@ measured = "none broken"
 [fingerprints]
 quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
-run  = "9ed108e227b448ca"   # the whole state after each of 9600 steps at 8000 Hz, in order
+run  = "f2e2a9ab52d6e5e4"   # the whole state after each of 9600 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.12 s" = "0f5af30c3e2181cd"
-"0.24 s" = "567d1a29d6d299dc"
-"0.36 s" = "ad3f20de5507cfa0"
-"0.48 s" = "37acbd24c4c1b62e"
-"0.6 s" = "d8fd76fc2d48cd4d"
-"0.72 s" = "dfb0849b383df6a1"
-"0.84 s" = "0943df257bffb4c5"
-"0.96 s" = "d0f9ea573cb5939c"
-"1.08 s" = "6170cbe88e7a2ed1"
-"1.2 s" = "ad80dd3cce7cfaa6"
+"0.12 s" = "0c44a5e21ba27420"
+"0.24 s" = "bbc5449fd9058ced"
+"0.36 s" = "7a9335f7a40eec19"
+"0.48 s" = "b4bbf3fd266f8cab"
+"0.6 s" = "c17277a4df3187ac"
+"0.72 s" = "a31dbd33b70a49f4"
+"0.84 s" = "b116c7685d919a64"
+"0.96 s" = "a14983b2168ddc5d"
+"1.08 s" = "e01bae8623c9d7e0"
+"1.2 s" = "0a2307518cefdec3"

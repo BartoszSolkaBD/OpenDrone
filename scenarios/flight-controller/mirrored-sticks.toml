@@ -20,7 +20,9 @@
 # the roll and yaw sums are past 600 too, but only for about 50 ms, as the
 # rates come up. Disarmed, both runs fall and tumble on, still each other's
 # mirror image. This Scenario checks only the symmetry, which holds either
-# way.
+# way. Its checks at 0.9 s and 1 s compare two falling, disarmed Quads; those
+# at 0.65 s, before the disarm, compare the two armed flights, with the Flight
+# Controller flying them.
 #
 # It flies the Freestyle 5″ with Prop Wash off (test/freestyle-5-no-prop-wash).
 # Low on throttle and rolling hard, its rotors sink into their own air, and
@@ -112,3 +114,51 @@ value   = "0 m ± 0.000001 m"
 against = { sticks = "mirrored" }
 compare = "difference"
 basis   = "rule: the mirror leaves up where it is, so both runs climb alike"
+
+[[expect]]
+what    = "roll rate"
+at      = "0.65 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: while both Quads are still armed, the Flight Controller's own flight is the mirror image: the mirrored run rolls exactly the other way"
+
+[[expect]]
+what    = "yaw rate"
+at      = "0.65 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: while both Quads are still armed, the mirrored run yaws exactly the other way"
+
+[[expect]]
+what    = "pitch rate"
+at      = "0.65 s"
+value   = "0 °/s ± 0.001 °/s"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: while both Quads are still armed, both runs pitch alike"
+
+[[expect]]
+what    = "distance east"
+at      = "0.65 s"
+value   = "-100% ± 0.001%"
+against = { sticks = "mirrored" }
+compare = "ratio"
+basis   = "rule: while both Quads are still armed, the mirrored run drifts as far west as this one drifts east"
+
+[[expect]]
+what    = "distance north"
+at      = "0.65 s"
+value   = "0 m ± 0.000001 m"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: while both Quads are still armed, both runs go as far north"
+
+[[expect]]
+what    = "height"
+at      = "0.65 s"
+value   = "0 m ± 0.000001 m"
+against = { sticks = "mirrored" }
+compare = "difference"
+basis   = "rule: while both Quads are still armed, both runs climb alike"

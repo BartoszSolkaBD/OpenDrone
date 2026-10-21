@@ -905,9 +905,13 @@ impl FlightController {
         f.write_u64(self.loops);
         self.receiver.write_fingerprint(f);
         self.failsafe.write_fingerprint(f);
-        if let Some(command) = self.command {
-            f.write_f64s(&command.sticks);
-            f.write_u64(command.throttle as u64);
+        match self.command {
+            None => f.write_u64(0),
+            Some(command) => {
+                f.write_u64(1);
+                f.write_f64s(&command.sticks);
+                f.write_u64(command.throttle as u64);
+            }
         }
         f.write_f64s(&self.setpoint);
         self.packet_rate.write_fingerprint(f);

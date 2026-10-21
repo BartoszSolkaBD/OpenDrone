@@ -41,6 +41,42 @@ expected = "0 m ± 0.000001 m"
 measured = "-0.00000000000000711 m"
 
 [[expect]]
+what     = "roll rate at 0.65 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "yaw rate at 0.65 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "pitch rate at 0.65 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 °/s ± 0.001 °/s"
+measured = "0.0000000000000827 °/s"
+
+[[expect]]
+what     = "distance east at 0.65 s, as a share of the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "-100% ± 0.001%"
+measured = "-100%"
+
+[[expect]]
+what     = "distance north at 0.65 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "-0.00000000000000400 m"
+
+[[expect]]
+what     = "height at 0.65 s, minus the same run with roll and yaw mirrored"
+basis    = "Rule"
+expected = "0 m ± 0.000001 m"
+measured = "0 m"
+
+[[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
 basis    = "Rule"
 expected = "none broken"
@@ -49,16 +85,16 @@ measured = "none broken"
 [fingerprints]
 quad = "7eacbd292c76ddbf"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "31f9075a86eb0ad5"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "965428f0bca72056"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "1b9f6163a18d078b"
-"0.2 s" = "24beb3a1f47d6aeb"
-"0.3 s" = "15026a1a78bf7e6c"
-"0.4 s" = "db0f2aa7a8dfd969"
-"0.5 s" = "49a0850f47f347f6"
-"0.6 s" = "f33bc9c6474c188f"
-"0.7 s" = "d4ceda28cc97a4e4"
-"0.8 s" = "9acc5d618033b4a6"
-"0.9 s" = "bf9c7fbc0e9b8142"
-"1 s" = "17d9d1a528adc4a0"
+"0.1 s" = "8e60aef0daeade12"
+"0.2 s" = "0158ff8c35661b86"
+"0.3 s" = "9c2c8b353af9f3d9"
+"0.4 s" = "07b8788cf52c9f50"
+"0.5 s" = "4933753cfa871b0b"
+"0.6 s" = "f9aa302ed55eb496"
+"0.7 s" = "6e06367e2959f809"
+"0.8 s" = "6f32bbcf7b9a64f3"
+"0.9 s" = "5c7ff4415810447f"
+"1 s" = "39a8873ac3778341"
