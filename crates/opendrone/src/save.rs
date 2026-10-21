@@ -19,9 +19,10 @@
 //! fresh Flight Controller, but the Simulation Time, the Radio Link's beat
 //! and the air's flicker go on through it (the Simulation's Reset), and
 //! arming changes none of the Quad's state. So the saved flight is the whole
-//! flight since the Simulation started, Resets in it as `reset` entries in the `other flight input` column. The
-//! Scenario's comment says when the last Reset was and when the Arm switch
-//! went on, so Expectations can name the stretch since then.
+//! flight since the Simulation started, Resets in it as `reset` entries in
+//! the `other flight input` column. The Scenario's comment says when the last
+//! Reset was and when the Arm switch went on, so Expectations can name the
+//! stretch since then.
 //!
 //! **How long.** The recorder keeps at most [`MAX_KEPT_INPUTS`] Flight
 //! Inputs, so a long session doesn't use more and more memory. Because a saved
