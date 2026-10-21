@@ -138,6 +138,53 @@ fn a_push_to_main_runs_every_rust_check_even_for_markdown() {
     assert_eq!(outputs["rust"], "true", "{outputs:?}");
 }
 
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_a_map_script_the_material_library_or_the_blender_version_rebuilds_the_maps()
+ {
+    for (case, file) in [
+        ("map-script", "assets-src/maps/skate-park/build.py"),
+        ("map-library", "assets-src/lib/odgeom.py"),
+        ("materials", "assets-src/materials.toml"),
+        ("blender-version", "assets-src/blender-version.toml"),
+        ("map-glb", "packs/opendrone/maps/skate-park/skate-park.glb"),
+        ("map-toml", "packs/opendrone/maps/skate-park/map.toml"),
+    ] {
+        let repo = Repo::new(case);
+        repo.write(file, "changed\n");
+        let outputs = repo.commit_and_check("pull_request");
+        assert_eq!(outputs["maps"], "true", "{file}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_neither_assets_nor_a_map_leaves_the_maps_alone() {
+    for (case, file) in [
+        ("maps-docs", "README.md"),
+        ("maps-code", "crates/physics/src/lib.rs"),
+        ("maps-scenario", "scenarios/free-fall.toml"),
+        // A Quad is not a Map.
+        ("maps-quad", "packs/opendrone/quads/whoop-65/quad.toml"),
+        // Only the Pack's maps/ folder counts, not a file named like one.
+        ("maps-lookalike", "docs/assets-src-notes.md"),
+    ] {
+        let repo = Repo::new(case);
+        repo.write(file, "changed\n");
+        let outputs = repo.commit_and_check("pull_request");
+        assert_eq!(outputs["maps"], "false", "{file}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_push_to_main_rebuilds_the_maps() {
+    let repo = Repo::new("maps-push-to-main");
+    repo.write("README.md", "# OpenDrone, now with more words\n");
+    let outputs = repo.commit_and_check("push");
+    assert_eq!(outputs["maps"], "true", "{outputs:?}");
+}
+
 /// A scratch git repository holding a few of the repo's kinds of files.
 struct Repo {
     path: PathBuf,

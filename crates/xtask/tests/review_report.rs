@@ -1345,12 +1345,14 @@ fn the_areas_touched_come_from_the_folders_in_codeowners() {
 }
 
 #[test]
-fn speed_renders_and_downloads_say_they_are_not_measured_yet() {
+fn speed_and_downloads_say_they_are_not_measured_yet_and_renders_say_where_the_maps_check_puts_them()
+ {
     let review = PullRequest::new("not-yet")
         .write("README.md", "# OpenDrone\n")
         .review();
     review.says("### Speed\n\nNot measured yet.");
-    review.says("### Renders\n\nNo Map renders yet.");
+    review.says("### Renders\n\nWhen `assets-src/` or a Pack's `maps/` changes, the Maps check renders every Map");
+    review.says("`map-previews` download of that check, on this PR's Checks tab.");
     review.says("### Downloads\n\nNo Blackbox logs or builds yet.");
 }
 

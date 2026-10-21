@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 use bevy::prelude::Resource;
-use opendrone_maths::{Attitude, PilotAngles, Vec3};
+use opendrone_maths::{Attitude, DEGREE, PilotAngles, Vec3};
 use opendrone_pack::{MapDefinition, Packs, QuadDefinition};
 use opendrone_physics::PROP_DISC_THICKNESS;
 use opendrone_sim::{
@@ -46,18 +46,22 @@ impl FlightPlan {
         })
     }
 
-    /// Where the Quad starts, and where Reset puts it: its Launch Spot. A
-    /// Map's own Launch Spot arrives with the Map ticket; the Test Maps have
-    /// none, so the Quad sits at the Map's origin, landed on the floor, level,
-    /// its nose north, still.
+    /// Where the Quad starts, and where Reset puts it: the Map's Launch Spot,
+    /// landed on the ground there, level, facing the spot's compass heading,
+    /// still. A Test Map has no Launch Spot, so the Quad sits at its origin,
+    /// landed on the floor, its nose north.
     pub fn launch_spot(&self) -> QuadState {
+        let (at, heading) = match &self.map.launch_spot {
+            Some(spot) => (spot.position, spot.heading * DEGREE),
+            None => (Vec3::ZERO, 0.0),
+        };
         QuadState {
-            position: Vec3::new(0.0, 0.0, landed_height(&self.quad.parameters.shape)),
+            position: at + Vec3::new(0.0, 0.0, landed_height(&self.quad.parameters.shape)),
             velocity: Vec3::ZERO,
             attitude: Attitude::from_pilot_angles(PilotAngles {
                 roll: 0.0,
                 pitch: 0.0,
-                heading: 0.0,
+                heading,
             }),
             rotation: Vec3::ZERO,
         }

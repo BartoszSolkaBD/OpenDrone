@@ -5,9 +5,11 @@
 mod common;
 
 use opendrone::pilot::flight_channels;
-use opendrone::set_up::landed_height;
+use opendrone::set_up::{FlightPlan, landed_height};
+use opendrone::settings::Settings;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::FlightMode;
+use opendrone_maths::{DEGREE, Vec3};
 use opendrone_sim::{Channel, EscState};
 
 #[test]
@@ -36,6 +38,52 @@ fn the_tracer_flies_the_flat_floor_with_the_quad_landed_at_its_origin() {
         let spot = plan.launch_spot();
         assert_eq!((spot.position.x, spot.position.y), (0.0, 0.0), "{quad}");
     }
+}
+
+#[test]
+fn on_the_skate_park_the_quad_starts_landed_on_its_launch_spot_facing_its_heading() {
+    // Basis: Rule (#63): a Quad starts, and Reset puts it, on the Map's
+    // Launch Spot, landed on the ground there, facing the spot's heading.
+    for quad in ["whoop-65", "freestyle-5"] {
+        let plan = FlightPlan::from_packs(
+            &common::packs(),
+            Settings::tracer(quad).on_map("opendrone/skate-park"),
+        )
+        .expect("the Skate Park is in the built-in Pack");
+        let spot = plan
+            .map
+            .launch_spot
+            .expect("the Skate Park has a Launch Spot");
+        let start = plan.launch_spot();
+        let landed = landed_height(&plan.quad.parameters.shape);
+        assert_eq!(
+            start.position,
+            spot.position + Vec3::new(0.0, 0.0, landed),
+            "{quad}"
+        );
+        let heading = start.attitude.pilot_angles().heading / DEGREE;
+        assert!((heading - 270.0).abs() < 1e-9, "{quad} faces {heading}°");
+        assert_eq!(start.velocity, Vec3::ZERO);
+    }
+}
+
+#[test]
+fn a_quad_set_up_on_the_skate_park_stays_landed_on_the_launch_spot() {
+    // Basis: Rule. The Map's colliders reach the Simulation: landed with a
+    // fresh Flight Controller, nothing moves the Quad (as the Scenarios
+    // landed-*-stays-still-on-the-skate-parks-launch-spot.toml prove headless).
+    let plan = FlightPlan::from_packs(
+        &common::packs(),
+        Settings::tracer("whoop-65").on_map("opendrone/skate-park"),
+    )
+    .unwrap();
+    let mut flight = Flight::new(plan.simulation(None).unwrap()).unwrap();
+    let start = plan.launch_spot();
+    for _ in 0..1000 {
+        flight.tick();
+    }
+    let output = flight.simulation().quad_output(0);
+    assert!((output.state.position - start.position).length() < 1e-6);
 }
 
 #[test]

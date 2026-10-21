@@ -1,0 +1,13 @@
+# The Blender that builds OpenDrone's Maps: one version, pinned here, which
+# `cargo xtask maps` and CI (the "Maps" check) both read (#63).
+#
+# Maps are built only with this exact version: a script writes the same bytes
+# on every computer only when Blender is the same too. Moving to a new version
+# means rebuilding every Map with it in the same change, and the new `.glb`
+# files may differ.
+version = "5.2.2"
+
+# What CI downloads on Linux, from https://download.blender.org/release/Blender5.2/
+# (the SHA-256 is the one on that page's blender-5.2.2.sha256).
+linux_url    = "https://download.blender.org/release/Blender5.2/blender-5.2.2-linux-x64.tar.xz"
+linux_sha256 = "84098912789dc450e95697c4184fb8a90acbe5111c2ba4aede3fecb57806a168"
