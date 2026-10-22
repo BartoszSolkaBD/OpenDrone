@@ -13,7 +13,7 @@ use opendrone::screens::model::{
     COUNTDOWN_SECONDS, Catalogue, DeviceFacts, Effect, Experience, Facts, ItemId, MapChoice, Menus,
     Pick, QuadChoice, Screen, quad_is_in_the_air,
 };
-use opendrone::settings_file::{PilotSettings, Preset, TextSize};
+use opendrone::settings_file::{FlyingDevice, PilotSettings, Preset, TextSize};
 use opendrone_input::DeviceId;
 use opendrone_input::controls::{PadAxis, PadButton};
 use opendrone_input::profile::Kind;
@@ -264,7 +264,17 @@ fn catalogue() -> Catalogue {
 fn dualsense() -> DeviceFacts {
     DeviceFacts {
         name: "DualSense".to_string(),
+        profile_name: "DualSense".to_string(),
         kind: Kind::Gamepad,
+        arm_bound: true,
+    }
+}
+
+fn pocket() -> DeviceFacts {
+    DeviceFacts {
+        name: "EdgeTX Radiomaster Pocket Joystick".to_string(),
+        profile_name: "Radiomaster Pocket".to_string(),
+        kind: Kind::Radio,
         arm_bound: true,
     }
 }
@@ -861,4 +871,137 @@ fn a_gamepad_flick_and_a_radio_flick_drive_the_same_menu_moves() {
         hub.press(input, None, &world.facts(), ms(20));
     }
     assert_eq!(cursor_label(&hub, &world), "Quad");
+}
+
+// ------------------------------------------------------ Flying device
+
+/// The value on the Settings page's Flying device stop, and its note.
+fn flying_device_stop(menus: &Menus, world: &World) -> (String, String) {
+    let item = menus
+        .items(&world.facts())
+        .into_iter()
+        .find(|i| i.id == ItemId::FlyingDevice)
+        .expect("the Settings page has a Flying device stop");
+    (item.value.unwrap(), item.note.unwrap())
+}
+
+fn settings_page(settings: PilotSettings, world: &World) -> Menus {
+    let mut menus = Menus::new(settings);
+    menus.point_at(ItemId::OpenSettings, &world.facts());
+    press_all(&mut menus, world, &[MenuInput::Select]);
+    assert_eq!(menus.screen(), Screen::Settings);
+    menus
+}
+
+fn named(name: &str) -> FlyingDevice {
+    FlyingDevice::Named(name.to_string())
+}
+
+#[test]
+fn the_settings_page_shows_the_flying_device_after_auto_arm_and_says_what_auto_means() {
+    // Basis: Rule (#271: next to Text size, Reduce motion and Auto-arm, with a
+    // plain description).
+    let world = World::with(vec![pocket(), dualsense()]);
+    let menus = settings_page(returning(), &world);
+    assert_eq!(
+        labels(&menus, &world),
+        vec![
+            "Text size",
+            "Reduce motion",
+            "Auto-arm",
+            "Flying device",
+            "Back"
+        ]
+    );
+    let (value, note) = flying_device_stop(&menus, &world);
+    assert_eq!(value, "Auto");
+    assert!(note.starts_with("Auto flies a Radio if one is plugged in, then a Gamepad."));
+}
+
+#[test]
+fn the_flying_device_steps_through_auto_and_each_device_found_and_is_saved() {
+    // Basis: Rule (#271: the pilot can choose one of the devices found, by
+    // its profile's name; each setting is one stop).
+    let world = World::with(vec![pocket(), dualsense()]);
+    let mut menus = settings_page(returning(), &world);
+    menus.point_at(ItemId::FlyingDevice, &world.facts());
+    assert_eq!(
+        press_all(&mut menus, &world, &[MenuInput::Right]),
+        vec![Effect::SettingsChanged]
+    );
+    assert_eq!(menus.settings().flying_device, named("Radiomaster Pocket"));
+    assert_eq!(flying_device_stop(&menus, &world).0, "Radiomaster Pocket");
+    press_all(&mut menus, &world, &[MenuInput::Right]);
+    assert_eq!(menus.settings().flying_device, named("DualSense"));
+    press_all(&mut menus, &world, &[MenuInput::Right]);
+    assert_eq!(menus.settings().flying_device, FlyingDevice::Auto);
+    press_all(&mut menus, &world, &[MenuInput::Left]);
+    assert_eq!(menus.settings().flying_device, named("DualSense"));
+    // Select steps on too, as for every stop.
+    press_all(&mut menus, &world, &[MenuInput::Select]);
+    assert_eq!(menus.settings().flying_device, FlyingDevice::Auto);
+}
+
+#[test]
+fn a_saved_device_that_is_not_plugged_in_shows_so_and_can_be_stepped_off() {
+    // Basis: Rule (#271: falls back to Auto and says so).
+    let world = World::with(vec![dualsense()]);
+    let settings = PilotSettings {
+        flying_device: named("Radiomaster Pocket"),
+        ..returning()
+    };
+    let mut menus = settings_page(settings, &world);
+    let (value, note) = flying_device_stop(&menus, &world);
+    assert_eq!(value, "Radiomaster Pocket (not plugged in)");
+    assert!(note.contains("isn't plugged in, so Auto picks for now"));
+    menus.point_at(ItemId::FlyingDevice, &world.facts());
+    // Back from the saved device is the DualSense, the last stop plugged in;
+    // once the pilot has moved off it, it is no longer a stop.
+    press_all(&mut menus, &world, &[MenuInput::Left]);
+    assert_eq!(menus.settings().flying_device, named("DualSense"));
+    press_all(&mut menus, &world, &[MenuInput::Right]);
+    assert_eq!(menus.settings().flying_device, FlyingDevice::Auto);
+}
+
+#[test]
+fn the_hub_warns_and_fly_says_so_when_the_saved_device_is_not_plugged_in() {
+    // Basis: Rule (#271: the message is in the start notice and the Pause Menu).
+    let world = World::with(vec![dualsense()]);
+    let settings = PilotSettings {
+        flying_device: named("Radiomaster Pocket"),
+        ..returning()
+    };
+    let mut hub = Menus::new(settings);
+    assert!(hub.warnings(&world.facts()).contains(
+        &"Radiomaster Pocket is your Flying device but isn't plugged in, so Auto picks for now."
+            .to_string()
+    ));
+    press_all(&mut hub, &world, &[MenuInput::Select]);
+    let page = hub.page(ms(0), &world.facts());
+    assert!(
+        page.notices.contains(
+            &"Radiomaster Pocket isn't plugged in, so the Flying device is Auto for this flight."
+                .to_string()
+        ),
+        "{:?}",
+        page.notices
+    );
+}
+
+#[test]
+fn a_flying_device_that_is_plugged_in_or_auto_gives_no_warning_and_no_notice() {
+    let world = World::with(vec![pocket(), dualsense()]);
+    for flying_device in [FlyingDevice::Auto, named("DualSense")] {
+        let mut hub = Menus::new(PilotSettings {
+            flying_device,
+            ..returning()
+        });
+        assert!(
+            hub.warnings(&world.facts())
+                .iter()
+                .all(|w| !w.contains("Flying device"))
+        );
+        press_all(&mut hub, &world, &[MenuInput::Select]);
+        assert!(hub.page(ms(0), &world.facts()).notices.is_empty());
+    }
 }

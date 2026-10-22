@@ -10,7 +10,7 @@ use opendrone::camera::lens::Aspect;
 use opendrone::camera::look::VideoLook;
 use opendrone::settings::Settings;
 use opendrone::settings_file::{
-    BROKEN_FILE_NAME, FILE_NAME, PilotSettings, Preset, SettingsFile, TextSize,
+    BROKEN_FILE_NAME, FILE_NAME, FlyingDevice, PilotSettings, Preset, SettingsFile, TextSize,
 };
 use opendrone_input::profile::FlightMode;
 use opendrone_sim::PacketRate;
@@ -39,6 +39,7 @@ fn changed() -> PilotSettings {
         endless_battery: true,
         auto_arm: true,
         packet_rate: PacketRate::from_hz(500).unwrap(),
+        flying_device: FlyingDevice::Named("Radiomaster Pocket".to_string()),
         ..PilotSettings::default()
     };
     settings.camera.look = VideoLook::Digital;
@@ -328,4 +329,59 @@ fn the_flight_is_set_up_from_the_settings_the_pilot_chose() {
     assert!(settings.auto_arm && settings.input_smoothing && settings.endless_battery);
     // The physics rate is the alpha's 8 kHz, never the pilot's to change.
     assert_eq!(settings.physics_rate.hz(), 8000);
+}
+
+#[test]
+fn the_flying_device_is_auto_unless_the_file_names_a_device() {
+    // Basis: Rule (#271: Auto by default; a device is saved by its profile's
+    // name).
+    let folder = folder("flying-device");
+    std::fs::create_dir_all(&folder).unwrap();
+    let mut file = SettingsFile::in_folder(folder.clone());
+    assert_eq!(file.load().settings.flying_device, FlyingDevice::Auto);
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[flying]\nflying_device = \"DualSense\"\n",
+    )
+    .unwrap();
+    let loaded = file.load();
+    assert_eq!(loaded.problems, Vec::<String>::new());
+    assert_eq!(
+        loaded.settings.flying_device,
+        FlyingDevice::Named("DualSense".to_string())
+    );
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[flying]\nflying_device = \"auto\"\n",
+    )
+    .unwrap();
+    assert_eq!(file.load().settings.flying_device, FlyingDevice::Auto);
+}
+
+#[test]
+fn a_flying_device_that_is_not_usable_is_ignored_and_said_so() {
+    let folder = folder("flying-device-bad");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[flying]\nflying_device = 3\n",
+    )
+    .unwrap();
+    let loaded = SettingsFile::in_folder(folder.clone()).load();
+    assert_eq!(loaded.settings.flying_device, FlyingDevice::Auto);
+    assert!(loaded.problems[0].starts_with("flying.flying_device should be text"));
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[flying]\nflying_device = \"  \"\n",
+    )
+    .unwrap();
+    let loaded = SettingsFile::in_folder(folder).load();
+    assert_eq!(loaded.settings.flying_device, FlyingDevice::Auto);
+    assert!(
+        loaded.problems[0].starts_with(
+            "flying.flying_device should be auto, or the name of an Input Device profile"
+        ),
+        "{:?}",
+        loaded.problems
+    );
 }

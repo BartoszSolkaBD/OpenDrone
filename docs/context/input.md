@@ -19,7 +19,7 @@ A console-style controller, such as a DualSense or an Xbox controller.
 _Avoid_: Joypad, controller
 
 **Flying Input Device**:
-The one Input Device whose Channels fly the Quad. It's the device that pressed FLY, unless the pilot picks one in Settings, and it never changes in flight.
+The one Input Device whose Channels fly the Quad. It's the device that pressed FLY, unless the pilot picks one with the Flying device setting (Auto flies a Radio first, then a Gamepad; or one device by its profile's name), and it never changes in flight.
 _Avoid_: Active controller, main device, primary device
 
 **Channel**:

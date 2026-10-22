@@ -31,9 +31,10 @@ use std::time::Duration;
 use opendrone_input::DeviceId;
 use opendrone_input::profile::Kind;
 
+use super::LONG_NOTICE_FOR;
 use super::menu_input::MenuInput;
 use crate::camera::controls::CameraSettings;
-use crate::settings_file::{PilotSettings, Preset, TextSize};
+use crate::settings_file::{FlyingDevice, PilotSettings, Preset, TextSize};
 
 /// How long a short notice stays on a screen.
 pub const NOTICE_FOR: Duration = Duration::from_secs(6);
@@ -113,6 +114,7 @@ pub enum ItemId {
     TextSize,
     ReduceMotion,
     AutoArm,
+    FlyingDevice,
     Answer(Experience),
     SetUp,
     SetUpLater,
@@ -214,7 +216,11 @@ pub struct Catalogue {
 /// An Input Device that is plugged in.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceFacts {
+    /// What SDL calls it, such as "DualSense Wireless Controller".
     pub name: String,
+    /// The on-screen name of the Input Device profile it flies on, such as
+    /// "DualSense": what the Flying device setting names.
+    pub profile_name: String,
     pub kind: Kind,
     /// Its profile binds an Arm switch.
     pub arm_bound: bool,
@@ -226,9 +232,10 @@ pub struct Facts<'a> {
     /// The Input Devices plugged in, in the order they were found.
     pub devices: &'a [DeviceFacts],
     pub catalogue: &'a Catalogue,
-    /// The Input Device that flies or will fly: the one that pressed FLY, the
-    /// only one plugged in, or the last one that moved a menu. `None` when it
-    /// isn't known yet.
+    /// The Input Device that flies or will fly: the one that pressed FLY, or
+    /// the one the Flying device setting picks. `None` when it isn't known
+    /// yet: nothing is plugged in, or several of the same tier tie and the
+    /// first to move flies.
     pub flying_with: Option<&'a str>,
     /// Whether the Quad is in the air now ([`quad_is_in_the_air`]).
     pub in_the_air: bool,
@@ -573,7 +580,7 @@ impl Menus {
         now: Duration,
     ) -> Vec<Effect> {
         match id {
-            ItemId::TextSize | ItemId::ReduceMotion | ItemId::AutoArm => {
+            ItemId::TextSize | ItemId::ReduceMotion | ItemId::AutoArm | ItemId::FlyingDevice => {
                 self.change(id, true, facts)
             }
             ItemId::MapChip | ItemId::QuadChip | ItemId::PresetChip => self.change(id, true, facts),
@@ -592,7 +599,7 @@ impl Menus {
                 self.leave_first_launch()
             }
             ItemId::SetUpLater | ItemId::ContinueWithout => self.leave_first_launch(),
-            ItemId::Fly => self.load(from),
+            ItemId::Fly => self.load(from, facts, now),
             ItemId::OpenSettings => {
                 self.settings_from = (self.screen, self.cursor);
                 self.enter(Screen::Settings);
@@ -638,7 +645,7 @@ impl Menus {
                 Some(map) => {
                     self.settings.map = map.id.clone();
                     let mut effects = vec![Effect::SettingsChanged];
-                    effects.extend(self.load(None));
+                    effects.extend(self.load(None, facts, now));
                     effects
                 }
                 None => Vec::new(),
@@ -647,7 +654,7 @@ impl Menus {
                 Some(quad) => {
                     self.settings.quad = quad.id.clone();
                     let mut effects = vec![Effect::SettingsChanged];
-                    effects.extend(self.load(None));
+                    effects.extend(self.load(None, facts, now));
                     effects
                 }
                 None => Vec::new(),
@@ -662,7 +669,14 @@ impl Menus {
         vec![Effect::SettingsChanged]
     }
 
-    fn load(&mut self, by: Option<DeviceId>) -> Vec<Effect> {
+    fn load(&mut self, by: Option<DeviceId>, facts: &Facts<'_>, now: Duration) -> Vec<Effect> {
+        if let Some(name) = self.unplugged_flying_device(facts) {
+            self.notice_for(
+                format!("{name} isn't plugged in, so the Flying device is Auto for this flight."),
+                now,
+                LONG_NOTICE_FOR,
+            );
+        }
         self.progress = 0.0;
         self.arm_bound = None;
         self.enter(Screen::Loading);
@@ -704,6 +718,20 @@ impl Menus {
             }
             ItemId::ReduceMotion => self.settings.reduce_motion = !self.settings.reduce_motion,
             ItemId::AutoArm => self.settings.auto_arm = !self.settings.auto_arm,
+            ItemId::FlyingDevice => {
+                let choices = self.flying_device_choices(facts);
+                let at = choices
+                    .iter()
+                    .position(|c| *c == self.settings.flying_device)
+                    .unwrap_or(0);
+                let count = choices.len();
+                let next = if forward {
+                    (at + 1) % count
+                } else {
+                    (at + count - 1) % count
+                };
+                self.settings.flying_device = choices[next].clone();
+            }
             ItemId::PresetChip => {
                 self.settings.preset = step(&Preset::ALL, self.settings.preset, forward)
             }
@@ -730,6 +758,60 @@ impl Menus {
             Vec::new()
         } else {
             vec![Effect::SettingsChanged]
+        }
+    }
+
+    /// What the Flying device stop steps through: Auto, then each Input
+    /// Device plugged in by its profile's name, then the saved device if it
+    /// isn't plugged in.
+    fn flying_device_choices(&self, facts: &Facts<'_>) -> Vec<FlyingDevice> {
+        let mut choices = vec![FlyingDevice::Auto];
+        for device in facts.devices {
+            let choice = FlyingDevice::Named(device.profile_name.clone());
+            if !choices.contains(&choice) {
+                choices.push(choice);
+            }
+        }
+        if !choices.contains(&self.settings.flying_device) {
+            choices.push(self.settings.flying_device.clone());
+        }
+        choices
+    }
+
+    /// The saved Flying device's name, when it isn't plugged in: Auto picks
+    /// until it is.
+    fn unplugged_flying_device(&self, facts: &Facts<'_>) -> Option<String> {
+        match &self.settings.flying_device {
+            FlyingDevice::Named(name) if !facts.devices.iter().any(|d| d.profile_name == *name) => {
+                Some(name.clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// The Flying device stop: its value and the plain words under it.
+    fn flying_device_item(&self, facts: &Facts<'_>) -> Item {
+        let (value, note) = match &self.settings.flying_device {
+            FlyingDevice::Auto => (
+                FlyingDevice::AUTO.to_string(),
+                "Auto flies a Radio if one is plugged in, then a Gamepad. With two of a kind, the first one you move flies. Menus work with any device.".to_string(),
+            ),
+            FlyingDevice::Named(name) => match self.unplugged_flying_device(facts) {
+                None => (
+                    name.clone(),
+                    "Flies with this device whenever it is plugged in. Menus work with any device.".to_string(),
+                ),
+                Some(_) => (
+                    format!("{name} (not plugged in)"),
+                    format!(
+                        "{name} isn't plugged in, so Auto picks for now: a Radio if one is plugged in, then a Gamepad."
+                    ),
+                ),
+            },
+        };
+        Item {
+            note: Some(note),
+            ..Item::stop(ItemId::FlyingDevice, "Flying device", value)
         }
     }
 
@@ -837,6 +919,7 @@ impl Menus {
                     on_off(settings.reduce_motion),
                 ),
                 Item::stop(ItemId::AutoArm, "Auto-arm", on_off(settings.auto_arm)),
+                self.flying_device_item(facts),
                 Item::button(ItemId::Back, "Back"),
             ],
         }
@@ -848,6 +931,11 @@ impl Menus {
         let mut warnings = Vec::new();
         if facts.devices.is_empty() {
             warnings.push("No Input Device connected. Plug in your Radio or Gamepad.".to_string());
+        }
+        if let Some(name) = self.unplugged_flying_device(facts) {
+            warnings.push(format!(
+                "{name} is your Flying device but isn't plugged in, so Auto picks for now."
+            ));
         }
         if !self.settings.auto_arm {
             for device in facts.devices.iter().filter(|d| !d.arm_bound) {
@@ -902,7 +990,7 @@ impl Menus {
                 page.flying_with = Some(match facts.flying_with {
                     Some(name) => format!("Flying with: {name}"),
                     None if facts.devices.is_empty() => "Flying with: no Input Device".to_string(),
-                    None => "Flying with: the Input Device you press FLY with".to_string(),
+                    None => "Flying with: the first Input Device you move".to_string(),
                 });
                 page.warnings = self.warnings(facts);
             }

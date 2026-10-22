@@ -727,9 +727,8 @@ fn spawn_item(
                 .spawn((
                     item_parts(item, index),
                     Node {
-                        flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::Center,
-                        justify_content: JustifyContent::SpaceBetween,
+                        flex_direction: FlexDirection::Column,
+                        row_gap: rem(0.2),
                         padding: UiRect::axes(rem(1.0), rem(0.5)),
                         border: UiRect::all(rem(0.15)),
                         border_radius: BorderRadius::all(rem(0.4)),
@@ -739,12 +738,25 @@ fn spawn_item(
                     },
                 ))
                 .with_children(|stop| {
-                    stop.spawn(text(item.label.clone(), 1.15, TEXT));
-                    stop.spawn(text(
-                        format!("<  {}  >", item.value.clone().unwrap_or_default()),
-                        1.15,
-                        TEXT,
-                    ));
+                    stop.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::SpaceBetween,
+                        ..default()
+                    })
+                    .with_children(|line| {
+                        line.spawn(text(item.label.clone(), 1.15, TEXT));
+                        line.spawn(text(
+                            format!("<  {}  >", item.value.clone().unwrap_or_default()),
+                            1.15,
+                            TEXT,
+                        ));
+                    });
+                    // A line of small print under the setting, such as what
+                    // Auto means for the Flying device.
+                    if let Some(note) = &item.note {
+                        stop.spawn(paragraph(note.clone(), 0.8, MUTED));
+                    }
                 });
         }
     }

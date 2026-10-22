@@ -23,7 +23,7 @@ use opendrone::screens::model::Screen;
 use opendrone::screens::view::CurrentPage;
 use opendrone::screens::{Screens, ScreensPlugin};
 use opendrone::set_up::repo_folder;
-use opendrone::settings_file::{Loaded, PilotSettings, SettingsFile, TextSize};
+use opendrone::settings_file::{FlyingDevice, Loaded, PilotSettings, SettingsFile, TextSize};
 use opendrone::stepping::{Flight, SteppingPlugin};
 use opendrone_input::controls::PadAxis;
 use opendrone_input::profile::Connection;
@@ -31,15 +31,21 @@ use opendrone_input::{Batch, DeviceInfo, DeviceState, Raw, SdlId};
 
 const POCKET: SdlId = SdlId(1);
 const DUALSENSE: SdlId = SdlId(2);
+const SECOND_POCKET: SdlId = SdlId(3);
 
 /// A Radiomaster Pocket over USB, RF off: eight axis channels and the rest
 /// as buttons, the throttle stick at the bottom.
 fn pocket() -> Vec<Raw> {
+    a_pocket(POCKET, "EdgeTX Radiomaster Pocket Joystick")
+}
+
+/// Another Pocket, of the same model, under a name of its own.
+fn a_pocket(id: SdlId, name: &str) -> Vec<Raw> {
     vec![
         Raw::Added {
-            device: POCKET,
+            device: id,
             info: DeviceInfo {
-                name: "EdgeTX Radiomaster Pocket Joystick".to_string(),
+                name: name.to_string(),
                 usb_vendor: 0x1209,
                 usb_product: 0x4F54,
                 sdl_gamepad: true,
@@ -50,7 +56,7 @@ fn pocket() -> Vec<Raw> {
         },
         // The throttle rests at the bottom.
         Raw::Axis {
-            device: POCKET,
+            device: id,
             axis: 2,
             value: -32767,
         },
@@ -458,27 +464,246 @@ fn fly_pressed_on_the_keyboard_flies_with_the_only_device_plugged_in() {
     );
 }
 
+/// A flick of a Pocket's yaw, which starts a flight with it.
+fn yaw_flick(device: SdlId) -> Vec<Raw> {
+    vec![Raw::Axis {
+        device,
+        axis: 3,
+        value: 30000,
+    }]
+}
+
+/// A flick of the DualSense's right stick.
+fn pad_flick() -> Vec<Raw> {
+    vec![Raw::PadAxis {
+        device: DUALSENSE,
+        axis: PadAxis::RightX,
+        value: 30000,
+    }]
+}
+
+fn named(name: &str) -> FlyingDevice {
+    FlyingDevice::Named(name.to_string())
+}
+
 #[test]
-fn with_two_devices_and_the_keyboard_the_first_stick_move_picks_the_flyer() {
-    // Basis: Rule (the Pilot module: the first device whose sticks move
-    // flies, as before the screens (#62)).
-    let mut host = Host::returning("two-devices");
+fn with_a_radio_a_gamepad_and_the_keyboard_fly_on_the_keyboard_flies_the_radio() {
+    // Basis: Rule (#271: Auto flies a Radio first, then a Gamepad, then the
+    // keyboard).
+    let mut host = Host::returning("tier-radio");
+    host.devices_report(dualsense());
+    host.devices_report(pocket());
+    host.frames(5);
+    assert_eq!(
+        host.page().flying_with.as_deref(),
+        Some("Flying with: EdgeTX Radiomaster Pocket Joystick")
+    );
+    host.fly();
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("EdgeTX Radiomaster Pocket Joystick")
+    );
+}
+
+#[test]
+fn with_a_gamepad_and_the_keyboard_fly_on_the_keyboard_flies_the_gamepad() {
+    // Basis: Rule (#271).
+    let mut host = Host::returning("tier-gamepad");
+    host.devices_report(dualsense());
+    host.frames(5);
+    host.fly();
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("DualSense Wireless Controller")
+    );
+}
+
+#[test]
+fn with_only_the_keyboard_no_input_device_flies_because_the_keyboard_cannot_fly_a_quad() {
+    // Basis: Rule (input.md: the keyboard can't fly a Quad; #271's last tier).
+    let mut host = Host::returning("tier-keyboard");
+    host.frames(5);
+    assert_eq!(
+        host.page().flying_with.as_deref(),
+        Some("Flying with: no Input Device")
+    );
+    host.fly();
+    assert_eq!(host.pilot().flying_name(), None);
+}
+
+#[test]
+fn with_two_radios_the_first_to_move_flies() {
+    // Basis: Rule (#271: the first stick move picks the device only where
+    // the tiers tie).
+    let mut host = Host::returning("tie-radios");
+    host.devices_report(pocket());
+    host.devices_report(a_pocket(
+        SECOND_POCKET,
+        "EdgeTX Radiomaster Pocket Joystick (2)",
+    ));
+    host.frames(5);
+    assert_eq!(
+        host.page().flying_with.as_deref(),
+        Some("Flying with: the first Input Device you move")
+    );
+    host.fly();
+    assert_eq!(host.pilot().flying_name(), None);
+    host.devices_report(yaw_flick(SECOND_POCKET));
+    host.frames(3);
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("EdgeTX Radiomaster Pocket Joystick (2)")
+    );
+}
+
+#[test]
+fn a_gamepad_cannot_take_the_flight_from_two_tied_radios() {
+    // Basis: Rule (#271: only the top tier is in the running).
+    let mut host = Host::returning("tie-radios-and-gamepad");
+    host.devices_report(pocket());
+    host.devices_report(a_pocket(
+        SECOND_POCKET,
+        "EdgeTX Radiomaster Pocket Joystick (2)",
+    ));
+    host.devices_report(dualsense());
+    host.frames(5);
+    host.fly();
+    host.devices_report(pad_flick());
+    host.frames(3);
+    assert_eq!(host.pilot().flying_name(), None);
+}
+
+#[test]
+fn a_device_named_in_settings_flies_whatever_else_is_plugged_in() {
+    // Basis: Rule (#271: a specific device).
+    let mut host = Host::with(
+        "named-device",
+        PilotSettings {
+            first_launch_done: true,
+            flying_device: named("DualSense"),
+            ..PilotSettings::default()
+        },
+    );
     host.devices_report(pocket());
     host.devices_report(dualsense());
     host.frames(5);
     assert_eq!(
         host.page().flying_with.as_deref(),
-        Some("Flying with: the Input Device you press FLY with")
+        Some("Flying with: DualSense Wireless Controller")
     );
     host.fly();
-    assert_eq!(host.pilot().flying_name(), None);
-    // A flick of the DualSense's right stick starts the flight with it.
-    host.devices_report(vec![Raw::PadAxis {
-        device: DUALSENSE,
-        axis: PadAxis::RightX,
-        value: 30000,
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("DualSense Wireless Controller")
+    );
+}
+
+#[test]
+fn a_device_named_in_settings_flies_even_when_another_device_pressed_fly() {
+    // Basis: Rule (#271: the pilot's choice of device is the one that flies).
+    let mut host = Host::with(
+        "named-device-other-pressed",
+        PilotSettings {
+            first_launch_done: true,
+            flying_device: named("DualSense"),
+            ..PilotSettings::default()
+        },
+    );
+    host.devices_report(pocket());
+    host.devices_report(dualsense());
+    host.frames(5);
+    // FLY with a flick of the Pocket's yaw.
+    host.devices_report(yaw_flick(POCKET));
+    host.frames(2);
+    host.devices_report(vec![Raw::Axis {
+        device: POCKET,
+        axis: 3,
+        value: 0,
     }]);
-    host.frames(3);
+    host.until(400, |h| h.screen() == Screen::Flying);
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("DualSense Wireless Controller")
+    );
+}
+
+#[test]
+fn a_named_device_that_is_not_plugged_in_falls_back_to_auto_and_says_so() {
+    // Basis: Rule (#271: falls back to Auto, and says so).
+    let mut host = Host::with(
+        "named-device-missing",
+        PilotSettings {
+            first_launch_done: true,
+            flying_device: named("DualSense"),
+            ..PilotSettings::default()
+        },
+    );
+    host.devices_report(pocket());
+    host.frames(5);
+    assert!(
+        host.page()
+            .warnings
+            .iter()
+            .any(|w| w.contains("DualSense") && w.contains("isn't plugged in")),
+        "{:?}",
+        host.page().warnings
+    );
+    host.press(MenuInput::Select);
+    assert!(
+        host.page()
+            .notices
+            .iter()
+            .any(|n| n.contains("DualSense isn't plugged in, so the Flying device is Auto")),
+        "{:?}",
+        host.page().notices
+    );
+    host.until(400, |h| h.screen() == Screen::Flying);
+    assert_eq!(
+        host.pilot().flying_name(),
+        Some("EdgeTX Radiomaster Pocket Joystick")
+    );
+    // The setting is kept, for when the device is plugged in again.
+    let kept = host
+        .app
+        .world()
+        .resource::<Screens>()
+        .menus()
+        .settings()
+        .flying_device
+        .clone();
+    assert_eq!(kept, named("DualSense"));
+}
+
+#[test]
+fn a_flying_device_picked_on_the_settings_page_is_saved_and_flies_next() {
+    // Basis: Rule (#271: saved in the settings file, changed with any device).
+    let mut host = Host::returning("pick-flying-device");
+    host.devices_report(pocket());
+    host.devices_report(dualsense());
+    host.frames(5);
+    // Hub: Settings is the fifth stop. Down x4, Select, then Down x3 to the
+    // Flying device (Text size, Reduce motion, Auto-arm, Flying device).
+    for _ in 0..4 {
+        host.press(MenuInput::Down);
+    }
+    host.press(MenuInput::Select);
+    assert_eq!(host.screen(), Screen::Settings);
+    for _ in 0..3 {
+        host.press(MenuInput::Down);
+    }
+    assert_eq!(host.cursor_label(), "Flying device");
+    // Auto -> Radiomaster Pocket -> DualSense.
+    host.press(MenuInput::Right);
+    host.press(MenuInput::Right);
+    assert_eq!(host.settings_on_disk().flying_device, named("DualSense"));
+    host.press(MenuInput::Back);
+    assert_eq!(host.screen(), Screen::Hub);
+    // The cursor is back on Settings: up to FLY.
+    for _ in 0..4 {
+        host.press(MenuInput::Up);
+    }
+    assert_eq!(host.cursor_label(), "FLY");
+    host.fly();
     assert_eq!(
         host.pilot().flying_name(),
         Some("DualSense Wireless Controller")

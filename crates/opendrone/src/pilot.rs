@@ -40,6 +40,13 @@
 //!   never read, and Reset and the camera's keys do nothing in a menu. The
 //!   device that selects FLY becomes the Flying Input Device
 //!   ([`Pilot::begin_flight`]).
+//! - **The Flying device setting** (#271) says which device flies when FLY
+//!   is pressed with the keyboard or the mouse: Auto, a Radio first and then
+//!   a Gamepad (the keyboard can't fly a Quad, so with no device nothing
+//!   flies), or a device the pilot named by its profile's name. A device the
+//!   pilot named flies whichever device pressed FLY. Where the tiers tie, two
+//!   Radios or two Gamepads, the Quad waits and the first of them whose
+//!   sticks move flies; a device of a lower tier can't take the flight.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -61,6 +68,7 @@ use crate::save::save_flight;
 use crate::screens::menu_input::{MenuInput, PadMenu, RadioMenu};
 use crate::screens::model::{DeviceFacts, InputMode};
 use crate::set_up::{FlightPlan, repo_folder};
+use crate::settings_file::FlyingDevice;
 use crate::stepping::Flight;
 
 /// Devices found in the first moments after the input thread starts were
@@ -119,8 +127,9 @@ pub struct Pilot {
     /// What the menus were asked since the screens last took them, with the
     /// device that asked (`None`: the keyboard).
     menu_queue: Vec<(Option<DeviceId>, MenuInput)>,
-    /// The last device that moved a menu.
-    last_menu_device: Option<DeviceId>,
+    /// The Flying device setting: which Input Device flies when FLY is
+    /// pressed with the keyboard or the mouse.
+    flying_choice: FlyingDevice,
     /// Short notices about devices coming and going, since the screens last
     /// took them.
     device_notices: Vec<String>,
@@ -181,7 +190,7 @@ impl Pilot {
             mode: InputMode::Flight,
             device_menus: BTreeMap::new(),
             menu_queue: Vec::new(),
-            last_menu_device: None,
+            flying_choice: FlyingDevice::Auto,
             device_notices: Vec::new(),
             handed: Vec::new(),
         }
@@ -254,6 +263,9 @@ impl Pilot {
                     d.id(),
                     DeviceFacts {
                         name: d.info().name.clone(),
+                        profile_name: d
+                            .profile()
+                            .map_or_else(|| d.info().name.clone(), |p| p.facts.name.clone()),
                         kind: d.kind(),
                         arm_bound,
                     },
@@ -262,19 +274,81 @@ impl Pilot {
             .collect()
     }
 
+    /// Takes the Flying device setting, as the screens have it now.
+    pub fn set_flying_device(&mut self, choice: FlyingDevice) {
+        self.flying_choice = choice;
+    }
+
+    /// The Input Devices the Flying device setting allows, in the order they
+    /// were found. A specific device that is plugged in; else, of those
+    /// plugged in, the Radios, or with no Radio the Gamepads. Empty when
+    /// nothing is plugged in: the keyboard can't fly a Quad. More than one
+    /// is a tie, and the first whose sticks move flies.
+    fn allowed_to_fly(&self) -> Vec<DeviceId> {
+        let plugged_in = self.devices();
+        if let FlyingDevice::Named(name) = &self.flying_choice {
+            let named: Vec<DeviceId> = plugged_in
+                .iter()
+                .filter(|(_, d)| d.profile_name == *name)
+                .map(|(id, _)| *id)
+                .collect();
+            if !named.is_empty() {
+                return named;
+            }
+            // Not plugged in: Auto picks.
+        }
+        let of_kind = |kind: Kind| -> Vec<DeviceId> {
+            plugged_in
+                .iter()
+                .filter(|(_, d)| d.kind == kind)
+                .map(|(id, _)| *id)
+                .collect()
+        };
+        let radios = of_kind(Kind::Radio);
+        if radios.is_empty() {
+            of_kind(Kind::Gamepad)
+        } else {
+            radios
+        }
+    }
+
+    /// The one Input Device the pilot named in the Flying device setting,
+    /// when it is plugged in.
+    fn named_device(&self) -> Option<DeviceId> {
+        let FlyingDevice::Named(name) = &self.flying_choice else {
+            return None;
+        };
+        let devices = self.devices();
+        let mut named = devices.iter().filter(|(_, d)| d.profile_name == *name);
+        match (named.next(), named.next()) {
+            (Some((id, _)), None) => Some(*id),
+            _ => None,
+        }
+    }
+
     /// The Input Device that flies, or will fly if the pilot presses FLY
-    /// with the keyboard or the mouse: the Flying Input Device, else the
-    /// last device that moved a menu, else the only one plugged in.
+    /// with the keyboard or the mouse: the device the pilot named, else the
+    /// Flying Input Device, else the one the setting's tiers pick, if they
+    /// pick just one. `None` when nothing is plugged in, or when several of
+    /// the same tier tie.
     pub fn device_to_fly(&self) -> Option<DeviceId> {
         let plugged_in = self.devices();
-        let is_plugged_in = |id: DeviceId| plugged_in.iter().any(|(d, _)| *d == id);
-        self.flying
-            .filter(|id| is_plugged_in(*id))
-            .or(self.last_menu_device.filter(|id| is_plugged_in(*id)))
-            .or(match plugged_in.as_slice() {
-                [(only, _)] => Some(*only),
+        let flying = self
+            .flying
+            .filter(|id| plugged_in.iter().any(|(d, _)| d == id));
+        self.named_device()
+            .or(flying)
+            .or(match self.allowed_to_fly().as_slice() {
+                [only] => Some(*only),
                 _ => None,
             })
+    }
+
+    /// The device that flies a flight that starts now: the one the pilot
+    /// named, else `by`, the device that pressed FLY, else
+    /// [`Pilot::device_to_fly`].
+    pub fn device_for_flight(&self, by: Option<DeviceId>) -> Option<DeviceId> {
+        self.named_device().or(by).or_else(|| self.device_to_fly())
     }
 
     /// A device's name.
@@ -423,9 +497,6 @@ impl Pilot {
                     None => Vec::new(),
                 },
             };
-            if !moves.is_empty() {
-                self.last_menu_device = Some(device.id());
-            }
             self.menu_queue
                 .extend(moves.into_iter().map(|m| (Some(device.id()), m)));
         }
@@ -563,6 +634,7 @@ impl Pilot {
                         // With the screens, sticks move the cursor in a menu:
                         // only in flight does a stick move pick the device.
                         && self.mode == InputMode::Flight
+                        && self.may_start_the_flight(device)
                         && self.sticks_moved(device, &channels)
                     {
                         queue.extend(self.start_flight(device, at, world));
@@ -672,6 +744,17 @@ impl Pilot {
             );
         }
         events
+    }
+
+    /// Whether this device may start a flight by moving its sticks: with the
+    /// screens, only a device the Flying device setting allows, so that a
+    /// Gamepad can't take the flight from a Radio. Without them, any.
+    fn may_start_the_flight(&self, device: DeviceId) -> bool {
+        if !self.screens {
+            return true;
+        }
+        let allowed = self.allowed_to_fly();
+        allowed.is_empty() || allowed.contains(&device)
     }
 
     /// Whether a device's sticks moved far from where they rested when it
