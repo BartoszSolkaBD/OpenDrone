@@ -723,6 +723,89 @@ fn a_new_input_in_cases_without_a_new_format_still_waits() {
     );
 }
 
+/// What the Report says when a new case input in a newer format can't be a
+/// format step's item.
+const CANT_TELL: &str = "The Report can't tell that `case.beeper` came from a format step: it is \
+                         new in the cases of `scenarios/flight-controller/mixer.toml`, in format ";
+
+#[test]
+fn two_cases_that_differ_only_in_a_new_input_with_one_source_expectation_changed_wait_for_the_maintainer()
+ {
+    // Beside a format step main doesn't know, the second case's motor 1
+    // moves to 160, and a copy of that case, set apart only by the new
+    // input, keeps the old 158. Leaving the new input out, the old
+    // Expectation would match the copy and hide the change.
+    let pull_request = PullRequest::new("new-input-tells-two-cases-apart")
+        .with_an_unknown_format_step(MIXER)
+        .edit(
+            MIXER,
+            "value = \"158 ± 1\"\nbasis = \"source: mixTable",
+            "value = \"160 ± 1\"\nbasis = \"source: mixTable",
+        )
+        .edit(
+            MIXER,
+            "basis = \"observed: what the Flight Controller did when this was written\"\n",
+            "basis = \"observed: what the Flight Controller did when this was written\"\n\n\
+             [[case]]\nroll     = \"0%\"\npitch    = \"0%\"\nyaw      = \"0%\"\n\
+             throttle = \"0%\"\narm      = \"on\"\ncrash_flip = \"off\"\nbeeper = \"on\"\n\
+             rotation = \"roll -100 °/s, pitch 0 °/s, yaw 0 °/s\"\n\n\
+             [[case.expect]]\nwhat  = \"motor 1 DShot\"\nvalue = \"158 ± 1\"\n\
+             basis = \"source: mixTable and applyMixerAdjustment: Airmode leaves the right \
+             motors at idle, 158\"\n",
+        );
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(!review.gate_passed, "{}", review.output);
+        review.waits_for_the_maintainer(
+            "A Source Expectation changed",
+            "\"motor 1 DShot, in the case with arm on; crash\\_flip off; pitch 0%; roll 0%; \
+             rotation roll -100 °/s, pitch 0 °/s, yaw 0 °/s; throttle 0%; yaw 0%\" (`158 ± 1`) \
+             was removed, or now measures something else.",
+        );
+        review.waits_for_the_maintainer("A Source Expectation changed", CANT_TELL);
+    }
+}
+
+#[test]
+fn a_new_input_with_different_values_in_different_cases_is_not_taken_as_the_format_step_s() {
+    // The step writes `beeper` into every case, but not with one value.
+    let review = PullRequest::new("new-input-with-two-values")
+        .with_an_unknown_format_step(MIXER)
+        .edit(
+            MIXER,
+            "beeper = \"off\"\n\n[[case.expect]]",
+            "beeper = \"on\"\n\n[[case.expect]]",
+        )
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "\"motor 1 DShot, in the case with arm on; crash\\_flip off; pitch 0%; roll 0%; throttle \
+         0%; yaw 0%\" (`158 ± 1`) was removed, or now measures something else.",
+    );
+    review.waits_for_the_maintainer("A Source Expectation changed", CANT_TELL);
+    assert!(
+        !review.report.contains("(new in its cases, in format"),
+        "`case.beeper` isn't the format step's, so it isn't left out of the match:\n{}",
+        review.report
+    );
+}
+
+#[test]
+fn a_new_input_in_only_some_cases_is_not_taken_as_the_format_step_s() {
+    // The step writes `beeper` into the first case only.
+    let review = PullRequest::new("new-input-in-one-case")
+        .with_an_unknown_format_step(MIXER)
+        .edit(MIXER, "beeper = \"off\"\nrotation", "rotation")
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "\"motor 1 DShot, in the case with arm on; crash\\_flip off; pitch 0%; roll 0%; throttle \
+         0%; yaw 0%\" (`158 ± 1`) was removed, or now measures something else.",
+    );
+    review.waits_for_the_maintainer("A Source Expectation changed", CANT_TELL);
+}
+
 // ADRs, Bevy and wgpu.
 
 #[test]

@@ -719,6 +719,45 @@ fn link_time_optimisation_fails_the_check_instead_of_hiding_the_calls() {
 }
 
 #[test]
+fn a_core_crate_cargo_reports_no_build_for_fails_naming_the_crate() {
+    // A core crate that is a program, with no library in it: cargo builds
+    // nothing the check can read, so nothing in it was checked.
+    let outcome = Fixture::new("core-crate-not-built")
+        .member("opendrone-maths", &[], "")
+        .program(
+            "opendrone-physics",
+            &["opendrone-maths"],
+            "fn main() { println!(\"{}\", 2f64.acos()); }",
+        )
+        .check();
+    assert!(!outcome.passed, "{}", outcome.output);
+    outcome.says("- cargo reported no build for `opendrone-physics`; nothing was checked.");
+    outcome.says("so it can't tell whether the core calls the operating system's maths");
+}
+
+#[test]
+fn a_library_the_core_uses_only_on_another_operating_system_isnt_counted_or_checked() {
+    // `cfg(any())` holds on no operating system, so it stands in for a
+    // library only another one uses: cargo never builds it here, and it isn't
+    // part of this computer's core.
+    let outcome = Fixture::new("library-for-another-os")
+        .outside("glamx", &[], "pub fn eigen(x: f64) -> f64 { x.acos() }")
+        .member("opendrone-maths", &[], "")
+        .member(
+            "opendrone-physics",
+            &["opendrone-maths"],
+            "pub fn half(x: f64) -> f64 { x / 2.0 }",
+        )
+        .manifest(
+            "opendrone-physics",
+            "[target.'cfg(any())'.dependencies]\nglamx = { path = \"../../outside/glamx\" }\n",
+        )
+        .check();
+    assert!(outcome.passed, "{}", outcome.output);
+    outcome.says("The core calls none of the operating system's maths: 2 libraries checked.");
+}
+
+#[test]
 fn ci_runs_the_check_on_macos_windows_and_linux_with_the_game_and_the_runner() {
     // Each OS checks its own build: a library or feature only Windows uses
     // shows only in the Windows build.
@@ -793,6 +832,8 @@ struct Package {
     /// A program (`main.rs`) rather than a library.
     program: bool,
     code: String,
+    /// More of its Cargo.toml, after everything else.
+    manifest: String,
 }
 
 impl Fixture {
@@ -848,6 +889,18 @@ impl Fixture {
     /// workspace's Cargo.toml does for parry3d-f64 and the physics.
     fn optimise(mut self, name: &str) -> Fixture {
         self.optimised.push(name.to_owned());
+        self
+    }
+
+    /// Adds to a package's Cargo.toml, after everything else.
+    fn manifest(mut self, name: &str, text: &str) -> Fixture {
+        self.members
+            .iter_mut()
+            .chain(self.outside.iter_mut())
+            .find(|package| package.name == name)
+            .expect("the package is in the fixture")
+            .manifest
+            .push_str(text);
         self
     }
 
@@ -971,6 +1024,8 @@ impl Fixture {
                 manifest.push_str(&format!("{feature} = []\n"));
             }
         }
+        manifest.push('\n');
+        manifest.push_str(&package.manifest);
         write(&folder.join("Cargo.toml"), &manifest);
         let code = match &package.module {
             None => package.code.clone(),
@@ -1006,6 +1061,7 @@ fn package(name: &str, uses: &[&str], module: Option<&str>, code: &str) -> Packa
         module: module.map(str::to_owned),
         program: false,
         code: code.to_owned(),
+        manifest: String::new(),
     }
 }
 
