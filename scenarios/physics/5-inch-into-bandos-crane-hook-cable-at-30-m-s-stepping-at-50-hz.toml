@@ -1,0 +1,76 @@
+# The same hit as the 8 kHz cable Scenario, stepped at 50 Hz so that the
+# continuous collision check has to do the stopping. The Freestyle 5″ flies
+# level at 30 m/s, 25 m up, straight at the hook cable of Bando's tower crane:
+# 5 cm across, 2 m west and 2 m north of the Map's origin, hanging from 35.5 m
+# to 20.6 m. Its motors are stopped, their ESCs letting the props turn freely.
+#
+# At 8 kHz the Quad moves 3.75 mm a step, far less than the cable is wide, so
+# even a Simulation with no continuous check would find the cable in the step
+# where the Quad first touches it. At 50 Hz a step is 0.6 m: longer than the
+# cable and the whole Quad together (the 5″ is under 0.3 m across). The Quad
+# starts 2.9 m west of the Map's origin, so without a continuous check its
+# centre would be at -2.3 m after the first step and -1.7 m after the second.
+# Both are clear of the cable, whose near side is at -2.025 m and far side at
+# -1.975 m, so nothing of the Quad would touch it where a step ends. Only the
+# continuous check, which looks along the whole move, can stop the Quad:
+# with it switched off, the Quad hops over the cable between two steps and
+# flies on. Proves the thin-rail half of E29 in #10 on the Map the crane is
+# on: a Quad never passes through a thin part, even when one step is longer
+# than the part and the Quad together (#267).
+format = 2
+name   = "A 5-inch at 30 m/s never passes through Bando's crane hook cable, even stepping at 50 Hz"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-no-drag"
+map               = "opendrone/bando"
+position          = "-2.9 m east, 2 m north, 25 m up"
+attitude          = "level, heading 90°"
+speed             = "30 m/s east, 0 m/s north, 0 m/s up"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so the items from here to
+# the Rates change nothing in this flight; they are written down all the same.
+armed             = false
+motors            = "stopped"
+flight_controller = "fresh"
+battery           = "100%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "50 Hz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# A Physics Scenario scripts the four motor commands instead of the sticks.
+timeline = [
+  { at = "0 s", motors = "0%" },
+]
+
+[[expect]]
+what    = "distance east"
+over    = "0 s to 0.5 s"
+highest = "between -3 m and -2.025 m"
+basis   = "rule: the cable's near side is -2 m - 2.5 cm = -2.025 m east. Flying free, the 5-inch's centre would be at -2.3 m after the first step (0.02 s), -1.7 m after the second and 12.1 m east by 0.5 s. Its centre is inside its shape, so only passing through the cable could take its centre past -2.025 m: the cable hangs from 20.6 m to 35.5 m, so it can't go under it (a 4 m drop) nor over it (a 10 m climb), and it has no sideways speed to go round it"
+
+[[expect]]
+what  = "speed east"
+at    = "0.5 s"
+value = "-8.72 m/s ± 0.5 m/s"
+basis = "observed: the 5-inch is stopped on the cable's near side in its second step, and comes back off it at about 8.7 m/s west, much faster than the 0.9 m/s of the 8 kHz Scenario, because at 50 Hz the bounce is worked out for the whole 30 m/s of a step that ran into the cable"
+
+[[expect]]
+what  = "distance east"
+at    = "0.5 s"
+value = "-6.48 m ± 0.3 m"
+basis = "observed: the 5-inch's centre is stopped well short of the cable's near side at -2.025 m, and by 0.5 s it has come back to 6.48 m west of the Map's origin, flying west at about 8.7 m/s"
