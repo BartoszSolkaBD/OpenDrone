@@ -1,8 +1,8 @@
 # The Whoop 65 is thrown straight up at 8 m/s from 1 m up on the Floor and
 # ceiling Test Map, whose floor and ceiling are triangle meshes, as a Map's
 # `.glb` gives them. It hits the ceiling, 3.1 m up, with the top of its camera
-# housing, the highest part of its shape, 40 mm ahead of its centre of mass:
-# an off-centre hit, which turns it. It falls back to the floor tumbling, and
+# housing, the highest part of its shape, 32 to 40 mm ahead of its centre of
+# mass: an off-centre hit, which turns it. It falls back to the floor tumbling, and
 # settles upside down on its camera housing and its rear duct rings, its
 # centre 18 mm up (#268 added the housing; before it, it hit the ceiling level
 # on its duct rings, fell back nearly flat, and settled upside down on its
@@ -63,7 +63,7 @@ basis   = "rule: the whoop's body box, 20 mm tall round its centre and wider tha
 what  = "vertical speed"
 at    = "0.4 s"
 value = "-1.85 m/s ± 0.05 m/s"
-basis = "observed: it hits the ceiling at about 0.325 s at about 4.8 m/s, with its housing 40 mm ahead of its centre, so the hit also turns it and sends less of the speed away than a hit through the centre would (the bounce, 0.3 times 4.81 m/s, is 1.44 m/s); it is falling at 1.85 m/s by 0.4 s. Before the housing, a level hit gave -2.17 m/s"
+basis = "observed: it hits the ceiling at about 0.325 s at about 4.8 m/s, with its housing 32 to 40 mm ahead of its centre, so the hit also turns it and sends less of the speed away than a hit through the centre would (the bounce, 0.3 times 4.81 m/s, is 1.44 m/s); it is falling at 1.85 m/s by 0.4 s. Before the housing, a level hit gave -2.17 m/s"
 
 [[expect]]
 what    = "speed"
@@ -75,4 +75,4 @@ basis   = "observed: it has settled on the floor"
 what  = "height"
 at    = "3 s"
 value = "0.0181 m ± 0.0001 m"
-basis = "observed: upside down on its camera housing and its rear duct rings, which reach 20.5 mm and 15 mm above its centre, so it rests tilted about 4° and its centre is 18 mm up (17.8 mm from the shapes' sizes: 15 mm × cos 3.8° + 43.3 mm × sin 3.8°). Before the housing, 15 mm"
+basis = "observed: upside down on its camera housing and its rear duct rings, which reach 20.5 mm and 15 mm above its centre, so it rests on the housing's back top edge (32 mm ahead of its centre) and the rear rings' tops (43.3 mm behind it), tilted by atan(5.5 mm / (32 mm + 43.3 mm)) = 4.2°, and its centre is 15 mm × cos 4.2° + 43.3 mm × sin 4.2° = 18.1 mm up. Before the housing, 15 mm"

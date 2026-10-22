@@ -7,7 +7,7 @@
 # It lies upside down on test/flat-floor, on its camera housing, whose top is
 # 20.5 mm above its centre of mass, and its rear duct rings, whose tops are 15
 # mm above it (8 mm up to the props' plane, plus half the rings' 14 mm), so
-# it rests tilted by atan(5.5 mm / (40 mm + 43.3 mm)) = 3.8° (#268 added the
+# it rests tilted by atan(5.5 mm / (32 mm + 43.3 mm)) = 4.2°, on the housing's back top edge, 32 mm ahead of the centre (#268 added the
 # housing; before it lay flat on the rings). It starts as Reset leaves it,
 # with the housing just touching the floor: disarmed, the ESCs powering up, ready
 # at 1.662 s. The Crash Flip switch is on; the Arm switch goes on at 2 s, so
@@ -75,7 +75,7 @@ timeline = [
 what  = "tilt"
 at    = "1.9 s"
 value = "176° ± 1°"
-basis = "rule: it starts upside down and lies still on its camera housing and its rear duct rings until it's armed: the housing's top is 20.5 mm above its centre and the rings' tops 15 mm, so it rests tilted by 180° - 3.8° = 176.2°"
+basis = "rule: it starts upside down and lies still on its camera housing and its rear duct rings until it's armed: the housing's top is 20.5 mm above its centre and the rings' tops 15 mm, so it rests on the housing's back top edge, 32 mm ahead of its centre, and the rear rings' tops, 43.3 mm behind it, tilted by 180° - atan(5.5 mm / (32 mm + 43.3 mm)) = 175.8°"
 
 [[expect]]
 what  = "Crash Flip starts"
@@ -93,7 +93,7 @@ basis = "source: the maintainer's memory of the Meteor65 Pro: Crash Flip \"works
 what  = "the Quad turns right side up"
 over  = "2 s to 3 s"
 first = "0.59 s ± 0.05 s"
-basis = "observed: the roll flip, from the Arm switch going on until it comes past its side; it took 0.495 s before the camera housing (#268), which holds it tilted 3.8° and changes how it rolls over its side"
+basis = "observed: the roll flip, from the Arm switch going on until it comes past its side; it took 0.495 s before the camera housing (#268), which holds it tilted 4.2° and changes how it rolls over its side"
 
 [[expect]]
 what  = "tilt"

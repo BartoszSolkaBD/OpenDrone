@@ -77,7 +77,7 @@ basis = "source: Betaflight 2026.6.2's defaults: crash_recovery OFF and landing_
 what  = "tilt"
 at    = "6 s"
 value = "176° ± 1°"
-basis = "observed: it comes to rest upside down on the floor, tilted about 4° because it rests on its camera housing and its rear duct rings (180° - 3.8°); before the housing it lay flat, at 180°"
+basis = "observed: it comes to rest upside down on the floor, tilted about 4° because it rests on its camera housing and its rear duct rings (180° - 4.2° = 175.8°: it rests on the housing's back top edge, 32 mm ahead of its centre, and the rear rings' tops, 43.3 mm behind it); before the housing it lay flat, at 180°"
 
 [[expect]]
 what  = "the Quad turns right side up"

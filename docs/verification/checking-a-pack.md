@@ -283,7 +283,7 @@ The checker refuses an unknown key, section, kind, button, key name, Action or F
 
 ## Fingerprints
 
-The checker gives each Quad a fingerprint of what the Simulation receives from it: every physics number, count and choice, the ESC melody and the Tune's settings. Its on-screen text, picture, camera, sound block, Confidences, sources, marks and comments don't count, and the same number written two ways ("23.0 g" or "0.023 kg") gives the same fingerprint. A Map's fingerprint covers its world values, its solid parts in order and its Launch Spot. Each Scenario's Results file records the fingerprints of the Quad and Map it ran on, so a moved Result can be traced to a changed Quad or Map.
+The checker gives each Quad a fingerprint of what the Simulation receives from it: every physics number, count and choice, the ESC melody and the Tune's settings, and on a Quad with a `camera_housing` the camera's `position`, which places the housing. Its on-screen text, picture, the rest of the camera, sound block, Confidences, sources, marks and comments don't count, and the same number written two ways ("23.0 g" or "0.023 kg") gives the same fingerprint. A Map's fingerprint covers its world values, its solid parts in order and its Launch Spot. Each Scenario's Results file records the fingerprints of the Quad and Map it ran on, so a moved Result can be traced to a changed Quad or Map.
 
 ## File formats
 

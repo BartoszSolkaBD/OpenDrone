@@ -64,8 +64,8 @@ timeline = [
 [[expect]]
 what    = "height"
 over    = "0 s to 2 s"
-highest = "between 3.0795 m and 3.0825 m"
-basis   = "rule: it reaches the ceiling at 3.1 m but never passes into it: the top of its camera housing, 20.5 mm above its centre (the lens 16 mm up, in the middle of the 9 mm tall box's front face), stops it, so its centre can't rise above 3.1 m - 0.0205 m = 3.0795 m while level (the physics lets a part sit at most 0.1 mm inside a surface), nor above 3.1 m - 0.0178 m = 3.0822 m however it tilts onto the housing and the rear rings' tops (43.3 mm behind the centre, 15 mm up: 15 mm × cos 3.8° + 43.3 mm × sin 3.8° = 17.8 mm)"
+highest = "between 3.0795 m and 3.0820 m"
+basis   = "rule: it reaches the ceiling at 3.1 m but never passes into it: the top of its camera housing, 20.5 mm above its centre (the lens 16 mm up, in the middle of the 9 mm tall box's front face), stops it, so its centre can't rise above 3.1 m - 0.0205 m = 3.0795 m while level (the physics lets a part sit at most 0.1 mm inside a surface), nor above 3.1 m - 0.0181 m = 3.0819 m when it tilts onto the housing's back top edge (32 mm ahead of the centre, 20.5 mm up) and the rear rings' tops (43.3 mm behind it, 15 mm up): it tilts by atan(5.5 mm / (32 mm + 43.3 mm)) = 4.2°, which puts the centre 15 mm × cos 4.2° + 43.3 mm × sin 4.2° = 18.1 mm below the ceiling"
 
 [[expect]]
 what   = "height"
