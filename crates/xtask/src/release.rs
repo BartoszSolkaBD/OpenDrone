@@ -6,7 +6,9 @@
 //!   releases, or why it isn't a release tag.
 //! - `package`: lays out a built game as a download, one zip per operating
 //!   system, in the layout the game looks for beside itself
-//!   (`opendrone::set_up::find_repo_folder`).
+//!   (`opendrone::set_up::find_repo_folder`). Packs and Scenarios come from
+//!   the files git tracks, so data downloaded onto this machine (NeuroBEM's,
+//!   which has no licence to redistribute) never goes in.
 //! - `bevy-upgrade <index file>`: the "Upgrade to Bevy 0.N" issues to open,
 //!   from crates.io's index entry for `bevy` and the fixed template.
 //! - `advisories <cargo-deny output>`: the issues the daily security scan
@@ -158,28 +160,48 @@ pub fn run_package(args: &[String]) -> ExitCode {
     finish(repo().and_then(|root| package(&root, &game, &os, &name, &out, textures)))
 }
 
-/// Every file under `folder`, as paths from the repo's root with `/`
-/// between folders, in name order. Hidden files, such as `.DS_Store`, are
-/// left out.
+/// Every file git tracks under `folder`, as paths from the repo's root with
+/// `/` between folders, in name order. Only committed files go into a
+/// download, never whatever else sits in the folder on this machine:
+/// NeuroBEM's data, which `cargo xtask download neurobem` writes beside its
+/// Scenarios, has no licence to be redistributed and is kept out of git by a
+/// `.gitignore` (#251). Hidden files and folders, such as `.gitignore`, are
+/// left out, and so is anything that isn't a plain file.
 fn files_under(root: &Path, folder: &str) -> Result<Vec<String>, String> {
+    if !root.join(".git").exists() {
+        return Err(format!(
+            "{} isn't a git checkout, and a download takes only the files git tracks, so \
+             downloaded data can't slip in. Run this inside a clone of the OpenDrone repo.",
+            root.display()
+        ));
+    }
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "-z", "--", folder])
+        .output()
+        .map_err(|e| format!("can't run git to list {folder}/: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git couldn't list {folder}/: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let listed = String::from_utf8(output.stdout)
+        .map_err(|_| format!("git listed a file under {folder}/ whose name isn't text"))?;
     let mut found = Vec::new();
-    let mut waiting = vec![folder.to_string()];
-    while let Some(here) = waiting.pop() {
-        let entries = fs::read_dir(root.join(&here)).map_err(|e| format!("{here}: {e}"))?;
-        for entry in entries {
-            let entry = entry.map_err(|e| format!("{here}: {e}"))?;
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
-                continue;
-            }
-            let path = format!("{here}/{name}");
-            let kind = entry.file_type().map_err(|e| format!("{path}: {e}"))?;
-            if kind.is_dir() {
-                waiting.push(path);
-            } else if kind.is_file() {
-                found.push(path);
-            }
+    for path in listed.split('\0').filter(|p| !p.is_empty()) {
+        if path.split('/').any(|part| part.starts_with('.')) {
+            continue;
         }
+        let kind = fs::symlink_metadata(root.join(path))
+            .map_err(|e| format!("{path}: git tracks it, but {e}"))?;
+        if kind.is_file() {
+            found.push(path.to_string());
+        }
+    }
+    if found.is_empty() {
+        return Err(format!("git tracks no files under {folder}/"));
     }
     found.sort();
     Ok(found)
