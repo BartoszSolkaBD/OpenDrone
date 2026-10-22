@@ -33,8 +33,11 @@
 //!   checks the committed `.glb` files are what it builds ([`maps`]).
 //! - `textures`: downloads the CC0 textures the material library lists and
 //!   checks each against its checksum ([`textures`]).
-//! - `credits`: writes `CREDITS.md` from the material library, or checks it
-//!   is up to date ([`textures`]).
+//! - `credits`: writes `CREDITS.md` from the material library and the list
+//!   of datasets, or checks it is up to date ([`textures`], [`datasets`]).
+//! - `tii-logs` and `download neurobem`: turn real flight logs into the
+//!   motor Input Tracks and recorded flights Physics Scenarios play back
+//!   ([`flight_logs`]).
 //! - `release-version`, `package`, `bevy-upgrade` and `advisories`: the
 //!   parts of the Build, Release, Bevy upgrade and Security workflows: a
 //!   release tag's version, a build laid out as a download, and the issues
@@ -46,6 +49,8 @@ use std::process::ExitCode;
 
 mod book;
 mod core_maths;
+mod datasets;
+mod flight_logs;
 mod import_tune;
 mod input_monitor;
 mod maps;
@@ -115,8 +120,20 @@ Commands:
       assets-src/textures/ (git ignores it) and refuse any file whose SHA-256
       differs from the manifest's. --pin writes the checksum of a new file.
   credits [--check]
-      Write CREDITS.md from assets-src/materials.toml, or with --check say
-      whether it is up to date.
+      Write CREDITS.md from assets-src/materials.toml and
+      assets-src/datasets.toml, with the checksum of every committed data
+      file, or with --check say whether it is up to date.
+  tii-logs <folder>
+      Trim TII's Race Against the Machine flights (CC BY 4.0), as their
+      downloader unpacks them into <folder>, into the motor Input Tracks and
+      recorded flights the Freestyle 5″'s Scenarios in
+      scenarios/quads/freestyle-5/tii-logs/ play back, and print each
+      Scenario's starting state.
+  download neurobem [--zip <processed_data.zip>]
+      Download NeuroBEM's processed flights (no licence, so never committed)
+      into target/downloads/neurobem/, or read the copy --zip names, and write
+      the files its Scenarios in scenarios/quads/freestyle-5/neurobem/ play
+      back, beside them, where git ignores them.
   import-tune <export file> (<quad folder> | --print)
       Import a quad's Betaflight diff all (diff bare on 4.3 and 4.4, or a
       dump, from Betaflight 4.3 or newer) as the Quad's tune.txt, in
@@ -172,6 +189,8 @@ fn main() -> ExitCode {
         "maps" => maps::run(rest),
         "textures" => textures::run_textures(rest),
         "credits" => textures::run_credits(rest),
+        "tii-logs" => flight_logs::run_tii(rest),
+        "download" => flight_logs::run_download(rest),
         "release-version" => release::run_release_version(rest),
         "package" => release::run_package(rest),
         "bevy-upgrade" => release::run_bevy_upgrade(rest),

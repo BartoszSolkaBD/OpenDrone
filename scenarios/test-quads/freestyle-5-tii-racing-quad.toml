@@ -1,0 +1,49 @@
+# TII's racing quad, as the Freestyle 5″ with that quad's own hardware.
+#                                         id: test/freestyle-5-tii-racing-quad
+#
+# TII Racing flew the flights of their Race Against the Machine dataset (data
+# CC BY 4.0, scenarios/quads/freestyle-5/tii-logs/NOTICE.md) on a 5″ racing
+# quad they documented in full: T-Motor F60PRO V 2020KV motors on the same
+# T5147 props as the Freestyle 5″, a Tattu R-Line 1400 mAh 6S pack, and a
+# Jetson Orin NX on board, about 870 g in all. The Physics Scenarios beside
+# the logs replay its logged motor commands into this Test Quad.
+#
+# It changes only that quad's own hardware: its mass and diagonal, its
+# motors and its pack. Everything about the air and the frame (rotor drag,
+# body drag, inertia and the rest) is the Freestyle 5″'s, so the rotor drag
+# the logs fit is the Freestyle 5″'s own number (its feel-tests.md), and any
+# change to the Freestyle 5″ carries into this Test Quad.
+#
+# A Test Quad lists only what it changes. Only the Scenario runner reads Test
+# Quads; pilots never fly them. Where each number comes from:
+# docs/research/quad-definitions.md, "Fitted to the TII logs".
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "TII's documented racing quad, so its logged motor commands can be played back against the Freestyle 5″'s air and frame"
+
+# Test Quad values carry no Confidence; each says where it comes from.
+[frame]
+# Bosello et al. 2024 (arXiv 2311.02667, §III): "including the battery,
+# weighs ~870 g", with a 215 mm prop-to-prop diagonal. The pack keeps the
+# Freestyle 5″'s 233 g, so the rest is the dry mass.
+dry_mass = "637 g"
+diagonal = "215 mm"
+
+[motors]
+# T-Motor F60PRO V 2020KV (TII's quadrotor/bom.md), 12N14P as the Freestyle
+# 5″'s Velox; its idle current, 1.25 A, from T-Motor's specification as
+# GetFPV lists it, which gives no voltage: T-Motor's sheets give it at 10 V.
+kv                 = "2020 KV"
+no_load_current    = "1.25 A at 10 V"
+# Fitted to these logs: the one lumped resistance (motor, ESC and wiring)
+# with which the logged commands give the logged thrust, the hovers about 7%
+# short and the punch-outs about 4% over. Nothing publishes it; the
+# Freestyle 5″'s Velox needs 0.19 Ω to meet T-Motor's own table.
+winding_resistance = "0.12 Ω"
+
+[battery]
+# Fitted to these logs' sag: a punch-out from hover to about 120 A takes
+# about 1.1 V off the logged voltage, about 9 mΩ in all for TII's Tattu
+# R-Line 150C, a lower-resistance pack than the Freestyle 5″'s estimate.
+resistance = "8 mΩ"
+connector  = "1 mΩ"

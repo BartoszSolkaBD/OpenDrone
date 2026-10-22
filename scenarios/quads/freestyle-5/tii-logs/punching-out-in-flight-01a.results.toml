@@ -1,0 +1,40 @@
+# Results of punching-out-in-flight-01a.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "TII's quad punches out with the thrust and the sag it logged (flight 01a)"
+
+[[expect]]
+what     = "felt acceleration up, mean gap from the recorded flight over 0.1 s to 0.3 s"
+basis    = "Source"
+expected = "0 m/s² ± 3 m/s²"
+measured = "1.43 m/s²"
+
+[[expect]]
+what     = "battery voltage, mean gap from the recorded flight over 0.1 s to 0.3 s"
+basis    = "Source"
+expected = "0 V ± 0.5 V"
+measured = "0.128 V"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "5eaf1631ce76e859"   # test/freestyle-5-tii-racing-quad: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "dac28a51377e4663"   # the whole state after each of 2400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.03 s" = "b8ddaf16cc926fbc"
+"0.06 s" = "f4753c042f06c985"
+"0.09 s" = "53d88bd32757ea41"
+"0.12 s" = "271a5906b62a9955"
+"0.15 s" = "9cb5d7ba38183f59"
+"0.18 s" = "04e59e6626b6072c"
+"0.21 s" = "049d9d797f292927"
+"0.24 s" = "aff2f57eddf341d1"
+"0.27 s" = "be49ad421711a77d"
+"0.3 s" = "ac47a20d6dbec360"

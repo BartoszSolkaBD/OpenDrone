@@ -20,7 +20,7 @@ This file is the **map**: read it first, then open only the deep dive for the to
 | World and content | Map, Skate Park, Bando, Gap, Backdrop, Launch Spot, Reset, Drift Event, Pack, Pack checker, Free Flight | [docs/context/world.md](docs/context/world.md) |
 | Camera and video | FPV Camera, Camera Tilt, Lens, FOV, Aspect ratio, Video Look, Video Signal, Breakup, Dynamic Range, Auto-exposure, OSD, OSD layout | [docs/context/camera.md](docs/context/camera.md) |
 | Simulation | Simulation, Simulation Time, Flight Input, Snapshot, Fingerprint | [docs/context/simulation.md](docs/context/simulation.md) |
-| Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Save Flight, Test Pilot, Test Map, Test Quad, Feel Test, Feel Test log | [docs/context/verification.md](docs/context/verification.md) |
+| Verification | Scenario (Flight, Thrust Stand, Flight Controller, Physics), Expectation, Basis, Results, Timeline, Input Track, Recorded flight, Save Flight, Test Pilot, Test Map, Test Quad, Feel Test, Feel Test log | [docs/context/verification.md](docs/context/verification.md) |
 | Screens and navigation | Hub, First Launch, Pause Menu, Pre-flight Warning, Loading screen | [docs/context/screens.md](docs/context/screens.md) |
 | Sound | Listening Position, Background Sound | [docs/context/sound.md](docs/context/sound.md) |
 | Development | Phase 1, Phase 2, Review Report, Red Flag, Reviewer, Verdict, Delegator, Area, Lane, Work Count, Frame Check | [docs/context/development.md](docs/context/development.md) |

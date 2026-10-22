@@ -22,8 +22,8 @@
 # guard to disarm it.
 #
 # What the hit does (since the air, #42, and Prop Strikes, #45): rotor and
-# body drag slow the Quad from 10 m/s to 7.8 m/s before it reaches the wall
-# at about 0.555 s. Its front props strike the wall first and stop, and it
+# body drag slow the Quad from 10 m/s before it reaches the wall at about
+# 0.555 s. Its front props strike the wall first and stop, and it
 # bounces back at about 2 m/s. Their ESCs find them stalled and restart them,
 # 0.1 s later and capped at the start-up power limit at first, so they run
 # again by about 0.88 s; until then the Flight Controller asks for all the
@@ -44,9 +44,16 @@
 # speed east at 1 s, from -0.0915 to -0.0858 m/s. The hit, the restarts, the
 # second hit at about 1.41 s and where it ends up are the same.
 #
+# Since the Freestyle 5″'s rotor drag was fitted to the TII logs (#47), from
+# 0.4 to 0.26 s⁻¹, the Quad keeps more of its speed, so it starts 0.21 m
+# further from the wall, which keeps the hit at about 0.555 s. It tumbles a
+# little differently after it, and the moved values are in the Results; it
+# ends up pressed against the wall all the same.
+#
 # It starts 2 m up on the Test Map with a wall (its face 5 m east, facing
-# west), level and armed, its motors "settled", flying east at 10 m/s with
-# the sticks centred and the throttle at 30%.
+# west), 0.21 m west of the Map's origin, level and armed, its motors
+# "settled", flying east at 10 m/s with the sticks centred and the throttle
+# at 30%.
 format = 2
 name   = "A Quad that hits a wall stays armed"
 
@@ -54,7 +61,7 @@ name   = "A Quad that hits a wall stays armed"
 kind              = "flight"
 quad              = "test/freestyle-5-no-runaway-takeoff-prevention"
 map               = "test/wall"
-position          = "0 m east, 0 m north, 2 m up"
+position          = "-0.21 m east, 0 m north, 2 m up"
 attitude          = "level, heading 90°"
 speed             = "10 m/s east, 0 m/s north, 0 m/s up"
 rotation          = "0 °/s"

@@ -6,7 +6,8 @@ A **Scenario** is a test you can read without reading code: a starting state, th
 
 - `scenarios/<topic>/<plain words>.toml`: the Scenarios, grouped by topic: `flight-controller/` for the Flight Controller (alone, or flying a Quad), `physics/`, `quads/<quad>/` for one Quad's own, such as its Thrust Stand Scenarios, `recorded/` for those that play back a real Input Device's recording, and `osd/` for what the OSD shows (see [What the pilot sees](#what-the-pilot-sees-osd) below).
 - `<name>.results.toml`, beside each Scenario: what the last run measured. The runner writes it; never edit it by hand.
-- `<plain words>.csv`, beside the Scenarios that play it: an Input Track, recorded Flight Inputs (see [An Input Track](#an-input-track) below).
+- `<plain words>.csv`, beside the Scenarios that play it: an Input Track, recorded Flight Inputs (see [An Input Track](#an-input-track) below), or a motor Input Track and a recorded flight from a real flight log (see [A real flight log](#a-real-flight-log) below).
+- `scenarios/quads/freestyle-5/tii-logs/`: the Physics Scenarios that play back TII's flight logs (CC BY 4.0), with the trimmed logs and their `NOTICE.md` beside them; `scenarios/quads/freestyle-5/neurobem/`: the one that plays back NeuroBEM's, whose files are downloaded, never committed (see [Data that is downloaded](#data-that-is-downloaded) below).
 - `scenarios/test-quads/`: Test Quads, such as `whoop-65-no-drag.toml`, the Whoop 65 with its drag set to zero, `whoop-65-bench-supply.toml`, the Whoop 65 on the 4.0 V bench supply BetaFPV measured its motor on, `whoop-65-rotor-drag-only.toml`, the Whoop 65 with rotor drag as its only drag (and no Prop Wash), `whoop-65-no-prop-wash.toml` and `freestyle-5-no-prop-wash.toml`, each Quad with Prop Wash off and everything else its own, `whoop-65-no-ceiling-effect.toml`, the Whoop 65 with its ceiling effect set to zero, `freestyle-5-filters-and-shaping-off.toml`, the Freestyle 5″ with the Flight Controller's filters, RC smoothing, feedforward and loop shaping off in its Tune, so Flight Controller Scenarios can check Betaflight's PID loop and mixer on their own, `freestyle-5-loop-shaping-off.toml`, the Freestyle 5″ with only its loop shaping (Dynamic D, I-term relax, anti-gravity, TPA and throttle boost, #50) off, so Flight Controller Scenarios can check the filters, RC smoothing and feedforward (#49) on their own, and `freestyle-5-loop-shaping-only.toml`, the opposite: the filters, RC smoothing and feedforward's own shaping off, so Flight Controller Scenarios can check the loop shaping on its own. Last, `whoop-65-small-pack.toml` is the Whoop 65 with a 20 mAh pack in place of its 320 mAh, so a pack that runs flat takes seconds, not minutes. Each says at its top what it changes and why.
 
 ## The Scenario file
@@ -17,6 +18,8 @@ name   = "Free fall is exactly g"
 ```
 
 `format` is the file format's version, so an older OpenDrone refuses a newer file. When a new starting-state item arrives, one command writes it into every Scenario and bumps this number ([Changing a file format](../format-migration.md)). `name` says what the Scenario proves.
+
+Two more lines may follow, in a Scenario that plays back a real flight log: `recorded_flight`, the recorded flight its Expectations compare with (see [A real flight log](#a-real-flight-log) below), and `downloaded`, when its files may not be committed (see [Data that is downloaded](#data-that-is-downloaded) below).
 
 ### The starting state, `[start]`
 
@@ -135,7 +138,7 @@ timeline = [
 ]
 ```
 
-A Timeline: what happens when. Each value holds until it changes. A Physics Scenario, or a Thrust Stand Scenario that scripts its motors, scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.)
+A Timeline: what happens when. Each value holds until it changes. A Physics Scenario, or a Thrust Stand Scenario that scripts its motors, scripts the four motor commands, either one for all four (`"50%"`) or four in Betaflight's motor order (rear right, front right, rear left, front left), such as `"100%, 0%, 0%, 0%"`. Each is from 0% to 100%: the ESC's drive, the share of the battery's voltage it puts across the motor, as a DShot throttle value is to Bluejay. (A thrust stand's "throttle" can mean something else: T-Motor's, for one, is a share of its stand's own signal.) It may instead play back the commands a real Flight Controller logged, from a motor Input Track: see [A real flight log](#a-real-flight-log) below.
 
 A Flight or Flight Controller Scenario, or a Thrust Stand Scenario that flies our Flight Controller, scripts the pilot's sticks and switches instead, as in [`full-right-roll-reaches-the-max-rate.toml`](../../scenarios/flight-controller/full-right-roll-reaches-the-max-rate.toml):
 
@@ -244,6 +247,64 @@ What the Radio Link does with an Input Track's device ([ADR-0020](../adr/0020-ra
 - **Otherwise it runs on its own clock,** from 0 s, as for scripted sticks; at 100 Hz a DualSense's 4 ms reports fall two and three to a frame by turns.
 - **A device that reports at rest counts as lost after 1 s without a report,** exactly as if it were unplugged: the Radio Link sends no frames, and Failsafe follows. Its next report brings it back. A device that reports only changes is lost only when the track says `input device lost`.
 
+### A real flight log
+
+A Physics Scenario can play back the motor commands a real quad's Flight Controller sent, and check that the Simulation does what the real quad did, as in [`slowing-from-5-m-s-in-flight-04a.toml`](../../scenarios/quads/freestyle-5/tii-logs/slowing-from-5-m-s-in-flight-04a.toml), one of the Freestyle 5″'s checks against TII's logs (#47):
+
+```toml
+format = 2
+name   = "TII's quad slows from 5 m/s with the rotor drag it logged (flight 04a)"
+recorded_flight = "slowing-from-5-m-s-in-flight-04a-recorded.csv"
+
+[inputs]
+input_track = "slowing-from-5-m-s-in-flight-04a-motors.csv"
+
+[[expect]]
+what     = "felt acceleration forward"
+over     = "0.05 s to 0.15 s"
+mean_gap = "0 m/s² ± 0.25 m/s²"
+basis    = "source: ..."
+```
+
+**A motor Input Track** is the logged motor commands, in a CSV file beside the Scenario, played in place of a Timeline. There's no `input_device`: no Input Device sent them.
+
+```text
+time (s),motor 1 (%),motor 2 (%),motor 3 (%),motor 4 (%)
+0.000,24.08,24.06,23.35,24.32
+0.002,23.93,24.29,,24.44
+```
+
+- **`time`** is Simulation Time from the Scenario's start, in seconds, each a whole number of physics steps.
+- **The commands** are in Betaflight's motor order, each from 0% to 100%, the ESC's drive, as a Timeline's `motors` are. The first row, at 0 s, gives all four; after it a row gives only the commands that changed, and an empty cell holds the last value. Each holds until the next row, and the run lasts at least to the last row.
+
+**A recorded flight** is what the real quad did, in a second CSV file beside the Scenario, which `recorded_flight` names. Its first column is the time; every other column is something the Scenario can measure, named as `what` names it, with its unit in brackets:
+
+```text
+time (s),felt acceleration forward (m/s²),felt acceleration left (m/s²),felt acceleration up (m/s²),battery voltage (V)
+0.000,-1.429,-0.017,10.642,23.50
+```
+
+A cell may be empty where nothing was recorded. Angles can't be recorded yet, because they wrap round; record a rate instead.
+
+**Matching a recorded flight** is an Expectation over a stretch with one of two words in place of `mean`, `lowest`, `highest` or `final`. At each recorded moment in the stretch (after its start, up to its end), the runner takes this run's value less the recording's:
+
+- **`mean_gap`**: those gaps averaged. Positive means the run is above the recording on average.
+- **`rms_gap`**: their root mean square, each gap squared, averaged, then square-rooted. It is never below zero, and a few big misses count more than many small ones.
+
+Its value and tolerance are in the measure's unit. A Scenario whose recorded flight has no column for the measure, or nothing recorded in the stretch, is refused. A run compared with a recording can't also be compared with another run.
+
+Each comparison is short on purpose. A replay is open-loop: the logged commands are the real Flight Controller's answers to the real quad's own motion, so the Simulation drifts away from the real flight within a few tenths of a second, and the Scenarios compare only stretches before it does. They compare what an accelerometer feels, which a small drift barely moves, more than where the quad points. Where the Freestyle 5″'s logs come from, and what they fit, are in [the Quad definitions research](../research/quad-definitions.md#fitted-to-the-tii-logs-47).
+
+#### Data that is downloaded
+
+Only CC BY data is committed ([the data policy](../data-policy.md)). A Scenario whose files come from data with no licence, such as NeuroBEM's, says so at its top, as [`rolling-out-of-a-hover.toml`](../../scenarios/quads/freestyle-5/neurobem/rolling-out-of-a-hover.toml) does:
+
+```toml
+downloaded = "NeuroBEM"
+```
+
+Its Input Track and recorded flight aren't in the repo: `cargo xtask download neurobem` downloads the flight and writes them beside it, where git ignores them. While they're missing, the runner skips the Scenario, says so, and counts it as passed, so it never blocks a merge. A nightly job ([`nightly.yml`](../../.github/workflows/nightly.yml)) downloads them and runs only these Scenarios with `cargo scenarios check --downloaded`, where a missing file fails. Its Results file is committed, as every Scenario's is: it holds only what OpenDrone's Simulation measured.
+
 ### A table of cases, `[[case]]`
 
 A Flight Controller Scenario may be fed a table of cases instead of a Timeline, as in [`mixer-and-airmode.toml`](../../scenarios/flight-controller/mixer-and-airmode.toml). Each case is a fresh Flight Controller (armed or not, as `[start]` says), one Radio Link frame with the case's sticks and switches, and one loop with its sensor readings; each `[[case.expect]]` is measured after that loop:
@@ -285,7 +346,7 @@ basis  = "rule: ..."
 ```
 
 - **`what`** is one of:
-  - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading, and **tilt**, how far the Quad's up axis leans from straight up, whichever way: 0° upright, 90° on its side, 180° upside down. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length, and acceleration east and north the same for the speeds east and north; none of the three can be measured at 0 s.
+  - **how the Quad moves:** height, distance east, distance north, vertical speed, speed east, speed north, horizontal speed, speed, vertical acceleration, acceleration east, acceleration north, roll rate, pitch rate, yaw rate, roll, pitch, heading, and **tilt**, how far the Quad's up axis leans from straight up, whichever way: 0° upright, 90° on its side, 180° upside down. Up, east, north, rolling right, pitching nose up and yawing nose right are positive. Vertical acceleration is how much the vertical speed changed over the last step, divided by the step's length, and acceleration east and north the same for the speeds east and north; none of the three can be measured at 0 s. **Felt acceleration forward**, **felt acceleration left** and **felt acceleration up** are what an accelerometer on the Quad reads along its own axes: the change in velocity over the last step, divided by its length, less gravity's pull, so the thrust and the air's push over the mass. In free fall it reads nothing; hovering still, 1 g (9.81 m/s²) up. Nor can these be measured at 0 s.
   - **what the gyro reads:** gyro roll rate, gyro pitch rate and gyro yaw rate: the roll, pitch and yaw rates, each clipped at the board's gyro range (±2,000 °/s on both alpha Quads).
   - **each motor,** written "motor 1 speed" to "motor 4 speed" in Betaflight's motor order, and the same for the rest: **speed** (written in RPM, positive the normal way), **thrust** (along the Quad's up axis, in N or gf, grams of thrust as makers' tables give it, over the last step: in flight, in the air the rotor moved through, so it falls in a climb and rises in a descent and at speed, and rises near a floor or under a ceiling; on the thrust stand, in still air, whatever the Map has near it), **torque** (the air's drag on its prop, in N·m), **current** (through the motor itself, which sets its torque; at part throttle its ESC draws less than this from the battery, about the drive times this) and **drive** (the share of the battery's voltage its ESC puts across it, in %) and **restarts** (how many times its ESC has restarted it since it last ran properly or stopped at 0%, a plain number). **Total thrust** is all four motors' thrust.
   - **each prop,** written "prop 1 rub" to "prop 4 rub": how hard it rubbed the Map during the last step (in N), the friction at its disc; 0 when it touches nothing.
@@ -293,7 +354,7 @@ basis  = "rule: ..."
   - **what our Flight Controller's loop did** (only where it runs, and not at 0 s, before its first loop): **roll setpoint**, **pitch setpoint** and **yaw setpoint**, the rotation speed the Rates ask for, before any smoothing (Betaflight's raw setpoint), in °/s; **roll smoothed setpoint** (and the same for pitch and yaw), the setpoint after RC smoothing when the Tune has it on; **roll PID setpoint** (and the same for pitch and yaw), the setpoint the PID loop compared with the gyro: after RC smoothing and, in Angle and Horizon, the levelling, which turns the tilt the sticks ask for into a rotation speed (as Blackbox logs the setpoint); **Horizon strength**, how strongly Horizon levelled, from 0 to 1 (0 outside Horizon); **filtered gyro roll rate** (and pitch and yaw), the gyro after the Flight Controller's low-passes, which every part of it reads; **roll P term**, **roll I term**, **roll D term**, **roll F term** (feedforward) and **roll PID sum** (and the same for pitch and yaw), plain numbers on Betaflight's scale, where 1000 is the whole motor range, as Blackbox shows them; **TPA factor**, what TPA multiplied D (and P, with `tpa_mode` PD) by, 1 being no cut, and **roll Dynamic D factor** (and the same for pitch and yaw), what Dynamic D multiplied that axis's D by, from 1 to D max ÷ D, plain numbers as Betaflight's TPA and D_MAX debug modes log them; **detected Packet Rate**, the Packet Rate the Flight Controller has worked out from the frames' timing (Betaflight's "Detected Rx frequency"), in Hz; **setpoint smoothing cutoff** and **throttle smoothing cutoff**, RC smoothing's cutoffs in use, in whole Hz (nothing to measure with RC smoothing off); **motor 1 DShot** to **motor 4 DShot**, the DShot value it sends each motor's ESC: 0 is "stop", 48 to 2047 the throttle, 158 the Freestyle 5″'s idle, and 20 or 21 the spin direction commands sent on arming and disarming (which an ESC takes as no throttle), the last one sent holding while it sends nothing; **motor 1 direction** to **motor 4 direction**, which way it has told each ESC to spin, 1 the normal way and -1 backwards (Crash Flip); and **mixer throttle**, the throttle the mixer starts from, from 0% to 100%, before Airmode moves it (Blackbox's throttle), which shows the pilot's throttle through the throttle curve, RC smoothing, the throttle limit and throttle boost whatever the PID loop does. Setpoints and terms are signed the pilot's way: rolling right, pitching nose up and yawing nose right are positive, so a positive pitch term pushes the nose up. A Flight Controller Scenario measures only these and what its Radio Link did.
   - **what the Radio Link did** (only where the pilot's sticks reach a Flight Controller, and not at 0 s): **reports in the frame**, how many of the device's reports arrived since the last frame, the fresh ones the frame carries, measured on each step a frame leaves (on the device's beat, values that reach the input thread in two polls within one report count once; with no fresh report, a frame repeats the last one's Channels); **frame age**, how long before a frame left the newest fresh report it carries arrived, measured on each step a frame with a fresh report leaves; and **roll channel**, **pitch channel**, **yaw channel** and **throttle channel**, each stick as the last frame carried it, in percent as a Timeline writes sticks (roll, pitch and yaw from -100% to 100%, the throttle from 0% to 100%, read through ELRS's µs: step 992, centre, is 0.06%). A frame that leaves on a step shows after it: the one that leaves at 1.012 s at 1.012125 s.
   - **something that happens** (only where our Flight Controller runs, except **the pack is empty**, which a Physics Scenario can measure too; and not in a table of cases): **the Quad arms**, **the Quad disarms**, **Failsafe's stage 2 starts** (with DROP, the Quad disarms), **Failsafe ends**, **the ESCs are ready** (every ESC has played its ready beep; only in a Flight Scenario), **the Quad turns right side up** (its tilt falls below 90°; not in a Flight Controller Scenario), **Crash Flip starts** and **Crash Flip ends**, **yaw spin recovery starts** and **yaw spin recovery ends**, **runaway takeoff prevention switches off** (the flight counts as stable), each of Betaflight's reasons for refusing to arm, **FAILSAFE**, **RXLOSS**, **NOT_DISARMED**, **RUNAWAY**, **THROTTLE**, **ANGLE**, **BOOTGRACE**, **FLIP_SWITCH** and **ARM_SWITCH**, written "RXLOSS blocks arming" or "RXLOSS stops blocking arming", **the pack is empty** (its charge reaches 0%: nothing cuts the motors off), and, as the Radio Link counts it, **the Flying Input Device is lost** (unplugged, or silent too long) and **the Flying Input Device is back**. See [When something happens](#when-something-happens) below.
-- **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`** (or **`first`**, for something that happens). A stretch covers the state after each step from just after its start up to its end.
+- **`at`** a moment, with **`value`**; or **`over`** a stretch, with one of **`mean`**, **`lowest`**, **`highest`** or **`final`** (or **`first`**, for something that happens, or **`mean_gap`** or **`rms_gap`**, to compare with a recorded flight: see [A real flight log](#a-real-flight-log)). A stretch covers the state after each step from just after its start up to its end.
 - **The value** always has a tolerance: `"± amount"`, `"± percent"` (a share of the value; for a value in percent, percentage points) or `"between X and Y"`.
 - **Angles** (roll, pitch, heading) are compared the short way round, so 359.9° and 0.1° are 0.2° apart. So no two angles are more than half a turn apart, and a tolerance a whole turn wide, such as `"0° ± 180°"` or `"between 0° and 360°"`, would accept every angle: it is refused, because it checks nothing.
   - Over a stretch, each angle is taken the short way round from the expected value before the lowest, highest, mean or final is worked out, so a heading that passes north or a roll that passes upside down still reads right ([`slow-turn-through-north.toml`](../../scenarios/physics/slow-turn-through-north.toml) shows it).
@@ -409,7 +470,8 @@ measured = "-4.91 m"
 ## Running them
 
 - `cargo scenarios run` runs every Scenario (or the files you name), prints each check as passed or FAILED, and writes the Results files. Commit them with your change.
-- `cargo scenarios check` is what CI runs on macOS, Windows and Linux. It runs every Scenario twice and blocks on a failed Expectation, on two runs that differ (the **repeat check**) and on a Results file that is out of date. It writes nothing except, with `--fingerprints <folder>`, the fingerprint after every step.
+- `cargo scenarios check` is what CI runs on macOS, Windows and Linux. It runs every Scenario twice and blocks on a failed Expectation, on two runs that differ (the **repeat check**) and on a Results file that is out of date. It writes nothing except, with `--fingerprints <folder>`, the fingerprint after every step. It skips a Scenario whose downloaded data is missing (see [Data that is downloaded](#data-that-is-downloaded)).
+- `cargo scenarios check --downloaded` is the nightly job's: it checks only the Scenarios that need downloaded data, and there a missing file fails. Run `cargo xtask download neurobem` first.
 - `cargo scenarios agree <folder> <folder> …` is the **agreement check**: CI gives it each OS's fingerprints, and on a mismatch it names the Scenario and the first step where the OSes split.
 
 ## Units

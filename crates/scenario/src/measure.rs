@@ -13,6 +13,9 @@ pub struct Sample {
     pub quad: Option<QuadOutput>,
     pub flight_controller: Option<DebugRecord>,
     pub radio_link: Option<RadioLinkOutput>,
+    /// How hard the Map's gravity pulls, in m/s²: what the accelerometer
+    /// doesn't feel (0 where the Flight Controller runs alone).
+    pub gravity: f64,
 }
 
 /// One of the four sticks, as a Channel the Radio Link carries.
@@ -69,6 +72,15 @@ pub enum Measure {
     AccelerationEast,
     /// The same for the speed north. North is positive.
     AccelerationNorth,
+    /// What an accelerometer on the Quad feels along its forward axis: the
+    /// change in velocity over the last step, divided by the step's length,
+    /// less gravity's pull, in body axes. The thrust and the air's push over
+    /// the mass: 0 in free fall, and along the up axis 1 g in a still hover.
+    FeltAccelerationForward,
+    /// The same along its left axis.
+    FeltAccelerationLeft,
+    /// The same along its up axis.
+    FeltAccelerationUp,
     /// Rolling right is positive.
     RollRate,
     /// Nose up is positive.
@@ -467,7 +479,7 @@ impl Event {
     }
 }
 
-const ALL: [(&str, Measure); 107] = [
+const ALL: [(&str, Measure); 110] = [
     ("height", Measure::Height),
     ("distance east", Measure::DistanceEast),
     ("distance north", Measure::DistanceNorth),
@@ -479,6 +491,12 @@ const ALL: [(&str, Measure); 107] = [
     ("vertical acceleration", Measure::VerticalAcceleration),
     ("acceleration east", Measure::AccelerationEast),
     ("acceleration north", Measure::AccelerationNorth),
+    (
+        "felt acceleration forward",
+        Measure::FeltAccelerationForward,
+    ),
+    ("felt acceleration left", Measure::FeltAccelerationLeft),
+    ("felt acceleration up", Measure::FeltAccelerationUp),
     ("roll rate", Measure::RollRate),
     ("pitch rate", Measure::PitchRate),
     ("yaw rate", Measure::YawRate),
@@ -677,7 +695,10 @@ impl Measure {
             | Measure::Speed => Dimension::SPEED,
             Measure::VerticalAcceleration
             | Measure::AccelerationEast
-            | Measure::AccelerationNorth => Dimension::ACCELERATION,
+            | Measure::AccelerationNorth
+            | Measure::FeltAccelerationForward
+            | Measure::FeltAccelerationLeft
+            | Measure::FeltAccelerationUp => Dimension::ACCELERATION,
             Measure::RollRate
             | Measure::PitchRate
             | Measure::YawRate
@@ -763,7 +784,12 @@ impl Measure {
     pub fn needs_a_step_before(self) -> bool {
         matches!(
             self,
-            Measure::VerticalAcceleration | Measure::AccelerationEast | Measure::AccelerationNorth
+            Measure::VerticalAcceleration
+                | Measure::AccelerationEast
+                | Measure::AccelerationNorth
+                | Measure::FeltAccelerationForward
+                | Measure::FeltAccelerationLeft
+                | Measure::FeltAccelerationUp
         )
     }
 
@@ -811,6 +837,7 @@ impl Measure {
                 _ => return None,
             });
         }
+        let gravity = now.gravity;
         let before = before.and_then(|b| b.quad.as_ref());
         let now = now.quad.as_ref()?;
         let state = &now.state;
@@ -830,6 +857,20 @@ impl Measure {
             Measure::VerticalAcceleration => (v.z - before?.state.velocity.z) / step,
             Measure::AccelerationEast => (v.x - before?.state.velocity.x) / step,
             Measure::AccelerationNorth => (v.y - before?.state.velocity.y) / step,
+            Measure::FeltAccelerationForward
+            | Measure::FeltAccelerationLeft
+            | Measure::FeltAccelerationUp => {
+                let felt = state.attitude.world_to_body(Vec3::new(
+                    (v.x - before?.state.velocity.x) / step,
+                    (v.y - before?.state.velocity.y) / step,
+                    (v.z - before?.state.velocity.z) / step + gravity,
+                ));
+                match self {
+                    Measure::FeltAccelerationForward => felt.x,
+                    Measure::FeltAccelerationLeft => felt.y,
+                    _ => felt.z,
+                }
+            }
             Measure::RollRate => rates().roll,
             Measure::PitchRate => rates().pitch,
             Measure::YawRate => rates().yaw,

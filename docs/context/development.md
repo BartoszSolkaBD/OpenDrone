@@ -39,7 +39,7 @@ A named part of the repo, such as Physics, Scenarios or Repo rules, with its fol
 _Avoid_: Module, component, team
 
 **Lane**:
-A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time; a PR that waits for the maintainer steps out of its Lane so it holds nothing up. Each ticket carries a `lane: <Lane>` label for each Lane it takes.
+A group of Areas whose PRs collide when they run side by side. For example, every change to how a flight comes out rewrites the Scenarios' Results files, so Physics, the Flight Controller, the Simulation and Scenarios share one Lane. Each Lane has at most one PR in review at a time; a PR that waits for the maintainer steps out of its Lane so it holds nothing up. Each ticket carries a `lane: <Lane>` label for each Lane it takes. While a Lane's PR is in review, one more ticket may build in that Lane when it changes none of the files the PR in review changes and neither changes a Results file; files decide it, not crates.
 _Avoid_: Track, queue, stream
 
 **Work Count**:
@@ -72,6 +72,10 @@ _Avoid_: FPS test, perf test
     - a change to the Repo rules Area
   - **Listed only:** an updated Observed Expectation (with its one-line reason), a new outside library, and a new ADR or glossary term.
 - A check is never weakened unless the ticket asks for it.
+- What CI runs where (decided on 22 October 2026, [#240](https://github.com/BartoszSolkaBD/OpenDrone/issues/240); the list of checks is in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#the-required-checks)):
+  - Every push to main runs every check on macOS, Windows and Linux, the Scenarios and the agreement check included.
+  - A PR runs every check on Linux. On macOS and Windows it only flies the Scenarios, for the agreement check, and only when the PR can change a flight result: a change to the core crates, the Scenario runner and the crates it's built with, `scenarios/`, `packs/`, the libraries' versions, the build settings, Rust's version, or how CI flies the Scenarios. Otherwise those two jobs and the agreement check pass with nothing to do.
+  - The cost: a break that shows only on macOS or Windows, in code that can't change a flight result (the SDL build, the game's window, the Input crate), is found by main's CI after the merge, not on the PR. So is one in a flight crate that the Scenarios don't show: even when a PR changes a flight crate, macOS and Windows run only the Scenarios, and their own core-maths check (an OS maths call from a library or feature only that OS uses), the core's tests and Clippy run there only on main. A red main is fixed before any other work.
 - A Work Count more than 2% above main fails the gate unless the PR names the change and a reason the Reviewer accepts ([ADR-0013](../adr/0013-performance-gates-count-work-not-time.md)). A tidy-up is never a reason. The Review Report also shows each Work Count's total change since the last release.
 - Render Work Counts are counted inside wgpu on GitHub's Linux machine, with Mesa's software GPU on one thread ([ADR-0016](../adr/0016-render-work-counts-from-a-counting-wgpu-on-one-lavapipe-thread.md)). Only counts from the same kind of machine are compared. The M4 matches on passes, draws, triangles and pipelines, but not on uploads or memory, and it can't count pixels shaded.
 - The 45 fps promise is an average. The slowest 1% of frames is reported but not promised. The maintainer runs the Frame Check before each release, and no release is tagged below the promise. The Frame Check gates no PR except a Bevy 0.N upgrade (below).

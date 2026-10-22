@@ -16,15 +16,25 @@ The short version: **only CC0 assets and CC BY data enter the repo.** Data with 
 - **Data with no licence.** No licence means all rights reserved, even when the data is public: for example NeuroBEM, the IDSIA nano-drone set and the UIUC propeller database. [The reference-data research](research/reference-flight-data.md) lists each source with its licence.
 - **Data under any other licence,** such as CC BY-NC-SA, or GPL data such as the chirp logs.
 
+## The flight logs in the repo
+
+The Freestyle 5″ is checked against TII's *Race Against the Machine* flights (CC BY 4.0, #47). Their trimmed CSV files sit beside the Physics Scenarios that play them, in [`scenarios/quads/freestyle-5/tii-logs/`](../scenarios/quads/freestyle-5/tii-logs/NOTICE.md), with a `NOTICE.md` that credits TII and says what was changed. `cargo xtask tii-logs <folder>` makes them again from TII's own download, every time the same bytes. [`assets-src/datasets.toml`](../assets-src/datasets.toml) lists the folder, so [`CREDITS.md`](../CREDITS.md) lists every file in it with its checksum, and CI's `cargo xtask credits --check` fails when a file changes without `CREDITS.md` being written again. How a Scenario reads them: [A real flight log](verification/reading-a-scenario.md#a-real-flight-log).
+
 ## Data we use but don't commit
 
-Tests that need uncommitted data download it into a local cache when it's needed, outside the repo's tracked files, and skip with a note when it's missing. Such a Scenario never blocks a merge until its data's licence is cleared. A nightly run reports how those Scenarios do, without blocking anything.
+Tests that need uncommitted data download it when it's needed, outside the repo's tracked files, and skip with a note when it's missing. Such a Scenario never blocks a merge until its data's licence is cleared. A nightly run reports how those Scenarios do, without blocking anything.
+
+Today that's NeuroBEM, for the inertia check (#47):
+
+- `cargo xtask download neurobem` downloads NeuroBEM's processed flights (about 630 MB) into `target/downloads/neurobem/`, and writes the files its Scenarios in [`scenarios/quads/freestyle-5/neurobem/`](../scenarios/quads/freestyle-5/neurobem/rolling-out-of-a-hover.toml) play back beside them, where a `.gitignore` keeps them out of git.
+- Each such Scenario says `downloaded = "NeuroBEM"` at its top. Without its files the runner skips it and counts it as passed. Its starting state is a level, still Quad, so nothing in the committed Scenario comes from the data; its committed Results hold only what OpenDrone's Simulation measured.
+- The [nightly job](../.github/workflows/nightly.yml) runs on main once a night: it downloads the data and runs only those Scenarios, with `cargo scenarios check --downloaded`, where a missing file fails. No pull request waits for it.
 
 The good Blackbox log decoders are GPL or AGPL, so they're only ever run as separate programs, never built into OpenDrone, and a Blackbox log a test reads back is converted to CSV first.
 
 ## How credit is kept
 
-- [`CREDITS.md`](../CREDITS.md) lists every outside asset and dataset in the repo with its source, its licence and a checksum. It's generated from the texture manifest, and lists the outside sound files the same way.
+- [`CREDITS.md`](../CREDITS.md) lists every outside asset and dataset in the repo with its source, its licence and a checksum. It's generated from the texture manifest and the list of datasets ([`assets-src/datasets.toml`](../assets-src/datasets.toml)), and lists the outside sound files the same way.
 - CC BY data carries its attribution notice beside its files, as well as in `CREDITS.md`.
 - A Pack names its licence in its manifest. The built-in Pack is CC0 throughout. A Pack that mixes licences lists the exceptions by path, with a credit line for anything under CC BY ([#16 §12](https://github.com/BartoszSolkaBD/OpenDrone/issues/16)).
 - Research notes cite every source, with its licence.

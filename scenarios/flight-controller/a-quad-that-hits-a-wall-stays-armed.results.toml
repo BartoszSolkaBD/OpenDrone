@@ -14,7 +14,7 @@ measured = "4.86 m"
 what     = "speed east at 1 s"
 basis    = "Observed"
 expected = "-0.09 m/s ± 0.5 m/s"
-measured = "-0.0631 m/s"
+measured = "-0.109 m/s"
 
 [[expect]]
 what     = "the Quad disarms, first over 0 s to 3 s"
@@ -32,43 +32,43 @@ measured = "158"
 what     = "pitch PID sum, highest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "10.9"
+measured = "7.02"
 
 [[expect]]
 what     = "pitch PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between 2000 and 3000"
-measured = "2460"
+measured = "2500"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 0.556 s to 0.85 s"
 basis    = "Observed"
 expected = "between 600 and 3000"
-measured = "2160"
+measured = "2220"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 0.52 s to 1.4 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-245"
+measured = "-244"
 
 [[expect]]
 what     = "pitch PID sum, lowest over 1.04 s to 1.34 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-1.12"
+measured = "-1.03"
 
 [[expect]]
 what     = "pitch PID sum, highest over 1.04 s to 1.34 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "1.14"
+measured = "0.974"
 
 [[expect]]
 what     = "pitch PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "22.5"
+measured = "27.1"
 
 [[expect]]
 what     = "roll PID sum, highest over 0 s to 0.55 s"
@@ -80,31 +80,31 @@ measured = "0.161"
 what     = "roll PID sum, lowest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-0.0560"
+measured = "-0.0354"
 
 [[expect]]
 what     = "roll PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "92.9"
+measured = "102"
 
 [[expect]]
 what     = "roll PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-128"
+measured = "-142"
 
 [[expect]]
 what     = "roll PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "26.4"
+measured = "105"
 
 [[expect]]
 what     = "roll PID sum, lowest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "5.04"
+measured = "-58.7"
 
 [[expect]]
 what     = "yaw PID sum, highest over 0 s to 0.55 s"
@@ -116,31 +116,31 @@ measured = "0.165"
 what     = "yaw PID sum, lowest over 0 s to 0.55 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-0.00577"
+measured = "-0.0326"
 
 [[expect]]
 what     = "yaw PID sum, highest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "119"
+measured = "132"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 0.59 s to 1.04 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "-11.7"
+measured = "-13.7"
 
 [[expect]]
 what     = "yaw PID sum, highest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "106"
+measured = "127"
 
 [[expect]]
 what     = "yaw PID sum, lowest over 1.6 s to 3 s"
 basis    = "Observed"
 expected = "between -600 and 600"
-measured = "10.0"
+measured = "61.9"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -149,18 +149,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "f0719d5edf4c32f5"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
+quad = "2dcfdbfa00ca4b08"   # test/freestyle-5-no-runaway-takeoff-prevention: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "ece2877482f03b8f"   # the whole state after each of 24000 steps at 8000 Hz, in order
+run  = "196d62840c74571c"   # the whole state after each of 24000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.3 s" = "73dfe0b2ae66263d"
-"0.6 s" = "78f89e9e0cc571d2"
-"0.9 s" = "7ffe4b753f77bf38"
-"1.2 s" = "6414eccfe05624c9"
-"1.5 s" = "a206be7fc5c50929"
-"1.8 s" = "2607bf12f5f4f61f"
-"2.1 s" = "b08e7cfc03d0128a"
-"2.4 s" = "19af4178678442a9"
-"2.7 s" = "a6175257a0365c25"
-"3 s" = "95a7e729f5261196"
+"0.3 s" = "2c9cc6f45ae974a2"
+"0.6 s" = "fb7af28d5e70184f"
+"0.9 s" = "785d66dbbcab6809"
+"1.2 s" = "3eaf82115d1a8bab"
+"1.5 s" = "264ce1b841bcf97e"
+"1.8 s" = "89540006a7a1adfa"
+"2.1 s" = "9e30f1dd6db61a06"
+"2.4 s" = "65e1507acff124c0"
+"2.7 s" = "e3033b0deeaa7d10"
+"3 s" = "99c4fa252ebf2afe"

@@ -1,0 +1,102 @@
+# The inertia check against NeuroBEM. UZH's NeuroBEM quad starts a race
+# trajectory (flight 2021-02-05-15-46-49, part 2, from 9.785 s) from a still
+# hover: over half a second it rolls right ever faster, from 4 °/s to 70
+# °/s. Its logged motor speeds, played into a Test Quad with NeuroBEM's
+# measured mass, inertia and arms, must roll it the same way: the torque the
+# speeds' differences make, over the measured inertia, is the roll it gets.
+#
+# NeuroBEM states no licence, so its files are never committed
+# (docs/data-policy.md): `cargo xtask download neurobem` downloads the
+# flight and writes the two files this Scenario reads beside it, and git
+# ignores them. Without them the runner skips it, so it never blocks a merge;
+# the nightly job downloads them and runs it (`cargo scenarios check
+# --downloaded`).
+#
+# NeuroBEM logged motor speeds, not commands, so the downloader turns each
+# into the drive that holds the Test Quad's motor on it, from a steady
+# bench supply (opendrone_physics::drive_holding). It takes off the hover
+# trim, as the TII files do, so the replay starts level. The window starts
+# in a still hover, so the starting state below is a level, still Quad, and
+# nothing in this file comes from NeuroBEM's data.
+#
+# Only the roll is checked: the logged pitch rate stays within 10 °/s, and
+# the replay's drifts by about 17 °/s, with any inertia (see
+# docs/research/quad-definitions.md, "Checked against NeuroBEM").
+format = 2
+name   = "NeuroBEM's quad rolls out of a hover as its measured inertia says"
+downloaded      = "NeuroBEM"
+recorded_flight = "rolling-out-of-a-hover-recorded.csv"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-neurobem-quad"
+map               = "test/empty-air"
+position          = "0 m east, 0 m north, 10 m up"
+attitude          = "level, heading 0°"
+speed             = "0 m/s"
+rotation          = "0 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+# The Test Quad's bench supply gives 16.0 V at 50%, the voltage the
+# downloader's drives are worked out from.
+battery           = "50%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# The drives that hold NeuroBEM's logged motor speeds, every 2.5 ms.
+input_track = "rolling-out-of-a-hover-motors.csv"
+
+[[expect]]
+what    = "roll rate"
+over    = "0.1 s to 0.5 s"
+rms_gap = "0 °/s ± 6 °/s"
+basis   = "source: NeuroBEM (Bauersfeld et al., RSS 2021, no licence; downloaded): the replay rolls as the quad did, from 18 °/s to 70 °/s, within 6 °/s root mean square. With NeuroBEM's measured inertia it is within about 4 °/s; with the Freestyle 5″'s own estimate (14, 15, 25 kg·cm²) it is off by about 12 °/s, so the check tells the two apart"
+
+[[expect]]
+what     = "motor 1 speed"
+over     = "0.1 s to 0.5 s"
+mean_gap = "0 RPM ± 150 RPM"
+basis    = "source: NeuroBEM: the downloader's drives hold each motor on its logged speed, about 10,900 RPM, within 1.4%, the hover trim they take off"
+
+[[expect]]
+what     = "motor 2 speed"
+over     = "0.1 s to 0.5 s"
+mean_gap = "0 RPM ± 150 RPM"
+basis    = "source: NeuroBEM: as motor 1"
+
+[[expect]]
+what     = "motor 3 speed"
+over     = "0.1 s to 0.5 s"
+mean_gap = "0 RPM ± 150 RPM"
+basis    = "source: NeuroBEM: as motor 1"
+
+[[expect]]
+what     = "motor 4 speed"
+over     = "0.1 s to 0.5 s"
+mean_gap = "0 RPM ± 150 RPM"
+basis    = "source: NeuroBEM: as motor 1"
+
+[[expect]]
+what     = "felt acceleration up"
+over     = "0.1 s to 0.5 s"
+mean_gap = "0 m/s² ± 0.5 m/s²"
+basis    = "source: NeuroBEM: the logged speeds give the thrust the quad felt, about 10 m/s², within 5%; the Test Quad's thrust coefficient is fitted to NeuroBEM's still hover just before"

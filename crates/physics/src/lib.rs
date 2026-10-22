@@ -241,7 +241,7 @@ pub use collide::{
 pub use commands::{MotorCommand, MotorCommands, SpinDirection};
 pub use esc::{EscParameters, EscState, StartUpStep, StoppedStep};
 pub use map::{LineCrossing, MapCollision, MapShape, MapShapeError, MapShapeProblem};
-pub use motor::{MotorParameters, PropParameters};
+pub use motor::{MotorParameters, PropParameters, drive_holding};
 pub use prop_wash::{Flicker, PropWash};
 pub use rotors::{PropDirection, RotorLayout};
 pub use shape::{DUCT_RING_SEGMENTS, DuctRings, PROP_DISC_THICKNESS, QuadPart, QuadShape};

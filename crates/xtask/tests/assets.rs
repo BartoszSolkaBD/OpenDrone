@@ -365,6 +365,63 @@ fn credits_are_generated_from_the_manifest_and_checked_for_being_up_to_date() {
 }
 
 #[test]
+fn credits_list_each_cc_by_data_file_with_its_checksum_and_go_stale_when_one_changes() {
+    let repo = Repo::new("credits-datasets");
+    let (diffuse, d, normal, n) = pictures(&repo);
+    repo.manifest((&diffuse, &d), (&normal, &n));
+    repo.write(
+        "assets-src/datasets.toml",
+        br#"[[dataset]]
+name    = "Some Flights"
+page    = "https://example.org/flights"
+by      = "A. Pilot"
+licence = "CC-BY-4.0"
+folder  = "data/flights"
+"#,
+    );
+    repo.write("data/flights/NOTICE.md", b"# Credit\n");
+    repo.write("data/flights/b.csv", b"time (s)\n0\n");
+    repo.write("data/flights/a.csv", b"time (s)\n1\n");
+    let (ok, text) = xtask(&repo.root, &["credits"], &[]);
+    assert!(ok, "{text}");
+    let credits = repo.read("CREDITS.md");
+    let a = sha256(b"time (s)\n1\n");
+    let b = sha256(b"time (s)\n0\n");
+    assert!(credits.contains(&format!(
+        "| [Some Flights](https://example.org/flights) | A. Pilot | CC-BY-4.0 | [`a.csv`](data/flights/a.csv) | `{a}` |\n|  |  |  | [`b.csv`](data/flights/b.csv) | `{b}` |"
+    )), "{credits}");
+    assert!(!credits.contains("- Reference datasets under CC BY."));
+    // A changed data file makes CREDITS.md out of date.
+    repo.write("data/flights/a.csv", b"time (s)\n2\n");
+    let (ok, text) = xtask(&repo.root, &["credits", "--check"], &[]);
+    assert!(!ok && text.contains("CREDITS.md is out of date"), "{text}");
+    // Only CC BY data enters the repo, and only with its notice beside it.
+    repo.write(
+        "assets-src/datasets.toml",
+        br#"[[dataset]]
+name    = "Some Flights"
+page    = "https://example.org/flights"
+by      = "A. Pilot"
+licence = "CC-BY-NC-SA-3.0"
+folder  = "data/flights"
+"#,
+    );
+    fs::remove_file(repo.root.join("data/flights/NOTICE.md")).unwrap();
+    let (ok, text) = xtask(&repo.root, &["credits"], &[]);
+    assert!(!ok);
+    assert!(
+        text.contains(
+            "\"Some Flights\" is under CC-BY-NC-SA-3.0, but only CC BY data enters the repo"
+        ),
+        "{text}"
+    );
+    assert!(
+        text.contains("\"Some Flights\"'s folder data/flights has no NOTICE.md"),
+        "{text}"
+    );
+}
+
+#[test]
 fn credits_cant_list_a_file_with_no_checksum() {
     let repo = Repo::new("credits-unpinned");
     let (diffuse, _, normal, n) = pictures(&repo);

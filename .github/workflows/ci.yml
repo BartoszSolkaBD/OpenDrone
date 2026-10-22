@@ -6,6 +6,13 @@
 # The docs site's job is the exception: it always does its work, because docs
 # are what it checks.
 #
+# A push to main runs every Rust check on macOS, Windows and Linux. A PR runs
+# every Rust check on Linux only. On macOS and Windows it runs only the
+# Scenarios, for the agreement check, and only when the PR can change a
+# flight result; otherwise those two jobs skip their work and pass (#240).
+# So a macOS- or Windows-only break in code that can't move a flight is found
+# by main's CI after the merge: the maintainer chose that cost.
+#
 # Changing this file is a Repo rules change: the Reviewer decides, and the
 # ticket must ask for it.
 
@@ -31,29 +38,38 @@ jobs:
   rust:
     name: Rust on ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # macOS and Windows build the whole game more slowly than Linux, and from
+    # a cold cache (a changed Cargo.lock) that took right about 45 minutes
+    # on Windows (#240).
+    timeout-minutes: ${{ matrix.timeout }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: macOS
             os: macos-latest
+            timeout: 60
           - name: Windows
             os: windows-latest
+            timeout: 60
           - name: Linux
             os: ubuntu-latest
+            timeout: 45
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
       - name: Decide what to check
+        # all_checks: every Rust check runs here (Linux, or a push to main).
+        # scenarios: the Scenarios run here, for the agreement check (every
+        # check, or a PR that can change a flight result).
         id: changes
         shell: bash
         run: bash .github/scripts/changes.sh
 
       - name: Install the pinned Rust (rust-toolchain.toml)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.scenarios == 'true'
         shell: bash
         run: rustup toolchain install
 
@@ -66,31 +82,34 @@ jobs:
         # headers; X11 it loads while running, with no headers. The sound
         # (Firewheel through cpal, ADR-0023) links the system's alsa-lib,
         # which deny.toml names, so it needs libasound2-dev.
-        if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
+        if: steps.changes.outputs.all_checks == 'true' && runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev libasound2-dev pkg-config
 
       - name: Reuse the build cache
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.scenarios == 'true'
         uses: Swatinem/rust-cache@v2
         with:
+          # Only main's runs save the cache, which PRs then restore. A main
+          # run that fails keeps its cache too, so a retry is faster.
           save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-on-failure: true
 
       - name: Install cargo-nextest
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
 
       - name: Formatting (rustfmt)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo fmt --all --check
 
       - name: Clippy, warnings as errors, with the house rules in the core crates
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Build (unsafe is forbidden outside opendrone-input and the game)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo build --workspace --locked
 
       - name: SDL's Linux build loads libudev and leaves out libusb and D-Bus (ADR-0014)
@@ -98,7 +117,7 @@ jobs:
         # running, never linked: this fails if SDL stops loading it that way.
         # libusb and D-Bus are switched off in crates/input/sdl-linux.cmake;
         # this fails if either crept back in.
-        if: steps.changes.outputs.rust == 'true' && runner.os == 'Linux'
+        if: steps.changes.outputs.all_checks == 'true' && runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
@@ -125,7 +144,7 @@ jobs:
           fi
 
       - name: Tests (cargo-nextest)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo nextest run --workspace --locked --profile ci
 
       - name: The game flies the reference Scenarios exactly as the headless runner does
@@ -136,7 +155,7 @@ jobs:
         # into a wall; another a whoop into a rail, a convex Map shape; the
         # third a whoop landed on the Skate Park's Launch Spot, so the game's
         # build reads a Map from its .glb to the very same bytes (#63).
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: >-
           cargo run --locked --quiet --package opendrone -- --reference
           scenarios/flight-controller/a-quad-that-hits-a-wall-stays-armed.toml
@@ -148,15 +167,15 @@ jobs:
         # with no window for 3 s, with its input thread and its sound's
         # thread, which finds no device and runs silent, and fails if the
         # Simulation didn't step (ADR-0003, "Checks in CI"; ADR-0023).
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo run --locked --quiet --package opendrone -- --headless --seconds 3
 
       - name: Examples in the docs (doctests, which cargo-nextest doesn't run)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo test --workspace --doc --locked
 
       - name: The core is free of Bevy and the operating system (crate walls)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask walls
 
       - name: The core's compiled code calls none of the operating system's maths
@@ -169,27 +188,27 @@ jobs:
         # another, except where crates/xtask/walls.toml allows a call with its
         # reason (ADR-0001). Each OS checks its own build, so a library or
         # feature only one OS uses counts too.
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask core-maths --with opendrone --with opendrone-scenario
 
       - name: Packs (every Pack and Test Quad passes the Pack checker)
         # The checker the game uses, over packs/ and scenarios/test-quads/.
         # Any problem blocks, listed with its file, line and a plain sentence
         # (#16, ADR-0011).
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask packs
 
       - name: CREDITS.md is generated from the material library and up to date
         # CREDITS.md lists every outside texture with its source, licence and
         # checksum, generated from assets-src/materials.toml (ADR-0014, #63).
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask credits --check
 
       - name: Feel Test log rules (an Estimate moves with a log row and inside its range; a locked number changes with its source)
         # Compares every Quad definition with this PR's base: HEAD^1 of the
         # merge commit (fetch-depth 2), or main's previous commit on a push
         # (#16 §3).
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask feel-tests --base HEAD^1
 
       - name: Scenarios (every Expectation, the repeat check, up-to-date Results)
@@ -197,13 +216,13 @@ jobs:
         # Expectation, two runs that differ, or a Results file that is out of
         # date (#11 §5). It also writes the fingerprint after every step, for
         # the agreement check below.
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.scenarios == 'true'
         run: cargo run --locked --quiet --package opendrone-scenario -- check --fingerprints fingerprints
 
       - name: Keep this OS's fingerprints for the agreement check
         # Kept even when a Scenario failed, so the agreement check can say
         # where this OS split from the others.
-        if: ${{ !cancelled() && steps.changes.outputs.rust == 'true' }}
+        if: ${{ !cancelled() && steps.changes.outputs.scenarios == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: fingerprints-${{ matrix.name }}
@@ -215,7 +234,9 @@ jobs:
     # The whole Simulation gives the same bits on every OS (ADR-0001): the
     # fingerprint after every step of every Scenario must agree across macOS,
     # Windows and Linux. On a mismatch it names the Scenario and the first step
-    # where the OSes split (#11 §5).
+    # where the OSes split (#11 §5). On a PR it compares them only when the
+    # PR can change a flight result, as only then do macOS and Windows fly
+    # the Scenarios (#240); otherwise it skips its work and passes.
     name: Scenarios agree on every OS
     needs: rust
     # Runs even when an OS's job failed, because a split often explains why.
@@ -233,25 +254,25 @@ jobs:
         run: bash .github/scripts/changes.sh
 
       - name: Install the pinned Rust (rust-toolchain.toml)
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.flight == 'true'
         shell: bash
         run: rustup toolchain install
 
       - name: Reuse the build cache
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.flight == 'true'
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Fetch each OS's fingerprints
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.flight == 'true'
         uses: actions/download-artifact@v8
         with:
           pattern: fingerprints-*
           path: fingerprints
 
       - name: Compare the fingerprints, step by step
-        if: steps.changes.outputs.rust == 'true'
+        if: steps.changes.outputs.flight == 'true'
         run: >-
           cargo run --locked --quiet --package opendrone-scenario --
           agree fingerprints/fingerprints-macOS fingerprints/fingerprints-Windows fingerprints/fingerprints-Linux

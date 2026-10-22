@@ -1,0 +1,55 @@
+# The nightly job: the Scenarios that need data OpenDrone may not commit
+# (docs/data-policy.md, #47).
+#
+# NeuroBEM states no licence, so its flights are downloaded when needed and
+# never committed. The Scenarios that play them skip in CI's required checks,
+# so they never block a merge. Here, once a night on main, they get their
+# data and run: `cargo xtask download neurobem` downloads the flight and
+# writes the files beside its Scenarios, and `cargo scenarios check
+# --downloaded` runs only those Scenarios, failing if one is skipped. A red
+# run here is a report, never a gate: no pull request waits for this job.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  downloaded-data:
+    name: Scenarios on downloaded data
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        run: rustup toolchain install
+
+      - name: Install the Linux packages SDL's source build, Bevy's window and the sound need
+        # The developer tools build opendrone-input, which builds SDL from
+        # source, as in ci.yml.
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev libasound2-dev pkg-config
+
+      - name: Reuse the build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+
+      - name: Download NeuroBEM's flight and write its Scenarios' files
+        # About 630 MB of NeuroBEM's processed flights, into
+        # target/downloads/neurobem/, of which one flight is read.
+        run: cargo xtask download neurobem
+
+      - name: Run the Scenarios that need downloaded data
+        run: cargo scenarios check --downloaded
