@@ -68,11 +68,13 @@ The Lanes and the Areas in CODEOWNERS group the same files, with two differences
 
 Place a ticket by the files its "What to build" will change. A ticket that spans two Lanes takes both.
 
+**Example: a ticket in two Lanes.** Ticket [#47](https://github.com/BartoszSolkaBD/OpenDrone/issues/47) checked the Freestyle 5″ against real flight logs ([PR #238](https://github.com/BartoszSolkaBD/OpenDrone/pull/238)). It changed the Flight lane's crates and `crates/xtask`, so it took the Flight Lane and the Repo rules Lane. It waited for a free slot in both, and while its PR was in review it held the one slot in each.
+
 **Lane labels.** A ticket carries one `lane: <Lane>` label for each Lane it takes, such as `lane: Flight` or `lane: Repo rules`. Whoever files the ticket adds them: a planning session, or the Delegator for an issue it files. Before you start a ticket, check its labels against the files its "What to build" will change. If one is missing or wrong, fix it, and list the fix in your end-of-batch report.
 
 - **One PR in review per Lane.** A PR that waits for the maintainer doesn't count: it steps out of its Lane ([below](#when-a-pr-waits-for-the-maintainer)).
 - **Building ahead:**
-  - While a Lane's PR is in review, one more ticket may build in that Lane. Its code must be in a different crate, for example a Flight Controller ticket beside a physics one.
+  - While a Lane's PR is in review, one more ticket may build in that Lane when **none of the files it will change are files the PR in review changes**, and neither changes a Results file. Files decide it, not crates. Check with `gh pr diff <P> --name-only` against the ticket's "What to build". Five Game tickets built ahead in `crates/opendrone` on 21 October 2026, and all five merged without a conflict.
   - It doesn't open its PR for review until the PR ahead has merged. Before then, it merges main and runs its Scenarios again.
 - **A ticket starts only when all its blockers are closed,** which means merged. Never build on top of an unmerged branch.
 - **A workflow-changing PR** (it changes `.github/workflows/` or `.github/actions/`) holds the Repo rules Lane while it's being reviewed. Once it passes, it waits for the maintainer to merge it by hand, so it steps out of the Lane like any PR that waits for them.
@@ -300,6 +302,21 @@ A PR that waits for the maintainer doesn't hold its Lane. Development carries on
   3. Take `needs-maintainer` off right before merging, after the last push. CI puts it back each time the Review Report runs again while the gate fails, so check it's gone just before you merge.
   4. Merge past the failing Red Flag gate. Do it only when every other condition under [Merging](#merging) holds, and only for the flags they cleared. The wait command there lists the failing gate: that row is expected.
   5. CI then gives the PR the `skipped-a-check` label and a comment naming each check that hadn't passed ([the Review Report](../review-report.md#merges-that-skipped-a-check)). Check that the comment names only the Red Flag gate. Leave the label for the maintainer to take off, and list the PR in your end-of-batch report. If the comment names any other check, tell the maintainer at once.
+
+## When a PR can't get a green check for a CI reason
+
+Sometimes a PR has passed review, but a check can't go green because of CI itself, not the PR's code: a job that times out or is cancelled, for example "Rust on Windows" on [#233](https://github.com/BartoszSolkaBD/OpenDrone/pull/233). The maintainer decided how this goes on 22 October 2026 ([#245](https://github.com/BartoszSolkaBD/OpenDrone/issues/245)).
+
+1. **Find out once whether the PR is at fault.** You may rerun the failed job one time, to learn whether it fails again. Never loop reruns, and never decide that a failure is "just a flake".
+2. **File the cause as its own ticket,** labelled `ready-for-agent` and with its Lane label. Put the evidence in it: the run link, and what was seen (which job, how long it ran, how it ended). Set blocked-by where it applies.
+3. **Step the PR out of its Lane.** Label it `needs-maintainer`, link the cause ticket from it, and treat it as under [When a PR waits for the maintainer](#when-a-pr-waits-for-the-maintainer). The Lane's next PR goes into review.
+4. **When the cause ticket has merged,** bring main in, as under [Merging](#merging). The PR takes its Lane again as soon as the Lane is free, ahead of any new ticket.
+
+When the cause is a workflow change, the PR that fixes it changes `.github/workflows/` or `.github/actions/`, so the maintainer merges it by hand ([Merging](#merging)).
+
+This is not the clearance of the Red Flag gate ([Clearing the Red Flag gate](#when-a-pr-waits-for-the-maintainer)): that is only for what the gate holds.
+
+**Which checks a PR runs.** From [#240](https://github.com/BartoszSolkaBD/OpenDrone/issues/240): a PR runs Linux in full, and macOS and Windows only when the PR can change a flight result; main runs all three. #240 isn't on main yet, so its PR confirms the exact wording.
 
 ## Usage limits
 
