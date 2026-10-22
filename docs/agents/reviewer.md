@@ -48,6 +48,7 @@ Read only these. Never read the author's notes or conversation.
   - **Code read from another file:** read the file each new `include!` or `#[path]` names, for `unsafe` code and house-rule exceptions.
   - **A change to CI workflows:** no workflow can set a commit status, whether through `statuses: write` or `permissions: write-all` (below).
   - **A Scenario's setup changed under Source or Rule Expectations:** the listed fields still let those Expectations check what their Basis says, for example the physics rate a Rule's working assumes.
+  - **A Scenario's data changed under Source or Rule Expectations:** the new Input Track or recorded flight still comes from the source those Expectations cite, and the PR says why it changed, for example a longer stretch of the same log.
 - **The listed Red Flags look right:**
   - each updated Observed Expectation has a one-line reason that holds;
   - each new library has a permissive or MPL-2.0 licence (ADR-0014);
