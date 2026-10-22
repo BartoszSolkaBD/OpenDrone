@@ -1,5 +1,6 @@
 //! Readable checks for `.github/scripts/changes.sh`, which decides whether a
-//! CI run needs the Rust checks and the security advisories (#15 §4).
+//! CI run needs the Rust checks and the security advisories (#15 §4), and
+//! which OSes run the Scenarios on a pull request (#240).
 //!
 //! Each check makes a scratch git repository with a base commit, commits a
 //! change on top of it, and runs the real script on it the way CI does: as a
@@ -199,6 +200,159 @@ fn a_push_to_main_rebuilds_the_maps() {
     assert_eq!(outputs["maps"], "true", "{outputs:?}");
 }
 
+/// One file under each path whose change can move a flight result, as listed
+/// in the script's header.
+const FLIGHT_FILES: [&str; 22] = [
+    "crates/maths/src/lib.rs",
+    "crates/physics/src/lib.rs",
+    "crates/flight-controller/src/lib.rs",
+    "crates/sim/src/lib.rs",
+    "crates/test-pilot/src/lib.rs",
+    "crates/scenario/src/lib.rs",
+    "crates/pack/src/lib.rs",
+    "crates/pack/test-maps/wall.toml",
+    "crates/blackbox/src/lib.rs",
+    "scenarios/physics/free-fall.toml",
+    "scenarios/physics/free-fall.results.toml",
+    "scenarios/test-quads/whoop-65-no-drag.toml",
+    "packs/opendrone/quads/whoop-65/quad.toml",
+    "packs/opendrone/maps/skate-park/skate-park.glb",
+    "packs/opendrone/pack.toml",
+    "Cargo.lock",
+    "Cargo.toml",
+    "rust-toolchain.toml",
+    ".cargo/config.toml",
+    ".config/nextest.toml",
+    ".github/workflows/ci.yml",
+    ".github/scripts/changes.sh",
+];
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_anything_a_flight_depends_on_runs_the_scenarios_on_every_os() {
+    for (index, file) in FLIGHT_FILES.into_iter().enumerate() {
+        for os in ["macOS", "Windows", "Linux"] {
+            let repo = Repo::new(&format!("flight-{index}-{os}"));
+            repo.write(file, "changed\n");
+            let outputs = repo.commit_and_check_on("pull_request", os);
+            assert_eq!(outputs["flight"], "true", "{file} on {os}: {outputs:?}");
+            assert_eq!(outputs["scenarios"], "true", "{file} on {os}: {outputs:?}");
+        }
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_a_flight_path_among_thousands_of_other_files_runs_the_scenarios_on_every_os()
+ {
+    // Reviewer's case on #250: piping one grep into a `grep -q` under
+    // pipefail fails when `grep -q` stops at its first match while the first
+    // grep is still writing, past the pipe's buffer. Cargo.lock sorts first,
+    // then over 64 KB of the game's paths follow it.
+    for os in ["macOS", "Windows", "Linux"] {
+        let repo = Repo::new(&format!("flight-among-many-{os}"));
+        repo.write("Cargo.lock", "version = 4\n# a library was upgraded\n");
+        for index in 0..2000 {
+            repo.write(
+                &format!(
+                    "crates/opendrone/src/generated/a-game-file-with-a-long-name-{index:04}.rs"
+                ),
+                "changed\n",
+            );
+        }
+        let outputs = repo.commit_and_check_on("pull_request", os);
+        assert_eq!(outputs["flight"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["scenarios"], "true", "{os}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_runs_every_rust_check_on_linux_and_only_the_scenarios_on_macos_and_windows() {
+    for (os, every_check) in [("Linux", "true"), ("macOS", "false"), ("Windows", "false")] {
+        let repo = Repo::new(&format!("flight-checks-{os}"));
+        repo.write("crates/physics/src/lib.rs", "changed\n");
+        let outputs = repo.commit_and_check_on("pull_request", os);
+        assert_eq!(outputs["rust"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["all_checks"], every_check, "{os}: {outputs:?}");
+        assert_eq!(outputs["scenarios"], "true", "{os}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_cant_change_a_flight_skips_macos_and_windows_and_the_agreement_check() {
+    for file in [
+        // Docs only.
+        "README.md",
+        "docs/context/development.md",
+        // Markdown inside a flight crate or the Scenarios folder.
+        "crates/physics/notes.md",
+        "scenarios/README.md",
+        // The game, the Input crate, the sound and the developer tools.
+        "crates/opendrone/src/main.rs",
+        "crates/input/src/lib.rs",
+        "crates/sound/src/lib.rs",
+        "crates/xtask/src/main.rs",
+        // Another workflow, and paths only named like flight ones.
+        ".github/workflows/build.yml",
+        "crates/simulator/src/lib.rs",
+        "docs/Cargo.toml",
+    ] {
+        for os in ["macOS", "Windows", "Linux"] {
+            let case = format!("not-flight-{}-{os}", file.replace(['/', '.'], "-"));
+            let repo = Repo::new(&case);
+            repo.write(file, "changed\n");
+            let outputs = repo.commit_and_check_on("pull_request", os);
+            assert_eq!(outputs["flight"], "false", "{file} on {os}: {outputs:?}");
+            if os == "Linux" {
+                // Linux still runs every Rust check the change needs.
+                assert_eq!(
+                    outputs["all_checks"], outputs["rust"],
+                    "{file} on {os}: {outputs:?}"
+                );
+                assert_eq!(
+                    outputs["scenarios"], outputs["rust"],
+                    "{file} on {os}: {outputs:?}"
+                );
+            } else {
+                assert_eq!(
+                    outputs["all_checks"], "false",
+                    "{file} on {os}: {outputs:?}"
+                );
+                assert_eq!(outputs["scenarios"], "false", "{file} on {os}: {outputs:?}");
+            }
+        }
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_only_changes_the_game_or_the_input_crate_runs_every_rust_check_on_linux() {
+    for file in ["crates/opendrone/src/main.rs", "crates/input/src/lib.rs"] {
+        let repo = Repo::new(&format!("edge-only-linux-{}", file.replace('/', "-")));
+        repo.write(file, "changed\n");
+        let outputs = repo.commit_and_check_on("pull_request", "Linux");
+        assert_eq!(outputs["rust"], "true", "{file}: {outputs:?}");
+        assert_eq!(outputs["all_checks"], "true", "{file}: {outputs:?}");
+        assert_eq!(outputs["scenarios"], "true", "{file}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_push_to_main_runs_every_rust_check_and_the_scenarios_on_every_os() {
+    for os in ["macOS", "Windows", "Linux"] {
+        let repo = Repo::new(&format!("flight-push-to-main-{os}"));
+        repo.write("README.md", "# OpenDrone, now with more words\n");
+        let outputs = repo.commit_and_check_on("push", os);
+        assert_eq!(outputs["rust"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["flight"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["all_checks"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["scenarios"], "true", "{os}: {outputs:?}");
+    }
+}
+
 /// A scratch git repository holding a few of the repo's kinds of files.
 struct Repo {
     path: PathBuf,
@@ -248,9 +402,16 @@ impl Repo {
         self.git(&["mv", from, to]);
     }
 
-    /// Commits the change, runs changes.sh as CI would for this event, and
-    /// returns its step outputs.
+    /// Commits the change, runs changes.sh as CI would for this event in a
+    /// job on Linux, and returns its step outputs.
     fn commit_and_check(&self, event: &str) -> BTreeMap<String, String> {
+        self.commit_and_check_on(event, "Linux")
+    }
+
+    /// Commits the change, runs changes.sh as CI would for this event in a
+    /// job on `os` (GitHub's RUNNER_OS: `Linux`, `macOS` or `Windows`), and
+    /// returns its step outputs.
+    fn commit_and_check_on(&self, event: &str, os: &str) -> BTreeMap<String, String> {
         self.git(&["add", "--all"]);
         self.git(&["commit", "--quiet", "--message", "the change"]);
         let outputs_file = self.path.join("github-output.txt");
@@ -260,6 +421,7 @@ impl Repo {
             .current_dir(&self.path)
             .env("GITHUB_EVENT_NAME", event)
             .env("GITHUB_OUTPUT", &outputs_file)
+            .env("RUNNER_OS", os)
             // Git's own settings, as on a fresh CI runner.
             .env("GIT_CONFIG_GLOBAL", self.path.join("no-global-gitconfig"))
             .env("GIT_CONFIG_NOSYSTEM", "1")

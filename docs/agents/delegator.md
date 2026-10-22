@@ -125,7 +125,7 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
 
 ## Order of work
 
-1. **Main's CI is red:** fix that first. Start a Standard author with the failing run, and start nothing else.
+1. **Main's CI is red:** fix that first. Start a Standard author with the failing run, and start nothing else. A PR runs every check on Linux only, and on macOS and Windows at most the Scenarios, so main's CI is the first to run everything there: a failure only on macOS or Windows is likely the last merged PR's ([#240](https://github.com/BartoszSolkaBD/OpenDrone/issues/240)).
 2. **Finish before you start:**
    - First, a PR that passed and waits to merge, or one the maintainer has just answered.
    - Then a Verdict to act on.
