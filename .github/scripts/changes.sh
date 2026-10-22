@@ -7,7 +7,10 @@
 #                   required checks never hang (#15 §4). Warning: this skip
 #                   assumes no Rust check reads a `.md` file outside packs/;
 #                   the Pack checker reads each Quad's feel-tests.md, which is
-#                   why any change under packs/ runs the checks.
+#                   why any change under packs/ runs the checks, and the
+#                   readable checks read .github/bevy-upgrade-issue.md, the
+#                   Bevy upgrade ticket's template (#81), which is why any
+#                   change under .github/ does too.
 #                   The Red Flag gate reads ADRs and deep dives, so it runs in
 #                   its own workflow (review.yml) with no skip.
 #   libraries=true  Cargo.lock or deny.toml changed: the PR adds or upgrades a
@@ -57,6 +60,9 @@ if grep -qvE '\.md$' <<< "$changed"; then
   echo "rust=true" >> "$GITHUB_OUTPUT"
 elif grep -qE '^packs/' <<< "$changed"; then
   echo "A Pack's Markdown changed (a Feel Test log), which the Pack checker reads, so the Rust checks run."
+  echo "rust=true" >> "$GITHUB_OUTPUT"
+elif grep -qE '^\.github/' <<< "$changed"; then
+  echo "Markdown under .github/ changed (such as the Bevy upgrade ticket's template), which the readable checks read, so the Rust checks run."
   echo "rust=true" >> "$GITHUB_OUTPUT"
 else
   echo "Only docs changed, so the Rust checks are skipped and report as passed."

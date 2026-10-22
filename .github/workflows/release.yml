@@ -1,0 +1,122 @@
+# Publishes a GitHub pre-release when the maintainer pushes a version tag
+# (#15 §8, #81): three zips, one per operating system, built by build.yml,
+# and notes made from the titles of the PRs merged since the last release.
+#
+# A tag is v0.1.0-alpha.N for a test build before the 0.1.0 alpha, and
+# vX.Y.Z from 0.1.0 on (`cargo xtask release-version` says which tags
+# count). It must be on main. Every release is a pre-release while signing
+# and notarisation wait. How to make one: docs/builds-and-releases.md. The
+# maintainer runs the Frame Check before tagging, and no release is tagged
+# below 45 fps.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # main's history, to check the tag is on it.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The tagged commit is on main
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
+            echo "::error::$GITHUB_REF_NAME isn't on $DEFAULT_BRANCH: a release is made only from a commit on $DEFAULT_BRANCH"
+            exit 1
+          fi
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install the Linux packages the xtask build needs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
+      - name: The version the tag releases
+        id: version
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version=$(cargo xtask release-version "$TAG")
+          echo "Releasing OpenDrone $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  publish:
+    name: Publish the pre-release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # the release and its files
+    steps:
+      - name: Fetch the three builds
+        uses: actions/download-artifact@v8
+        with:
+          pattern: OpenDrone-*
+          path: dist
+          merge-multiple: true
+
+      - name: There is one zip for each operating system
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          for system in macos windows linux; do
+            test -f "dist/OpenDrone-$VERSION-$system.zip" || { echo "::error::No build for $system"; exit 1; }
+          done
+          ls -l dist
+
+      - name: Publish the pre-release, its notes made from the PRs' titles
+        # GitHub writes the notes: one line per PR merged since the previous
+        # tag, with its title, as each PR's squash commit carries. A release
+        # made by hand on GitHub's Releases page, which makes its tag too,
+        # gets the three zips added and is marked a pre-release; its notes
+        # are left as written there.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
+          else
+            gh release create "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --prerelease --generate-notes --title "OpenDrone $VERSION"
+          fi

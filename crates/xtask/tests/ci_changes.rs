@@ -58,6 +58,20 @@ fn a_pull_request_that_only_changes_a_quads_feel_test_log_runs_the_rust_checks()
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_only_changes_the_bevy_upgrade_tickets_template_runs_the_rust_checks() {
+    // The readable checks read .github/bevy-upgrade-issue.md (#81), so a
+    // change to it is checked even though it's Markdown.
+    let repo = Repo::new("bevy-upgrade-template");
+    repo.write(
+        ".github/bevy-upgrade-issue.md",
+        "Bevy {release} has shipped.\n",
+    );
+    let outputs = repo.commit_and_check("pull_request");
+    assert_eq!(outputs["rust"], "true", "{outputs:?}");
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
 fn a_pull_request_that_only_changes_markdown_with_a_non_ascii_name_skips_the_rust_checks() {
     // Git quotes a path that isn't plain ASCII unless it's read raw, and a
     // quoted path ends in a quote mark, not ".md".

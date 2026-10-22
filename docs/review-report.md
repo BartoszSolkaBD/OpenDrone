@@ -10,7 +10,7 @@ Every pull request gets one **Review Report**: a comment from CI (`github-action
 | **Speed** | Work Counts against main. Not measured yet: they arrive with #78 and #79. |
 | **Areas touched** | The Areas whose folders the PR changes, with any new outside library and its licence. |
 | **Renders** | Pictures of the Maps, when `assets-src/` or a Pack's `maps/` changed: a plan, a three-quarter view and what each Quad's camera sees from the Launch Spot and a few places to fly. The Report says where they are: the `map-previews` download of the PR's **Maps** check. |
-| **Downloads** | Blackbox logs and builds. None yet: they arrive with #55 and #81. |
+| **Downloads** | Blackbox logs and builds. Blackbox logs arrive with #55. Builds come when you add the `build` label to the PR: the Build workflow makes the game for macOS, Windows and Linux, as zips among that run's downloads ([Builds and releases](builds-and-releases.md)). |
 
 The whole Report is worked out again after every push, and whenever the maintainer's account comments on the PR.
 

@@ -38,6 +38,10 @@
 //! - `tii-logs` and `download neurobem`: turn real flight logs into the
 //!   motor Input Tracks and recorded flights Physics Scenarios play back
 //!   ([`flight_logs`]).
+//! - `release-version`, `package`, `bevy-upgrade` and `advisories`: the
+//!   parts of the Build, Release, Bevy upgrade and Security workflows: a
+//!   release tag's version, a build laid out as a download, and the issues
+//!   the two scheduled workflows open ([`release`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -53,6 +57,7 @@ mod maps;
 mod materials;
 mod migrate;
 mod packs;
+mod release;
 mod review;
 mod scenario_catalogue;
 mod textures;
@@ -134,7 +139,24 @@ Commands:
       dump, from Betaflight 4.3 or newer) as the Quad's tune.txt, in
       Betaflight 2026.6's names with every line marked (ADR-0008, ADR-0015),
       and list what was translated and left out. --print prints the Tune
-      instead of writing it.";
+      instead of writing it.
+  release-version <tag>
+      Print the version a release tag releases (v0.1.0-alpha.N before the
+      0.1.0 alpha, vX.Y.Z from 0.1.0 on), or say why it isn't one.
+  package --game <built program> --os <macos|windows|linux> --name <name> [--out <folder>] [--no-textures]
+      Lay a built game out as a download, OpenDrone-<name>-<os>.zip in
+      <folder> (default target/dist): the game, with its Packs, the
+      Scenarios, the material library and its textures beside it, where it
+      looks for them, and the licences, the credits and a README.txt.
+  bevy-upgrade <index file>
+      From crates.io's index entry for bevy, print the \"Upgrade to Bevy 0.N\"
+      issues to open, as JSON, from .github/bevy-upgrade-issue.md: one for
+      each final 0.N.0 newer than Cargo.toml's Bevy, never a release
+      candidate (ADR-0021).
+  advisories <file>
+      From cargo-deny's JSON output (cargo deny --format json check
+      advisories), print the issues the daily security scan opens, as JSON:
+      one per advisory.";
 
 fn main() -> ExitCode {
     // `core-maths` has cargo run xtask as its compiler wrapper, to keep each
@@ -169,6 +191,10 @@ fn main() -> ExitCode {
         "credits" => textures::run_credits(rest),
         "tii-logs" => flight_logs::run_tii(rest),
         "download" => flight_logs::run_download(rest),
+        "release-version" => release::run_release_version(rest),
+        "package" => release::run_package(rest),
+        "bevy-upgrade" => release::run_bevy_upgrade(rest),
+        "advisories" => release::run_advisories(rest),
         _ => {
             eprintln!("{USAGE}\n{}", review::usage());
             ExitCode::from(2)
