@@ -186,13 +186,15 @@ fn a_library_only_one_operating_system_builds_is_listed_for_that_system_only() {
 }
 
 #[test]
-fn a_library_with_no_licence_file_gets_the_standard_text_and_a_note() {
+fn a_library_that_may_be_used_under_apache_with_no_licence_file_gets_apaches_standard_text_and_a_note()
+ {
     // Basis: Observed (cargo metadata on this repo's Cargo.lock, 23 October
-    // 2026): 17 of the game's libraries, such as taffy and parry3d-f64, keep
-    // their licence files in the repository above the crate, so the package
-    // has none. They are offered under MIT or Apache-2.0, so the file gives
-    // the standard text of Apache-2.0, which names no missing copyright
-    // holder, and says so.
+    // 2026): some libraries (17 entries on Linux, 19 on Windows and 36 on
+    // macOS have no licence file in their package, such as parry3d-f64 and
+    // Firewheel's crates) keep their licence files in the repository above
+    // the crate. Those that may be used under Apache-2.0, alone or as one
+    // choice of "MIT OR Apache-2.0", get Apache-2.0's standard text, which has
+    // no copyright holder to fill in, and the file says so.
     let w = Workspace::new("no-licence-file");
     w.library("bare", "0.4.0", "MIT OR Apache-2.0", &[]);
     w.set_game_dependencies("[dependencies]\nbare = { path = \"../../libs/bare\" }\n");
@@ -223,6 +225,72 @@ fn a_library_with_no_licence_file_under_a_licence_with_no_standard_text_is_an_er
     assert!(!ok);
     assert!(err.contains("odd 1.0.0"), "{err}");
     assert!(err.contains("no licence file"), "{err}");
+}
+
+#[test]
+fn an_mit_only_library_with_no_licence_file_and_no_kept_text_stops_the_tool() {
+    // Basis: Rule (#270, #284): MIT asks for the copyright notice to travel
+    // with every copy, and no standard text has it. So an MIT-only library
+    // with no licence file and no text read in its repository stops the tool,
+    // naming the library, rather than getting MIT's text with no notice.
+    let w = Workspace::new("mit-only-no-text");
+    w.library("unknown-holder", "1.0.0", "MIT", &[]);
+    w.set_game_dependencies(
+        "[dependencies]\nunknown-holder = { path = \"../../libs/unknown-holder\" }\n",
+    );
+    let (ok, _, err) = w.run(&["licences", "--os", "linux"]);
+    assert!(!ok);
+    assert!(err.contains("unknown-holder 1.0.0"), "{err}");
+    assert!(err.contains("no licence file"), "{err}");
+    assert!(err.contains("copyright"), "{err}");
+    assert!(!w.root.join("licences").exists(), "nothing was written");
+}
+
+#[test]
+fn an_mit_only_library_with_a_text_read_in_its_repository_carries_that_text() {
+    // Basis: Observed (taffy 0.14.0's repository, read on 23 October 2026):
+    // its LICENSE names "Visly Inc." and "Taffy Authors", and its package has
+    // no licence file, so the tool carries the text read in the repository and
+    // says where it was read. A new version of it is not covered until its
+    // text is read again.
+    let w = Workspace::new("mit-only-kept-text");
+    w.library("taffy", "0.14.0", "MIT", &[]);
+    w.set_game_dependencies("[dependencies]\ntaffy = { path = \"../../libs/taffy\" }\n");
+    let (ok, _, err) = w.run(&["licences", "--os", "linux"]);
+    assert!(ok, "{err}");
+    let file = w.file("linux");
+    assert!(file.contains("Copyright (c) 2018 Visly Inc."), "{file}");
+    assert!(file.contains("Copyright (c) 2026 Taffy Authors"), "{file}");
+    assert!(
+        file.contains("github.com/DioxusLabs/taffy at the commit this version was published from"),
+        "{file}"
+    );
+
+    w.library("taffy", "0.15.0", "MIT", &[]);
+    w.set_game_dependencies("[dependencies]\ntaffy = { path = \"../../libs/taffy\" }\n");
+    let (ok, _, err) = w.run(&["licences", "--os", "linux"]);
+    assert!(!ok, "a version nobody read the repository of");
+    assert!(err.contains("taffy 0.15.0"), "{err}");
+}
+
+#[test]
+fn a_library_whose_repository_has_no_licence_file_either_gets_mits_standard_text_and_says_so() {
+    // Basis: Observed (dispatch 0.2.0 and github.com/SSheldon/rust-dispatch,
+    // read on 23 October 2026): no licence file in the package or the
+    // repository, only "MIT" and "Steven Sheldon" in the manifest. The file
+    // gives MIT's standard text with no copyright line, and says why.
+    let w = Workspace::new("mit-only-none-anywhere");
+    w.library("dispatch", "0.2.0", "MIT", &[]);
+    w.set_game_dependencies("[dependencies]\ndispatch = { path = \"../../libs/dispatch\" }\n");
+    let (ok, _, err) = w.run(&["licences", "--os", "linux"]);
+    assert!(ok, "{err}");
+    let file = w.file("linux");
+    assert!(file.contains("has no licence file either"), "{file}");
+    assert!(
+        file.contains("Permission is hereby granted, free of charge"),
+        "{file}"
+    );
+    assert!(!file.contains("Copyright (c) 2026 The OpenDrone"), "{file}");
 }
 
 #[test]

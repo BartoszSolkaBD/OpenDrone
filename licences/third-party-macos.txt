@@ -11,25 +11,25 @@ accesskit 0.24.1
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_consumer 0.38.0
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_macos 0.26.3
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_winit 0.33.2
     licence: Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 adler2 2.0.1
     licence: 0BSD OR MIT OR Apache-2.0
@@ -400,13 +400,13 @@ block2 0.5.1
     licence: MIT
     source: https://github.com/madsmtm/objc2
     licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from
 
 block2 0.6.2
     licence: MIT
     source: https://github.com/madsmtm/objc2
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [31]
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE-MIT.txt in github.com/madsmtm/objc2 at commit ee9a7ad, because the commit this version was published from has only a summary, LICENSE.md, with no copyright notice
 
 blocking 1.7.0
     licence: Apache-2.0 OR MIT
@@ -416,12 +416,12 @@ blocking 1.7.0
 bumpalo 3.20.3
     licence: MIT OR Apache-2.0
     source: https://github.com/fitzgen/bumpalo
-    licence text: [10] [31]
+    licence text: [10] [32]
 
 bytemuck 1.25.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/Lokathor/bytemuck
-    licence text: [32] [33] [34]
+    licence text: [33] [34] [35]
 
 byteorder 1.5.0
     licence: Unlicense OR MIT
@@ -436,7 +436,7 @@ byteorder-lite 0.1.0
 cfg-if 1.0.5
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/cfg-if
-    licence text: [10] [35]
+    licence text: [10] [36]
 
 codespan-reporting 0.13.1
     licence: Apache-2.0
@@ -456,53 +456,53 @@ concurrent-queue 2.5.0
 const-fnv1a-hash 1.1.0
     licence: MIT
     source: https://github.com/HindrikStegenga/const-fnv1a-hash
-    licence text: [36]
+    licence text: [37]
 
 const_panic 0.2.17
     licence: Zlib
     source: https://github.com/rodrimati1992/const_panic/
-    licence text: [37]
+    licence text: [38]
 
 const_soft_float 0.1.4
     licence: MIT OR Apache-2.0
     source: https://github.com/823984418/const_soft_float
-    licence text: [38] [39]
+    licence text: [39] [40]
 
 constant_time_eq 0.4.2
     licence: CC0-1.0 OR MIT-0 OR Apache-2.0
     source: https://github.com/cesarb/constant_time_eq
-    licence text: [18] [29] [40]
+    licence text: [18] [29] [41]
 
 constgebra 0.1.4
     licence: MIT OR Apache-2.0
     source: https://github.com/knickish/constgebra
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 core-foundation 0.9.4
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/core-foundation-rs
-    licence text: [10] [41]
+    licence text: [10] [42]
 
 core-foundation-sys 0.8.7
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/core-foundation-rs
-    licence text: [10] [41]
+    licence text: [10] [42]
 
 core-graphics 0.23.2
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/core-foundation-rs
-    licence text: [42] [10] [41]
+    licence text: [43] [10] [42]
 
 core-graphics-types 0.1.3
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/core-foundation-rs
-    licence text: [10] [41]
+    licence text: [10] [42]
 
 coreaudio-rs 0.14.2
     licence: MIT/Apache-2.0
     source: https://github.com/RustAudio/coreaudio-rs.git
-    licence text: [10] [43]
+    licence text: [10] [44]
 
 cpal 0.18.2
     licence: Apache-2.0
@@ -512,55 +512,55 @@ cpal 0.18.2
 crc32fast 1.5.2
     licence: MIT OR Apache-2.0
     source: https://github.com/srijs/rust-crc32fast
-    licence text: [8] [44]
+    licence text: [8] [45]
 
 crossbeam-channel 0.5.17
     licence: MIT OR Apache-2.0
     source: https://github.com/crossbeam-rs/crossbeam
-    licence text: [10] [45] [46]
+    licence text: [10] [46] [47]
 
 crossbeam-queue 0.3.14
     licence: MIT OR Apache-2.0
     source: https://github.com/crossbeam-rs/crossbeam
-    licence text: [10] [45]
+    licence text: [10] [46]
 
 crossbeam-utils 0.8.23
     licence: MIT OR Apache-2.0
     source: https://github.com/crossbeam-rs/crossbeam
-    licence text: [10] [45]
+    licence text: [10] [46]
 
 ctrlc 3.5.2
     licence: MIT/Apache-2.0
     source: https://github.com/Detegr/rust-ctrlc.git
-    licence text: [47] [4]
+    licence text: [48] [4]
 
 cursor-icon 1.2.0
     licence: MIT OR Apache-2.0 OR Zlib
     source: https://github.com/rust-windowing/cursor-icon
-    licence text: [48] [49] [50]
+    licence text: [49] [50] [51]
 
 dasp_sample 0.11.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rustaudio/sample.git
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 derive_more 2.1.1
     licence: MIT
     source: https://github.com/JelteF/derive_more
-    licence text: [51]
+    licence text: [52]
 
 dispatch 0.2.0
     licence: MIT
     source: http://github.com/SSheldon/rust-dispatch
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [53]
+    note: its package has no licence file, and its repository, github.com/SSheldon/rust-dispatch, has no licence file either; its manifest names Steven Sheldon as the author and MIT as the licence, so this is MIT's standard text with no copyright line
 
 dispatch2 0.3.1
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 disqualified 1.1.0
     licence: MIT OR Apache-2.0
@@ -570,27 +570,27 @@ disqualified 1.1.0
 downcast-rs 2.0.2
     licence: MIT OR Apache-2.0
     source: https://github.com/marcianx/downcast-rs
-    licence text: [23] [52]
+    licence text: [23] [54]
 
 dpi 0.1.2
     licence: Apache-2.0 AND MIT
     source: https://github.com/rust-windowing/winit
-    licence text: [53] [54]
+    licence text: [55] [56]
 
 either 1.19.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rayon-rs/either
-    licence text: [10] [43]
+    licence text: [10] [44]
 
 encase 0.12.1
     licence: MIT-0
     source: https://github.com/teoxoy/encase
-    licence text: [55]
+    licence text: [57]
 
 equivalent 1.0.2
     licence: Apache-2.0 OR MIT
     source: https://github.com/indexmap-rs/equivalent
-    licence text: [10] [56]
+    licence text: [10] [58]
 
 erased-serde 0.4.10
     licence: MIT OR Apache-2.0
@@ -600,12 +600,12 @@ erased-serde 0.4.10
 errno 0.3.14
     licence: MIT OR Apache-2.0
     source: https://github.com/lambda-fairy/rust-errno
-    licence text: [10] [57]
+    licence text: [10] [59]
 
 euclid 0.22.14
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/euclid
-    licence text: [42] [10] [41]
+    licence text: [43] [10] [42]
 
 event-listener 5.4.2
     licence: Apache-2.0 OR MIT
@@ -625,86 +625,86 @@ fastrand 2.5.0
 fdeflate 0.3.7
     licence: MIT OR Apache-2.0
     source: https://github.com/image-rs/fdeflate
-    licence text: [58] [59]
+    licence text: [60] [61]
 
 firewheel 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
-    licence text: [60] [61]
+    licence text: [62] [63]
 
 firewheel-core 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-cpal 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-graph 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-nodes 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 fixed-resample 0.13.0
     licence: MIT
     source: https://codeberg.org/Meadowlark/fixed-resample
-    licence text: [62] [63]
+    licence text: [64] [65]
 
 fixedbitset 0.5.7
     licence: MIT OR Apache-2.0
     source: https://github.com/petgraph/fixedbitset
-    licence text: [10] [64]
+    licence text: [10] [66]
 
 flate2 1.1.10
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/flate2-rs
-    licence text: [10] [65]
+    licence text: [10] [67]
 
 foldhash 0.2.0
     licence: Zlib
     source: https://github.com/orlp/foldhash
-    licence text: [66]
+    licence text: [68]
 
 font-types 0.12.7
     licence: MIT OR Apache-2.0
     source: https://github.com/googlefonts/fontations
-    licence text: [67] [68]
+    licence text: [69] [70]
 
 fontique 0.11.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/linebender/parley
-    licence text: [10] [69]
+    licence text: [10] [71]
 
 foreign-types 0.5.0
     licence: MIT/Apache-2.0
     source: https://github.com/sfackler/foreign-types
-    licence text: [8] [70]
+    licence text: [8] [72]
 
 foreign-types-shared 0.3.1
     licence: MIT/Apache-2.0
     source: https://github.com/sfackler/foreign-types
-    licence text: [8] [70]
+    licence text: [8] [72]
 
 futures-core 0.3.34
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/futures-rs
-    licence text: [71] [72]
+    licence text: [73] [74]
 
 futures-io 0.3.34
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/futures-rs
-    licence text: [71] [72]
+    licence text: [73] [74]
 
 futures-lite 2.6.1
     licence: Apache-2.0 OR MIT
@@ -714,27 +714,27 @@ futures-lite 2.6.1
 futures-task 0.3.34
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/futures-rs
-    licence text: [71] [72]
+    licence text: [73] [74]
 
 futures-util 0.3.34
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/futures-rs
-    licence text: [71] [72]
+    licence text: [73] [74]
 
 getrandom 0.4.3
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-random/getrandom
-    licence text: [73] [74]
+    licence text: [75] [76]
 
 glam 0.33.12
     licence: MIT OR Apache-2.0
     source: https://github.com/bitshifter/glam-rs
-    licence text: [75] [4]
+    licence text: [77] [4]
 
 glamx 0.3.1
     licence: MIT OR Apache-2.0
     source: https://github.com/dimforge/glamx
-    licence text: [75] [4]
+    licence text: [77] [4]
 
 glob 0.3.4
     licence: MIT OR Apache-2.0
@@ -744,7 +744,7 @@ glob 0.3.4
 guillotiere 0.7.0
     licence: MIT/Apache-2.0
     source: https://github.com/nical/guillotiere
-    licence text: [76] [77]
+    licence text: [78] [79]
 
 half 2.7.1
     licence: MIT OR Apache-2.0
@@ -754,27 +754,27 @@ half 2.7.1
 harfrust 0.12.0
     licence: MIT
     source: https://github.com/harfbuzz/harfrust
-    licence text: [78]
+    licence text: [80]
 
 hash32 0.3.1
     licence: MIT OR Apache-2.0
     source: https://github.com/japaric/hash32
-    licence text: [10] [79]
+    licence text: [10] [81]
 
 hashbrown 0.16.1
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/hashbrown
-    licence text: [10] [80]
+    licence text: [10] [82]
 
 hashbrown 0.17.1
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/hashbrown
-    licence text: [10] [80]
+    licence text: [10] [82]
 
 heapless 0.8.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-embedded/heapless
-    licence text: [10] [81]
+    licence text: [10] [83]
 
 hexasphere 19.0.0
     licence: MIT OR Apache-2.0
@@ -784,67 +784,67 @@ hexasphere 19.0.0
 icu_collections 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_locale_core 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_locale_fallback 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_locale_fallback_data 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_normalizer 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_normalizer_data 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_properties 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_properties_data 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_provider 2.3.1
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_segmenter 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 icu_segmenter_data 2.3.0
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 image 0.25.10
     licence: MIT OR Apache-2.0
     source: https://github.com/image-rs/image
-    licence text: [58] [59]
+    licence text: [60] [61]
 
 indexmap 2.14.2
     licence: Apache-2.0 OR MIT
     source: https://github.com/indexmap-rs/indexmap
-    licence text: [10] [83]
+    licence text: [10] [85]
 
 inventory 0.3.25
     licence: MIT OR Apache-2.0
@@ -859,12 +859,12 @@ is_terminal_polyfill 1.70.2
 itertools 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-itertools/itertools
-    licence text: [10] [43]
+    licence text: [10] [44]
 
 itertools 0.15.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-itertools/itertools
-    licence text: [10] [43]
+    licence text: [10] [44]
 
 itoa 1.0.18
     licence: MIT OR Apache-2.0
@@ -874,12 +874,12 @@ itoa 1.0.18
 ktx2 0.5.0
     licence: Apache-2.0
     source: https://github.com/BVE-Reborn/ktx2
-    licence text: [84]
+    licence text: [86]
 
 lalrpop-util 0.23.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/lalrpop/lalrpop
-    licence text: [10] [85]
+    licence text: [10] [87]
 
 lazy_static 1.5.1
     licence: MIT OR Apache-2.0
@@ -889,22 +889,22 @@ lazy_static 1.5.1
 lexical 7.0.5
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 lexical-core 1.0.6
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 lexical-parse-float 1.0.6
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 lexical-parse-integer 1.0.6
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 lexical-util 1.0.7
     licence: MIT/Apache-2.0
@@ -914,27 +914,27 @@ lexical-util 1.0.7
 lexical-write-float 1.0.6
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 lexical-write-integer 1.0.6
     licence: MIT/Apache-2.0
     source: https://github.com/Alexhuszagh/rust-lexical
-    licence text: [23] [4] [86]
+    licence text: [23] [4] [88]
 
 libc 0.2.190
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-lang/libc
-    licence text: [18] [87]
+    licence text: [18] [89]
 
 libloading 0.8.9
     licence: ISC
     source: https://github.com/nagisa/rust_libloading/
-    licence text: [88]
+    licence text: [90]
 
 libm 0.2.16
     licence: MIT
     source: https://github.com/rust-lang/compiler-builtins
-    licence text: [89]
+    licence text: [91]
 
 linebender_resource_handle 0.1.1
     licence: Apache-2.0 OR MIT
@@ -944,12 +944,12 @@ linebender_resource_handle 0.1.1
 litemap 0.8.3
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 lock_api 0.4.14
     licence: MIT OR Apache-2.0
     source: https://github.com/Amanieu/parking_lot
-    licence text: [10] [90]
+    licence text: [10] [92]
 
 log 0.4.34
     licence: MIT OR Apache-2.0
@@ -959,17 +959,17 @@ log 0.4.34
 logos 0.16.1
     licence: MIT OR Apache-2.0
     source: https://github.com/maciejhirsz/logos
-    licence text: [91] [92]
+    licence text: [93] [94]
 
 mach2 0.6.0
     licence: BSD-2-Clause OR MIT OR Apache-2.0
     source: https://github.com/JohnTitor/mach2
-    licence text: [18] [93] [94]
+    licence text: [18] [95] [96]
 
 matchers 0.2.0
     licence: MIT
     source: https://github.com/hawkw/matchers
-    licence text: [95]
+    licence text: [97]
 
 memchr 2.8.3
     licence: Unlicense OR MIT
@@ -979,47 +979,47 @@ memchr 2.8.3
 memmap2 0.9.11
     licence: MIT OR Apache-2.0
     source: https://github.com/RazrFalcon/memmap2-rs
-    licence text: [96] [97]
+    licence text: [98] [99]
 
 miniz_oxide 0.8.9
     licence: MIT OR Zlib OR Apache-2.0
     source: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
-    licence text: [98] [58] [99] [100]
+    licence text: [100] [60] [101] [102]
 
 miniz_oxide 0.9.1
     licence: MIT OR Zlib OR Apache-2.0
     source: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
-    licence text: [98] [58] [99] [100]
+    licence text: [100] [60] [101] [102]
 
 moxcms 0.8.1
     licence: BSD-3-Clause OR Apache-2.0
     source: https://github.com/awxkee/moxcms.git
-    licence text: [101] [102]
+    licence text: [103] [104]
 
 naga 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 naga-types 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 nix 0.31.3
     licence: MIT
     source: https://github.com/nix-rust/nix
-    licence text: [104]
+    licence text: [106]
 
 nonmax 0.5.5
     licence: MIT OR Apache-2.0
     source: https://github.com/LPGhatguy/nonmax
-    licence text: [105] [106]
+    licence text: [107] [108]
 
 nu-ansi-term 0.50.3
     licence: MIT
     source: https://github.com/nushell/nu-ansi-term
-    licence text: [107]
+    licence text: [109]
 
 num-complex 0.4.6
     licence: MIT OR Apache-2.0
@@ -1035,90 +1035,90 @@ objc-sys 0.3.5
     licence: MIT
     source: https://github.com/madsmtm/objc2
     licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from
 
 objc2 0.5.3
     licence: MIT
     source: https://github.com/madsmtm/objc2
     licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from
 
 objc2 0.6.5
     licence: MIT
     source: https://github.com/madsmtm/objc2
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [31]
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE-MIT.txt in github.com/madsmtm/objc2 at commit ee9a7ad, because the commit this version was published from has only a summary, LICENSE.md, with no copyright notice
 
 objc2-app-kit 0.2.2
     licence: MIT
     source: https://github.com/madsmtm/objc2
     licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from
 
 objc2-audio-toolbox 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-core-audio 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-core-audio-types 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-core-foundation 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-core-graphics 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-encode 4.1.0
     licence: MIT
     source: https://github.com/madsmtm/objc2
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [31]
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE-MIT.txt in github.com/madsmtm/objc2 at commit ee9a7ad, because the commit this version was published from has only a summary, LICENSE.md, with no copyright notice
 
 objc2-foundation 0.2.2
     licence: MIT
     source: https://github.com/madsmtm/objc2
     licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from
 
 objc2-foundation 0.3.2
     licence: MIT
     source: https://github.com/madsmtm/objc2
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [31]
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE-MIT.txt in github.com/madsmtm/objc2 at commit ee9a7ad, because the commit this version was published from has only a summary, LICENSE.md, with no copyright notice
 
 objc2-metal 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 objc2-quartz-core 0.3.2
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/madsmtm/objc2
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 offset-allocator 0.2.0
     licence: MIT
     source: https://github.com/pcwalton/offset-allocator/
-    licence text: [108]
+    licence text: [110]
 
 once_cell 1.21.4
     licence: MIT OR Apache-2.0
@@ -1128,48 +1128,48 @@ once_cell 1.21.4
 ordered-float 5.5.0
     licence: MIT
     source: https://github.com/reem/rust-ordered-float
-    licence text: [109]
+    licence text: [111]
 
 parking 2.2.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/smol-rs/parking
-    licence text: [10] [4] [110]
+    licence text: [10] [4] [112]
 
 parking_lot 0.12.5
     licence: MIT OR Apache-2.0
     source: https://github.com/Amanieu/parking_lot
-    licence text: [10] [90]
+    licence text: [10] [92]
 
 parking_lot_core 0.9.12
     licence: MIT OR Apache-2.0
     source: https://github.com/Amanieu/parking_lot
-    licence text: [10] [90]
+    licence text: [10] [92]
 
 parlance 0.1.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/linebender/parley
-    licence text: [10] [111]
+    licence text: [10] [113]
 
 parley 0.11.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/linebender/parley
-    licence text: [10] [111]
+    licence text: [10] [113]
 
 parley_data 0.11.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/linebender/parley
-    licence text: [10] [111]
+    licence text: [10] [113]
 
 parry3d-f64 0.31.1
     licence: Apache-2.0
     source: https://github.com/dimforge/parry
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 pin-project-lite 0.2.17
     licence: Apache-2.0 OR MIT
     source: https://github.com/taiki-e/pin-project-lite
-    licence text: [58] [4]
+    licence text: [60] [4]
 
 piper 0.2.5
     licence: MIT OR Apache-2.0
@@ -1179,7 +1179,7 @@ piper 0.2.5
 png 0.18.1
     licence: MIT OR Apache-2.0
     source: https://github.com/image-rs/image-png
-    licence text: [10] [112]
+    licence text: [10] [114]
 
 polling 3.11.0
     licence: Apache-2.0 OR MIT
@@ -1189,68 +1189,68 @@ polling 3.11.0
 portable-atomic 1.15.0
     licence: Apache-2.0 OR MIT
     source: https://github.com/taiki-e/portable-atomic
-    licence text: [58] [4]
+    licence text: [60] [4]
 
 portable-atomic-util 0.2.8
     licence: Apache-2.0 OR MIT
     source: https://github.com/taiki-e/portable-atomic-util
-    licence text: [58] [4]
+    licence text: [60] [4]
 
 potential_utf 0.1.6
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 profiling 1.0.18
     licence: MIT OR Apache-2.0
     source: https://github.com/aclysma/profiling
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 pxfm 0.1.30
     licence: BSD-3-Clause OR Apache-2.0
     source: https://github.com/awxkee/pxfm
-    licence text: [101] [102]
+    licence text: [103] [104]
 
 radsort 0.1.1
     licence: MIT OR Apache-2.0
     source: https://github.com/jakubvaltar/radsort
-    licence text: [1] [113]
+    licence text: [1] [115]
 
 rand 0.10.3
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-random/rand
-    licence text: [114] [115] [116]
+    licence text: [116] [117] [118]
 
 rand_core 0.10.1
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-random/rand_core
-    licence text: [117] [118] [119]
+    licence text: [119] [120] [121]
 
 rand_distr 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-random/rand_distr
-    licence text: [114] [118] [120]
+    licence text: [116] [120] [122]
 
 raw-window-handle 0.6.2
     licence: MIT OR Apache-2.0 OR Zlib
     source: https://github.com/rust-windowing/raw-window-handle
-    licence text: [58] [121] [122]
+    licence text: [60] [123] [124]
 
 raw-window-metal 1.1.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rust-windowing/raw-window-metal
-    licence text: [1] [123]
+    licence text: [1] [125]
 
 read-fonts 0.41.0
     licence: MIT OR Apache-2.0
     source: https://github.com/googlefonts/fontations
-    licence text: [67] [68]
+    licence text: [69] [70]
 
 rectangle-pack 0.4.2
     licence: MIT/Apache-2.0
     source: https://github.com/chinedufn/rectangle-pack
-    licence text: [124] [125]
+    licence text: [126] [127]
 
 regex-automata 0.4.18
     licence: MIT OR Apache-2.0
@@ -1265,18 +1265,18 @@ regex-syntax 0.8.11
 ringbuf 0.5.3
     licence: MIT OR Apache-2.0
     source: https://github.com/agerasev/ringbuf.git
-    licence text: [10] [126]
+    licence text: [10] [128]
 
 ron 0.12.2
     licence: MIT OR Apache-2.0
     source: https://github.com/ron-rs/ron
-    licence text: [10] [127]
+    licence text: [10] [129]
 
 rstar 0.13.0
     licence: MIT OR Apache-2.0
     source: https://github.com/georust/rstar
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 rustc-hash 1.1.0
     licence: Apache-2.0/MIT
@@ -1286,28 +1286,28 @@ rustc-hash 1.1.0
 rustix 1.1.5
     licence: Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT
     source: https://github.com/bytecodealliance/rustix
-    licence text: [128] [10] [129] [4]
+    licence text: [130] [10] [131] [4]
 
 ruzstd 0.8.3
     licence: MIT
     source: https://github.com/KillingSpark/zstd-rs
-    licence text: [130]
+    licence text: [132]
 
 scopeguard 1.2.0
     licence: MIT OR Apache-2.0
     source: https://github.com/bluss/scopeguard
-    licence text: [10] [131]
+    licence text: [10] [133]
 
 sdl3-src 3.4.18
     licence: Zlib
     source: https://codeberg.org/maia/sdl3-sys-rs
-    licence text: [132] [133] [134]
+    licence text: [134] [135] [136]
     note: SDL itself: its C source, which sdl3-sys builds and links into the game (ADR-0018)
 
 sdl3-sys 0.7.2+SDL-3.4.18
     licence: Zlib
     source: https://codeberg.org/maia/sdl3-sys-rs
-    licence text: [135]
+    licence text: [137]
 
 serde 1.0.229
     licence: MIT OR Apache-2.0
@@ -1332,37 +1332,37 @@ serde_spanned 1.1.1
 sharded-slab 0.1.7
     licence: MIT
     source: https://github.com/hawkw/sharded-slab
-    licence text: [136]
+    licence text: [138]
 
 simba 0.10.2
     licence: Apache-2.0
     source: https://github.com/dimforge/simba
-    licence text: [137]
+    licence text: [139]
 
 simd-adler32 0.3.10
     licence: MIT
     source: https://github.com/mcountryman/simd-adler32
-    licence text: [138]
+    licence text: [140]
 
 skrifa 0.44.0
     licence: MIT OR Apache-2.0
     source: https://github.com/googlefonts/fontations
-    licence text: [67] [68]
+    licence text: [69] [70]
 
 slab 0.4.12
     licence: MIT
     source: https://github.com/tokio-rs/slab
-    licence text: [139]
+    licence text: [141]
 
 slotmap 1.1.1
     licence: Zlib
     source: https://github.com/orlp/slotmap
-    licence text: [140]
+    licence text: [142]
 
 smallvec 1.16.2
     licence: MIT OR Apache-2.0
     source: https://github.com/servo/rust-smallvec
-    licence text: [10] [141]
+    licence text: [10] [143]
 
 smol_str 0.2.2
     licence: MIT OR Apache-2.0
@@ -1372,43 +1372,43 @@ smol_str 0.2.2
 spin 0.10.1
     licence: MIT
     source: https://github.com/mvdnes/spin-rs.git
-    licence text: [142]
+    licence text: [144]
 
 spin 0.12.3
     licence: MIT
     source: https://codeberg.org/zesterer/spin
-    licence text: [142]
+    licence text: [144]
 
 stable_deref_trait 1.2.1
     licence: MIT OR Apache-2.0
     source: https://github.com/storyyeller/stable_deref_trait
-    licence text: [10] [143]
+    licence text: [10] [145]
 
 stackfuture 0.3.1
     licence: MIT
     source: https://github.com/microsoft/stackfuture
-    licence text: [144]
+    licence text: [146]
 
 static_assertions 1.1.0
     licence: MIT OR Apache-2.0
     source: https://github.com/nvzqz/static-assertions-rs
-    licence text: [1] [145]
+    licence text: [1] [147]
 
 swash 0.2.10
     licence: Apache-2.0 OR MIT
     source: https://github.com/dfrg/swash
-    licence text: [10] [146]
+    licence text: [10] [148]
 
 sys-locale 0.3.2
     licence: MIT OR Apache-2.0
     source: https://github.com/1Password/sys-locale
-    licence text: [19] [147]
+    licence text: [19] [149]
 
 taffy 0.14.0
     licence: MIT
     source: https://github.com/DioxusLabs/taffy
-    licence text: [30]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    licence text: [150]
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE in github.com/DioxusLabs/taffy at the commit this version was published from
 
 thiserror 2.0.21
     licence: MIT OR Apache-2.0
@@ -1418,17 +1418,17 @@ thiserror 2.0.21
 thread_local 1.1.10
     licence: MIT OR Apache-2.0
     source: https://github.com/Amanieu/thread_local-rs
-    licence text: [10] [90]
+    licence text: [10] [92]
 
 thunderdome 0.6.1
     licence: MIT OR Apache-2.0
     source: https://github.com/LPGhatguy/thunderdome
-    licence text: [105] [106]
+    licence text: [107] [108]
 
 tinystr 0.8.4
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 toml 1.1.6+spec-1.1.0
     licence: MIT OR Apache-2.0
@@ -1458,32 +1458,32 @@ toml_writer 1.1.2+spec-1.1.0
 tracing 0.1.44
     licence: MIT
     source: https://github.com/tokio-rs/tracing
-    licence text: [148]
+    licence text: [151]
 
 tracing-core 0.1.36
     licence: MIT
     source: https://github.com/tokio-rs/tracing
-    licence text: [148]
+    licence text: [151]
 
 tracing-log 0.2.0
     licence: MIT
     source: https://github.com/tokio-rs/tracing
-    licence text: [148]
+    licence text: [151]
 
 tracing-subscriber 0.3.23
     licence: MIT
     source: https://github.com/tokio-rs/tracing
-    licence text: [148]
+    licence text: [151]
 
 triple_buffer 9.0.0
     licence: MPL-2.0
     source: https://github.com/HadrienG2/triple-buffer
-    licence text: [149]
+    licence text: [152]
 
 twox-hash 2.1.5
     licence: MIT
     source: https://github.com/shepmaster/twox-hash
-    licence text: [150]
+    licence text: [153]
 
 typeid 1.0.3
     licence: MIT OR Apache-2.0
@@ -1493,146 +1493,146 @@ typeid 1.0.3
 typewit 1.15.2
     licence: Zlib
     source: https://github.com/rodrimati1992/typewit/
-    licence text: [151]
+    licence text: [154]
 
 unicode-ident 1.0.24
     licence: (MIT OR Apache-2.0) AND Unicode-3.0
     source: https://github.com/dtolnay/unicode-ident
-    licence text: [18] [4] [152]
+    licence text: [18] [4] [155]
 
 unicode-width 0.2.2
     licence: MIT OR Apache-2.0
     source: https://github.com/unicode-rs/unicode-width
-    licence text: [153] [10] [154]
+    licence text: [156] [10] [157]
 
 utf8_iter 1.0.4
     licence: Apache-2.0 OR MIT
     source: https://github.com/hsivonen/utf8_iter
-    licence text: [155] [1] [156]
+    licence text: [158] [1] [159]
 
 utf8parse 0.2.2
     licence: Apache-2.0 OR MIT
     source: https://github.com/alacritty/vte
-    licence text: [18] [157]
+    licence text: [18] [160]
 
 uuid 1.28.0
     licence: Apache-2.0 OR MIT
     source: https://github.com/uuid-rs/uuid
-    licence text: [10] [158]
+    licence text: [10] [161]
 
 weak-table 0.4.0
     licence: MIT
     source: https://github.com/tov/weak-table-rs
-    licence text: [159]
+    licence text: [162]
 
 wesl 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wesl-core 0.1.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wgpu 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgpu-core 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgpu-core-deps-apple 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgpu-hal 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgpu-naga-bridge 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgpu-types 30.0.1
     licence: MIT OR Apache-2.0
     source: https://github.com/gfx-rs/wgpu
-    licence text: [15] [103]
+    licence text: [15] [105]
 
 wgsl-parse 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wgsl-types 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wide 1.7.1
     licence: Zlib OR Apache-2.0 OR MIT
     source: https://github.com/Lokathor/wide
-    licence text: [160] [161] [162]
+    licence text: [163] [164] [165]
 
 winit 0.30.13
     licence: Apache-2.0
     source: https://github.com/rust-windowing/winit
-    licence text: [53]
+    licence text: [55]
 
 winnow 1.0.4
     licence: MIT
     source: https://github.com/winnow-rs/winnow
-    licence text: [163]
+    licence text: [166]
 
 writeable 0.6.4
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 yazi 0.2.1
     licence: Apache-2.0 OR MIT
     source: https://github.com/dfrg/yazi
-    licence text: [10] [164]
+    licence text: [10] [167]
 
 yoke 0.8.3
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 zeno 0.3.3
     licence: Apache-2.0 OR MIT
     source: https://github.com/dfrg/zeno
-    licence text: [10] [146]
+    licence text: [10] [148]
 
 zerocopy 0.8.62
     licence: BSD-2-Clause OR Apache-2.0 OR MIT
     source: https://github.com/google/zerocopy
-    licence text: [165] [166] [167]
+    licence text: [168] [169] [170]
 
 zerofrom 0.1.8
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 zerotrie 0.2.5
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 zerovec 0.11.8
     licence: Unicode-3.0
     source: https://github.com/unicode-org/icu4x
-    licence text: [82]
+    licence text: [84]
 
 zmij 1.0.23
     licence: MIT
@@ -1642,12 +1642,12 @@ zmij 1.0.23
 zune-core 0.5.3
     licence: MIT OR Apache-2.0 OR Zlib
     source: https://github.com/etemesi254/zune-image
-    licence text: [19] [168] [169]
+    licence text: [19] [171] [172]
 
 zune-jpeg 0.5.15
     licence: MIT OR Apache-2.0 OR Zlib
     source: https://github.com/etemesi254/zune-image/tree/dev/crates/zune-jpeg
-    licence text: [19] [168] [169]
+    licence text: [19] [171] [172]
 
 
 LICENCE TEXTS
@@ -4439,11 +4439,12 @@ express Statement of Purpose.
     this CC0 or use of the Work.
 
 ================================================================================
-[30] used by: block2, dispatch, objc-sys, objc2, objc2-app-kit, objc2-encode, objc2-foundation, taffy
+[30] used by: block2, objc-sys, objc2, objc2-app-kit, objc2-foundation
 ================================================================================
 
 MIT License
 
+Copyright (c) Steven Sheldon
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -4464,7 +4465,37 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[31] used by: bumpalo
+[31] used by: block2, objc2, objc2-encode, objc2-foundation
+================================================================================
+
+Copyright 2026 Mads Marquart
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+================================================================================
+[32] used by: bumpalo
 ================================================================================
 
 Copyright (c) 2019 Nick Fitzgerald
@@ -4494,7 +4525,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[32] used by: bytemuck
+[33] used by: bytemuck
 ================================================================================
 
 Apache License
@@ -4560,7 +4591,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[33] used by: bytemuck
+[34] used by: bytemuck
 ================================================================================
 
 MIT License
@@ -4574,7 +4605,7 @@ The above copyright notice and this permission notice (including the next paragr
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[34] used by: bytemuck
+[35] used by: bytemuck
 ================================================================================
 
 Copyright (c) 2019 Daniel "Lokathor" Gee.
@@ -4590,7 +4621,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[35] used by: cfg-if
+[36] used by: cfg-if
 ================================================================================
 
 Copyright (c) 2014 Alex Crichton
@@ -4620,7 +4651,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[36] used by: const-fnv1a-hash
+[37] used by: const-fnv1a-hash
 ================================================================================
 
 MIT License
@@ -4646,7 +4677,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[37] used by: const_panic
+[38] used by: const_panic
 ================================================================================
 
 Copyright (c) 2021 Matias Rodriguez.
@@ -4668,7 +4699,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[38] used by: const_soft_float
+[39] used by: const_soft_float
 ================================================================================
 
                               Apache License
@@ -4874,7 +4905,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[39] used by: const_soft_float
+[40] used by: const_soft_float
 ================================================================================
 
 Copyright (c) 2023 Kirk Nickish and https://github.com/823984418
@@ -4904,7 +4935,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[40] used by: constant_time_eq
+[41] used by: constant_time_eq
 ================================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining a
@@ -4923,7 +4954,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[41] used by: core-foundation, core-foundation-sys, core-graphics, core-graphics-types, euclid
+[42] used by: core-foundation, core-foundation-sys, core-graphics, core-graphics-types, euclid
 ================================================================================
 
 Copyright (c) 2012-2013 Mozilla Foundation
@@ -4953,7 +4984,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[42] used by: core-graphics, euclid
+[43] used by: core-graphics, euclid
 ================================================================================
 
 Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -4963,7 +4994,7 @@ option. All files in the project carrying such notice may not be
 copied, modified, or distributed except according to those terms.
 
 ================================================================================
-[43] used by: coreaudio-rs, either, itertools
+[44] used by: coreaudio-rs, either, itertools
 ================================================================================
 
 Copyright (c) 2015
@@ -4993,7 +5024,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[44] used by: crc32fast
+[45] used by: crc32fast
 ================================================================================
 
 MIT License
@@ -5019,7 +5050,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[45] used by: crossbeam-channel, crossbeam-queue, crossbeam-utils
+[46] used by: crossbeam-channel, crossbeam-queue, crossbeam-utils
 ================================================================================
 
 The MIT License (MIT)
@@ -5051,7 +5082,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[46] used by: crossbeam-channel
+[47] used by: crossbeam-channel
 ================================================================================
 
 ===============================================================================
@@ -5649,7 +5680,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[47] used by: ctrlc
+[48] used by: ctrlc
 ================================================================================
 
                               Apache License
@@ -5855,7 +5886,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[48] used by: cursor-icon
+[49] used by: cursor-icon
 ================================================================================
 
 
@@ -6062,7 +6093,7 @@ limitations under the License.
    limitations under the License.
 
 ================================================================================
-[49] used by: cursor-icon
+[50] used by: cursor-icon
 ================================================================================
 
 Copyright (c) 2023 Kirill Chibisov
@@ -6086,7 +6117,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[50] used by: cursor-icon
+[51] used by: cursor-icon
 ================================================================================
 
 Copyright (c) 2023 Kirill Chibisov
@@ -6102,7 +6133,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[51] used by: derive_more
+[52] used by: derive_more
 ================================================================================
 
 The MIT License (MIT)
@@ -6128,7 +6159,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[52] used by: downcast-rs
+[53] used by: dispatch
+================================================================================
+
+MIT License
+
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+[54] used by: downcast-rs
 ================================================================================
 
 Copyright (c) 2020 Ashish Myles and contributors
@@ -6158,7 +6214,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[53] used by: dpi, winit
+[55] used by: dpi, winit
 ================================================================================
 
 Apache License
@@ -6364,7 +6420,7 @@ Apache License
    limitations under the License.
 
 ================================================================================
-[54] used by: dpi
+[56] used by: dpi
 ================================================================================
 
 rust-lang/libm as a whole is available for use under the MIT license:
@@ -6420,7 +6476,7 @@ have been licensed under extremely permissive terms.
 ------------------------------------------------------------------------------
 
 ================================================================================
-[55] used by: encase
+[57] used by: encase
 ================================================================================
 
 MIT No Attribution
@@ -6441,7 +6497,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[56] used by: equivalent
+[58] used by: equivalent
 ================================================================================
 
 Copyright (c) 2016--2023
@@ -6471,7 +6527,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[57] used by: errno
+[59] used by: errno
 ================================================================================
 
 Copyright (c) 2014 Chris Wong
@@ -6501,7 +6557,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[58] used by: fdeflate, image, miniz_oxide, pin-project-lite, portable-atomic, portable-atomic-util, raw-window-handle
+[60] used by: fdeflate, image, miniz_oxide, pin-project-lite, portable-atomic, portable-atomic-util, raw-window-handle
 ================================================================================
 
 
@@ -6683,7 +6739,7 @@ DEALINGS IN THE SOFTWARE.
    END OF TERMS AND CONDITIONS
 
 ================================================================================
-[59] used by: fdeflate, image
+[61] used by: fdeflate, image
 ================================================================================
 
 MIT License
@@ -6713,7 +6769,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[60] used by: firewheel
+[62] used by: firewheel
 ================================================================================
 
 Apache License
@@ -6919,7 +6975,7 @@ Apache License
    limitations under the License.
 
 ================================================================================
-[61] used by: firewheel
+[63] used by: firewheel
 ================================================================================
 
 MIT License
@@ -6945,7 +7001,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[62] used by: fixed-resample
+[64] used by: fixed-resample
 ================================================================================
 
 Apache License
@@ -7151,7 +7207,7 @@ Apache License
    limitations under the License.
 
 ================================================================================
-[63] used by: fixed-resample
+[65] used by: fixed-resample
 ================================================================================
 
 MIT License
@@ -7177,7 +7233,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[64] used by: fixedbitset
+[66] used by: fixedbitset
 ================================================================================
 
 Copyright (c) 2015-2017
@@ -7207,7 +7263,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[65] used by: flate2
+[67] used by: flate2
 ================================================================================
 
 Copyright (c) 2014-2026 Alex Crichton
@@ -7237,7 +7293,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[66] used by: foldhash
+[68] used by: foldhash
 ================================================================================
 
 Copyright (c) 2024 Orson Peters
@@ -7261,7 +7317,7 @@ the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[67] used by: font-types, read-fonts, skrifa
+[69] used by: font-types, read-fonts, skrifa
 ================================================================================
 
 Apache License
@@ -7333,7 +7389,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[68] used by: font-types, read-fonts, skrifa
+[70] used by: font-types, read-fonts, skrifa
 ================================================================================
 
 Copyright (c) 2019 Fontations Developers
@@ -7363,7 +7419,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[69] used by: fontique
+[71] used by: fontique
 ================================================================================
 
 Copyright 2024 the Parley Authors
@@ -7393,7 +7449,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[70] used by: foreign-types, foreign-types-shared
+[72] used by: foreign-types, foreign-types-shared
 ================================================================================
 
 Copyright (c) 2017 The foreign-types Developers
@@ -7417,7 +7473,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[71] used by: futures-core, futures-io, futures-task, futures-util
+[73] used by: futures-core, futures-io, futures-task, futures-util
 ================================================================================
 
                               Apache License
@@ -7624,7 +7680,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[72] used by: futures-core, futures-io, futures-task, futures-util
+[74] used by: futures-core, futures-io, futures-task, futures-util
 ================================================================================
 
 Copyright (c) 2016 Alex Crichton
@@ -7655,7 +7711,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[73] used by: getrandom
+[75] used by: getrandom
 ================================================================================
 
                               Apache License
@@ -7861,7 +7917,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[74] used by: getrandom
+[76] used by: getrandom
 ================================================================================
 
 Copyright (c) 2018-2026 The rust-random Project Developers
@@ -7892,7 +7948,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[75] used by: glam, glamx
+[77] used by: glam, glamx
 ================================================================================
 
                               Apache License
@@ -8098,7 +8154,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[76] used by: guillotiere
+[78] used by: guillotiere
 ================================================================================
 
 Copyright 2019 Nicolas Silva
@@ -8116,7 +8172,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[77] used by: guillotiere
+[79] used by: guillotiere
 ================================================================================
 
 The MIT License (MIT)
@@ -8141,7 +8197,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[78] used by: harfrust
+[80] used by: harfrust
 ================================================================================
 
 The MIT License (MIT)
@@ -8168,7 +8224,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[79] used by: hash32
+[81] used by: hash32
 ================================================================================
 
 Copyright (c) 2018 Jorge Aparicio
@@ -8198,7 +8254,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[80] used by: hashbrown
+[82] used by: hashbrown
 ================================================================================
 
 Copyright (c) 2016 Amanieu d'Antras
@@ -8228,7 +8284,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[81] used by: heapless
+[83] used by: heapless
 ================================================================================
 
 Copyright (c) 2017 Jorge Aparicio
@@ -8258,7 +8314,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[82] used by: icu_collections, icu_locale_core, icu_locale_fallback, icu_locale_fallback_data, icu_normalizer, icu_normalizer_data, icu_properties, icu_properties_data, icu_provider, icu_segmenter, icu_segmenter_data, litemap, potential_utf, tinystr, writeable, yoke, zerofrom, zerotrie, zerovec
+[84] used by: icu_collections, icu_locale_core, icu_locale_fallback, icu_locale_fallback_data, icu_normalizer, icu_normalizer_data, icu_properties, icu_properties_data, icu_provider, icu_segmenter, icu_segmenter_data, litemap, potential_utf, tinystr, writeable, yoke, zerofrom, zerotrie, zerovec
 ================================================================================
 
 UNICODE LICENSE V3
@@ -8309,7 +8365,7 @@ Portions of ICU4X may have been adapted from ICU4C and/or ICU4J.
 ICU 1.8.1 to ICU 57.1 © 1995-2016 International Business Machines Corporation and others.
 
 ================================================================================
-[83] used by: indexmap
+[85] used by: indexmap
 ================================================================================
 
 Copyright (c) 2016--2017
@@ -8339,7 +8395,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[84] used by: ktx2
+[86] used by: ktx2
 ================================================================================
 
                                  Apache License
@@ -8545,7 +8601,7 @@ DEALINGS IN THE SOFTWARE.
    limitations under the License.
 
 ================================================================================
-[85] used by: lalrpop-util
+[87] used by: lalrpop-util
 ================================================================================
 
 Copyright (c) 2015 The LALRPOP Project Developers
@@ -8575,7 +8631,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[86] used by: lexical, lexical-core, lexical-parse-float, lexical-parse-integer, lexical-write-float, lexical-write-integer
+[88] used by: lexical, lexical-core, lexical-parse-float, lexical-parse-integer, lexical-write-float, lexical-write-integer
 ================================================================================
 
 # Licensing
@@ -8917,7 +8973,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[87] used by: libc
+[89] used by: libc
 ================================================================================
 
 Copyright (c) The Rust Project Developers
@@ -8947,7 +9003,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[88] used by: libloading
+[90] used by: libloading
 ================================================================================
 
 Copyright © 2015, Simonas Kazlauskas
@@ -8964,7 +9020,7 @@ NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE US
 THIS SOFTWARE.
 
 ================================================================================
-[89] used by: libm
+[91] used by: libm
 ================================================================================
 
 rust-lang/libm as a whole is available for use under the MIT license:
@@ -9227,7 +9283,7 @@ have been licensed under extremely permissive terms.
 Copyright notices are retained in src/* files where relevant.
 
 ================================================================================
-[90] used by: lock_api, parking_lot, parking_lot_core, thread_local
+[92] used by: lock_api, parking_lot, parking_lot_core, thread_local
 ================================================================================
 
 Copyright (c) 2016 The Rust Project Developers
@@ -9257,7 +9313,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[91] used by: logos
+[93] used by: logos
 ================================================================================
 
                               Apache License
@@ -9463,7 +9519,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[92] used by: logos
+[94] used by: logos
 ================================================================================
 
 Copyright (c) 2018 Maciej Hirsz <maciej.hirsz@gmail.com>
@@ -9489,7 +9545,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[93] used by: mach2
+[95] used by: mach2
 ================================================================================
 
 Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi
@@ -9517,7 +9573,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-[94] used by: mach2
+[96] used by: mach2
 ================================================================================
 
 Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi
@@ -9547,7 +9603,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[95] used by: matchers
+[97] used by: matchers
 ================================================================================
 
 Copyright (c) 2019 Eliza Weisman
@@ -9571,7 +9627,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[96] used by: memmap2
+[98] used by: memmap2
 ================================================================================
 
                               Apache License
@@ -9777,7 +9833,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[97] used by: memmap2
+[99] used by: memmap2
 ================================================================================
 
 Copyright (c) 2020 Yevhenii Reizner
@@ -9808,66 +9864,66 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[98] used by: miniz_oxide
-================================================================================
-
-MIT License
-
-Copyright 2013-2014 RAD Game Tools and Valve Software
-Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
-Copyright (c) 2017 Frommi
-Copyright (c) 2017-2024 oyvindln
-
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-================================================================================
-[99] used by: miniz_oxide
-================================================================================
-
-MIT License
-
-Copyright 2013-2014 RAD Game Tools and Valve Software
-Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
-Copyright (c) 2017 Frommi
-Copyright (c) 2017-2024 oyvindln
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-================================================================================
 [100] used by: miniz_oxide
+================================================================================
+
+MIT License
+
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+Copyright (c) 2017 Frommi
+Copyright (c) 2017-2024 oyvindln
+
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+[101] used by: miniz_oxide
+================================================================================
+
+MIT License
+
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+Copyright (c) 2017 Frommi
+Copyright (c) 2017-2024 oyvindln
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+[102] used by: miniz_oxide
 ================================================================================
 
 Copyright 2013-2014 RAD Game Tools and Valve Software
@@ -9886,7 +9942,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[101] used by: moxcms, pxfm
+[103] used by: moxcms, pxfm
 ================================================================================
 
                                  Apache License
@@ -10092,7 +10148,7 @@ Permission is granted to anyone to use this software for any purpose, including 
    limitations under the License.
 
 ================================================================================
-[102] used by: moxcms, pxfm
+[104] used by: moxcms, pxfm
 ================================================================================
 
 Copyright (c) Radzivon Bartoshyk. All rights reserved.
@@ -10123,7 +10179,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-[103] used by: naga, naga-types, wgpu, wgpu-core, wgpu-core-deps-apple, wgpu-hal, wgpu-naga-bridge, wgpu-types
+[105] used by: naga, naga-types, wgpu, wgpu-core, wgpu-core-deps-apple, wgpu-hal, wgpu-naga-bridge, wgpu-types
 ================================================================================
 
 MIT License
@@ -10149,7 +10205,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[104] used by: nix
+[106] used by: nix
 ================================================================================
 
 The MIT License (MIT)
@@ -10175,7 +10231,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ================================================================================
-[105] used by: nonmax, thunderdome
+[107] used by: nonmax, thunderdome
 ================================================================================
 
 i                                 Apache License
@@ -10381,7 +10437,7 @@ i                                 Apache License
    limitations under the License.
 
 ================================================================================
-[106] used by: nonmax, thunderdome
+[108] used by: nonmax, thunderdome
 ================================================================================
 
 Copyright (c) 2020 Lucien Greathouse
@@ -10405,7 +10461,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[107] used by: nu-ansi-term
+[109] used by: nu-ansi-term
 ================================================================================
 
 The MIT License (MIT)
@@ -10432,7 +10488,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[108] used by: offset-allocator
+[110] used by: offset-allocator
 ================================================================================
 
 MIT License
@@ -10458,7 +10514,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[109] used by: ordered-float
+[111] used by: ordered-float
 ================================================================================
 
 Copyright (c) 2015 Jonathan Reem
@@ -10488,7 +10544,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[110] used by: parking
+[112] used by: parking
 ================================================================================
 
 ===============================================================================
@@ -10502,7 +10558,7 @@ option. All files in the project carrying such notice may not be
 copied, modified, or distributed except according to those terms.
 
 ================================================================================
-[111] used by: parlance, parley, parley_data
+[113] used by: parlance, parley, parley_data
 ================================================================================
 
 Copyright 2020 the Parley Authors
@@ -10532,7 +10588,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[112] used by: png
+[114] used by: png
 ================================================================================
 
 Copyright (c) 2015 nwin
@@ -10562,7 +10618,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[113] used by: radsort
+[115] used by: radsort
 ================================================================================
 
 Copyright 2020 Jakub Valtar
@@ -10592,7 +10648,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[114] used by: rand, rand_distr
+[116] used by: rand, rand_distr
 ================================================================================
 
 Copyrights in the Rand project are retained by their contributors. No
@@ -10609,7 +10665,7 @@ The Rand project includes code from the Rust project
 published under these same licenses.
 
 ================================================================================
-[115] used by: rand
+[117] used by: rand
 ================================================================================
 
                               Apache License
@@ -10790,7 +10846,7 @@ TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 END OF TERMS AND CONDITIONS
 
 ================================================================================
-[116] used by: rand
+[118] used by: rand
 ================================================================================
 
 Copyright 2018 Developers of the Rand project
@@ -10821,7 +10877,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[117] used by: rand_core
+[119] used by: rand_core
 ================================================================================
 
 Copyrights in the Rand project are retained by their contributors. No
@@ -10835,7 +10891,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
 
 ================================================================================
-[118] used by: rand_core, rand_distr
+[120] used by: rand_core, rand_distr
 ================================================================================
 
                               Apache License
@@ -11027,7 +11083,7 @@ APPENDIX: How to apply the Apache License to your work.
    identification within third-party archives.
 
 ================================================================================
-[119] used by: rand_core
+[121] used by: rand_core
 ================================================================================
 
 Copyright (c) 2018-2026 The Rand Project Developers
@@ -11057,7 +11113,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[120] used by: rand_distr
+[122] used by: rand_distr
 ================================================================================
 
 Copyright 2018 Developers of the Rand project
@@ -11087,7 +11143,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[121] used by: raw-window-handle
+[123] used by: raw-window-handle
 ================================================================================
 
 MIT License
@@ -11113,7 +11169,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[122] used by: raw-window-handle
+[124] used by: raw-window-handle
 ================================================================================
 
 Copyright (c) 2020 Osspial
@@ -11129,7 +11185,7 @@ Permission is granted to anyone to use this software for any purpose, including 
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[123] used by: raw-window-metal
+[125] used by: raw-window-metal
 ================================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -11151,7 +11207,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[124] used by: rectangle-pack
+[126] used by: rectangle-pack
 ================================================================================
 
                               Apache License
@@ -11357,7 +11413,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 ================================================================================
-[125] used by: rectangle-pack
+[127] used by: rectangle-pack
 ================================================================================
 
 Copyright (c) 2021 Chinedu Francis Nwafili
@@ -11387,7 +11443,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[126] used by: ringbuf
+[128] used by: ringbuf
 ================================================================================
 
 Copyright (c) 2019 Alexey Gerasev
@@ -11417,7 +11473,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[127] used by: ron
+[129] used by: ron
 ================================================================================
 
 Copyright (c) 2017 RON developers
@@ -11447,7 +11503,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[128] used by: rustix
+[130] used by: rustix
 ================================================================================
 
 Short version for non-lawyers:
@@ -11481,7 +11537,7 @@ is licensed under:
 at your option.
 
 ================================================================================
-[129] used by: rustix
+[131] used by: rustix
 ================================================================================
 
 
@@ -11705,7 +11761,7 @@ the License, but only in their entirety and only with respect to the Combined
 Software.
 
 ================================================================================
-[130] used by: ruzstd
+[132] used by: ruzstd
 ================================================================================
 
 MIT License
@@ -11731,7 +11787,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[131] used by: scopeguard
+[133] used by: scopeguard
 ================================================================================
 
 Copyright (c) 2016-2019 Ulrik Sverdrup "bluss" and scopeguard developers
@@ -11761,7 +11817,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[132] used by: sdl3-src
+[134] used by: sdl3-src
 ================================================================================
 
 zlib License
@@ -11785,7 +11841,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[133] used by: sdl3-src
+[135] used by: sdl3-src
 ================================================================================
 
 Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
@@ -11807,7 +11863,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[134] used by: sdl3-src
+[136] used by: sdl3-src
 ================================================================================
 
 Copyright (c) 2010, Alan Ott, Signal 11 Software
@@ -11838,7 +11894,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-[135] used by: sdl3-sys
+[137] used by: sdl3-sys
 ================================================================================
 
 zlib License
@@ -11862,7 +11918,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[136] used by: sharded-slab
+[138] used by: sharded-slab
 ================================================================================
 
 Copyright (c) 2019 Eliza Weisman
@@ -11886,7 +11942,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ================================================================================
-[137] used by: simba
+[139] used by: simba
 ================================================================================
 
                                  Apache License
@@ -12092,7 +12148,7 @@ THE SOFTWARE.
    limitations under the License.
 
 ================================================================================
-[138] used by: simd-adler32
+[140] used by: simd-adler32
 ================================================================================
 
 MIT License
@@ -12118,7 +12174,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[139] used by: slab
+[141] used by: slab
 ================================================================================
 
 Copyright (c) 2019 Carl Lerche
@@ -12148,7 +12204,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[140] used by: slotmap
+[142] used by: slotmap
 ================================================================================
 
 Copyright (c) 2021 Orson Peters <orsonpeters@gmail.com>
@@ -12172,7 +12228,7 @@ the following restrictions:
  3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[141] used by: smallvec
+[143] used by: smallvec
 ================================================================================
 
 Copyright (c) 2018 The Servo Project Developers
@@ -12202,7 +12258,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[142] used by: spin
+[144] used by: spin
 ================================================================================
 
 The MIT License (MIT)
@@ -12228,7 +12284,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[143] used by: stable_deref_trait
+[145] used by: stable_deref_trait
 ================================================================================
 
 Copyright (c) 2017 Robert Grosse
@@ -12258,7 +12314,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[144] used by: stackfuture
+[146] used by: stackfuture
 ================================================================================
 
 StackFuture
@@ -12285,7 +12341,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[145] used by: static_assertions
+[147] used by: static_assertions
 ================================================================================
 
 MIT License
@@ -12311,7 +12367,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[146] used by: swash, zeno
+[148] used by: swash, zeno
 ================================================================================
 
 Copyright (c) 2020 Chad Brokaw
@@ -12341,7 +12397,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[147] used by: sys-locale
+[149] used by: sys-locale
 ================================================================================
 
 MIT License
@@ -12367,7 +12423,34 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[148] used by: tracing, tracing-core, tracing-log, tracing-subscriber
+[150] used by: taffy
+================================================================================
+
+MIT License
+
+Copyright (c) 2018 Visly Inc.
+Copyright (c) 2026 Taffy Authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+[151] used by: tracing, tracing-core, tracing-log, tracing-subscriber
 ================================================================================
 
 Copyright (c) 2019 Tokio Contributors
@@ -12397,7 +12480,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[149] used by: triple_buffer
+[152] used by: triple_buffer
 ================================================================================
 
 Mozilla Public License Version 2.0
@@ -12775,7 +12858,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
   defined by the Mozilla Public License, v. 2.0.
 
 ================================================================================
-[150] used by: twox-hash
+[153] used by: twox-hash
 ================================================================================
 
 The MIT License (MIT)
@@ -12801,7 +12884,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[151] used by: typewit
+[154] used by: typewit
 ================================================================================
 
 Copyright (c) 2023 Matias Rodriguez.
@@ -12823,7 +12906,7 @@ freely, subject to the following restrictions:
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[152] used by: unicode-ident
+[155] used by: unicode-ident
 ================================================================================
 
 UNICODE LICENSE V3
@@ -12867,7 +12950,7 @@ dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
 
 ================================================================================
-[153] used by: unicode-width
+[156] used by: unicode-width
 ================================================================================
 
 Licensed under the Apache License, Version 2.0
@@ -12879,7 +12962,7 @@ notice may not be copied, modified, or distributed except
 according to those terms.
 
 ================================================================================
-[154] used by: unicode-width
+[157] used by: unicode-width
 ================================================================================
 
 Copyright (c) 2015 The Rust Project Developers
@@ -12909,7 +12992,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[155] used by: utf8_iter
+[158] used by: utf8_iter
 ================================================================================
 
 Copyright Mozilla Foundation
@@ -12956,7 +13039,7 @@ licensed under the Apache License, Version 2.0 <LICENSE-APACHE> or
 <LICENSE-MIT> or <http://opensource.org/licenses/MIT>, at your option.
 
 ================================================================================
-[156] used by: utf8_iter
+[159] used by: utf8_iter
 ================================================================================
 
 Copyright Mozilla Foundation
@@ -12986,7 +13069,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[157] used by: utf8parse
+[160] used by: utf8parse
 ================================================================================
 
 Copyright (c) 2016 Joe Wilm
@@ -13016,7 +13099,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[158] used by: uuid
+[161] used by: uuid
 ================================================================================
 
 Copyright (c) 2014 The Rust Project Developers
@@ -13047,7 +13130,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[159] used by: weak-table
+[162] used by: weak-table
 ================================================================================
 
 MIT License
@@ -13074,7 +13157,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[160] used by: wide
+[163] used by: wide
 ================================================================================
 
 
@@ -13281,7 +13364,7 @@ SOFTWARE.
    limitations under the License.
 
 ================================================================================
-[161] used by: wide
+[164] used by: wide
 ================================================================================
 
 MIT License
@@ -13307,7 +13390,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[162] used by: wide
+[165] used by: wide
 ================================================================================
 
 Copyright (c) 2020 Daniel "Lokathor" Gee.
@@ -13329,7 +13412,7 @@ misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
 
 ================================================================================
-[163] used by: winnow
+[166] used by: winnow
 ================================================================================
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -13352,7 +13435,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[164] used by: yazi
+[167] used by: yazi
 ================================================================================
 
 Copyright (c) 2020 Chad Brokaw
@@ -13376,7 +13459,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ================================================================================
-[165] used by: zerocopy
+[168] used by: zerocopy
 ================================================================================
 
                                  Apache License
@@ -13582,7 +13665,7 @@ THE SOFTWARE.
    limitations under the License.
 
 ================================================================================
-[166] used by: zerocopy
+[169] used by: zerocopy
 ================================================================================
 
 Copyright 2019 The Fuchsia Authors.
@@ -13611,7 +13694,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ================================================================================
-[167] used by: zerocopy
+[170] used by: zerocopy
 ================================================================================
 
 Copyright 2023 The Fuchsia Authors
@@ -13641,7 +13724,7 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ================================================================================
-[168] used by: zune-core, zune-jpeg
+[171] used by: zune-core, zune-jpeg
 ================================================================================
 
 MIT License
@@ -13667,7 +13750,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ================================================================================
-[169] used by: zune-core, zune-jpeg
+[172] used by: zune-core, zune-jpeg
 ================================================================================
 
 zlib License

@@ -20,11 +20,18 @@
 //! A library's licence texts are the licence files in the top folder of its
 //! package (`LICENSE*`, `COPYING*`, `NOTICE*` and the like). A few packages
 //! carry none, because their licence files sit in the repository above the
-//! crate. For those the file says so and carries the standard text of the
-//! licence the library declares: Apache-2.0's, or, for a library offered
-//! under MIT or Apache-2.0, Apache-2.0's, which names no copyright holder
-//! that would be missing. Any other licence with no file is an error, so a
-//! text is never made up.
+//! crate. For those, in this order:
+//!
+//! 1. **A library that may be used under Apache-2.0** (alone, or as one
+//!    choice of "MIT OR Apache-2.0" and the like) gets Apache-2.0's standard
+//!    text, which has no copyright notice to fill in, and the file says so.
+//! 2. **A library offered only under MIT** has a copyright notice that MIT
+//!    asks to travel with every copy, and no standard text has it. Its text is
+//!    one a person read in its repository, kept in `REPOSITORY_TEXTS`, keyed
+//!    by the library's name and version, with where it was read. A new
+//!    version of such a library, or a new such library, stops the tool until
+//!    its text is read again and added.
+//! 3. **Anything else is an error,** so a text is never made up.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,10 +58,88 @@ pub fn file_for(os: &str) -> String {
     format!("{FOLDER}/third-party-{os}.txt")
 }
 
-/// The standard texts for a library that ships no licence file: the game's
-/// own, which are the standard ones.
+/// The standard texts the game's own licence files are, used for a library
+/// that ships no licence file: Apache-2.0's for a library that may be used
+/// under it, and MIT's, without its copyright line, for `dispatch` alone.
 const APACHE_TEXT: &str = include_str!("../../../LICENSE-APACHE");
 const MIT_TEXT: &str = include_str!("../../../LICENSE-MIT");
+
+/// Where a library's licence text came from, when its package has no licence
+/// file and it is offered only under MIT.
+enum Text {
+    /// A text read in the library's repository, kept in `licence-texts/`.
+    Repository {
+        text: &'static str,
+        /// What was read, and where, for the note in the file.
+        read: &'static str,
+    },
+    /// The standard MIT text with no copyright line: the library's repository
+    /// has no licence file either, and its manifest names only an author.
+    StandardMit { why: &'static str },
+}
+
+struct RepositoryText {
+    library: &'static str,
+    version: &'static str,
+    text: Text,
+}
+
+/// Each MIT-only library with no licence file in its package, as of the
+/// versions in Cargo.lock (#270). Read on 23 October 2026, at the commit each
+/// version was published from (the `sha1` in its `.cargo_vcs_info.json`).
+const REPOSITORY_TEXTS: [RepositoryText; 11] = [
+    // objc2's 0.5 family, whose repository has `LICENSE.txt`: MIT, with
+    // Steven Sheldon's copyright, as the family began as his rust-objc.
+    objc2_0_5("block2", "0.5.1"),
+    objc2_0_5("objc-sys", "0.3.5"),
+    objc2_0_5("objc2", "0.5.3"),
+    objc2_0_5("objc2-app-kit", "0.2.2"),
+    objc2_0_5("objc2-foundation", "0.2.2"),
+    // objc2's 0.6 family. Its repository had only a summary, `LICENSE.md`,
+    // with no copyright notice, when these were published; its MIT text,
+    // `LICENSE-MIT.txt`, came in commit ee9a7ad of 18 March 2026.
+    objc2_0_6("block2", "0.6.2"),
+    objc2_0_6("objc2", "0.6.5"),
+    objc2_0_6("objc2-encode", "4.1.0"),
+    objc2_0_6("objc2-foundation", "0.3.2"),
+    RepositoryText {
+        library: "taffy",
+        version: "0.14.0",
+        text: Text::Repository {
+            text: include_str!("licence-texts/taffy.txt"),
+            read: "LICENSE in github.com/DioxusLabs/taffy at the commit this version was published from",
+        },
+    },
+    RepositoryText {
+        library: "dispatch",
+        version: "0.2.0",
+        text: Text::StandardMit {
+            why: "its repository, github.com/SSheldon/rust-dispatch, has no licence file either; its manifest names Steven Sheldon as the author and MIT as the licence, so this is MIT's standard text with no copyright line",
+        },
+    },
+];
+
+const fn objc2_0_5(library: &'static str, version: &'static str) -> RepositoryText {
+    RepositoryText {
+        library,
+        version,
+        text: Text::Repository {
+            text: include_str!("licence-texts/objc2-0.5-family.txt"),
+            read: "LICENSE.txt in github.com/madsmtm/objc2 at the commit this version was published from",
+        },
+    }
+}
+
+const fn objc2_0_6(library: &'static str, version: &'static str) -> RepositoryText {
+    RepositoryText {
+        library,
+        version,
+        text: Text::Repository {
+            text: include_str!("licence-texts/objc2-0.6-family.txt"),
+            read: "LICENSE-MIT.txt in github.com/madsmtm/objc2 at commit ee9a7ad, because the commit this version was published from has only a summary, LICENSE.md, with no copyright notice",
+        },
+    }
+}
 
 /// A package that Cargo only builds with, whose code ends up in the game all
 /// the same, so Cargo's normal dependencies don't show it.
@@ -301,19 +386,40 @@ pub fn generate(root: &Path, os: &str, target: &str) -> Result<String, String> {
         )?;
         let mut note = native.map(|n| n.why.to_string());
         if files.is_empty() {
-            let (which, text) = standard_text(&licence).ok_or_else(|| {
-                format!(
+            let kept = REPOSITORY_TEXTS
+                .iter()
+                .find(|r| r.library == name && r.version == version);
+            if let Some(apache) = standard_apache(&licence) {
+                note = Some(
+                    "its package has no licence file; it may be used under Apache-2.0, whose \
+                     standard text follows, with no copyright holder's name filled in"
+                        .to_string(),
+                );
+                files.push(("standard text".to_string(), apache));
+            } else if let Some(kept) = kept {
+                let text = match &kept.text {
+                    Text::Repository { text, read } => {
+                        note = Some(format!(
+                            "its package has no licence file; its licence text, with its \
+                             copyright notice, is the one read in its repository: {read}"
+                        ));
+                        tidy(text)
+                    }
+                    Text::StandardMit { why } => {
+                        note = Some(format!("its package has no licence file, and {why}"));
+                        standard_mit()
+                    }
+                };
+                files.push(("repository text".to_string(), text));
+            } else {
+                return Err(format!(
                     "{name} {version} (licence {licence:?}) has no licence file in its package, and \
-                     the only standard texts this tool carries are Apache-2.0's and MIT's: add \
-                     the library's own licence text by extending `standard_text` in \
-                     crates/xtask/src/licences.rs, once you have read it in the library's repository"
-                )
-            })?;
-            note = Some(format!(
-                "its package has no licence file, so the standard text of {which} follows, \
-                 without its copyright holders' names"
-            ));
-            files.push(("standard text".to_string(), text));
+                     this tool has no licence text for it. Read its licence text, with its copyright \
+                     notice, in the library's repository, at the commit this version was published \
+                     from (its package's .cargo_vcs_info.json names it), and add it to \
+                     REPOSITORY_TEXTS in crates/xtask/src/licences.rs: a licence text is never made up."
+                ));
+            }
         }
         libraries.push(Library {
             name: name.clone(),
@@ -426,29 +532,25 @@ fn tidy(text: &str) -> String {
     format!("{}\n", text.trim_end())
 }
 
-/// The standard text for a licence expression, and its name: Apache-2.0's
-/// when the library may be used under it, MIT's if not. `None` for any other
-/// licence, and for an expression that needs both of two licences (AND),
-/// which no single standard text covers.
-fn standard_text(expression: &str) -> Option<(&'static str, String)> {
+/// Apache-2.0's standard text, when the library may be used under it. `None`
+/// for any other licence, and for an expression that needs both of two
+/// licences (AND), which no single text covers.
+fn standard_apache(expression: &str) -> Option<String> {
     if expression.split_whitespace().any(|w| w == "AND") {
         return None;
     }
-    let options: Vec<&str> = expression
+    expression
         .split(|c: char| c.is_whitespace() || matches!(c, '/' | '(' | ')'))
-        .filter(|w| !w.is_empty() && *w != "OR")
+        .any(|w| w == "Apache-2.0")
+        .then(|| tidy(APACHE_TEXT))
+}
+
+/// MIT's standard text with no copyright line: the game's own MIT text, which
+/// is the standard one, but for the line that names its copyright holders.
+fn standard_mit() -> String {
+    let standard: Vec<&str> = MIT_TEXT
+        .lines()
+        .filter(|l| !l.starts_with("Copyright"))
         .collect();
-    if options.contains(&"Apache-2.0") {
-        Some(("Apache-2.0", tidy(APACHE_TEXT)))
-    } else if options.contains(&"MIT") {
-        // The game's own MIT text, which is the standard one, but for the
-        // line that names its copyright holders.
-        let standard: Vec<&str> = MIT_TEXT
-            .lines()
-            .filter(|l| !l.starts_with("Copyright"))
-            .collect();
-        Some(("MIT", tidy(&standard.join("\n"))))
-    } else {
-        None
-    }
+    tidy(&standard.join("\n"))
 }

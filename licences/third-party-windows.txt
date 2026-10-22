@@ -11,25 +11,25 @@ accesskit 0.24.1
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_consumer 0.38.0
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_windows 0.34.0
     licence: MIT OR Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 accesskit_winit 0.33.2
     licence: Apache-2.0
     source: https://github.com/AccessKit/accesskit
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 adler2 2.0.1
     licence: 0BSD OR MIT OR Apache-2.0
@@ -470,7 +470,7 @@ constgebra 0.1.4
     licence: MIT OR Apache-2.0
     source: https://github.com/knickish/constgebra
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 cpal 0.18.2
     licence: Apache-2.0
@@ -516,7 +516,7 @@ dasp_sample 0.11.0
     licence: MIT OR Apache-2.0
     source: https://github.com/rustaudio/sample.git
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 derive_more 2.1.1
     licence: MIT
@@ -592,25 +592,25 @@ firewheel-core 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-cpal 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-graph 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 firewheel-nodes 0.14.0
     licence: MIT OR Apache-2.0
     source: https://github.com/BillyDM/firewheel
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 fixed-resample 0.13.0
     licence: MIT
@@ -1021,7 +1021,7 @@ parry3d-f64 0.31.1
     licence: Apache-2.0
     source: https://github.com/dimforge/parry
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 pin-project-lite 0.2.17
     licence: Apache-2.0 OR MIT
@@ -1062,7 +1062,7 @@ profiling 1.0.18
     licence: MIT OR Apache-2.0
     source: https://github.com/aclysma/profiling
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 pxfm 0.1.30
     licence: BSD-3-Clause OR Apache-2.0
@@ -1138,7 +1138,7 @@ rstar 0.13.0
     licence: MIT OR Apache-2.0
     source: https://github.com/georust/rstar
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 rustc-hash 1.1.0
     licence: Apache-2.0/MIT
@@ -1245,7 +1245,7 @@ spirv 0.4.0+sdk-1.4.341.0
     licence: Apache-2.0
     source: https://github.com/gfx-rs/rspirv
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 stable_deref_trait 1.2.1
     licence: MIT OR Apache-2.0
@@ -1276,7 +1276,7 @@ taffy 0.14.0
     licence: MIT
     source: https://github.com/DioxusLabs/taffy
     licence text: [149]
-    note: its package has no licence file, so the standard text of MIT follows, without its copyright holders' names
+    note: its package has no licence file; its licence text, with its copyright notice, is the one read in its repository: LICENSE in github.com/DioxusLabs/taffy at the commit this version was published from
 
 thiserror 2.0.21
     licence: MIT OR Apache-2.0
@@ -1402,13 +1402,13 @@ wesl 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wesl-core 0.1.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wgpu 30.0.1
     licence: MIT OR Apache-2.0
@@ -1444,13 +1444,13 @@ wgsl-parse 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wgsl-types 0.6.0
     licence: MIT OR Apache-2.0
     source: https://github.com/webgpu-tools/wesl-rs
     licence text: [1]
-    note: its package has no licence file, so the standard text of Apache-2.0 follows, without its copyright holders' names
+    note: its package has no licence file; it may be used under Apache-2.0, whose standard text follows, with no copyright holder's name filled in
 
 wide 1.7.1
     licence: Zlib OR Apache-2.0 OR MIT
@@ -12509,6 +12509,8 @@ SOFTWARE.
 
 MIT License
 
+Copyright (c) 2018 Visly Inc.
+Copyright (c) 2026 Taffy Authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
