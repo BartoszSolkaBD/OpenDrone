@@ -1,3 +1,4 @@
+// Evidence for #240 only: a change to a flight crate. Never merged.
 //! Quad physics and Map collisions, including a "held on a thrust stand" set-up.
 //!
 //! It uses only `opendrone-maths`, and never the Flight Controller: the two
