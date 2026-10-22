@@ -1,0 +1,94 @@
+# Every day, scans main's libraries for security advisories published since
+# they came in, and opens an issue for each one found (#15 §4, ADR-0014,
+# #81). It reports and never blocks: CI's Licences and sources check blocks
+# only a PR that adds or upgrades a library with a known advisory.
+#
+# cargo-deny reads the RustSec advisory database with deny.toml's policy, so
+# an advisory the maintainer accepted there, with its reason, isn't reported
+# again. `cargo xtask advisories` turns what it finds into one issue per
+# advisory, labelled `needs-triage`; an advisory that already has an open
+# issue gets no second one.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Security
+
+on:
+  schedule:
+    # 05:00 UTC every day.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  scan:
+    name: Scan for security advisories
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write # an issue for each advisory
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+
+      - name: Install the Linux packages the xtask build needs
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
+      - name: Scan for advisories (cargo-deny)
+        # It fails when it finds one; the next step tells that apart from a
+        # scan that couldn't run, so this step never stops the job.
+        id: scan
+        shell: bash
+        run: |
+          set +e
+          cargo deny --locked --format json check advisories 2> "$RUNNER_TEMP/deny.json"
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Work out the issues to open
+        shell: bash
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+        run: |
+          set -euo pipefail
+          cargo xtask advisories "$RUNNER_TEMP/deny.json" > "$RUNNER_TEMP/issues.json"
+          found=$(jq length "$RUNNER_TEMP/issues.json")
+          echo "Advisories found: $found"
+          if [[ "$STATUS" != 0 && "$found" == 0 ]]; then
+            echo "::error::cargo-deny failed without finding an advisory, so the scan didn't run:"
+            cat "$RUNNER_TEMP/deny.json"
+            exit 1
+          fi
+
+      - name: Open an issue for each advisory with no open issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count=$(jq length "$RUNNER_TEMP/issues.json")
+          for i in $(seq 0 $((count - 1))); do
+            title=$(jq -r --argjson i "$i" '.[$i].title' "$RUNNER_TEMP/issues.json")
+            jq -r --argjson i "$i" '.[$i].body' "$RUNNER_TEMP/issues.json" > "$RUNNER_TEMP/body.md"
+            same=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 \
+              --search "\"$title\" in:title" --json title \
+              | jq --arg title "$title" '[.[] | select(.title == $title)] | length')
+            if [[ "$same" != 0 ]]; then
+              echo "\"$title\" already has an open issue."
+              continue
+            fi
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md" --label needs-triage
+          done
