@@ -50,8 +50,10 @@ const QUAD_FIELD: &str = "start.quad";
 
 /// The keys that hold an Expectation's expected value, one per kind: at a
 /// moment, or a statistic over a stretch (`first` for when something
-/// happens).
-const VALUE_KEYS: [&str; 6] = ["value", "mean", "lowest", "highest", "final", "first"];
+/// happens, `mean_gap` and `rms_gap` for matching a recorded flight).
+const VALUE_KEYS: [&str; 8] = [
+    "value", "mean", "lowest", "highest", "final", "first", "mean_gap", "rms_gap",
+];
 
 /// Whether a path is a Scenario file.
 pub fn is_scenario(path: &str) -> bool {
@@ -396,7 +398,12 @@ impl Expectation {
         let checks = match (self.text("at"), self.text("over"), self.statistic()) {
             (Some(at), _, _) => format!("{section}{what} at {at}"),
             (None, Some(over), Some((statistic, _))) => {
-                format!("{section}{what}, {statistic} over {over}")
+                let words = match statistic {
+                    "mean_gap" => "mean gap from the recorded flight",
+                    "rms_gap" => "root-mean-square gap from the recorded flight",
+                    other => other,
+                };
+                format!("{section}{what}, {words} over {over}")
             }
             (None, Some(over), None) => format!("{section}{what} over {over}"),
             (None, None, _) => format!("{section}{what}"),

@@ -26,31 +26,31 @@ measured = "670 °/s"
 what     = "roll rate at 0.9 s"
 basis    = "Observed"
 expected = "0 °/s ± 0.5 °/s"
-measured = "0.104 °/s"
+measured = "0.112 °/s"
 
 [[expect]]
 what     = "pitch rate, lowest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.159 °/s"
+measured = "-0.140 °/s"
 
 [[expect]]
 what     = "pitch rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "-0.0731 °/s"
+measured = "-0.0790 °/s"
 
 [[expect]]
 what     = "yaw rate, lowest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.0777 °/s"
+measured = "0.0838 °/s"
 
 [[expect]]
 what     = "yaw rate, highest over 1 s to 1.5 s"
 basis    = "Observed"
 expected = "0 °/s ± 1 °/s"
-measured = "0.181 °/s"
+measured = "0.155 °/s"
 
 [[expect]]
 what     = "roll rate, highest over 1 s to 1.5 s"
@@ -62,7 +62,7 @@ measured = "670 °/s"
 what     = "roll rate at 1.8 s"
 basis    = "Observed"
 expected = "0 °/s ± 0.5 °/s"
-measured = "-0.194 °/s"
+measured = "-0.0314 °/s"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "0d3c101d670191df"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "2456c1a11988026b"   # the whole state after each of 14400 steps at 8000 Hz, in order
+run  = "1fe2cc2c49e5c181"   # the whole state after each of 14400 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.18 s" = "3427032cf0125bbc"
-"0.36 s" = "8d91878aded33448"
-"0.54 s" = "1c93c0a6c9dd07b4"
-"0.72 s" = "c7f42e45a3dd8bfe"
-"0.9 s" = "a035105c2a35e501"
-"1.08 s" = "a8cddefee5518867"
-"1.26 s" = "a3b53204dde47904"
-"1.44 s" = "e5de308949adc47d"
-"1.62 s" = "e9d8ca5330799bf0"
-"1.8 s" = "85c66b3592331723"
+"0.18 s" = "ec34f9c00a92b290"
+"0.36 s" = "576ad3bf2e9c986a"
+"0.54 s" = "824e56c58dfebc1c"
+"0.72 s" = "1533f7d146b6bd14"
+"0.9 s" = "fec09eea587cb86b"
+"1.08 s" = "a3bc5673ad9a2964"
+"1.26 s" = "7a1e72b141f25839"
+"1.44 s" = "f1ac229aa5c669a7"
+"1.62 s" = "0d95bbccf14f964e"
+"1.8 s" = "9fc19e59ccbb3e2c"

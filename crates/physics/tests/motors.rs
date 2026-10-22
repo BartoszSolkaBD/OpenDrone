@@ -126,6 +126,57 @@ fn faster_right_motors_roll_the_quad_left_and_faster_front_motors_pitch_it_up() 
 }
 
 #[test]
+fn the_drive_that_holds_a_recorded_speed_keeps_a_motor_on_it_steady_and_while_it_speeds_up() {
+    // `drive_holding` undoes the motor model for a log of motor speeds: at
+    // the battery's voltage, its drive holds a motor on a speed, and with the
+    // speed's rate of change it keeps a motor on a speed that climbs.
+    let parameters = whoop();
+    let mut quad = QuadBody::new(
+        parameters.clone(),
+        start(StartingMotors::Settled, Mount::ThrustStand),
+        &WORLD,
+    )
+    .unwrap();
+    let drive = |speed: f64, change: f64, volts: f64| {
+        opendrone_physics::drive_holding(
+            &parameters.motors,
+            &parameters.props,
+            WORLD.air_density,
+            speed,
+            change,
+            volts,
+        )
+    };
+    let empty_air = MapCollision::default();
+    // Steady at 2,000 rad/s for a second, the drive worked out each step
+    // from the pack's voltage then.
+    let steady = 2000.0;
+    for _ in 0..8000 {
+        let d = drive(steady, 0.0, quad.battery().voltage);
+        quad.step(&WORLD, &empty_air, &MotorCommands::all(d), STEP);
+    }
+    let speed = quad.motors()[0].speed;
+    assert!(
+        (speed - steady).abs() < 1e-6 * steady,
+        "held at {steady} rad/s, the motor turns at {speed} rad/s"
+    );
+    // Then climbing at 2,000 rad/s² for a quarter of a second: after the
+    // first lag's own catching up, a few spin-up times, it follows the climb.
+    let climb = 2000.0;
+    for k in 0..2000 {
+        let wanted = steady + climb * f64::from(k) * STEP;
+        let d = drive(wanted, climb, quad.battery().voltage);
+        quad.step(&WORLD, &empty_air, &MotorCommands::all(d), STEP);
+    }
+    let wanted = steady + climb * 2000.0 * STEP;
+    let speed = quad.motors()[0].speed;
+    assert!(
+        (speed - wanted).abs() < 0.002 * wanted,
+        "climbing to {wanted} rad/s, the motor turns at {speed} rad/s"
+    );
+}
+
+#[test]
 fn settled_motors_carry_a_level_quads_weight_from_the_first_step() {
     let mut quad =
         QuadBody::new(whoop(), start(StartingMotors::Settled, Mount::Free), &WORLD).unwrap();

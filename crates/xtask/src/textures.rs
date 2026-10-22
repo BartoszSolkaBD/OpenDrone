@@ -61,7 +61,7 @@ pub fn run_textures(args: &[String]) -> ExitCode {
 
 /// Downloads `url` into `to`. The file is written only if the whole download
 /// worked.
-fn download(url: &str, to: &Path) -> Result<(), String> {
+pub(crate) fn download(url: &str, to: &Path) -> Result<(), String> {
     if let Some(folder) = to.parent() {
         fs::create_dir_all(folder).map_err(|e| format!("can't make {}: {e}", folder.display()))?;
     }
@@ -213,14 +213,15 @@ pub fn run_credits(args: &[String]) -> ExitCode {
                 file.kind
             ));
         }
-        let wanted = materials::credits(&manifest);
+        let datasets = crate::datasets::read(&root)?;
+        let wanted = materials::credits(&manifest, &datasets);
         let path = root.join("CREDITS.md");
         let have = fs::read_to_string(&path).unwrap_or_default();
         if check {
             if have == wanted {
                 Ok("CREDITS.md is up to date.".to_string())
             } else {
-                Err("CREDITS.md is out of date with assets-src/materials.toml: run `cargo xtask credits` and commit it".to_string())
+                Err("CREDITS.md is out of date with assets-src/materials.toml or assets-src/datasets.toml and the data files it lists: run `cargo xtask credits` and commit it".to_string())
             }
         } else if have == wanted {
             Ok("CREDITS.md was already up to date.".to_string())

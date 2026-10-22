@@ -1,0 +1,40 @@
+# Results of slowing-from-5-m-s-in-flight-01a.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "TII's quad slows from 5 m/s with the rotor drag it logged (flight 01a)"
+
+[[expect]]
+what     = "felt acceleration forward, mean gap from the recorded flight over 0.05 s to 0.15 s"
+basis    = "Source"
+expected = "0 m/s² ± 0.25 m/s²"
+measured = "-0.0180 m/s²"
+
+[[expect]]
+what     = "felt acceleration left, mean gap from the recorded flight over 0.05 s to 0.15 s"
+basis    = "Source"
+expected = "0 m/s² ± 0.25 m/s²"
+measured = "0.106 m/s²"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "5eaf1631ce76e859"   # test/freestyle-5-tii-racing-quad: what the Simulation receives from it
+map  = "f720a5ecea6336f3"   # test/empty-air
+run  = "e6c12cb91d1bd0cd"   # the whole state after each of 1600 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.02 s" = "d866cf7c2f064291"
+"0.04 s" = "2ab276008c9c8fce"
+"0.06 s" = "57cd27d179de174f"
+"0.08 s" = "279b79d698a974a2"
+"0.1 s" = "599fc27af697e035"
+"0.12 s" = "85297ec44567cc7d"
+"0.14 s" = "a056d57b0e600156"
+"0.16 s" = "6558d307bf4357dc"
+"0.18 s" = "3721f3115db86a40"
+"0.2 s" = "ec8ce64230a451f9"

@@ -50,7 +50,7 @@ blades             = 3
 direction          = "props-in"   # the Tune's yaw_motors_reversed must match
 thrust_coefficient = { value = "0.187", confidence = "Derived", source = "tmotor-fit" }
 power_coefficient  = { value = "0.105", confidence = "Estimate", range = "0.07–0.11", source = "tmotor-fit" }
-rotor_drag         = { value = "0.4 s⁻¹", confidence = "Estimate", range = "0.24–0.54 s⁻¹", source = "rotor-drag" }
+rotor_drag         = { value = "0.26 s⁻¹", confidence = "Estimate", range = "0.24–0.54 s⁻¹", source = "rotor-drag" }
 rotor_inertia      = { value = "55 g·cm²", confidence = "Estimate", range = "×0.5–×2", source = "rotor-inertia" }   # prop and motor bell
 reverse_thrust     = { value = "48%", confidence = "Measured", source = "reverse-thrust" }   # of forward, at the same speed
 reverse_torque     = { value = "100%", confidence = "Estimate", range = "50–100%", source = "crashes" }

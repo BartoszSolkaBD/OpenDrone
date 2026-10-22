@@ -1,0 +1,67 @@
+# TII's racing quad punching out, flight-01a from 9.9 s for 0.3 s: the commands
+# reach about 50% and the accelerometer feels about 3 g. The replay must feel
+# the same thrust, and its pack must sag as the logged voltage did.
+#
+# The Test Quad is the Freestyle 5″ with TII's quad's own mass, motors and
+# pack (scenarios/test-quads/freestyle-5-tii-racing-quad.toml). Its motors'
+# winding resistance and its pack's resistance are fitted to these logs, the
+# hovers and the punch-outs together (docs/research/quad-definitions.md,
+# "Fitted to the TII logs"). The first 0.1 s is left out while the "settled"
+# motors take up the logged commands.
+format = 2
+name   = "TII's quad punches out with the thrust and the sag it logged (flight 01a)"
+recorded_flight = "punching-out-in-flight-01a-recorded.csv"
+
+[start]
+kind              = "physics"
+quad              = "test/freestyle-5-tii-racing-quad"
+map               = "test/empty-air"
+# Where TII's motion capture had the quad when the window starts (its x, y
+# and z as east, north and up), how it pointed and moved, and its gyro;
+# `cargo xtask tii-logs` prints these. Empty air: the logs' floor is far
+# below the rotors here (more than ten rotor radii), so it adds nothing.
+position = "8.841 m east, -0.002 m north, 0.793 m up"
+attitude = "roll -4.81°, pitch -66.14°, heading 282.70°"
+speed    = "0.182 m/s east, 2.301 m/s north, 0.328 m/s up"
+rotation = "roll -24.7 °/s, pitch -51.0 °/s, yaw -13.1 °/s"
+# Every starting state spells out everything (ADR-0002). In a Physics Scenario
+# scripted motors stand in for the Flight Controller, so armed, the Flight
+# Mode, the Assists, the Radio Link and the Rates change nothing in this
+# flight; they are written down all the same.
+armed             = true
+motors            = "settled"
+flight_controller = "fresh"
+# The charge whose voltage, with this window's load, is the logged voltage
+# at the window's start (chosen, so Observed).
+battery           = "79%"
+flight_mode       = "Acro"
+assists           = { input_smoothing = "off", endless_battery = "off", auto_arm = "off" }
+radio_link        = "250 Hz"
+physics_rate      = "8 kHz"
+random_seed       = 1
+
+[start.rates]
+# Betaflight 2026.6's default rate profile, as the Betaflight App shows it.
+type               = "Actual"
+roll               = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+pitch              = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+yaw                = "center sensitivity 70 °/s, max rate 670 °/s, expo 0.00"
+rate_limit         = "1998 °/s"
+throttle           = "mid 0.50, hover 0.50, expo 0.00, limit off"
+quickrates_rc_expo = "off"
+
+[inputs]
+# The motor commands Betaflight sent, every 2 ms, with the hover trim.
+input_track = "punching-out-in-flight-01a-motors.csv"
+
+[[expect]]
+what     = "felt acceleration up"
+over     = "0.1 s to 0.3 s"
+mean_gap = "0 m/s² ± 3 m/s²"
+basis    = "source: TII's Race Against the Machine logs (CC BY 4.0, NOTICE.md), flight 01a: the replay feels the logged thrust, about 30 m/s², within 10%, for the reasons the hovers give"
+
+[[expect]]
+what     = "battery voltage"
+over     = "0.1 s to 0.3 s"
+mean_gap = "0 V ± 0.5 V"
+basis    = "source: TII's Race Against the Machine logs (CC BY 4.0, NOTICE.md), flight 01a: the pack sags as the logged voltage did, within 0.5 V of a 1.2 V sag; Betaflight logs the voltage only to 0.1 V, and TII's pack resistance is fitted to these flights"

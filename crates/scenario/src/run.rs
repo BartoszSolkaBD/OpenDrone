@@ -85,6 +85,20 @@ impl Outcome {
 /// the way.
 pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let start = &scenario.start;
+    // Only the runner's Expectations need the recorded flight; the game
+    // flies the Scenario without it.
+    if let Some(recorded) = &scenario.recorded_flight
+        && !recorded.read
+    {
+        return Err(Problems(vec![Problem {
+            file: scenario.file.clone(),
+            line: recorded.line,
+            sentence: format!(
+                "the recorded flight \"{}\" hasn't been read: the runner reads it from beside the Scenario",
+                recorded.file
+            ),
+        }]));
+    }
     let Found { quad, map, tune } = find(scenario, packs)?;
     let quad_received = Received {
         id: quad.id.clone(),
@@ -105,7 +119,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
     let mut tallies: Vec<Tally> = scenario
         .expectations
         .iter()
-        .map(|e| Tally::new(e, e.when))
+        .map(|e| Tally::new(e, e.when, recorded_values(scenario, e)))
         .collect();
     let this_run = Plan::this_run(scenario);
     // The OSD, worked out beside the run, where the Scenario expects OSD
@@ -135,7 +149,7 @@ pub fn run(scenario: &Scenario, packs: &Packs) -> Result<Outcome, Problems> {
             .enumerate()
             .filter_map(|(n, e)| {
                 let compared = e.compared.filter(|c| c.run == index)?;
-                Some((n, Tally::new(e, compared.when)))
+                Some((n, Tally::new(e, compared.when, None)))
             })
             .unzip();
         let plan = Plan {
@@ -284,6 +298,22 @@ fn find(scenario: &Scenario, packs: &Packs) -> Result<Found, Problems> {
             ),
         }]));
     }
+    let unread = |line: usize, sentence: String| {
+        Err(Problems(vec![Problem {
+            file: scenario.file.clone(),
+            line,
+            sentence,
+        }]))
+    };
+    if let Inputs::MotorTrack(track) = &scenario.inputs {
+        return unread(
+            track.line,
+            format!(
+                "the Input Track \"{}\" hasn't been read: the runner reads it from beside the Scenario",
+                track.file
+            ),
+        );
+    }
     // Scripted motors need no Flight Controller; a pilot's inputs fly ours,
     // on the thrust stand too.
     let tune = match (start.kind, &scenario.inputs) {
@@ -372,6 +402,7 @@ fn simulate(
             quad: Some(output),
             flight_controller: output.flight_controller,
             radio_link: (flies && tick > 0).then_some(output.radio_link),
+            gravity: map.world.gravity,
         };
         step_fingerprints.push(sim.fingerprint());
         let finite = sim.is_finite() && output.flight_controller.is_none_or(|r| finite_record(&r));
@@ -425,6 +456,9 @@ fn set_up(
         )),
         (Inputs::Pilot(_) | Inputs::Track(_), None) => {
             unreachable!("a pilot's inputs fly our Flight Controller")
+        }
+        (Inputs::MotorTrack(_), _) => {
+            unreachable!("`find` refuses a motor Input Track that hasn't been read")
         }
     };
     // Where the motors are scripted, no sticks reach a Flight Controller.
@@ -527,7 +561,7 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad_name: &str, quad: Received) 
         let mut tallies: Vec<Tally> = scenario
             .expectations
             .iter()
-            .map(|e| Tally::new(e, e.when))
+            .map(|e| Tally::new(e, e.when, recorded_values(scenario, e)))
             .collect();
         let mut feed = Feed::new(&scenario.inputs, start, start.physics_rate);
         let mut osd = scenario
@@ -553,7 +587,7 @@ fn run_alone(scenario: &Scenario, tune: &Tune, quad_name: &str, quad: Received) 
             let mut tallies: Vec<Tally> = case
                 .expectations
                 .iter()
-                .map(|e| Tally::new(e, e.when))
+                .map(|e| Tally::new(e, e.when, None))
                 .collect();
             let timeline = Inputs::Pilot(case_timeline(case));
             let mut feed = Feed::new(&timeline, start, start.physics_rate);
@@ -631,6 +665,7 @@ fn loop_alone(
             quad: None,
             flight_controller: None,
             radio_link: None,
+            gravity: 0.0,
         };
         if tick > 0 {
             let t = tick - 1;
@@ -725,7 +760,7 @@ impl Feed {
                 device: track.device,
                 readings: SensorReadings::still(start.rotation, start.attitude, true),
             },
-            Inputs::Motors(_) => Feed::None,
+            Inputs::Motors(_) | Inputs::MotorTrack(_) => Feed::None,
         }
     }
 
@@ -972,10 +1007,32 @@ struct Tally<'s> {
     /// For something that happens: how long after the stretch's start it
     /// first did, in seconds.
     first: Option<f64>,
+    /// For a gap from a recorded flight: the recorded values, in SI units,
+    /// each at its step, in time order.
+    recorded: Option<&'s [(u64, f64)]>,
+    /// For a gap: the sum of the gaps' squares.
+    sum_of_squares: f64,
+}
+
+/// The recorded values an Expectation that matches a recorded flight
+/// compares with: its measure's column. `None` for any other Expectation.
+fn recorded_values<'s>(scenario: &'s Scenario, e: &Expectation) -> Option<&'s [(u64, f64)]> {
+    match e.when {
+        When::Over { statistic, .. } if statistic.is_a_gap() => scenario
+            .recorded_flight
+            .as_ref()?
+            .column(e.measure)
+            .map(|column| column.values.as_slice()),
+        _ => None,
+    }
 }
 
 impl<'s> Tally<'s> {
-    fn new(expectation: &'s Expectation, when: When) -> Tally<'s> {
+    fn new(
+        expectation: &'s Expectation,
+        when: When,
+        recorded: Option<&'s [(u64, f64)]>,
+    ) -> Tally<'s> {
         Tally {
             expectation,
             when,
@@ -987,6 +1044,8 @@ impl<'s> Tally<'s> {
             no_single_answer: false,
             straight_up_or_down: 0,
             first: None,
+            recorded,
+            sum_of_squares: 0.0,
         }
     }
 
@@ -1001,6 +1060,23 @@ impl<'s> Tally<'s> {
         let Some(mut value) = self.expectation.measure.read(before, now, step) else {
             return;
         };
+        // Matching a recorded flight: only at the recorded moments, the gap
+        // between this run and the recording.
+        if let When::Over { statistic, .. } = self.when
+            && statistic.is_a_gap()
+        {
+            let Some(recorded) = self.recorded else {
+                return;
+            };
+            let Ok(at) = recorded.binary_search_by_key(&tick, |(t, _)| *t) else {
+                return;
+            };
+            let gap = value - recorded[at].1;
+            self.count += 1;
+            self.sum += gap;
+            self.sum_of_squares += gap * gap;
+            return;
+        }
         // Something that happens reads 1 on the step it happens.
         if let When::Over {
             from,
@@ -1106,7 +1182,8 @@ impl<'s> Tally<'s> {
                 ..
             } => return self.first.ok_or_else(|| "never".to_string()),
             When::Over { statistic, .. } if self.count > 0 => Some(match statistic {
-                Statistic::Mean => self.sum / self.count as f64,
+                Statistic::Mean | Statistic::MeanGap => self.sum / self.count as f64,
+                Statistic::RmsGap => (self.sum_of_squares / self.count as f64).sqrt(),
                 Statistic::Lowest => self.lowest,
                 Statistic::Highest => self.highest,
                 Statistic::Final | Statistic::First => self.last.unwrap_or(f64::NAN),

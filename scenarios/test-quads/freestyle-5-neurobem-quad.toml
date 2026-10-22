@@ -1,0 +1,58 @@
+# NeuroBEM's quad, as the Freestyle 5″ with that quad's measured mass,
+# inertia and layout.                     id: test/freestyle-5-neurobem-quad
+#
+# UZH's NeuroBEM dataset (Bauersfeld et al., RSS 2021) logs a 6″-frame quad
+# on 5″ three-blade props: each motor's speed at 400 Hz, and its body rates
+# from the gyro and motion capture. It states no licence, so its files are
+# downloaded when needed and never committed (docs/data-policy.md). The
+# Scenarios in scenarios/quads/freestyle-5/neurobem/ play its logged motor
+# speeds into this Test Quad: the inertia check. With NeuroBEM's measured
+# inertia and arms, the torque the logged speeds make must turn the quad as
+# it really turned.
+#
+# A Test Quad lists only what it changes. Only the Scenario runner reads Test
+# Quads; pilots never fly them. Where each number comes from:
+# docs/research/quad-definitions.md, "Checked against NeuroBEM".
+format   = 1
+based_on = "opendrone/freestyle-5"
+why      = "NeuroBEM's measured quad, so its logged motor speeds can be played back to check the rigid body and the rotors' torques against a measured inertia"
+
+# Test Quad values carry no Confidence; each says where it comes from.
+[frame]
+# NeuroBEM's readme: 0.772 kg, inertia diagonal (0.0025, 0.0021, 0.0043)
+# kg·m²; its simulator's params.h gives the props 78 mm forward or back and
+# 100 mm to the side of the centre of mass, and 27 mm above it. A Quad
+# definition's props sit on a square, so this one's diagonal is the real
+# one, 254 mm, putting each prop 89.7 mm forward and to the side, and its roll
+# and pitch inertia are the measured ones times 89.7 / 100 and 89.7 / 78:
+# each logged speed difference then turns it exactly as the real arms and
+# inertia did. The pack keeps the Freestyle 5″'s 233 g.
+dry_mass     = "539 g"
+diagonal     = "254 mm"
+rotor_height = "27 mm"
+inertia      = "roll 22.4, pitch 24.2, yaw 43 kg·cm²"
+
+[props]
+# Fitted to NeuroBEM's still hover: its four motors turn at about 1,130
+# rad/s to carry 0.772 kg, which with the Freestyle 5″'s 129.5 mm props (the
+# same radius, 64.77 mm, as NeuroBEM's bem_parameters.yaml) in the Test
+# Map's air is a thrust coefficient of 0.170.
+thrust_coefficient = "0.170"
+
+[motors]
+# NeuroBEM names Hobbywing XRotor 2306 motors on 4S but not their KV; the
+# 2450KV one is the 4S model. Its numbers matter only through the drive the
+# downloader works out to hold each logged speed (opendrone_physics::
+# drive_holding), which undoes the motor model with these same numbers.
+kv = "2450 KV"
+
+[battery]
+# A steady bench supply in place of the pack: four cells' worth, 16.0 V at
+# 50%, with no resistance, so the downloader's drive holds every logged
+# speed exactly, whatever NeuroBEM's own pack sagged to.
+cells         = 4
+voltage_curve = "4.20 V at 100%, 4.00 V at 50%, 3.50 V at 0%"
+capacity      = "1000 Ah"
+resistance    = "0 mΩ"
+slow_sag      = "0 mV·Ah/W"
+connector     = "0 mΩ"

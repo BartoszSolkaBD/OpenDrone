@@ -14,19 +14,19 @@ measured = "never"
 what     = "pitch PID sum, lowest over 0.556 s to 0.63 s"
 basis    = "Observed"
 expected = "between 600 and 3000"
-measured = "2160"
+measured = "2220"
 
 [[expect]]
 what     = "the Quad disarms, first over 0.55 s to 1 s"
 basis    = "Source"
 expected = "0.0805 s ± 0.002 s"
-measured = "0.0808 s"
+measured = "0.0809 s"
 
 [[expect]]
 what     = "RUNAWAY blocks arming, first over 0.55 s to 1 s"
 basis    = "Source"
 expected = "0.0805 s ± 0.002 s"
-measured = "0.0808 s"
+measured = "0.0809 s"
 
 [[expect]]
 what     = "runaway takeoff prevention switches off, first over 0 s to 1 s"
@@ -47,18 +47,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "397d2701f3212342"   # opendrone/freestyle-5: what the Simulation receives from it
+quad = "0d3c101d670191df"   # opendrone/freestyle-5: what the Simulation receives from it
 map  = "cd2831041fb0f223"   # test/wall
-run  = "6eaa8da5a22bebd3"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "103d0ab9097058be"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "701375bed29981bc"
-"0.2 s" = "cf15bdf24de38a21"
-"0.3 s" = "eac7c13282784784"
-"0.4 s" = "8ac2700f8eeae7e0"
-"0.5 s" = "1651d4f593c9ead9"
-"0.6 s" = "3dbbf46925c227dd"
-"0.7 s" = "fffec0ae59b56e6e"
-"0.8 s" = "77fa6f8f454cdf89"
-"0.9 s" = "8af33647ccd8dbff"
-"1 s" = "295ac206a13cc60b"
+"0.1 s" = "376ee2b6a8976978"
+"0.2 s" = "46fde05367195dc1"
+"0.3 s" = "2adac5bc7661aeeb"
+"0.4 s" = "f2859d186b69a306"
+"0.5 s" = "55a940e7f97eb0cd"
+"0.6 s" = "ff2470806b9c234e"
+"0.7 s" = "d94f82eef4d89693"
+"0.8 s" = "ec37109d43bd0458"
+"0.9 s" = "b29937ad3eedf046"
+"1 s" = "69415c22e9d2e3fb"

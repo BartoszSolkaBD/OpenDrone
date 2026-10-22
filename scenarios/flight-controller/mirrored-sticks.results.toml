@@ -20,7 +20,7 @@ measured = "-100%"
 what     = "pitch rate at 0.9 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 °/s ± 0.001 °/s"
-measured = "0.000000000000254 °/s"
+measured = "-0.000000000000407 °/s"
 
 [[expect]]
 what     = "distance east at 1 s, as a share of the same run with roll and yaw mirrored"
@@ -32,13 +32,13 @@ measured = "-100%"
 what     = "distance north at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "-0.0000000000000107 m"
+measured = "-0.00000000000000444 m"
 
 [[expect]]
 what     = "height at 1 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "-0.00000000000000711 m"
+measured = "0 m"
 
 [[expect]]
 what     = "roll rate at 0.65 s, as a share of the same run with roll and yaw mirrored"
@@ -56,7 +56,7 @@ measured = "-100%"
 what     = "pitch rate at 0.65 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 °/s ± 0.001 °/s"
-measured = "0.0000000000000827 °/s"
+measured = "0.000000000000264 °/s"
 
 [[expect]]
 what     = "distance east at 0.65 s, as a share of the same run with roll and yaw mirrored"
@@ -68,7 +68,7 @@ measured = "-100%"
 what     = "distance north at 0.65 s, minus the same run with roll and yaw mirrored"
 basis    = "Rule"
 expected = "0 m ± 0.000001 m"
-measured = "-0.00000000000000400 m"
+measured = "0.00000000000000111 m"
 
 [[expect]]
 what     = "height at 0.65 s, minus the same run with roll and yaw mirrored"
@@ -83,18 +83,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "7eacbd292c76ddbf"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
+quad = "c7e7f722a1574d46"   # test/freestyle-5-no-prop-wash: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
-run  = "965428f0bca72056"   # the whole state after each of 8000 steps at 8000 Hz, in order
+run  = "e0bcb15d2dcbe32c"   # the whole state after each of 8000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.1 s" = "8e60aef0daeade12"
-"0.2 s" = "0158ff8c35661b86"
-"0.3 s" = "9c2c8b353af9f3d9"
-"0.4 s" = "07b8788cf52c9f50"
-"0.5 s" = "4933753cfa871b0b"
-"0.6 s" = "f9aa302ed55eb496"
-"0.7 s" = "6e06367e2959f809"
-"0.8 s" = "6f32bbcf7b9a64f3"
-"0.9 s" = "5c7ff4415810447f"
-"1 s" = "39a8873ac3778341"
+"0.1 s" = "fba33d6f0f418da6"
+"0.2 s" = "82c14994cf75bbbd"
+"0.3 s" = "5640058e3ccd5831"
+"0.4 s" = "441489374d06e18c"
+"0.5 s" = "de6eee997496b95a"
+"0.6 s" = "0fdffb1929770722"
+"0.7 s" = "39a626e801a66042"
+"0.8 s" = "9e9bf3a755c27559"
+"0.9 s" = "a33ee91347bb2f59"
+"1 s" = "10927c257b013430"
