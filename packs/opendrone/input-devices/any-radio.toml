@@ -17,6 +17,9 @@ arm         = { channel = 5, on = "high" }
 flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
 crash_flip  = { channel = 7, on = "high" }
 
+[actions]             # a switch the model sends to CH10 pauses, so a Radio alone opens the Pause Menu (#258)
+pause = { channel = 10, on = "pressed" }
+
 [calibration]
 roll     = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
 pitch    = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }

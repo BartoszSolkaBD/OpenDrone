@@ -91,11 +91,16 @@ fn the_pocket_profile_holds_19s_layout() {
             on: Position::Pressed
         })
     );
+    // A switch the pilot's model sends to CH10 pauses: a Radio alone can open
+    // the Pause Menu (#258).
     assert_eq!(
         setup.actions.get(&Action::Pause),
-        None,
-        "setup offers a spare switch"
+        Some(&ActionSource::Channel {
+            channel: 10,
+            on: Position::Pressed
+        })
     );
+    assert_eq!(setup.actions.len(), 2, "Pause and Reset, no other Action");
     // "Trust the radio": −100 %, 0 %, +100 %, no deadband.
     assert_eq!(setup.calibration.roll.min, -32768.0);
     assert_eq!(setup.calibration.roll.centre, 0.0);
@@ -104,7 +109,7 @@ fn the_pocket_profile_holds_19s_layout() {
 }
 
 #[test]
-fn any_radio_has_the_pockets_layout_but_no_report_rate_or_actions() {
+fn any_radio_has_the_pockets_layout_and_pause_but_no_report_rate_or_reset() {
     let any = built_in("opendrone/any-radio");
     let pocket = built_in("opendrone/radiomaster-pocket");
     assert_eq!(any.facts.matches, Match::Any);
@@ -115,7 +120,14 @@ fn any_radio_has_the_pockets_layout_but_no_report_rate_or_actions() {
     assert_eq!(any.channels, pocket.channels);
     assert_eq!(any.switches, pocket.switches);
     assert_eq!(any.calibration, pocket.calibration);
-    assert!(any.actions.is_empty());
+    // Pause is the Pocket's, on the same channel, so a Radio alone can open
+    // the Pause Menu; Reset stays unbound (#258).
+    assert_eq!(
+        any.actions.get(&Action::Pause),
+        pocket.actions.get(&Action::Pause)
+    );
+    assert!(any.actions.contains_key(&Action::Pause));
+    assert_eq!(any.actions.len(), 1);
 }
 
 #[test]

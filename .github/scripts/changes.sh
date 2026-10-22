@@ -22,30 +22,12 @@
 #                   Linux and must match the committed `.glb` (#63).
 #   flight=true     Something that can change a flight result changed, so
 #                   the Scenarios run on macOS and Windows too and the
-#                   agreement check compares the three OSes (#240). That is
-#                   anything, other than Markdown outside packs/, under:
-#                     crates/maths, crates/physics, crates/flight-controller,
-#                       crates/sim, crates/test-pilot: the core;
-#                     crates/scenario, crates/pack, crates/blackbox: the
-#                       Scenario runner and the two edge crates it is built
-#                       with (the Pack reader holds the built-in Test Maps
-#                       and turns Quad definitions and Maps into the
-#                       Simulation's numbers; the Blackbox writer is empty
-#                       for now, but the runner is built with it);
-#                     scenarios/: the Scenarios, their Results and the Test
-#                       Quads;
-#                     packs/: the Quad definitions and the Maps the
-#                       Scenarios fly;
-#                     Cargo.lock, Cargo.toml, rust-toolchain.toml, .cargo/,
-#                       .config/: the libraries' versions, the build
-#                       settings and Rust itself;
-#                     .github/workflows/ci.yml, .github/scripts/changes.sh:
-#                       how CI runs and compares the Scenarios on each OS.
-#                   The Scenario runner is built from these crates only
-#                   (crates/scenario/Cargo.toml), so a change to the game,
-#                   the Input crate, the sound or the xtask tools can't move
-#                   a flight. Warning: a new crate the runner is built with
-#                   must join this list.
+#                   agreement check compares the three OSes (#240). That is a
+#                   change, other than to Markdown, to one of the flight
+#                   paths, or any change under packs/. The flight paths are
+#                   the `flight_paths` list just below this header, each with
+#                   its reason: it is the one place to edit them.
+#                   CONTRIBUTING.md and the readable checks point to it.
 #   all_checks=true This job runs every Rust check: the Rust checks run, and
 #                   it runs on Linux or for a push to main. A pull request
 #                   runs every check on Linux only (#240).
@@ -67,6 +49,63 @@
 #
 # Readable checks for this script: crates/xtask/tests/ci_changes.rs.
 set -euo pipefail
+
+# The flight paths: what a pull request can change to move a flight result.
+# This is the one list to edit. A path ending in "/" is a folder, and counts
+# with everything under it except Markdown; any other path is one file. A
+# path may hold only letters, digits, ".", "_", "-" and "/".
+#
+# The Scenario runner is built from the crates here only (see
+# crates/scenario/Cargo.toml and what those crates use), so a change to the
+# game, the Input crate, the sound or the xtask tools can't move a flight. A
+# new crate the runner is built with must join this list: a readable check
+# reads them from `cargo metadata` and fails if one is missing.
+#
+# packs/, the Quad definitions and the Maps the Scenarios fly, counts too,
+# Markdown included; it is checked on its own below, where flight is decided.
+flight_paths=(
+  # The core.
+  crates/maths/
+  crates/physics/
+  crates/flight-controller/
+  crates/sim/
+  crates/test-pilot/
+  # The Scenario runner and the two edge crates it is built with. The Pack
+  # reader holds the built-in Test Maps and turns Quad definitions and Maps
+  # into the Simulation's numbers; the Blackbox writer is empty for now, but
+  # the runner is built with it.
+  crates/scenario/
+  crates/pack/
+  crates/blackbox/
+  # The Scenarios, their Results and the Test Quads.
+  scenarios/
+  # The libraries' versions, the build settings and Rust itself.
+  Cargo.lock
+  Cargo.toml
+  rust-toolchain.toml
+  .cargo/
+  .config/
+  # How CI runs and compares the Scenarios on each OS.
+  .github/workflows/ci.yml
+  .github/scripts/changes.sh
+)
+
+# The flight paths as one grep pattern: a folder matches what starts with it,
+# a file matches only itself. A "." is escaped, so it matches only a ".".
+flight_pattern=""
+for path in "${flight_paths[@]}"; do
+  if [[ ! "$path" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "::error::The flight path \"$path\" holds a character other than letters, digits, \".\", \"_\", \"-\" and \"/\"."
+    exit 1
+  fi
+  path="${path//./\\.}"
+  if [[ "$path" == */ ]]; then
+    flight_pattern+="|^$path"
+  else
+    flight_pattern+="|^$path\$"
+  fi
+done
+flight_pattern="${flight_pattern#|}"
 
 if [[ "${GITHUB_EVENT_NAME:-}" != "pull_request" ]]; then
   echo "Not a pull request, so every Rust check runs."
@@ -119,7 +158,7 @@ echo "rust=$rust" >> "$GITHUB_OUTPUT"
 # `|| true`: grep -v finds nothing to keep when every path is Markdown.
 not_markdown="$(grep -vE '\.md$' <<< "$changed" || true)"
 flight=false
-if grep -qE '^(crates/(maths|physics|flight-controller|sim|test-pilot|scenario|pack|blackbox)/|scenarios/|\.cargo/|\.config/)|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|\.github/workflows/ci\.yml|\.github/scripts/changes\.sh)$' <<< "$not_markdown" \
+if grep -qE "$flight_pattern" <<< "$not_markdown" \
   || grep -qE '^packs/' <<< "$changed"; then
   echo "Something that can change a flight result changed, so the Scenarios run on every OS and the agreement check compares them."
   flight=true

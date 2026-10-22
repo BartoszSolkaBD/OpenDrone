@@ -23,6 +23,7 @@ flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
 crash_flip  = { channel = 7, on = "high" }
 
 [actions]
+pause = { channel = 10, on = "pressed" }  # a switch the model sends to CH10, so a Radio alone opens the Pause Menu (#258)
 reset = { channel = 9, on = "pressed" }   # SE, the Pocket's momentary switch
 
 [calibration]         # starting values: "trust the radio"

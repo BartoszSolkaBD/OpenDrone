@@ -51,7 +51,7 @@ Two kinds of reference sit outside the repo:
   - Change only what the ticket's "What to build" needs. If you must change another Lane's code, say so in your report and in the PR.
   - In the shared files (`CONTEXT.md`, `docs/SUMMARY.md` and the deep dives), add rather than rewrite.
 - **Builds:**
-  - Use the shared target folder and the lighter debug settings, as [Setting up a build](#setting-up-a-build) says.
+  - Use your worktree's own `target/` folder and the lighter debug settings, as [Setting up a build](#setting-up-a-build) says.
   - Don't build the game crate unless your ticket is in the Game lane.
 - **Docs:** write plain-language docs for anything a pilot or the maintainer meets. The maintainer doesn't read Rust.
 - **Scope:** do exactly the ticket.
@@ -60,15 +60,12 @@ Two kinds of reference sit outside the repo:
 
 ## Setting up a build
 
-Every worktree used to build its own `target/` folder, 17 to 18 GB each, and the disk filled up. So all worktrees share one, built with less debug info. Do this before your first `cargo` command, in each new shell:
+Each worktree builds in its own `target/` folder, and nobody shares one. We tried one shared folder ([#223](https://github.com/BartoszSolkaBD/OpenDrone/issues/223)) and dropped it: cargo names a crate's build by where the crate sits in its workspace, not by worktree, so one worktree's build could run another worktree's code ([#226](https://github.com/BartoszSolkaBD/OpenDrone/issues/226)). A `target/` folder is 17 to 18 GB with full debug info, so build it with less. Do this before your first `cargo` command, in each new shell:
 
 1. **Check the free space.** Run `df -h /`. If under 10 GB is free, stop before you build, and say so in your report.
-2. **Share one target folder.** Run `export CARGO_TARGET_DIR="$HOME/.cache/opendrone-target"`. Every worktree then shares one build of Bevy and the dependency tree. The cost is that parallel cargo runs wait for each other's file lock. If cargo prints "Blocking waiting for file lock", another run holds the lock, so don't kill yours: it is only waiting.
+2. **Build with less debug info.** Run `export CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0`. Agents don't use debuggers, and this shrinks the build a lot and drops the 1 GB incremental folder.
 
-   There is a second cost, found in [#226](https://github.com/BartoszSolkaBD/OpenDrone/issues/226). Cargo gives two worktrees' builds of one crate the same name. It counts the other worktree's build as up to date whenever your copy of the crate's files is older than that build. So a crate you haven't changed can run another worktree's code. If a test or a Scenario surprises you in a crate you haven't changed, run `git ls-files -z crates/<crate> | xargs -0 touch` and run it again: cargo then builds your own copy. The xtask tests are safe: each small workspace they build gets its own target folder.
-3. **Build with less debug info.** Run `export CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0`. Agents don't use debuggers, and this shrinks the build a lot and drops the 1 GB incremental folder.
-
-Don't delete the shared folder: other agents may be building in it. The [Delegator](delegator.md#merging) clears it when it grows too big.
+The [Delegator](delegator.md#merging) deletes the worktree's `target/` folder when its PR merges.
 
 ## Save tokens
 
