@@ -45,7 +45,9 @@
 //! A missing key keeps its default, so a file from an older OpenDrone still
 //! reads. A key this OpenDrone doesn't know stays in the file when it saves,
 //! so a newer OpenDrone's settings aren't lost. A value that isn't one it
-//! accepts is ignored and said so, and the setting keeps its default. A file
+//! accepts is ignored and said so, and the setting keeps its default; a
+//! `[camera.quads]` entry it ignores stays in the file as the pilot wrote it,
+//! until the pilot sets that Quad's camera. A file
 //! that isn't TOML at all is kept aside as `settings.broken.toml`, and the
 //! game starts fresh.
 
@@ -399,30 +401,44 @@ pub fn settings_from(table: &Table, problems: &mut Vec<String>) -> PilotSettings
     {
         for (id, quad) in quads {
             let Some(quad) = quad.as_table() else {
-                problems.push(format!("[camera.quads.\"{id}\"] should be a section"));
+                problems.push(format!(
+                    "[camera.quads.\"{id}\"] should be a section, so it is ignored; it stays in the file as it is"
+                ));
                 continue;
             };
-            let number = |key: &str, range: (f64, f64)| -> Option<f64> {
-                let value = quad.get(key)?;
-                let n = value
-                    .as_float()
-                    .or_else(|| value.as_integer().map(|i| i as f64));
-                match n {
-                    Some(n) if (range.0..=range.1).contains(&n) => Some(n),
-                    _ => None,
-                }
-            };
             use crate::camera::controls::{FOV_RANGE, TILT_RANGE};
-            match (number("tilt", TILT_RANGE), number("fov", FOV_RANGE)) {
-                (Some(tilt), Some(fov)) => settings.camera.set_quad(id, QuadCamera { tilt, fov }),
-                _ => problems.push(format!(
-                    "[camera.quads.\"{id}\"] needs a tilt from {} to {} degrees and a fov from {} to {} degrees, so that Quad's camera keeps its own values",
-                    TILT_RANGE.0, TILT_RANGE.1, FOV_RANGE.0, FOV_RANGE.1
-                )),
+            let tilt = quad_number(quad, "tilt", TILT_RANGE);
+            let fov = quad_number(quad, "fov", FOV_RANGE);
+            match (tilt, fov) {
+                (Ok(tilt), Ok(fov)) => settings.camera.set_quad(id, QuadCamera { tilt, fov }),
+                (tilt, fov) => {
+                    let why: Vec<String> = [tilt.err(), fov.err()].into_iter().flatten().collect();
+                    problems.push(format!(
+                        "[camera.quads.\"{id}\"] is ignored ({}), so that Quad's camera keeps its own values; the entry stays in the file as it is",
+                        why.join("; ")
+                    ));
+                }
             }
         }
     }
     settings
+}
+
+/// One number of a Quad's camera entry, or the plain reason it can't be used.
+fn quad_number(entry: &Table, key: &str, range: (f64, f64)) -> Result<f64, String> {
+    let value = entry.get(key).ok_or(format!("{key} is missing"))?;
+    let n = value
+        .as_float()
+        .or_else(|| value.as_integer().map(|i| i as f64))
+        .ok_or(format!("{key} should be a number"))?;
+    if (range.0..=range.1).contains(&n) {
+        Ok(n)
+    } else {
+        Err(format!(
+            "{key} is {n}, which is outside {} to {} degrees",
+            range.0, range.1
+        ))
+    }
 }
 
 /// What each `Reader` method looks up: a key in a section, of one kind.
@@ -564,7 +580,15 @@ pub fn table_of(settings: &PilotSettings, mut base: Table) -> Table {
                 .to_string(),
             ),
         );
-        let mut quads = Table::new();
+        // The entries the reader ignored stay as the pilot wrote them. Every
+        // entry it understood is in `settings`, so what `base` holds for an id
+        // that isn't there is one it rejected; the pilot's own change for an
+        // id replaces it.
+        let mut quads = match camera.remove("quads") {
+            Some(Value::Table(kept)) => kept,
+            _ => Table::new(),
+        };
+        quads.retain(|id, _| !settings.camera.quads().any(|(known, _)| known == id));
         for (id, quad) in settings.camera.quads() {
             let mut one = Table::new();
             one.insert("tilt".into(), Value::Float(quad.tilt));
