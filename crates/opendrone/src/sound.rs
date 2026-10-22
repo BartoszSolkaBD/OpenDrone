@@ -31,9 +31,9 @@ impl Plugin for SoundPlugin {
 #[derive(Resource)]
 pub struct QuadSoundPlaying {
     sound: Sound,
-    /// Whether the game has said where the sound plays, or that there's no
-    /// sound device: it says so once.
-    said: bool,
+    /// What has been said of the sound's device, so the log says each
+    /// change once.
+    heard: SoundHeard,
     /// The Quad whose sound it is.
     quad: String,
 }
@@ -47,7 +47,7 @@ impl QuadSoundPlaying {
         match quad_sound(&plan.quad, plan.map.world.air_density) {
             Ok(quad) => Some(QuadSoundPlaying {
                 sound: Sound::start(quad),
-                said: false,
+                heard: SoundHeard::default(),
                 quad: plan.quad.id.clone(),
             }),
             Err(problem) => {
@@ -90,11 +90,12 @@ fn say_where_the_sound_plays(sound: Option<ResMut<QuadSoundPlaying>>) {
     let Some(mut sound) = sound else {
         return;
     };
-    if sound.said {
+    let device = sound.device();
+    if sound.heard.hear(Some(&device)).is_none() {
         return;
     }
-    match sound.device() {
-        Device::Opening => return,
+    match &device {
+        Device::Opening => {}
         Device::Playing {
             name,
             block_frames,
@@ -103,10 +104,84 @@ fn say_where_the_sound_plays(sound: Option<ResMut<QuadSoundPlaying>>) {
             "the Quad's sound plays on {} in blocks of {block_frames} frames at {sample_rate} Hz",
             name.as_deref().unwrap_or("the default sound device")
         ),
+        Device::Lost(why) => warn!("the sound device was lost, trying to find a new one: {why}"),
         Device::None(why) => warn!("no sound device, so the game runs silent: {why}"),
     }
-    sound.said = true;
 }
+
+/// What the sound's device is, without the details: a change of it is said
+/// once, and never each detail of it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Seen {
+    Playing,
+    /// The device went away, and the sound is looking for a new one.
+    Lost,
+    /// No device could be opened.
+    Silent,
+}
+
+/// What the game has said of the Quad's sound so far, so it says each
+/// change once: the Hub's short notice, and the log.
+#[derive(Clone, Debug, Default)]
+pub struct SoundHeard {
+    seen: Option<Seen>,
+}
+
+impl SoundHeard {
+    /// Takes in what `device` is now (`None` when the Quad's sound couldn't
+    /// be made, so the game runs silent). It returns `None` when nothing
+    /// changed, and the [`Change`] when something did. The Hub shows the
+    /// change's notice:
+    ///
+    /// - no device at the start: "No sound device: OpenDrone runs silent."
+    /// - the device lost in flight: "Sound device lost: looking for a new one."
+    /// - a device opened after either: where the sound plays now.
+    ///
+    /// Playing from the start has no notice. The sound's first try to open a
+    /// device is no change yet.
+    pub fn hear(&mut self, device: Option<&Device>) -> Option<Change> {
+        let (now, notice) = match device {
+            None => {
+                // The Quad's sound couldn't be made: said once, at the start.
+                if self.seen.is_some() {
+                    return None;
+                }
+                (Seen::Silent, SILENT.to_string())
+            }
+            Some(Device::Opening) => return None,
+            Some(Device::Playing { name, .. }) => (
+                Seen::Playing,
+                match name {
+                    Some(name) => format!("Sound is playing on {name}."),
+                    None => "Sound is playing on the new device.".to_string(),
+                },
+            ),
+            Some(Device::Lost(_)) => (
+                Seen::Lost,
+                "Sound device lost: looking for a new one.".to_string(),
+            ),
+            Some(Device::None(_)) => (Seen::Silent, SILENT.to_string()),
+        };
+        let before = self.seen.replace(now);
+        if before == Some(now) {
+            return None;
+        }
+        // Playing from the start is no news to the pilot.
+        let from_the_start = before.is_none() && now == Seen::Playing;
+        Some(Change {
+            notice: (!from_the_start).then_some(notice),
+        })
+    }
+}
+
+/// A change of the sound's device.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Change {
+    /// What the Hub's notice says about it, if it says anything.
+    pub notice: Option<String>,
+}
+
+const SILENT: &str = "No sound device: OpenDrone runs silent.";
 
 /// The Quad's state after the last tick, as the sound reads it.
 pub fn quad_frame(flight: &Flight, paused: bool) -> QuadFrame {

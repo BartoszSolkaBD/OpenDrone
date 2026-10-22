@@ -44,7 +44,7 @@ fn starting_the_sound_never_fails_and_soon_says_where_it_plays_or_why_it_is_sile
         } => {
             assert!(block_frames > 0 && sample_rate > 0, "{device:?}");
         }
-        Device::None(why) => assert!(!why.is_empty()),
+        Device::None(why) | Device::Lost(why) => assert!(!why.is_empty()),
         Device::Opening => panic!("the sound device was still opening after 10 s"),
     }
     sound.hand_over(all_four(0.0, 0.0, 0.0));

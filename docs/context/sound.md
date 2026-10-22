@@ -98,6 +98,8 @@ _Avoid_: Ambience, ambient sound, environment sound
 - **The sound device:** the game asks for a 256-frame block, about 5 ms at 48 kHz. If the device can't do that, it takes the device's default. Firewheel's own default is 1024 frames, about 23 ms, which is too slow.
 - **No sound device at start:** the game runs silent and says so once on the Hub.
 - **Sound device lost in flight:** the sound moves to the new default device, and nothing pauses.
+  - **It never gives up.** If the old device's stream hasn't let go yet, or no new device is there, the game stays silent and keeps trying, a little longer between tries (a quarter of a second at first, up to 3 seconds), until a device opens or the game stops. Stopping never waits for it.
+  - **The game says so in a short notice, once for each change:** "Sound device lost: looking for a new one." when it goes, and "Sound is playing on …" when a device opens again. A device that turns up after a start with none is said the same way.
 - **Window in the background:** sound keeps playing.
 
 ### Where sound sits
