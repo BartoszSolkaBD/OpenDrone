@@ -641,12 +641,12 @@ fn generic_radio() -> Vec<Raw> {
     ]
 }
 
-/// The switch on CH10 of a Radio (button 1 of CH9–CH32), pressed and let go.
+/// The switch on CH11 of a Radio (button 2 of CH9–CH32), pressed and let go.
 fn flip_the_pause_switch(host: &mut Host) {
     for down in [true, false] {
         host.devices_report(vec![Raw::Button {
             device: POCKET,
-            button: 1,
+            button: 2,
             down,
         }]);
         host.frames(2);
@@ -680,12 +680,12 @@ fn a_radio_alone_pauses_and_goes_on(test: &str, radio: Vec<Raw>) {
 #[test]
 fn the_pocket_alone_opens_the_pause_menu_with_its_pause_switch_and_closes_it_again() {
     // Basis: Rule (#258: a Radio alone can reach the Pause Menu; the
-    // radiomaster-pocket profile binds Pause to CH10).
+    // radiomaster-pocket profile binds Pause to CH11).
     a_radio_alone_pauses_and_goes_on("pocket-pause", pocket());
 }
 
 #[test]
 fn any_radio_alone_opens_the_pause_menu_with_its_pause_switch_and_closes_it_again() {
-    // Basis: Rule (#258: the any-radio profile binds Pause to CH10 too).
+    // Basis: Rule (#258: the any-radio profile binds Pause to CH11 too).
     a_radio_alone_pauses_and_goes_on("any-radio-pause", generic_radio());
 }

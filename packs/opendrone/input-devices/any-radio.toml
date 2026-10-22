@@ -17,8 +17,8 @@ arm         = { channel = 5, on = "high" }
 flight_mode = { channel = 6, low = "Acro", middle = "Horizon", high = "Angle" }
 crash_flip  = { channel = 7, on = "high" }
 
-[actions]             # a switch the model sends to CH10 pauses, so a Radio alone opens the Pause Menu (#258)
-pause = { channel = 10, on = "pressed" }
+[actions]             # a switch the model sends to CH11 pauses, so a Radio alone opens the Pause Menu (#258); CH11, since the Radiomaster factory models' S1 knob is on CH10 (#275)
+pause = { channel = 11, on = "pressed" }
 
 [calibration]
 roll     = { min = "-100 %", centre = "0 %", max = "+100 %", deadband = "0 %" }
