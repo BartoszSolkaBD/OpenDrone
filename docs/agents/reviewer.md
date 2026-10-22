@@ -92,7 +92,7 @@ In round 2 and later, start from the earlier Verdicts:
 
 ## Working efficiently
 
-- **CI has already run every check** on all three operating systems. Run something locally only to test a specific claim, and cut long output with `| tail -n 40`.
+- **CI has already run every check:** every Rust check on Linux, and on macOS and Windows the Scenarios and the agreement check, when the PR can change a flight result. On a PR that can't, such as a docs-only or Game-only one, Rust on macOS, Rust on Windows and the agreement check pass with nothing done: that's expected, and main's CI runs them in full after the merge ([The required checks](../../CONTRIBUTING.md#the-required-checks)). Run something locally only to test a specific claim, and cut long output with `| tail -n 40`.
 - **Don't build the game crate** unless the PR changes it.
 - **Before you run any `cargo` command,** set up the build as the author does ([Setting up a build](author.md#setting-up-a-build)):
   1. Run `df -h /`, and stop and say so if under 10 GB is free.
