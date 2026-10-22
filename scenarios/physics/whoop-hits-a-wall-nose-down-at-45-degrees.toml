@@ -5,7 +5,7 @@
 # check in crates/opendrone/tests/camera.rs flies this Scenario to find where
 # the FPV Camera's near plane ends up against the wall (#268).
 format = 2
-name   = "A whoop that hits a wall nose down at 45° stops with its front duct rings against it"
+name   = "A whoop that hits a wall nose down at 45° stops with its camera housing against it"
 
 [start]
 kind              = "physics"

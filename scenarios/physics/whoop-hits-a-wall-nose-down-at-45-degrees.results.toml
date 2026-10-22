@@ -2,7 +2,7 @@
 # Don't edit this file by hand: CI checks that it is up to date. Each value is
 # what this run measured, to 3 significant figures.
 format   = 1
-scenario = "A whoop that hits a wall nose down at 45° stops with its front duct rings against it"
+scenario = "A whoop that hits a wall nose down at 45° stops with its camera housing against it"
 
 [[expect]]
 what     = "distance east, highest over 0 s to 0.3 s"
