@@ -1,0 +1,12 @@
+{"name":"bevy","vers":"0.18.0-rc.1","deps":[],"cksum":"025b2a90cabc7aa843dc8176aeceeabc564c19cb7e2d96fe7bbedc5210eff71b","features":{},"yanked":false}
+{"name":"bevy","vers":"0.18.0-rc.2","deps":[],"cksum":"26fff8c5d747d0cea4636daa00ce3738c1ebd9cba0bdc5ba880df9ac7f5701c6","features":{},"yanked":false}
+{"name":"bevy","vers":"0.18.0","deps":[],"cksum":"ec689b5a79452b6f777b889bbff22d3216b82a8d2ab7814d4a0eb571e9938d97","features":{},"yanked":false}
+{"name":"bevy","vers":"0.18.1","deps":[],"cksum":"1fd310426290cec560221f9750c2f4484be4a8eeea7de3483c423329b465c40e","features":{},"yanked":false}
+{"name":"bevy","vers":"0.19.0-rc.1","deps":[],"cksum":"47ef678e8907c48bf206808fc5fb946e2de4fc5c3991de03a10a283bebdfbf78","features":{},"yanked":false}
+{"name":"bevy","vers":"0.19.0-rc.2","deps":[],"cksum":"d66de79f9778e3458ca92a5a855b9e11cc4ec1b15a6c4330d8244a08d22539d9","features":{},"yanked":false}
+{"name":"bevy","vers":"0.19.0-rc.3","deps":[],"cksum":"496063bfe040716731a217c3a8af9df315e8cd7c75d30f9892e57d154742ebf9","features":{},"yanked":false}
+{"name":"bevy","vers":"0.19.0","deps":[],"cksum":"950238d3049d81006a6fd6b898a34cfc01bb5462a7668795a54d640aed19fd0a","features":{},"yanked":false}
+{"name":"bevy","vers":"0.19.1","deps":[],"cksum":"4bfadbebfc6599aa59289b754ac30023959854304f3d393da2cf62bb3cd5df8f","features":{},"yanked":false}
+{"name":"bevy","vers":"0.20.0-rc.1","deps":[],"cksum":"396e1587b1079514a3267154bb9f5c2988bf9a28110044738223b6a1978d0397","features":{},"yanked":false}
+{"name":"bevy","vers":"0.20.0-rc.2","deps":[],"cksum":"58ef8c940e975677de2bc02af8bc3892f568640a3d371159f65d443bcb57ad90","features":{},"yanked":false}
+{"name":"bevy","vers":"0.20.0","deps":[],"cksum":"8bd0e4ea5ec677698955f9f285221eab78606d8c27b57b889def199c16ce36e6","features":{},"yanked":false}

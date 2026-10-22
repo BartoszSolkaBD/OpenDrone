@@ -20,6 +20,8 @@ cargo run --release -p opendrone -- --map flat-floor    # developer command: fly
 
 The first build takes a few minutes. `--release` matters: without it the picture is slow.
 
+**Or download a build,** with no Rust needed: every push to main, and every release, makes one for macOS, Windows and Linux. Unzip it and double-click `opendrone`. They aren't signed yet, so the system warns the first time. [Builds and releases](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/builds-and-releases.md) says where to find them and how to open them on each system. In a build, every `cargo run --release -p opendrone --` above is just `opendrone`, with the same options after it.
+
 ### The screens
 
 **First Launch** is one screen, shown once, on a new install. Text size and Reduce motion are at the top, then a notice about flashing images (FPV video static and Breakup can flash), then "Have you flown FPV before?". Your answer picks your starting Preset: No, never is Beginner; A little is Intermediate; Yes is Pro; Skip is Beginner. A second step is about your Input Device: it shows the Radio or Gamepad it found, or says "Plug in your Radio or Gamepad" and offers "Continue without". Setting up an Input Device (Calibration and switches) is a later version's job: **Set up** takes you on to the Hub and says so, and your device flies on its profile's starting values. A new install starts with the Whoop 65 on the Skate Park.

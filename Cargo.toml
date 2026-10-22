@@ -118,7 +118,7 @@ audioadapter-buffers = { version = "=5.2.0", default-features = false, features 
 # same wgpu Bevy 0.20.0 draws with, whose query types it doesn't re-export.
 # Only the game uses it.
 wgpu = { version = "=30.0.1", default-features = false }
-serde_json = "=1.0.151"
+serde_json = "=1.0.154"
 toml = "=1.1.6"
 # The format migration steps rewrite Scenario and Pack files with it, keeping
 # every comment and the layout (#60). opendrone-pack holds the steps, because
@@ -128,7 +128,7 @@ toml_edit = "=0.25.15"
 # manifest's checksum and to take a file out of the zip ambientCG gives (#63).
 # MIT or Apache-2.0, and MIT. The zip crate keeps only deflate, in pure Rust.
 sha2 = "=0.11.1"
-zip = { version = "=9.0.2", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "=9.0.5", default-features = false, features = ["deflate-flate2"] }
 # The zip crate leaves the inflate backend to its user: Rust's own, miniz_oxide.
 flate2 = { version = "=1.1.10", default-features = false, features = ["rust_backend"] }
 

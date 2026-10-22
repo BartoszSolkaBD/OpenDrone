@@ -30,7 +30,7 @@ mod areas;
 mod changes;
 mod flags;
 mod libraries;
-mod markdown;
+pub(crate) mod markdown;
 mod merges;
 mod report;
 mod results;

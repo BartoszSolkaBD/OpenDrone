@@ -1,0 +1,184 @@
+# Builds the game, unsigned, for macOS, Windows and Linux, so the maintainer
+# can Feel Test a change by double-clicking it (#15 §8, #81):
+#
+# - on every push to main;
+# - on a PR with the `build` label: when the label goes on, and on every push
+#   to the PR while it has it;
+# - for a release, called by release.yml with the version a tag names.
+#
+# Each build is one zip, OpenDrone-<name>-<os>.zip, kept 30 days as a
+# download of this workflow's run. <name> is main-<commit>, pr<N>-<commit> or
+# the release's version. `cargo xtask package` lays it out: the game, with its
+# Packs, the Scenarios, the material library and its textures beside it,
+# where it looks for them. How to open one: docs/builds-and-releases.md.
+#
+# It's never a required check: a PR without the label skips every job.
+#
+# Changing this file is a Repo rules change: the Reviewer decides, and the
+# ticket must ask for it.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  workflow_call:
+    inputs:
+      version:
+        description: The version the builds are named after, such as 0.1.0-alpha.1.
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push to a labelled PR cancels that PR's older build. Builds of main
+  # and of releases all finish. Another label going on a PR builds nothing,
+  # so its run gets a group of its own and cancels no build.
+  group: build-${{ github.event.pull_request.number || github.sha }}-${{ inputs.version || 'test' }}-${{ (github.event.action == 'labeled' && github.event.label.name != 'build') && github.run_id || 'build' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  textures:
+    name: Fetch the Maps' textures
+    # On a PR, only with the `build` label: as it goes on, or on any other
+    # change while it's there.
+    if: >-
+      github.event_name != 'pull_request'
+      || (github.event.action == 'labeled' && github.event.label.name == 'build')
+      || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'build'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Reuse the textures fetched before
+        # The material library lists every picture with its checksum, so the
+        # same library always means the same pictures.
+        id: cache
+        uses: actions/cache@v6
+        with:
+          path: assets-src/textures
+          key: textures-${{ hashFiles('assets-src/materials.toml') }}
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install the Linux packages the xtask build needs
+        # xtask builds opendrone-input, which builds SDL 3.4 from source
+        # (ADR-0018).
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev pkg-config
+
+      - name: Download the CC0 textures and check each against its checksum
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cargo xtask textures
+
+      - name: Hand the textures to the builds
+        uses: actions/upload-artifact@v7
+        with:
+          name: textures
+          path: assets-src/textures/
+          if-no-files-found: error
+          retention-days: 1
+
+  game:
+    name: Build the game for ${{ matrix.name }}
+    needs: textures
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            system: macos
+            program: target/release/opendrone
+          - name: Windows
+            os: windows-latest
+            system: windows
+            program: target/release/opendrone.exe
+          - name: Linux
+            os: ubuntu-latest
+            system: linux
+            program: target/release/opendrone
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Name the build
+        # main-<commit>, pr<N>-<commit>, or the release's version. Only
+        # letters, digits and . - + _ reach a file name.
+        id: name
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PR: ${{ github.event.pull_request.number }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$VERSION" ]]; then
+            name="$VERSION"
+          elif [[ -n "$PR" ]]; then
+            name="pr${PR}-${PR_SHA:0:7}"
+          else
+            name="main-${GITHUB_SHA:0:7}"
+          fi
+          if [[ ! "$name" =~ ^[A-Za-z0-9.+_-]+$ ]]; then
+            echo "::error::The build's name, $name, can't be a file name"
+            exit 1
+          fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Install the pinned Rust (rust-toolchain.toml)
+        shell: bash
+        run: rustup toolchain install
+
+      - name: Install the Linux packages SDL's source build, Bevy's window and the sound need
+        # As CI's Rust job does: libudev's headers for SDL (ADR-0018),
+        # Wayland's client library for the window (#62), and alsa-lib for
+        # the sound (ADR-0023).
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libudev-dev libwayland-dev libasound2-dev pkg-config
+
+      - name: Reuse the build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Release builds, kept apart from CI's development builds.
+          key: release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build the game, optimised
+        run: cargo build --release --locked --package opendrone
+
+      - name: Fetch the Maps' textures
+        uses: actions/download-artifact@v8
+        with:
+          name: textures
+          path: assets-src/textures
+
+      - name: Lay the build out as a zip (cargo xtask package)
+        shell: bash
+        env:
+          NAME: ${{ steps.name.outputs.name }}
+          SYSTEM: ${{ matrix.system }}
+          PROGRAM: ${{ matrix.program }}
+        run: cargo run --release --locked --quiet --package xtask -- package --game "$PROGRAM" --os "$SYSTEM" --name "$NAME" --out dist
+
+      - name: Keep the build as a download
+        # The zip itself, not zipped again, so the game keeps its permission
+        # to run on macOS and Linux.
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/OpenDrone-${{ steps.name.outputs.name }}-${{ matrix.system }}.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30

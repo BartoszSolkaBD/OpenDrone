@@ -1,11 +1,15 @@
 //! Readable checks for how the tracer sets a flight up: the Quad on the flat
 //! floor's origin, landed, and the pilot's Channels as a receiver hands them
 //! over. Lengths in metres, speeds in m/s, Channels in µs and CRSF steps.
+//! And where the game finds its Packs, in the repo and in a downloaded build.
 
 mod common;
 
+use std::fs;
+use std::path::{Path, PathBuf};
+
 use opendrone::pilot::flight_channels;
-use opendrone::set_up::{FlightPlan, landed_height};
+use opendrone::set_up::{FlightPlan, find_repo_folder, landed_height};
 use opendrone::settings::Settings;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::FlightMode;
@@ -155,4 +159,73 @@ fn a_switch_with_no_source_is_low() {
     let fc = flight_channels(&opendrone_input::Channels::at_rest(), FlightMode::Acro);
     assert_eq!(fc.arm, Channel::LOW);
     assert_eq!(fc.crash_flip, Channel::LOW);
+}
+
+/// A scratch folder for the checks below, emptied first.
+fn scratch(case: &str) -> PathBuf {
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("finding-the-game")
+        .join(case);
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    root
+}
+
+/// A folder laid out as the game's: `packs/` and `scenarios/`.
+fn lay_out_the_game(folder: &Path) {
+    fs::create_dir_all(folder.join("packs")).unwrap();
+    fs::create_dir_all(folder.join("scenarios")).unwrap();
+}
+
+#[test]
+fn a_downloaded_build_finds_its_packs_beside_itself_wherever_it_is_started_from() {
+    // Basis: Rule (#81): a build is unzipped anywhere and double-clicked, so
+    // the working folder is often the pilot's home folder.
+    let root = scratch("downloaded");
+    let build = root.join("OpenDrone-0.1.0-alpha.1-macos");
+    lay_out_the_game(&build);
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let program = build.join("opendrone");
+    assert_eq!(
+        find_repo_folder(Some(&program), Some(&home)),
+        Some(build.clone())
+    );
+    assert_eq!(find_repo_folder(Some(&program), None), Some(build));
+}
+
+#[test]
+fn a_build_started_inside_another_repo_still_flies_its_own_packs() {
+    // Basis: Rule (#81): the program's own folder comes first, so a build
+    // started from a terminal in a checkout never mixes in that checkout's
+    // Packs.
+    let root = scratch("inside-a-repo");
+    let repo = root.join("OpenDrone");
+    lay_out_the_game(&repo);
+    let build = root.join("build");
+    lay_out_the_game(&build);
+    assert_eq!(
+        find_repo_folder(Some(&build.join("opendrone")), Some(&repo)),
+        Some(build)
+    );
+}
+
+#[test]
+fn the_game_run_with_cargo_finds_the_repo_at_or_above_the_working_folder() {
+    // Basis: Rule: `cargo run` puts the program in a target folder, which
+    // holds no Packs and may sit outside the repo.
+    let root = scratch("with-cargo");
+    let repo = root.join("OpenDrone");
+    lay_out_the_game(&repo);
+    let program = root.join("target").join("release").join("opendrone");
+    let here = repo.join("crates").join("opendrone");
+    fs::create_dir_all(&here).unwrap();
+    assert_eq!(
+        find_repo_folder(Some(&program), Some(&here)),
+        Some(repo.clone())
+    );
+    // Started beside the repo, not inside it, the game doesn't find it.
+    // (What it finds instead depends on where the scratch folder is: inside
+    // a checkout's own target/ folder, that checkout.)
+    assert_ne!(find_repo_folder(Some(&program), Some(&root)), Some(repo));
 }

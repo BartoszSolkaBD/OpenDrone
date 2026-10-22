@@ -90,6 +90,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
 - [Setup and CI](book/contributing.md)
 - [Changing a file format](format-migration.md)
 - [Building a Map](building-a-map.md)
+- [Builds and releases](builds-and-releases.md)
 - [The agent workflow](book/agents.md)
   - [Issue tracker](agents/issue-tracker.md)
   - [Triage labels](agents/triage-labels.md)

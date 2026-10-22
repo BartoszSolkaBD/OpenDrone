@@ -11,8 +11,8 @@
 //! - **Materials.** A part names its material (`concrete_smooth`). The
 //!   library, `assets-src/materials.toml`, says which CC0 pictures that name
 //!   means, and `cargo xtask textures` has fetched them into
-//!   `assets-src/textures/` (the alpha runs from the repo: a packaged build
-//!   finds them once the release ticket lays them out). A material with no
+//!   `assets-src/textures/`, in the repo or in a downloaded build, which
+//!   `cargo xtask package` lays out the same way (#81). A material with no
 //!   picture on disk is drawn in its flat colour from the `.glb`, so the Map
 //!   is always flyable.
 //!
