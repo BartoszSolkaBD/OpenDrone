@@ -203,8 +203,11 @@ fn a_push_to_main_rebuilds_the_maps() {
 /// One file under each flight path that isn't a crate, and under `packs/`.
 /// The script's `flight_paths` is the list. The crates are read from Cargo
 /// instead, by
-/// `a_pull_request_that_changes_any_crate_the_scenario_runner_is_built_with_runs_the_scenarios_on_every_os`.
-const FLIGHT_FILES: [&str; 13] = [
+/// `a_pull_request_that_changes_any_crate_the_scenario_runner_is_built_with_runs_the_scenarios_on_every_os`,
+/// except one data file a crate builds in: the Pack reader's built-in Test
+/// Maps, which the Scenarios fly.
+const FLIGHT_FILES: [&str; 14] = [
+    "crates/pack/test-maps/wall.toml",
     "scenarios/physics/free-fall.toml",
     "scenarios/physics/free-fall.results.toml",
     "scenarios/test-quads/whoop-65-no-drag.toml",
@@ -246,18 +249,27 @@ fn a_pull_request_that_changes_any_crate_the_scenario_runner_is_built_with_runs_
         crates.contains("crates/scenario/") && crates.contains("crates/maths/"),
         "the runner's crates as Cargo reads them: {crates:?}"
     );
+    // The crate's code, and its own Cargo.toml (its features and libraries),
+    // which sits outside src/. So a flight path narrowed to a crate's src/
+    // fails here: it would miss the crate's other files too, such as the Pack
+    // reader's Test Maps (Reviewer's case on #260).
     for folder in &crates {
-        let file = format!("{folder}src/lib.rs");
-        for os in ["macOS", "Windows", "Linux"] {
-            let repo = Repo::new(&format!("runner-crate-{}-{os}", folder.replace('/', "-")));
-            repo.write(&file, "changed\n");
-            let outputs = repo.commit_and_check_on("pull_request", os);
-            assert!(
-                outputs["flight"] == "true" && outputs["scenarios"] == "true",
-                "The Scenario runner is built with {folder}, but a change to {file} doesn't run \
-                 the Scenarios on {os}. Add `{folder}` to flight_paths in \
-                 .github/scripts/changes.sh. Outputs: {outputs:?}"
-            );
+        for (kind, file) in [
+            ("code", format!("{folder}src/lib.rs")),
+            ("manifest", format!("{folder}Cargo.toml")),
+        ] {
+            for os in ["macOS", "Windows", "Linux"] {
+                let case = format!("runner-crate-{}-{kind}-{os}", folder.replace('/', "-"));
+                let repo = Repo::new(&case);
+                repo.write(&file, "changed\n");
+                let outputs = repo.commit_and_check_on("pull_request", os);
+                assert!(
+                    outputs["flight"] == "true" && outputs["scenarios"] == "true",
+                    "The Scenario runner is built with {folder}, but a change to {file} doesn't \
+                     run the Scenarios on {os}. Add `{folder}`, the whole folder, to flight_paths \
+                     in .github/scripts/changes.sh. Outputs: {outputs:?}"
+                );
+            }
         }
     }
 }
