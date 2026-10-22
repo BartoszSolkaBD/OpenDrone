@@ -16,9 +16,11 @@
 # the sticks centred. At 0.7 s, about 1.7 m up, full roll right turns it
 # over; at 0.95 s the sticks centre and the throttle drops to 0, and it falls
 # onto the floor upside down at about 1.5 s. It bounces, and by about 1.8 s
-# it lies flat on its duct rings, still. There it lies, armed, the Arm
-# switch on: Airmode keeps the PID loop working, the I terms keep what they
-# wound up in the landing (roll's near +95), and the motors keep pushing it
+# it lies still on its camera housing and its rear duct rings, tilted about
+# 4° (#268 added the housing, which is higher than the rings). There it lies,
+# armed, the Arm switch on: Airmode keeps the PID loop working, the I terms
+# keep what they wound up in the landing (roll's near +82), and the motors
+# keep pushing it
 # into the floor, well above idle. Lying still, the I terms move only by
 # what the centred sticks ask, 0.11 °/s: 0.244381 × 64 × 0.10966 = 1.7 a
 # second.
@@ -74,8 +76,8 @@ basis = "source: Betaflight 2026.6.2's defaults: crash_recovery OFF and landing_
 [[expect]]
 what  = "tilt"
 at    = "6 s"
-value = "180° ± 1°"
-basis = "observed: it comes to rest upside down on the floor"
+value = "176° ± 1°"
+basis = "observed: it comes to rest upside down on the floor, tilted about 4° because it rests on its camera housing and its rear duct rings (180° - 3.8°); before the housing it lay flat, at 180°"
 
 [[expect]]
 what  = "the Quad turns right side up"
@@ -86,8 +88,8 @@ basis = "observed: pushing as it does, it never rights itself"
 [[expect]]
 what  = "roll I term"
 at    = "6 s"
-value = "94.6 ± 10"
-basis = "observed: lying armed, with Airmode on, the roll I term keeps what it wound up in the landing, moving only by the centred stick's 0.11 °/s. With the loop shaping (#50) in the PID loop, the landing leaves it at +95; before, it left -293"
+value = "81.6 ± 10"
+basis = "observed: lying armed, with Airmode on, the roll I term keeps what it wound up in the landing, moving only by the centred stick's 0.11 °/s. With the loop shaping (#50) in the PID loop, and the camera housing (#268) changing how it lands, the landing leaves it at +82; before the housing, +95, and before the loop shaping, -293"
 
 [[expect]]
 what   = "motor 1 DShot"
@@ -116,5 +118,5 @@ basis  = "source: mixTable: armed with Airmode on, no motor drops below idle"
 [[expect]]
 what  = "motor 4 DShot"
 over  = "6 s to 12 s"
-mean  = "986 ± 100"
-basis = "observed: lying still, the front left motor keeps pushing hard, well above idle, for the whole 6 s; which motor pushes follows the I terms the landing left (before the loop shaping, #50, it was the front right, at 1370)"
+mean  = "1190 ± 100"
+basis = "observed: lying still, the front left motor keeps pushing hard, well above idle, for the whole 6 s; which motor pushes follows the I terms the landing left (before the camera housing, #268, it was at 986; before the loop shaping, #50, it was the front right, at 1370)"

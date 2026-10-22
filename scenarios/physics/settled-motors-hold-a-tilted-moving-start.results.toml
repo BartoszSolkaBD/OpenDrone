@@ -53,7 +53,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "442d8c4fd3437403"   # test/whoop-65-body-drag-only: what the Simulation receives from it
+quad = "4a7dda4f891af0c6"   # test/whoop-65-body-drag-only: what the Simulation receives from it
 map  = "f720a5ecea6336f3"   # test/empty-air
 run  = "6ae18516af721ea6"   # the whole state after each of 8000 steps at 8000 Hz, in order
 

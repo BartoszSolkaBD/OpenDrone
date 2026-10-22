@@ -107,6 +107,8 @@ pub enum Need {
     /// Only on a Quad with a buzzer: the reader checks it goes with
     /// `[sound] buzzer = true`.
     WithBuzzer,
+    /// A Quad may have it or not, with nothing else depending on it.
+    Optional,
 }
 
 /// One key in a section.
@@ -256,6 +258,7 @@ pub const SECTIONS: &[Section] = &[
                 )),
             ),
             key("friction", Physics(one(Dimension::NONE, ZeroOrMore))),
+            only(Need::Optional, "camera_housing", Physics(Form::Box)),
         ],
     },
     Section {

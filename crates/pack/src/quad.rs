@@ -20,8 +20,8 @@ use std::collections::BTreeMap;
 use opendrone_flight_controller::Tune as FlightControllerTune;
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters,
-    PropParameters, PropWash, QuadParameters, QuadShape, RotorLayout,
+    BatteryParameters, CameraHousing, Drag, DuctRings, EscParameters, GroundAndCeiling,
+    MotorParameters, PropParameters, PropWash, QuadParameters, QuadShape, RotorLayout,
 };
 
 use crate::document::{Document, Item, Problem, Problems, Table};
@@ -793,6 +793,10 @@ pub struct Collision {
     pub pack_height: f64,
     /// Each duct's ring: inside diameter, wall and height.
     pub duct_rings: Option<[f64; 3]>,
+    /// The box that holds the FPV Camera, front to back, side to side and top
+    /// to bottom: its front face's middle is the camera's position, and it
+    /// lies behind it.
+    pub camera_housing: Option<[f64; 3]>,
     pub bounce: f64,
     pub friction: f64,
 }
@@ -1289,6 +1293,9 @@ fn definition(
         duct_rings: r
             .has("collision.duct_rings")
             .then(|| r.three("collision.duct_rings")),
+        camera_housing: r
+            .has("collision.camera_housing")
+            .then(|| r.three("collision.camera_housing")),
         bounce: r.one("collision.bounce"),
         friction: r.one("collision.friction"),
     };
@@ -1365,6 +1372,10 @@ fn definition(
                     wall,
                     height,
                 }),
+            camera_housing: collision.camera_housing.map(|sides| CameraHousing {
+                size: size(sides),
+                front: size(r.three("camera.position")),
+            }),
             bounce: collision.bounce,
             friction: collision.friction,
         },

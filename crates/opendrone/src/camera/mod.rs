@@ -63,8 +63,10 @@ use self::render::{FpvDisplay, FpvFrame, FpvRenderPlugin, SOURCE_VIEW, SourceTex
 /// than straight ahead does, by 2.6 mm at the Whoop 65's default Camera Tilt
 /// and FOV. A wall the Quad is pressed against has to stay beyond all of it,
 /// or the picture shows through the wall: the Whoop 65's camera sits behind
-/// its front duct rings, which touch the wall first, and the check in
-/// `tests/camera.rs` takes the near plane's four corners.
+/// its front duct rings, which touch the wall first in a level hit, and its
+/// camera housing, a collision part behind the lens, touches first in a
+/// nose-dive. The checks in `tests/camera.rs` take the near plane's four
+/// corners.
 pub const NEAR: f32 = 0.001;
 
 /// How far the flat render draws, in metres.

@@ -122,6 +122,7 @@ fn whoop_at(position: Vec3, velocity: Vec3) -> QuadSetUp {
                 rotor_height: 0.008,
                 prop_diameter: 0.035,
                 duct_rings: None,
+                camera_housing: None,
                 bounce: 0.3,
                 friction: 0.5,
             },

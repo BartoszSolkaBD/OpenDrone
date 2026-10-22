@@ -244,7 +244,9 @@ pub use map::{LineCrossing, MapCollision, MapShape, MapShapeError, MapShapeProbl
 pub use motor::{MotorParameters, PropParameters, drive_holding};
 pub use prop_wash::{Flicker, PropWash};
 pub use rotors::{PropDirection, RotorLayout};
-pub use shape::{DUCT_RING_SEGMENTS, DuctRings, PROP_DISC_THICKNESS, QuadPart, QuadShape};
+pub use shape::{
+    CameraHousing, DUCT_RING_SEGMENTS, DuctRings, PROP_DISC_THICKNESS, QuadPart, QuadShape,
+};
 
 use collide::{Collider, collide};
 use shape::Part;

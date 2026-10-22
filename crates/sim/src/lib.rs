@@ -131,7 +131,7 @@ pub use opendrone_physics::{
     RotorLayout, SetUpProblem, SpinDirection, StartUpStep, StartingMotors, StoppedStep, World,
 };
 pub use opendrone_physics::{
-    Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
+    CameraHousing, Contact, DuctRings, LineCrossing, MapShape, MapShapeProblem, QuadPart, QuadShape,
 };
 pub use opendrone_physics::{Flicker, PropWash};
 pub use radio_link::{

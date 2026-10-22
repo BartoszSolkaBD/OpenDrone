@@ -20,7 +20,7 @@ picture     = "picture.png"
 
 [camera]   # #14 and #28
 lens        = "fisheye"
-position    = "40 mm forward, 0 mm left, 16 mm up"   # between the front duct rings, 3 mm behind their outer edge (43 mm forward) so a wall stops the rings before the picture's near plane reaches it, and just above their tops (15 mm up): docs/research/quad-definitions.md
+position    = "40 mm forward, 0 mm left, 16 mm up"   # between the front duct rings, 3 mm behind their outer edge (43 mm forward) so a level hit stops the rings before the picture's near plane reaches the wall, and just above their tops (15 mm up). The camera housing in [collision] sits behind this position, so a nose-dive stops it too: docs/research/quad-definitions.md
 camera_tilt = "30°"     # the Meteor65 Pro's stock insert
 fov         = "160°"    # its C03 camera, corner to corner
 vtx_power   = "25 mW"   # what the maintainer's quads run
@@ -40,6 +40,7 @@ body        = { value = "box 35 × 30 × 20 mm", confidence = "Estimate", range 
 pack        = { value = "box 64 × 10 × 6 mm", confidence = "Manufacturer", source = "lava" }
 pack_height = { value = "-6 mm", confidence = "Estimate", range = "-12–0 mm", source = "layout" }   # under the frame
 duct_rings  = { value = "37 mm inside, 1.5 mm wall, 14 mm tall", confidence = "Estimate", range = "×0.9–×1.1", source = "layout" }
+camera_housing = { value = "box 8 × 6 × 9 mm", confidence = "Estimate", range = "×0.8–×1.2", source = "camera-housing" }   # behind the lens, which is the middle of its front face
 bounce      = { value = "0.3", confidence = "Estimate", range = "0.1–0.6", source = "feel" }
 friction    = { value = "0.5", confidence = "Estimate", range = "0.2–0.8", source = "feel" }
 
@@ -142,6 +143,7 @@ dynamics        = "docs/research/flight-dynamics.md §9.1 and #10's resolution �
 thrust-35mm     = "#34's correction to docs/research/flight-dynamics.md §9.1: BetaFPV's 0802 (2026) on 40 mm props gives C_T ≈ 0.29; the same C_T on the 35 mm props hovers at about 22,700 RPM; a Feel Test settles it"
 motor-model     = "docs/research/quad-definitions.md: worked from BetaFPV's 30.6 g at 3.4 A and 4 V through the motor model, using the Estimates for C_T and the no-load current"
 rotor-inertia   = "docs/research/quad-definitions.md: a 0.25 g 35 mm prop plus an 0802 motor's bell; it gives a spin-up of about 30 ms, inside the motor lag's range"
+camera-housing  = "docs/research/quad-definitions.md: an estimate of the C03 camera and its holder as a box 8 mm front to back, 6 mm across (it fits between the front duct rings) and 9 mm tall, with the lens in the middle of its front face; sized so it covers the picture's near plane in a nose-down hit at any angle (#268); nothing measured"
 layout          = "docs/research/quad-definitions.md: estimated from the frame's layout in BetaFPV's photos; nothing measured"
 first-guess     = "a first guess with no source yet, from #16's sample Quad file; the effect's own ticket (motors #41, air #42) works out the real value"
 drag-areas      = "docs/research/quad-definitions.md: each the silhouette of the collision shapes (frame and canopy, pack, duct rings) seen from the front, the side and above, times a drag coefficient of 1, as for the Freestyle 5″; seen from above, the prop discs are left out, since the air through them is the rotors' own. flight-dynamics.md §4.1 says to estimate them from the frame, then fit them to top speed and terminal speed: a Feel Test settles them"

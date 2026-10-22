@@ -7,8 +7,8 @@ scenario = "An upside-down Whoop 65 on a hard floor Crash Flips upright on roll 
 [[expect]]
 what     = "tilt at 1.9 s"
 basis    = "Rule"
-expected = "180° ± 1°"
-measured = "180°"
+expected = "176° ± 1°"
+measured = "176°"
 
 [[expect]]
 what     = "Crash Flip starts, first over 2 s to 2.1 s"
@@ -20,19 +20,19 @@ measured = "0.00413 s"
 what     = "tilt at 3.1 s"
 basis    = "Source"
 expected = "between 0° and 45°"
-measured = "0.0000000475°"
+measured = "0.00000000904°"
 
 [[expect]]
 what     = "the Quad turns right side up, first over 2 s to 3 s"
 basis    = "Observed"
-expected = "0.495 s ± 0.05 s"
-measured = "0.495 s"
+expected = "0.59 s ± 0.05 s"
+measured = "0.590 s"
 
 [[expect]]
 what     = "tilt at 3 s"
 basis    = "Observed"
 expected = "0° ± 1°"
-measured = "0.0000000475°"
+measured = "0.00000000904°"
 
 [[expect]]
 what     = "the Quad disarms, first over 3.2 s to 3.3 s"
@@ -43,26 +43,26 @@ measured = "0.000125 s"
 [[expect]]
 what     = "tilt at 5.9 s"
 basis    = "Rule"
-expected = "180° ± 1°"
-measured = "180°"
+expected = "176° ± 1°"
+measured = "176°"
 
 [[expect]]
 what     = "tilt at 7.1 s"
 basis    = "Source"
 expected = "between 0° and 45°"
-measured = "0.000000380°"
+measured = "0.000000117°"
 
 [[expect]]
 what     = "the Quad turns right side up, first over 6 s to 7 s"
 basis    = "Observed"
 expected = "0.501 s ± 0.05 s"
-measured = "0.501 s"
+measured = "0.488 s"
 
 [[expect]]
 what     = "tilt at 7 s"
 basis    = "Observed"
 expected = "0° ± 1°"
-measured = "0.000000380°"
+measured = "0.000000117°"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "fd7de940f5ef804f"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "34beaba8089d12cd"   # the whole state after each of 60000 steps at 8000 Hz, in order
+run  = "266b190815476907"   # the whole state after each of 60000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
-"0.75 s" = "3c8b63a1033aadb8"
-"1.5 s" = "ea4c0bacf8a44d71"
-"2.25 s" = "60bc8dfca5487905"
-"3 s" = "f8b63186dae74ecb"
-"3.75 s" = "ed66a13e91f9b694"
-"4.5 s" = "8f575e727df07b51"
-"5.25 s" = "6a0f505c6551ed68"
-"6 s" = "7af034578d96dd46"
-"6.75 s" = "25bdd116f29eac08"
-"7.5 s" = "1d0ab0476c54c909"
+"0.75 s" = "18c1303b766bc21d"
+"1.5 s" = "48df5c3f18715fd2"
+"2.25 s" = "b31e24ad8840b0b1"
+"3 s" = "fa30c9b80a2b2763"
+"3.75 s" = "2926f42aeb9a5b70"
+"4.5 s" = "6aaac1703448bc65"
+"5.25 s" = "b7a28ab2968ebf00"
+"6 s" = "25b1679e098c9bba"
+"6.75 s" = "65654d4b39d749ba"
+"7.5 s" = "a1d61f918e56f812"

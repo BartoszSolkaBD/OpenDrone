@@ -101,6 +101,7 @@ pub fn whoop_shape() -> QuadShape {
             wall: 0.0015,
             height: 0.014,
         }),
+        camera_housing: None,
         bounce: 0.3,
         friction: 0.5,
     }

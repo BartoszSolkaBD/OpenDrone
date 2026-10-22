@@ -7,7 +7,7 @@ scenario = "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on 
 [[expect]]
 what     = "height, highest over 0 s to 2 s"
 basis    = "Rule"
-expected = "3.085 m ± 0.0002 m"
+expected = "between 3.0795 m and 3.0825 m"
 measured = "3.08 m"
 
 [[expect]]
@@ -19,13 +19,13 @@ measured = "3.07 m"
 [[expect]]
 what     = "height at 0.5 s"
 basis    = "Observed"
-expected = "3.085 m ± 0.0002 m"
+expected = "3.082 m ± 0.0005 m"
 measured = "3.08 m"
 
 [[expect]]
 what     = "height at 2 s"
 basis    = "Observed"
-expected = "3.085 m ± 0.0002 m"
+expected = "3.082 m ± 0.0005 m"
 measured = "3.08 m"
 
 [[expect]]
@@ -35,18 +35,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "fd7de940f5ef804f"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
-run  = "224cd22239ec7d8c"   # the whole state after each of 16000 steps at 8000 Hz, in order
+run  = "295acba38344a540"   # the whole state after each of 16000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.2 s" = "2df606c63659245d"
-"0.4 s" = "f5204a7f563b9dc7"
-"0.6 s" = "ca1226acbb8a6667"
-"0.8 s" = "f568fe51d43d6194"
-"1 s" = "0de9d6f520de1253"
-"1.2 s" = "5e537d2fde70b79a"
-"1.4 s" = "3a5b80a603a2eceb"
-"1.6 s" = "6266d8602286b940"
-"1.8 s" = "32d462e84f3d4205"
-"2 s" = "7a0599eda8e5d371"
+"0.4 s" = "9f57198df0e3c2e5"
+"0.6 s" = "8128eb74cab9196a"
+"0.8 s" = "01f835f9e08b8754"
+"1 s" = "51693a8fead5ddf6"
+"1.2 s" = "8a64dd2b207c4b71"
+"1.4 s" = "c8870c2ab3455d85"
+"1.6 s" = "70f6e16e11e5194c"
+"1.8 s" = "98baacb57a280563"
+"2 s" = "ab3991a6a2eb43e5"

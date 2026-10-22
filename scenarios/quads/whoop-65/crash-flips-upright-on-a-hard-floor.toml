@@ -4,9 +4,12 @@
 # details, it comes over; how long each flip takes is what the Simulation
 # does today.
 #
-# It lies upside down on test/flat-floor, on its duct rings, their tops 15 mm
-# above its centre of mass (8 mm up to the props' plane, plus half the rings'
-# 14 mm), and starts as Reset leaves it: disarmed, the ESCs powering up, ready
+# It lies upside down on test/flat-floor, on its camera housing, whose top is
+# 20.5 mm above its centre of mass, and its rear duct rings, whose tops are 15
+# mm above it (8 mm up to the props' plane, plus half the rings' 14 mm), so
+# it rests tilted by atan(5.5 mm / (40 mm + 43.3 mm)) = 3.8° (#268 added the
+# housing; before it lay flat on the rings). It starts as Reset leaves it,
+# with the housing just touching the floor: disarmed, the ESCs powering up, ready
 # at 1.662 s. The Crash Flip switch is on; the Arm switch goes on at 2 s, so
 # it arms in Crash Flip at 2.004 s, and the motors' commands reach the ESCs
 # 21.25 ms later, after "spin direction reversed"; each ESC then waits its
@@ -16,8 +19,9 @@
 # thrust (50% of forward, an Estimate) lifts its right side, and it rolls
 # over its left side. The motors take a while to get going: each ESC starts
 # its motor capped at the start-up power limit for 15 electrical turns, so
-# they run fast only from about 2.3 s. The pilot centres the stick at 2.45 s,
-# as it comes over, and it lands right side up; held on, the pair that lifted
+# they run fast only from about 2.3 s. The pilot centres the stick at 2.4 s,
+# as it comes over, and it lands right side up (centred at 2.45 s, as before
+# the housing, it still has speed to roll back over its other side); held on, the pair that lifted
 # it would keep pushing once it's over and flip it over again, as on a real
 # quad. The Crash Flip switch then goes off, which disarms it. Then Reset
 # puts it back upside down, and it does the same on full pitch forward: the
@@ -29,7 +33,7 @@ name   = "An upside-down Whoop 65 on a hard floor Crash Flips upright on roll an
 kind              = "flight"
 quad              = "opendrone/whoop-65"
 map               = "test/flat-floor"
-position          = "0 m east, 0 m north, 0.015 m up"
+position          = "0 m east, 0 m north, 0.0205 m up"
 attitude          = "roll 180°, pitch 0°, heading 0°"
 speed             = "0 m/s"
 rotation          = "0 °/s"
@@ -56,7 +60,7 @@ quickrates_rc_expo = "off"
 timeline = [
   { at = "0 s",   roll = "100%", pitch = "0%", yaw = "0%", throttle = "0%", arm = "off", crash_flip = "on" },
   { at = "2 s",   arm = "on" },
-  { at = "2.45 s", roll = "0%" },
+  { at = "2.4 s",  roll = "0%" },
   { at = "3.2 s", crash_flip = "off" },
   { at = "3.5 s", arm = "off" },
   # Back upside down, then on pitch.
@@ -70,8 +74,8 @@ timeline = [
 [[expect]]
 what  = "tilt"
 at    = "1.9 s"
-value = "180° ± 1°"
-basis = "rule: it starts upside down and lies still on its duct rings until it's armed"
+value = "176° ± 1°"
+basis = "rule: it starts upside down and lies still on its camera housing and its rear duct rings until it's armed: the housing's top is 20.5 mm above its centre and the rings' tops 15 mm, so it rests tilted by 180° - 3.8° = 176.2°"
 
 [[expect]]
 what  = "Crash Flip starts"
@@ -88,8 +92,8 @@ basis = "source: the maintainer's memory of the Meteor65 Pro: Crash Flip \"works
 [[expect]]
 what  = "the Quad turns right side up"
 over  = "2 s to 3 s"
-first = "0.495 s ± 0.05 s"
-basis = "observed: the roll flip, from the Arm switch going on until it comes past its side"
+first = "0.59 s ± 0.05 s"
+basis = "observed: the roll flip, from the Arm switch going on until it comes past its side; it took 0.495 s before the camera housing (#268), which holds it tilted 3.8° and changes how it rolls over its side"
 
 [[expect]]
 what  = "tilt"
@@ -106,8 +110,8 @@ basis = "source: updateArmingStatus: the Crash Flip switch off while armed in Cr
 [[expect]]
 what  = "tilt"
 at    = "5.9 s"
-value = "180° ± 1°"
-basis = "rule: Reset put it back upside down on its Launch Spot"
+value = "176° ± 1°"
+basis = "rule: Reset put it back upside down on its Launch Spot, where it rests tilted on its camera housing and rear duct rings, as before the roll flip"
 
 [[expect]]
 what  = "tilt"

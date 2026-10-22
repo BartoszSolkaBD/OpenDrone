@@ -864,25 +864,18 @@ fn the_late_picture_never_enters_the_simulation() {
 // ---------------------------------------------------------------------------
 // Where the camera sits on the Whoop 65
 
-#[test]
-fn after_a_level_nose_first_hit_into_a_wall_the_whoops_near_plane_stays_short_of_the_wall() {
-    // Basis: Rule. The picture draws nothing nearer than the near plane, so
-    // the picture shows through a wall once any part of the near plane is
-    // past the wall's face (#208). The near plane is a flat rectangle, NEAR
-    // ahead of the camera along its axis, as wide and tall as the flat render
-    // reaches (`Lens::flat_reach`): on a 160° FOV its bottom edge reaches much
-    // nearer a wall than straight ahead does. The Scenario flies the Whoop 65
-    // level, nose first, at 10 m/s east into the Wall Test Map's wall, whose
-    // face is 5 m east, and the check takes the near plane's four corners
-    // every tick, at the default Camera Tilt and FOV, under both Video Looks'
-    // Lens curves. Metres.
+/// How far the Whoop 65's near plane gets past the Wall Test Map's wall, at
+/// worst, in the hit a Scenario flies, in metres (negative while it stays
+/// short). The wall's face is 5 m east. The near plane is a flat rectangle,
+/// NEAR ahead of the camera along its axis, as wide and tall as the flat
+/// render reaches (`Lens::flat_reach`): on a 160° FOV its bottom edge reaches
+/// much nearer a wall than straight ahead does. The check takes its four
+/// corners every tick, at the default Camera Tilt and FOV, under both Video
+/// Looks' Lens curves.
+fn deepest_near_plane_past_the_wall(scenario: &str) -> f64 {
     const WALL_FACE: f64 = 5.0;
     let repo = repo_folder();
-    let loaded = reference::load(
-        &repo,
-        &repo.join("scenarios/physics/whoop-hits-a-wall-nose-first-with-its-front-duct-rings.toml"),
-    )
-    .unwrap();
+    let loaded = reference::load(&repo, &repo.join(scenario)).unwrap();
     let (simulation, inputs) = opendrone_scenario::simulation(&loaded.scenario, &loaded.packs)
         .unwrap_or_else(|problems| panic!("{problems}"));
     let mut flight = Flight::scripted(simulation, inputs).unwrap();
@@ -920,6 +913,34 @@ fn after_a_level_nose_first_hit_into_a_wall_the_whoops_near_plane_stays_short_of
         bounced |= state.velocity.x < 0.0;
     }
     assert!(bounced, "the whoop never hit the wall and bounced back");
+    deepest
+}
+
+#[test]
+fn after_a_level_nose_first_hit_into_a_wall_the_whoops_near_plane_stays_short_of_the_wall() {
+    // Basis: Rule. The picture draws nothing nearer than the near plane, so
+    // the picture shows through a wall once any part of the near plane is
+    // past the wall's face (#208). The Scenario flies the Whoop 65 level,
+    // nose first, at 10 m/s east into the wall. Metres.
+    let deepest = deepest_near_plane_past_the_wall(
+        "scenarios/physics/whoop-hits-a-wall-nose-first-with-its-front-duct-rings.toml",
+    );
+    assert!(
+        deepest < 0.0,
+        "the near plane's corner got {:.2} mm past the wall's face",
+        deepest * 1000.0
+    );
+}
+
+#[test]
+fn after_a_45_degree_nose_down_hit_into_a_wall_the_whoops_near_plane_stays_short_of_the_wall() {
+    // Basis: Rule. As for the level hit (#268): the picture shows through a
+    // wall once any part of the near plane is past the wall's face. The
+    // Scenario flies the Whoop 65 nose down 45° at 10 m/s east into the
+    // wall: a nose-dive, which whoop flying meets often. Metres.
+    let deepest = deepest_near_plane_past_the_wall(
+        "scenarios/physics/whoop-hits-a-wall-nose-down-at-45-degrees.toml",
+    );
     assert!(
         deepest < 0.0,
         "the near plane's corner got {:.2} mm past the wall's face",

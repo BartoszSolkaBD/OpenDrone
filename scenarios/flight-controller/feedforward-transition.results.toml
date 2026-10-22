@@ -23,7 +23,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "b55d8297fc758672"   # test/freestyle-5-feedforward-transition: what the Simulation receives from it
+quad = "f477ba1fbd1df6f2"   # test/freestyle-5-feedforward-transition: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "5c6b259c2cb71c0b"   # the whole state after each of 5600 steps at 8000 Hz, in order
 
