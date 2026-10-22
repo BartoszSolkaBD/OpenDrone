@@ -204,6 +204,14 @@ jobs:
         if: steps.changes.outputs.all_checks == 'true'
         run: cargo xtask credits --check
 
+      - name: The libraries' licence texts that every download carries are up to date
+        # licences/third-party-<os>.txt list every library built into the game
+        # on each OS, with its version, licence and licence text, generated
+        # from Cargo.lock (ADR-0014, #270). A library added or upgraded needs
+        # `cargo xtask licences` run and its files committed.
+        if: steps.changes.outputs.all_checks == 'true'
+        run: cargo xtask licences --check
+
       - name: Feel Test log rules (an Estimate moves with a log row and inside its range; a locked number changes with its source)
         # Compares every Quad definition with this PR's base: HEAD^1 of the
         # merge commit (fetch-depth 2), or main's previous commit on a push

@@ -8,7 +8,9 @@
 //!   system, in the layout the game looks for beside itself
 //!   (`opendrone::set_up::find_repo_folder`). Packs and Scenarios come from
 //!   the files git tracks, so data downloaded onto this machine (NeuroBEM's,
-//!   which has no licence to redistribute) never goes in.
+//!   which has no licence to redistribute) never goes in. The libraries'
+//!   licence texts come from `licences/third-party-<os>.txt`, which
+//!   `cargo xtask licences` writes and CI keeps up to date (#270).
 //! - `bevy-upgrade <index file>`: the "Upgrade to Bevy 0.N" issues to open,
 //!   from crates.io's index entry for `bevy` and the fixed template.
 //! - `advisories <cargo-deny output>`: the issues the daily security scan
@@ -127,6 +129,10 @@ const FILES: [&str; 4] = [
     "LICENSE-APACHE",
 ];
 
+/// The name every download gives the libraries' licence texts, which come
+/// from `crate::licences::file_for(os)`.
+const THIRD_PARTY_LICENCES: &str = "THIRD-PARTY-LICENSES.txt";
+
 pub fn run_package(args: &[String]) -> ExitCode {
     const USAGE: &str = "Usage: cargo xtask package --game <built program> --os <macos|windows|linux> \
                          --name <version or build name> [--out <folder>] [--no-textures]";
@@ -237,7 +243,8 @@ fn read_me(name: &str, os: &str) -> String {
          \r\n\
          How to fly it, and what there is so far: \
          https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/pilot-guide.md\r\n\
-         Licences: LICENSE-MIT and LICENSE-APACHE; the textures and where they come from: \
+         Licences: LICENSE-MIT and LICENSE-APACHE for OpenDrone; THIRD-PARTY-LICENSES.txt for \
+         the libraries built into the game; the textures and where they come from: \
          CREDITS.md.\r\n"
     )
 }
@@ -279,6 +286,13 @@ pub fn package(
         }
         files.push(file.to_string());
     }
+    let third_party = crate::licences::file_for(os);
+    let third_party_text = fs::read(root.join(&third_party)).map_err(|e| {
+        format!(
+            "{third_party} can't be read ({e}): every download carries the libraries' licence \
+             texts. Run `cargo xtask licences` and commit it."
+        )
+    })?;
     let manifest = materials::read(root)?;
     let mut missing = Vec::new();
     let mut textured = 0;
@@ -351,6 +365,11 @@ pub fn package(
         read_me(name, os).as_bytes(),
         0o644,
     )?;
+    write(
+        format!("{top}/{THIRD_PARTY_LICENCES}"),
+        &third_party_text,
+        0o644,
+    )?;
     for path in &files {
         let bytes = fs::read(root.join(path)).map_err(|e| format!("{path}: {e}"))?;
         write(format!("{top}/{path}"), &bytes, 0o644)?;
@@ -365,7 +384,7 @@ pub fn package(
     Ok(format!(
         "{}: the game ({program_name}), {} files of Packs, Scenarios, licences and credits, and {textures_line}.",
         zip_path.display(),
-        files.len() - if textures { 2 * textured } else { 0 },
+        files.len() + 1 - if textures { 2 * textured } else { 0 },
     ))
 }
 

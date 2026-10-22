@@ -20,7 +20,7 @@ The builds aren't signed, so each system warns about them the first time. Signin
 - **Windows.** Double-click `opendrone.exe`. The first time, SmartScreen may say it protected your PC: click **More info**, then **Run anyway**.
 - **Linux.** Run `./opendrone` in the folder, or double-click it if your file manager runs programs. It needs the system's sound library (alsa-lib) and a Vulkan driver, which most desktops have.
 
-What's inside, beside the game: the built-in Pack (`packs/`), the Scenarios (`scenarios/`), the Maps' textures and the material library (`assets-src/`), the licences, `CREDITS.md` and a short `README.txt`. The game looks for its Packs in the folder it's in first, so it finds them wherever it's started from. A flight saved with Save Flight goes into the build's own `scenarios/saved/`. [Flying OpenDrone](pilot-guide.md) says how to fly what there is.
+What's inside, beside the game: the built-in Pack (`packs/`), the Scenarios (`scenarios/`), the Maps' textures and the material library (`assets-src/`), the licences, `THIRD-PARTY-LICENSES.txt`, `CREDITS.md` and a short `README.txt`. The game looks for its Packs in the folder it's in first, so it finds them wherever it's started from. A flight saved with Save Flight goes into the build's own `scenarios/saved/`. [Flying OpenDrone](pilot-guide.md) says how to fly what there is.
 
 ## Making a release
 
@@ -37,6 +37,15 @@ What's inside, beside the game: the built-in Pack (`packs/`), the Scenarios (`sc
 3. **The Release workflow does the rest,** in about the time a build of main takes. It checks the tag, builds the three zips, and publishes a pre-release named "OpenDrone 0.1.0-alpha.1" with them. Its notes list every PR merged since the last release, by its title. Every release is a pre-release for now.
 
 The Release workflow refuses a tag that isn't on main, and one that isn't a release version: `v0.0.5`, `v0.1.0-rc.1`, `v0.1.0-beta.1` and `v0.1.0-alpha.0` publish nothing (`cargo xtask release-version <tag>` says why). If you make the release on GitHub's Releases page instead, with a new tag, the workflow adds the three zips to it and marks it a pre-release, and keeps the notes you wrote there.
+
+## The libraries' licences
+
+MIT, Zlib and the other licences of the libraries inside the game ask for their texts to travel with every copy of the game, and a download is a copy. So each zip carries `THIRD-PARTY-LICENSES.txt`: every library built into the game for that operating system, each with its version, its licence, where it comes from and the full text of its licence files. A text that several libraries share is written once, and each library points to it.
+
+- **Where it comes from.** `cargo xtask licences` writes one file per operating system, `licences/third-party-macos.txt`, `-windows.txt` and `-linux.txt`, from `Cargo.lock`. `cargo xtask package` copies the right one into the zip. The files are committed, and CI's `cargo xtask licences --check` fails when one is out of date, so a library added or upgraded in a PR comes with its files written again: run `cargo xtask licences` and commit them.
+- **Which libraries.** The ones Cargo builds the game with on that system: not the tools that run only while it builds (build scripts, procedural macros), and not the test tools. One exception goes the other way: SDL is built from its C source and linked into the game, so its licence, and the BSD licence of the HIDAPI inside it, are listed although Cargo only builds with its source.
+- **Why this tool.** It uses Cargo's own `cargo tree` and `cargo metadata`, which are already there, so no library and no new tool is added. `cargo about` does the same, but adds a tool and a second list of accepted licences to keep beside `deny.toml`'s.
+- **Packages with no licence file.** A few libraries (17 on Linux at the time of writing) keep their licence files in their repository, outside the crate that is published. For those the file says so, and gives the standard text of Apache-2.0, which they all offer, without a copyright holder's name. A library like that under a licence with no standard text in the tool stops it with a message naming the library: its text has to be read in its repository and added to the tool, never made up.
 
 ## Updates
 
@@ -65,4 +74,3 @@ You can start either scheduled workflow by hand from GitHub's **Actions** tab, o
 - The macOS build runs on Apple Silicon only.
 - The Linux build needs a system at least as new as the Ubuntu GitHub builds it on.
 - The Windows build needs Microsoft's Visual C++ runtime, which most Windows PCs already have.
-- A build carries OpenDrone's own licences and `CREDITS.md`, but not yet the licence texts of the libraries built into the game.

@@ -96,6 +96,12 @@ impl Repo {
         self.write("CREDITS.md", "# Credits\n");
         self.write("LICENSE-MIT", "MIT\n");
         self.write("LICENSE-APACHE", "Apache\n");
+        for os in ["macos", "windows", "linux"] {
+            self.write(
+                &format!("licences/third-party-{os}.txt"),
+                &format!("The libraries' licences, for {os}\n"),
+            );
+        }
         self.write("built/opendrone", "the game's program");
         self.track();
     }
@@ -248,13 +254,14 @@ fn a_download_holds_the_game_with_its_packs_and_scenarios_beside_it() {
         "CREDITS.md",
         "LICENSE-MIT",
         "LICENSE-APACHE",
+        "THIRD-PARTY-LICENSES.txt",
     ] {
         assert!(
             files.contains(&format!("{top}/{want}").as_str()),
             "{want} in {files:?}"
         );
     }
-    assert_eq!(files.len(), 11, "nothing else: {files:?}");
+    assert_eq!(files.len(), 12, "nothing else: {files:?}");
     let program = entries
         .iter()
         .find(|(n, _, _)| n == &format!("{top}/opendrone"))
@@ -343,7 +350,7 @@ fn a_file_git_does_not_track_never_goes_into_a_download() {
     let files = file_names(&repo.root.join("dist/OpenDrone-x-macos.zip"));
     assert_eq!(
         files.len(),
-        11,
+        12,
         "the same files as a clean checkout: {files:?}"
     );
     assert!(
@@ -374,6 +381,73 @@ fn a_folder_that_is_not_a_git_checkout_is_refused_with_a_plain_message() {
     ]);
     assert!(!ok);
     assert!(err.contains("isn't a git checkout"), "{err}");
+    assert!(!repo.root.join("dist").exists());
+}
+
+#[test]
+fn every_download_carries_the_licence_texts_of_the_libraries_built_into_its_game() {
+    // Basis: Rule (#270, ADR-0014): MIT and Zlib ask for their texts to
+    // travel with a binary copy, so each system's zip holds that system's
+    // list of libraries with their licence texts, as THIRD-PARTY-LICENSES.txt
+    // beside the game's own licences.
+    let repo = Repo::new("third-party");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    for os in ["macos", "windows", "linux"] {
+        let (ok, _, err) = repo.run(&[
+            "package",
+            "--game",
+            "built/opendrone",
+            "--os",
+            os,
+            "--name",
+            "x",
+            "--out",
+            "dist",
+        ]);
+        assert!(ok, "{os}: {err}");
+        let entries = unzip(&repo.root.join(format!("dist/OpenDrone-x-{os}.zip")));
+        let (_, _, text) = entries
+            .iter()
+            .find(|(n, _, _)| n == &format!("OpenDrone-x-{os}/THIRD-PARTY-LICENSES.txt"))
+            .unwrap_or_else(|| panic!("{os}: no THIRD-PARTY-LICENSES.txt"));
+        assert_eq!(
+            String::from_utf8_lossy(text),
+            format!("The libraries' licences, for {os}\n")
+        );
+        let readme = entries
+            .iter()
+            .find(|(n, _, _)| n.ends_with("/README.txt"))
+            .unwrap();
+        assert!(
+            String::from_utf8_lossy(&readme.2).contains("THIRD-PARTY-LICENSES.txt"),
+            "the README points to it"
+        );
+    }
+}
+
+#[test]
+fn a_download_without_the_libraries_licence_texts_is_refused() {
+    // Basis: Rule (#270): no download goes out without them.
+    let repo = Repo::new("no-third-party");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    fs::remove_file(repo.root.join("licences/third-party-linux.txt")).unwrap();
+    repo.track();
+    let (ok, _, err) = repo.run(&[
+        "package",
+        "--game",
+        "built/opendrone",
+        "--os",
+        "linux",
+        "--name",
+        "x",
+        "--out",
+        "dist",
+    ]);
+    assert!(!ok);
+    assert!(err.contains("licences/third-party-linux.txt"), "{err}");
+    assert!(err.contains("cargo xtask licences"), "{err}");
     assert!(!repo.root.join("dist").exists());
 }
 
