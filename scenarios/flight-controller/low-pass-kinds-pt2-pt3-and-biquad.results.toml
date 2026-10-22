@@ -65,7 +65,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "958c7276e7cf88c5"   # test/freestyle-5-other-low-pass-kinds: what the Simulation receives from it
+quad = "56723aef27271845"   # test/freestyle-5-other-low-pass-kinds: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "be491c72bcc07104"   # the whole state after each of 4800 steps at 8000 Hz, in order
 

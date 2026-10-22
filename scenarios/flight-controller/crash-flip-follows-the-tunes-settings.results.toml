@@ -89,7 +89,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "73448ea06a1dbe09"   # test/freestyle-5-crash-flip-settings: what the Simulation receives from it
+quad = "342a5718a9754d89"   # test/freestyle-5-crash-flip-settings: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "abbdffd249c40f2f"   # the whole state after each of 8000 steps at 8000 Hz, in order
 

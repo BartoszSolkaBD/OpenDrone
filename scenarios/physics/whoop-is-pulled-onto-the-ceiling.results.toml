@@ -7,7 +7,7 @@ scenario = "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on 
 [[expect]]
 what     = "height, highest over 0 s to 2 s"
 basis    = "Rule"
-expected = "between 3.0795 m and 3.0825 m"
+expected = "between 3.0795 m and 3.0820 m"
 measured = "3.08 m"
 
 [[expect]]
@@ -35,7 +35,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "fd7de940f5ef804f"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "3232af5450196812"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
 run  = "295acba38344a540"   # the whole state after each of 16000 steps at 8000 Hz, in order
 

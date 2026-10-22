@@ -53,7 +53,7 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "535268f9629230d8"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
+quad = "14383171a1e9c058"   # test/freestyle-5-loop-shaping-only: what the Simulation receives from it
 map  = "none"   # the Flight Controller runs alone, with no Map
 run  = "807b25007e489a30"   # the Flight Controller's whole state after each of 6 cases, in order
 
