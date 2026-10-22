@@ -4,16 +4,22 @@
 //! clock into Simulation Time and hands the Simulation Flight Inputs. It is one
 //! of the two crates that may use `unsafe` ([ADR-0003]).
 //!
-//! What the first flight needs, so far (#62):
+//! What the game is made of, so far:
 //!
 //! - [`stepping`]: the Simulation stepped in Bevy's fixed timestep at 1 kHz,
 //!   8 steps a tick in one system, with catch-up stepping;
 //! - [`clock`]: the computer's clock turned into Simulation Time, standing
 //!   still while paused;
 //! - [`pilot`]: the Input Devices' Channels as Flight Inputs, the Flying
-//!   Input Device, and the Actions Reset and Pause;
-//! - [`set_up`]: the flight set up from the built-in Pack and the
-//!   [`settings`], fixed until the screens ticket;
+//!   Input Device, and the Actions Reset and Pause; in a menu, the Input
+//!   Devices move the cursor instead;
+//! - [`screens`] (#68): First Launch, the Hub, the loading screen, the Pause
+//!   Menu and a small Settings page, on Bevy's UI widgets, usable with a
+//!   Radio alone;
+//! - [`settings_file`] (#68): the one settings file, saved the moment a
+//!   setting changes, with the pilot's settings in it;
+//! - [`set_up`]: the flight set up from the Packs and the [`settings`]
+//!   (the pilot's own, from the settings file);
 //! - [`sound`](mod@sound): the Quad's sound On the Quad, on the sound's own
 //!   thread, silent when there's no sound device (#74);
 //! - [`drawing`]: the Map and the Quad drawn from their solid parts, a grid
@@ -46,8 +52,10 @@ pub mod map_drawing;
 pub mod pilot;
 pub mod reference;
 pub mod save;
+pub mod screens;
 pub mod set_up;
 pub mod settings;
+pub mod settings_file;
 pub mod sound;
 pub mod status;
 pub mod stepping;
@@ -64,6 +72,7 @@ use bevy::window::PresentMode;
 use crate::camera::CameraPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pilot::{KeyboardPlugin, Pilot, PilotPlugin};
+use crate::screens::{Screens, ScreensPlugin, ViewPlugin};
 use crate::set_up::FlightPlan;
 use crate::sound::SoundPlugin;
 use crate::status::StatusPlugin;
@@ -77,6 +86,18 @@ pub use crate::developer::{measure_camera_cost, screenshot_after};
 pub fn game(plan: FlightPlan, pilot: Pilot) -> Result<App, String> {
     let flight = Flight::new(plan.simulation(None)?)?;
     Ok(window_game(plan, pilot, flight))
+}
+
+/// The game in its window with its screens (#68): First Launch on a new
+/// install, then the Hub, the loading screen and the Pause Menu. `plan` is the
+/// flight the settings start from, made behind the screens until FLY makes
+/// it afresh.
+pub fn screens_game(plan: FlightPlan, pilot: Pilot, screens: Screens) -> Result<App, String> {
+    let flight = Flight::new(plan.simulation(None)?)?;
+    let mut app = window_game(plan, pilot.with_screens(), flight);
+    app.add_plugins((ScreensPlugin, ViewPlugin))
+        .insert_resource(screens);
+    Ok(app)
 }
 
 /// The game in its window, watching a Scenario (#73): its flight stepped by

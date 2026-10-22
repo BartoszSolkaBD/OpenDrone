@@ -12,5 +12,5 @@ pub fn packs() -> Packs {
 
 /// The tracer's flight plan for a built-in Quad, such as `whoop-65`.
 pub fn plan(quad: &str) -> FlightPlan {
-    FlightPlan::from_packs(&packs(), Settings::tracer(quad)).expect("the tracer's Quads fly")
+    FlightPlan::from_packs(&packs(), Settings::defaults(quad)).expect("the tracer's Quads fly")
 }

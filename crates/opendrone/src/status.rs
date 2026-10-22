@@ -1,20 +1,24 @@
-//! What the pilot needs to know, in the window's title until the OSD and the
-//! screens arrive: the Quad, the Flying Input Device or how to pick one,
-//! whether the Quad is armed or what blocks arming, Failsafe and Pause, that
-//! there's no sound device (which the Hub will say instead), the brief readout
-//! after a Camera Tilt or FOV change, and what Save Flight said. When a
-//! Scenario is being watched, its name stands in for the Input Device, and the
-//! title says where it is in its run.
+//! What the pilot needs to know, in the window's title until the OSD arrives:
+//! the Quad, the Flying Input Device or how to pick one, whether the Quad is
+//! armed or what blocks arming, Failsafe and Pause, the brief readout after a
+//! Camera Tilt or FOV change, and what Save Flight said. When a Scenario is
+//! being watched, its name stands in for the Input Device, and the title says
+//! where it is in its run.
+//!
+//! With the screens (#68), the title is only "OpenDrone" on a screen with no
+//! flight behind it, and the Pause Menu says what Pause says. That there's no
+//! sound device is a Hub notice, shown once ([`crate::screens`]), not a
+//! segment of the title.
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use opendrone_input::Lost;
-use opendrone_sound::Device;
 
 use crate::camera::CameraReadout;
 use crate::pilot::Pilot;
+use crate::screens::Screens;
+use crate::screens::model::Screen;
 use crate::set_up::FlightPlan;
-use crate::sound::QuadSoundPlaying;
 use crate::stepping::Flight;
 use crate::watch::Watching;
 
@@ -33,12 +37,22 @@ fn show_the_status(
     pilot: Res<Pilot>,
     flight: NonSend<Flight>,
     game_clock: Res<Time<Virtual>>,
-    sound: Option<Res<QuadSoundPlaying>>,
     readout: Res<CameraReadout>,
     real: Res<Time<Real>>,
     watching: Option<Res<Watching>>,
+    screens: Option<Res<Screens>>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
+    if let Some(screens) = &screens
+        && (!screens.menus().world_shown() || screens.menus().screen() == Screen::Loading)
+    {
+        for mut window in &mut windows {
+            if window.title != "OpenDrone" {
+                window.title = "OpenDrone".to_string();
+            }
+        }
+        return;
+    }
     let mut parts = vec![format!("OpenDrone: {}", plan.quad.name)];
     if let Some(watching) = &watching {
         let sim = flight.simulation();
@@ -79,11 +93,8 @@ fn show_the_status(
             parts.push("FAILSAFE".to_string());
         }
     }
-    if game_clock.is_paused() {
+    if game_clock.is_paused() && screens.is_none() {
         parts.push("paused (Esc goes on)".to_string());
-    }
-    if sound.is_none_or(|s| matches!(s.device(), Device::None(_))) {
-        parts.push("no sound device: running silent".to_string());
     }
     if let Some(text) = readout.text(real.elapsed()) {
         parts.push(text.to_string());

@@ -57,8 +57,13 @@ sdl3-sys = { version = "=0.7.2", default-features = false }
 # the default tonemapping its look-up tables, which need `ktx2` and
 # `zstd_rust` to read. `bevy_post_process` is for the FPV Camera's
 # Auto-exposure, and `bevy_curve` for the compensation curve that keeps it in
-# each Video Look's limits. `jpeg` reads the Maps' CC0 textures (#63). On Linux
-# it draws on X11 and Wayland, as Bevy's own default does.
+# each Video Look's limits. `jpeg` reads the Maps' CC0 textures (#63), and
+# `png` the Quads' pictures for the screens (#68). The screens are Bevy's UI:
+# `bevy_ui_widgets` is its headless widgets (with the input focus and UI they
+# need), `bevy_ui_render` and `bevy_text` draw them, `default_font` is the
+# placeholder style's font, and `bevy_picking` with `ui_picking` is how the
+# mouse reaches them. On Linux it draws on X11 and Wayland, as Bevy's own
+# default does.
 bevy = { version = "=0.20.0", default-features = false, features = [
     "std",
     "multi_threaded",
@@ -84,10 +89,17 @@ bevy = { version = "=0.20.0", default-features = false, features = [
     "bevy_gizmos_render",
     "bevy_post_process",
     "bevy_curve",
+    "bevy_ui_widgets",
+    "bevy_ui_render",
+    "bevy_text",
+    "default_font",
+    "bevy_picking",
+    "ui_picking",
     "tonemapping_luts",
     "ktx2",
     "zstd_rust",
     "jpeg",
+    "png",
 ] }
 # The sound engine, used directly with no Bevy add-on (ADR-0023). Only
 # opendrone-sound uses it. Its API still changes often, so it moves on

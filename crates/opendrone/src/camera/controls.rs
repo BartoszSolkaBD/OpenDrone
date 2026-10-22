@@ -105,9 +105,9 @@ impl QuadCamera {
 }
 
 /// The pilot's camera settings. Camera Tilt and FOV are kept for each Quad,
-/// by its id, and start from the Quad's definition. They live here until the
-/// settings file arrives with the screens ticket; then they persist there.
-#[derive(Resource, Clone, Debug, Default)]
+/// by its id, and start from the Quad's definition. The settings file keeps
+/// them ([`crate::settings_file`]).
+#[derive(Resource, Clone, Debug, Default, PartialEq)]
 pub struct CameraSettings {
     quads: BTreeMap<String, QuadCamera>,
     pub look: VideoLook,
@@ -123,7 +123,12 @@ impl CameraSettings {
             .unwrap_or_else(|| QuadCamera::defaults(camera))
     }
 
-    /// Sets this Quad's Camera Tilt and FOV, as the settings file will.
+    /// Every Quad the pilot has changed the camera of, by id, in id order.
+    pub fn quads(&self) -> impl Iterator<Item = (&String, &QuadCamera)> {
+        self.quads.iter()
+    }
+
+    /// Sets this Quad's Camera Tilt and FOV, as the settings file does.
     pub fn set_quad(&mut self, id: &str, camera: QuadCamera) {
         self.quads.insert(id.to_string(), camera);
     }

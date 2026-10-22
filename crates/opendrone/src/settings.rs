@@ -1,20 +1,15 @@
-//! The tracer's fixed settings. The screens ticket brings the settings file
-//! and the menus to change them; until then every flight uses these.
+//! What a flight starts from: the pilot's settings that belong to the
+//! Simulation (ADR-0003), and which Quad on which Map.
+//!
+//! The pilot's own settings live in the settings file
+//! ([`crate::settings_file`]); [`Settings::from_pilot`] turns them into what
+//! the Simulation is set up with. The physics rate and the random seed aren't
+//! the pilot's to change.
 
 use opendrone_input::profile::FlightMode;
 use opendrone_sim::{PacketRate, PhysicsRate, Rates};
 
-/// The Quads the tracer flies, by the id after `opendrone/`.
-pub const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
-
-/// The Maps the game flies, by the name `--map` takes, with the id each
-/// means: the Skate Park and Bando from the built-in Pack, and the Test Map
-/// `flat-floor` with its grid, for a place with nothing to hit.
-pub const MAPS: [(&str, &str); 3] = [
-    ("skate-park", "opendrone/skate-park"),
-    ("bando", "opendrone/bando"),
-    ("flat-floor", "test/flat-floor"),
-];
+use crate::settings_file::PilotSettings;
 
 /// What a flight starts from: the pilot's settings that belong to the
 /// Simulation (ADR-0003), and which Quad on which Map.
@@ -22,18 +17,20 @@ pub const MAPS: [(&str, &str); 3] = [
 pub struct Settings {
     /// The Quad's id, such as `opendrone/whoop-65`.
     pub quad: String,
-    /// The Map's id. The tracer flies the flat floor, a Test Map.
+    /// The Map's id, such as `opendrone/skate-park`.
     pub map: String,
     /// 8 kHz: the alpha's physics rate.
     pub physics_rate: PhysicsRate,
-    /// 250 Hz, the default Packet Rate.
+    /// The Packet Rate, 250 Hz unless the pilot picked another.
     pub packet_rate: PacketRate,
-    /// Betaflight 2026.6's default Rates.
+    /// Betaflight 2026.6's default Rates, until the Settings drawer (#69)
+    /// lets a pilot paste their own.
     pub rates: Rates,
     /// The Flight Mode for an Input Device with no Flight Mode switch, such
-    /// as the DualSense: Acro, as a real quad flies.
+    /// as the DualSense: Acro, as a real quad flies, unless the pilot picked
+    /// another.
     pub flight_mode: FlightMode,
-    /// The Assists, all off.
+    /// The Assists, all off unless the pilot turned them on.
     pub input_smoothing: bool,
     pub endless_battery: bool,
     pub auto_arm: bool,
@@ -49,18 +46,30 @@ impl Settings {
         self
     }
 
-    /// The fixed defaults, flying the Quad `quad` (an id after `opendrone/`).
-    pub fn tracer(quad: &str) -> Settings {
+    /// A new install's settings, flying the Quad `quad` (an id after
+    /// `opendrone/`) on the Test Map `flat-floor`: what the readable checks
+    /// and the developer commands fly with, so they never read the pilot's
+    /// settings file.
+    pub fn defaults(quad: &str) -> Settings {
         Settings {
             quad: format!("opendrone/{quad}"),
             map: "test/flat-floor".to_string(),
+            ..Settings::from_pilot(&PilotSettings::default())
+        }
+    }
+
+    /// The settings a flight starts from, from the pilot's settings file.
+    pub fn from_pilot(pilot: &PilotSettings) -> Settings {
+        Settings {
+            quad: pilot.quad.clone(),
+            map: pilot.map.clone(),
             physics_rate: PhysicsRate::from_hz(8000).expect("8 kHz is a rate"),
-            packet_rate: PacketRate::from_hz(250).expect("250 Hz is a Packet Rate"),
+            packet_rate: pilot.packet_rate,
             rates: Rates::BETAFLIGHT_DEFAULT,
-            flight_mode: FlightMode::Acro,
-            input_smoothing: false,
-            endless_battery: false,
-            auto_arm: false,
+            flight_mode: pilot.flight_mode,
+            input_smoothing: pilot.input_smoothing,
+            endless_battery: pilot.endless_battery,
+            auto_arm: pilot.auto_arm,
             random_seed: 1,
         }
     }

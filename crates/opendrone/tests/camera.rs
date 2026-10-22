@@ -795,7 +795,7 @@ fn the_late_picture_never_enters_the_simulation() {
     // the position drawn.
     // The Quad climbs and rolls (with Auto-arm on), so it is moving while the
     // history is read: a Quad at rest would pass whatever the history did.
-    let mut settings = Settings::tracer("whoop-65");
+    let mut settings = Settings::defaults("whoop-65");
     settings.auto_arm = true;
     let plan = FlightPlan::from_packs(&common::packs(), settings).unwrap();
     let device = InputDeviceFacts {

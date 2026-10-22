@@ -51,8 +51,9 @@ fn on_each_built_in_map_the_quad_starts_landed_on_its_launch_spot_facing_its_hea
     // into the pool on the Skate Park, north at the tower on Bando.
     for (map, facing) in [("opendrone/skate-park", 270.0), ("opendrone/bando", 0.0)] {
         for quad in ["whoop-65", "freestyle-5"] {
-            let plan = FlightPlan::from_packs(&common::packs(), Settings::tracer(quad).on_map(map))
-                .unwrap_or_else(|_| panic!("{map} is in the built-in Pack"));
+            let plan =
+                FlightPlan::from_packs(&common::packs(), Settings::defaults(quad).on_map(map))
+                    .unwrap_or_else(|_| panic!("{map} is in the built-in Pack"));
             let spot = plan
                 .map
                 .launch_spot
@@ -79,7 +80,7 @@ fn a_quad_set_up_on_the_skate_park_stays_landed_on_the_launch_spot() {
     // landed-*-stays-still-on-the-skate-parks-launch-spot.toml prove headless).
     let plan = FlightPlan::from_packs(
         &common::packs(),
-        Settings::tracer("whoop-65").on_map("opendrone/skate-park"),
+        Settings::defaults("whoop-65").on_map("opendrone/skate-park"),
     )
     .unwrap();
     let mut flight = Flight::new(plan.simulation(None).unwrap()).unwrap();
