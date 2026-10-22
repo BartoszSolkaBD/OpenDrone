@@ -69,9 +69,23 @@ Block only when one of these is true:
 
 **A problem already in a triage issue doesn't block again,** even if it's still there: it gets fixed under that issue, in a later run. Say in one line that the triage issue holds it. Blocking on it again would cost another failed round and another triage for the same problem. A new problem blocks as usual.
 
-Everything else goes under a heading **Follow-ups (not blocking)**. The Delegator files those for the maintainer to sort. That covers edge cases beyond the ticket, hardening ideas, wording and taste.
+## Follow-ups
 
-Review tooling, the checkers and xtask, during the alpha: block only if a wrong change could get through unnoticed, or if CI breaks. Hardening against unlikely inputs is a follow-up.
+Each follow-up costs the maintainer a look, so there is a bar. List an item under a heading **Follow-ups (not blocking)** only if it is one of:
+
+- **A wrong result a pilot would meet.**
+- **A false pass or hole in a check:** a way a wrong change could get through unnoticed, or a check that can be skipped silently.
+- **A decision only the maintainer can make.** Give the question and a recommendation.
+- **A trap a later ticket will hit.** Name the ticket.
+
+Wording, hardening against unlikely input, taste, and edge cases beyond the ticket are not listed. Drop them. If a fix is one or two lines in files the PR already changes, say it as a non-blocking "fix now (cheap)", so the author folds it into a round that is happening anyway. Never start a round only for it.
+
+- **At most 3 items** per Verdict, most important first. Each says in one line why it meets the bar.
+- **Mark each item** with its kind. An item of the first, second or third kind starts **"Worth a ticket:"**, then its Lane and a concrete fix. An item of the fourth kind starts **"Note for #N:"**.
+
+The [Delegator](delegator.md#follow-ups) files only the items marked "Worth a ticket:". Everything else stays in the Verdict comment.
+
+Review tooling, the checkers and xtask, during the alpha: block only if a wrong change could get through unnoticed, or if CI breaks. Hardening against unlikely inputs isn't listed.
 
 ## Later rounds
 
@@ -109,14 +123,14 @@ Reviewed commit <the PR's latest commit, all 40 characters>
 
 <your review: a table of the acceptance criteria with status and evidence,
 what else you checked, then the blocking problems, each with a concrete fix,
-then "Follow-ups (not blocking)">
+then "Follow-ups (not blocking)", if any meet the bar">
 
 Verdict: pass
 ```
 
 - **The first line** is exactly `Reviewed commit ` and the full SHA. Get it with `gh pr view <PR> -R BartoszSolkaBD/OpenDrone --json headRefOid -q .headRefOid`, and check it again just before you post.
 - **The last line** is exactly `Verdict: pass` or `Verdict: changes needed`. Nothing comes after it.
-- **Say pass** only when no problem blocks the merge. List non-blocking problems anyway.
+- **Say pass** only when no problem blocks the merge. A non-blocking item that meets the [bar](#follow-ups) is listed anyway.
 - **Post it** with `gh pr comment <PR> -R BartoszSolkaBD/OpenDrone --body-file verdict-<PR>.md`. Name the file after the PR: other agents share your scratchpad, and a plain `verdict.md` could be another Reviewer's.
 - **Never edit** an earlier Verdict to change what it says. Post a new one.
 
