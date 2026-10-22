@@ -91,12 +91,12 @@ fn the_pocket_profile_holds_19s_layout() {
             on: Position::Pressed
         })
     );
-    // A switch the pilot's model sends to CH10 pauses: a Radio alone can open
-    // the Pause Menu (#258).
+    // A switch the pilot's model sends to CH11 pauses: a Radio alone can open
+    // the Pause Menu (#258). CH10 is the S1 knob of the factory models (#275).
     assert_eq!(
         setup.actions.get(&Action::Pause),
         Some(&ActionSource::Channel {
-            channel: 10,
+            channel: 11,
             on: Position::Pressed
         })
     );
@@ -128,6 +128,26 @@ fn any_radio_has_the_pockets_layout_and_pause_but_no_report_rate_or_reset() {
     );
     assert!(any.actions.contains_key(&Action::Pause));
     assert_eq!(any.actions.len(), 1);
+}
+
+#[test]
+fn pause_is_on_a_channel_the_radiomaster_factory_models_leave_free() {
+    // Basis: Source (docs/research/input-devices.md, "What a model sends on
+    // CH5 and up": the factory models "POCKET" and "FPV DRONE" send CH1–CH10,
+    // with Reset's SE on CH9 and the S1 knob on CH10).
+    const FACTORY_MODELS_SEND_UP_TO: u8 = 10;
+    for id in ["opendrone/radiomaster-pocket", "opendrone/any-radio"] {
+        let Setup::Radio(radio) = built_in(id).setup else {
+            panic!("{id} is a Radio")
+        };
+        let Some(ActionSource::Channel { channel, .. }) = radio.actions.get(&Action::Pause) else {
+            panic!("{id} binds Pause to a channel")
+        };
+        assert!(
+            *channel > FACTORY_MODELS_SEND_UP_TO,
+            "{id} binds Pause to CH{channel}, which a factory model sends"
+        );
+    }
 }
 
 #[test]
