@@ -27,6 +27,7 @@ Tests that need uncommitted data download it when it's needed, outside the repo'
 Today that's NeuroBEM, for the inertia check (#47):
 
 - `cargo xtask download neurobem` downloads NeuroBEM's processed flights (about 630 MB) into `target/downloads/neurobem/`, and writes the files its Scenarios in [`scenarios/quads/freestyle-5/neurobem/`](../scenarios/quads/freestyle-5/neurobem/rolling-out-of-a-hover.toml) play back beside them, where a `.gitignore` keeps them out of git.
+- `cargo xtask package`, which makes the downloadable builds, takes the Packs and Scenarios only from the files git tracks, so a machine that has run the download still can't put NeuroBEM's data into a zip. Outside a git checkout it refuses, with a plain message.
 - Each such Scenario says `downloaded = "NeuroBEM"` at its top. Without its files the runner skips it and counts it as passed. Its starting state is a level, still Quad, so nothing in the committed Scenario comes from the data; its committed Results hold only what OpenDrone's Simulation measured.
 - The [nightly job](../.github/workflows/nightly.yml) runs on main once a night: it downloads the data and runs only those Scenarios, with `cargo scenarios check --downloaded`, where a missing file fails. No pull request waits for it.
 
