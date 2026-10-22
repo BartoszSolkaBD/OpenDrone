@@ -20,6 +20,10 @@ _Avoid_: Esc menu, pit stop, in-game menu
 A notice on the Hub that something would stop the pilot flying, or flying well, such as no Input Device, no way to Arm, an Input Device that isn't calibrated, or a Radio still transmitting. It never blocks flying.
 _Avoid_: Error, blocker
 
+**Loading screen**:
+The screen between the Hub (or a swap of the Map or Quad from the Pause Menu) and Free Flight. It shows the Map, the Quad and the Preset, a progress bar and a reminder of the keys. The game makes the flight behind it and draws the Map, and the renderer compiles its shaders there, so the first seconds of flight don't stutter.
+_Avoid_: Splash screen
+
 ## Rules
 
 - A returning pilot reaches the Launch Spot in one press from the Hub. A new install takes three when the pilot skips the Input Device setup: answer the question, Set up later, FLY. Setting up there is the selected choice and adds about half a minute of guided steps.
@@ -28,3 +32,6 @@ _Avoid_: Error, blocker
 - Settings take effect as soon as they change. Only resolution and window mode ask to be kept, and they change back after 15 seconds.
 - Every menu works with a Radio, a Gamepad, or the keyboard and mouse. A Radio moves the cursor with the right stick, and a flick of yaw right or left selects or goes back. Menus never read the throttle or the switches.
 - Each setting is one stop in a menu, changed with left and right. There are no drop-down lists.
+- All settings live in one file, one per install, saved the moment a setting changes. Quads and Maps are named by id in it. Saved flights go in a folder beside it. A file the game can't read is kept aside and the game starts fresh, and says so.
+- The Input Devices fly the Quad in Free Flight and move the cursor everywhere else, never both. A stick held when a menu opens does nothing until it is let go.
+- The Hub's Preset is remembered from First Launch, and what a Preset sets arrives with the Settings drawer ([#69](https://github.com/BartoszSolkaBD/OpenDrone/issues/69)); until then it changes no setting.

@@ -50,25 +50,122 @@ pub fn turn(attitude: Attitude) -> Quat {
 #[derive(Component)]
 pub struct QuadDrawing;
 
+/// Marks everything the flight's world is drawn with: the Map, the Quad and
+/// the lights. They go together when the world does.
+#[derive(Component)]
+pub struct InTheWorld;
+
+/// Whether the flight's world (the Map, the Quad, its camera and the sun) is
+/// drawn, and whether it should be. A game with no screens wants it from the
+/// start; the screens ask for it when the loading screen opens, and let it go
+/// on Back to the Hub.
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct WorldDrawing {
+    /// The world should be drawn.
+    pub wanted: bool,
+    drawn: bool,
+}
+
+impl WorldDrawing {
+    /// A world nobody is drawing, which is wanted or not.
+    pub fn wanting(wanted: bool) -> WorldDrawing {
+        WorldDrawing {
+            wanted,
+            drawn: false,
+        }
+    }
+
+    /// Says the world is drawn, for the readable checks, which have no
+    /// renderer to draw it with.
+    pub fn set_drawn(&mut self, drawn: bool) {
+        self.drawn = drawn;
+    }
+
+    /// Whether the world is drawn now.
+    pub fn is_drawn(&self) -> bool {
+        self.drawn
+    }
+}
+
+impl Default for WorldDrawing {
+    fn default() -> WorldDrawing {
+        WorldDrawing {
+            wanted: true,
+            drawn: false,
+        }
+    }
+}
+
 /// Draws the flight in the game's window.
 pub struct DrawingPlugin;
 
 impl Plugin for DrawingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<View>()
+            .init_resource::<WorldDrawing>()
             .insert_resource(ClearColor(Color::srgb(0.55, 0.7, 0.9)))
             .insert_resource(GlobalAmbientLight {
                 color: Color::WHITE,
                 brightness: 600.0,
                 ..default()
             })
-            .add_systems(Startup, (draw_the_map, draw_the_quad, set_up_the_grid))
+            .add_systems(Startup, set_up_the_grid)
             .add_systems(
                 RunFixedMainLoop,
                 place_the_quad.in_set(RunFixedMainLoopSystems::AfterFixedMainLoop),
             )
-            .add_systems(Update, draw_the_grid);
+            .add_systems(
+                Update,
+                (
+                    undraw_the_world.run_if(|d: Res<WorldDrawing>| d.drawn && !d.wanted),
+                    draw_the_world.run_if(|d: Res<WorldDrawing>| d.wanted && !d.drawn),
+                    draw_the_grid.run_if(|d: Res<WorldDrawing>| d.drawn),
+                )
+                    .chain(),
+            );
     }
+}
+
+/// Draws the Map and the Quad, once the world is wanted.
+#[allow(clippy::too_many_arguments)]
+fn draw_the_world(
+    plan: Res<FlightPlan>,
+    flight: NonSend<Flight>,
+    view: Res<View>,
+    mut drawing: ResMut<WorldDrawing>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
+) {
+    draw_the_map(
+        &plan,
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut images,
+    );
+    draw_the_quad(
+        &plan,
+        &flight,
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        *view,
+    );
+    drawing.drawn = true;
+}
+
+/// Takes the world down: the Map, the Quad, its camera and the sun.
+fn undraw_the_world(
+    world: Query<Entity, With<InTheWorld>>,
+    mut drawing: ResMut<WorldDrawing>,
+    mut commands: Commands,
+) {
+    for entity in &world {
+        commands.entity(entity).despawn();
+    }
+    drawing.drawn = false;
 }
 
 /// The grid's lines sit on the floor, so they're drawn a little nearer the
@@ -98,6 +195,7 @@ fn draw_the_map_from_its_file(
             .or_insert_with(|| materials.add(library.material(&part.material, part.colour, images)))
             .clone();
         commands.spawn((
+            InTheWorld,
             Mesh3d(meshes.add(part_mesh(part))),
             MeshMaterial3d(material),
             Transform::IDENTITY,
@@ -120,6 +218,7 @@ fn draw_the_map_from_its_file(
         ..default()
     });
     commands.spawn((
+        InTheWorld,
         DirectionalLight {
             illuminance: 100_000.0,
             shadow_maps_enabled: true,
@@ -139,21 +238,20 @@ fn draw_the_map_from_its_file(
 }
 
 fn draw_the_map(
-    plan: Res<FlightPlan>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut images: ResMut<Assets<Image>>,
+    plan: &FlightPlan,
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
 ) {
     if !plan.map.drawing.is_empty() {
-        return draw_the_map_from_its_file(
-            &plan,
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &mut images,
-        );
+        return draw_the_map_from_its_file(plan, commands, meshes, materials, images);
     }
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::WHITE,
+        brightness: 600.0,
+        ..default()
+    });
     let surface = materials.add(StandardMaterial {
         base_color: Color::srgb(0.42, 0.42, 0.4),
         perceptual_roughness: 0.9,
@@ -178,6 +276,7 @@ fn draw_the_map(
             }
         };
         commands.spawn((
+            InTheWorld,
             Mesh3d(meshes.add(mesh)),
             MeshMaterial3d(surface.clone()),
             transform,
@@ -185,6 +284,7 @@ fn draw_the_map(
     }
     // The sun.
     commands.spawn((
+        InTheWorld,
         DirectionalLight {
             // Direct sun, 100,000 lux, which Exposure::SUNLIGHT (ev100 15)
             // is set for: the Map's baked light arrives with its ticket.
@@ -237,12 +337,12 @@ fn draw_the_grid(plan: Res<FlightPlan>, mut gizmos: Gizmos) {
 /// the pack, a prop disc per motor and, on a whoop, the duct rings), with
 /// the FPV Camera at the Quad's camera position and Camera Tilt.
 fn draw_the_quad(
-    plan: Res<FlightPlan>,
-    flight: NonSend<Flight>,
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    view: Res<View>,
+    plan: &FlightPlan,
+    flight: &Flight,
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    view: View,
 ) {
     let shape = &plan.quad.parameters.shape;
     let frame = materials.add(StandardMaterial {
@@ -262,6 +362,7 @@ fn draw_the_quad(
     });
     let (_, state) = flight.drawn_between();
     let mut quad = commands.spawn((
+        InTheWorld,
         QuadDrawing,
         Transform::from_translation(point(state.position)).with_rotation(turn(state.attitude)),
         Visibility::default(),
@@ -314,14 +415,15 @@ fn draw_the_quad(
                 }
             }
         }
-        if *view == View::Fpv {
+        if view == View::Fpv {
             // The FPV Camera: its place and tilt are set each frame from the
             // Quad's definition and the pilot's Camera Tilt.
             parts.spawn((flat_camera(), Transform::IDENTITY));
         }
     });
-    if *view == View::Chase {
+    if view == View::Chase {
         commands.spawn((
+            InTheWorld,
             ChaseCamera,
             Camera3d::default(),
             NoCpuCulling,

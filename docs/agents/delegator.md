@@ -163,6 +163,7 @@ Everything else the author needs is on the ticket and in the brief. That way a f
   1. Start a fix round, at the tier the table gives.
   2. The fixer pushes. Then start a **new** Reviewer. Never reuse one.
   3. Sometimes every blocking item is an edge case beyond the ticket, or a hardening idea for tooling. Fix those too, since they're usually small. Note them for your end-of-batch report, so the Reviewer page's calibration can be tuned.
+  4. Tell the fixer about any "fix now (cheap)" item in the Verdict, so it is folded into this round. Never start a round only for it.
 - **Five failed rounds:** the Review check fails and the PR gets `needs-triage`. The maintainer decided on 8 October 2026 that a PR shouldn't wait for them because its rounds ran out ([#120](https://github.com/BartoszSolkaBD/OpenDrone/issues/120)). So don't start a sixth round. Triage it instead:
   1. **File what still blocks** as one issue, to be fixed in a later run. List the fifth Verdict's blocking problems, each with its concrete fix, and link the PR and that Verdict. Title it "Left from PR #P", and label it `ready-for-agent`.
   2. **Post the triage comment** on the PR. Its first line is exactly `Triaged to #<issue>`, naming that issue:
@@ -238,12 +239,15 @@ How you merge depends on what main has done since the PR's base:
 
 ## Follow-ups
 
-A Verdict may list "Follow-ups (not blocking)". After the PR merges:
+A Verdict may list up to 3 items under "Follow-ups (not blocking)", each meeting the Reviewer's [bar](reviewer.md#follow-ups). After the PR merges, file only the items marked **"Worth a ticket:"**:
 
-- **File them together:** one issue per PR that has any, titled "Follow-ups from PR #P". Link every Verdict the items come from. A later round often repeats an earlier round's items: list each item once.
-- **Label it `needs-triage`, not `ready-for-agent`,** so the maintainer decides. Create the label the first time if it's missing.
-- **One exception:** an item that is a wrong result a pilot would meet gets its own `ready-for-agent` issue, blocked by what it needs.
-- **Never mark a follow-up `ready-for-agent`** if it came from reviewing another follow-up. That's how review spirals start.
+- **One issue per item,** not one per PR. Link the PR and the Verdict the item comes from. A later round often repeats an earlier round's items: file each item once.
+- **Label it `ready-for-agent`, with its Lane label,** when the fix is concrete. When the item is a decision, label it `needs-maintainer` instead, with the question and the Reviewer's recommendation. Never apply `needs-triage`, and never file a "Follow-ups from PR #P" issue.
+- **Items marked "Note for #N:"** go as a comment on that ticket, "Notes from #M (PR #P):" ([After a merge](#merging)), not as an issue.
+- **Everything else stays in the Verdict comment,** which is searchable and not in the maintainer's queue. Don't copy it anywhere. That includes any "fix now (cheap)" item the author didn't take.
+- **A wrong result a pilot would meet** gets its own `ready-for-agent` issue, blocked by what it needs, as any marked item does.
+- **Never file a follow-up that came from reviewing another follow-up,** or from a PR made of follow-ups, whatever its mark. That's how review spirals start.
+- **Count as you go:** how many items the Verdicts dropped or left unmarked, and how many you filed, for [the end-of-batch report](#ending-a-batch).
 
 ## Saving tokens
 
@@ -316,7 +320,7 @@ When the cause is a workflow change, the PR that fixes it changes `.github/workf
 
 This is not the clearance of the Red Flag gate ([Clearing the Red Flag gate](#when-a-pr-waits-for-the-maintainer)): that is only for what the gate holds.
 
-**Which checks a PR runs.** From [#240](https://github.com/BartoszSolkaBD/OpenDrone/issues/240): a PR runs Linux in full, and macOS and Windows only when the PR can change a flight result; main runs all three. #240 isn't on main yet, so its PR confirms the exact wording.
+**Which checks a PR runs.** A PR runs Linux in full. It runs macOS and Windows only for the Scenarios and the agreement check, and only when the PR can change a flight result (`changes.sh`'s `flight` output); otherwise those jobs pass with nothing done. Main runs all three in full. The list of paths that can change a flight result is in [`CONTRIBUTING.md`](../../CONTRIBUTING.md#the-required-checks).
 
 ## Usage limits
 
@@ -329,8 +333,8 @@ The session note dies with its session, but a PR that waits for the maintainer c
 
 - **When a session ends,** post a comment on each open PR that has passed review and waits for the maintainer. Start it "Delegator's hand-off:", and give:
   - the author's notes for later tickets, grouped by ticket;
-  - the follow-ups to file after the merge, each with its Verdict's link.
-- **When the PR merges,** whoever merged it, post the notes and file the follow-ups as [After a merge](#merging) and [Follow-ups](#follow-ups) say. Then comment "Hand-off done:", naming the tickets that got notes and the follow-up issue.
+  - the follow-up items to file after the merge, which are only those marked "Worth a ticket:", each with its Verdict's link.
+- **When the PR merges,** whoever merged it, post the notes and file the follow-ups as [After a merge](#merging) and [Follow-ups](#follow-ups) say. Then comment "Hand-off done:", naming the tickets that got notes and the follow-up issues.
 - **When a session starts,** finish any hand-off whose PR merged meanwhile, for example one the maintainer merged by hand. This lists merged PRs with a hand-off and no "Hand-off done" yet:
 
   ```sh
@@ -345,6 +349,7 @@ Report to the maintainer:
 - what merged, as ticket and PR;
 - what waits for them, and why, including each PR that stepped out of its Lane, and each PR merged past a cleared Red Flag gate whose `skipped-a-check` label they should take off;
 - the follow-up issues you filed, and each issue you triaged a PR to;
+- how many follow-up items the Verdicts dropped or left unmarked, and how many you filed, so the maintainer can see the bar is working;
 - each PR you left a hand-off on;
 - for each PR, the author's model and its number of review rounds;
 - the model the Delegator itself ran on, for the trial;

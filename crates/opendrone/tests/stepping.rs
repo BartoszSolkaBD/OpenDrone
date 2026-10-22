@@ -132,7 +132,7 @@ fn a_flight_input_stamped_with_a_moment_already_stepped_still_reaches_the_flight
 /// A flight on the Whoop 65 with Auto-arm on, climbing and rolling for 4 s
 /// (4,000 ticks), so the Quad is well away from its Launch Spot.
 fn flight_away_from_the_launch_spot() -> (opendrone::set_up::FlightPlan, Flight) {
-    let mut settings = opendrone::settings::Settings::tracer("whoop-65");
+    let mut settings = opendrone::settings::Settings::defaults("whoop-65");
     settings.auto_arm = true;
     let plan = opendrone::set_up::FlightPlan::from_packs(&common::packs(), settings).unwrap();
     let device = opendrone_sim::InputDeviceFacts {

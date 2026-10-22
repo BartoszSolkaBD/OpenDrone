@@ -112,7 +112,7 @@ If your change moves a flight, run `cargo scenarios run` and commit the Results 
 
 When a Verdict says changes needed:
 
-- Fix each blocking problem, and nothing else. Items under "Follow-ups (not blocking)" aren't yours to fix in this PR.
+- Fix each blocking problem, and nothing else. Items under "Follow-ups (not blocking)" aren't yours to fix in this PR, except one a Reviewer marked "fix now (cheap)": fold that into the round, since it is one or two lines in files the PR already changes.
 - If you think a blocking problem is wrong, say so in your report, with evidence. Don't work around it.
 - Push, and wait for CI with the background command under [Save tokens](#save-tokens).
 

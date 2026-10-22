@@ -239,7 +239,7 @@ time (s),roll (µs),pitch (µs),throttle (µs),yaw (µs),arm (µs),flight mode (
 
 The Input Tracks in `scenarios/recorded/` are the maintainer's own device recordings from the SDL3 input probe (#18, #27, #30), committed trimmed in `crates/input/tests/traces/`, played through the built-in Pack's Input Device profiles exactly as the game does. A readable check in `crates/input/tests/input_tracks.rs` makes each track afresh and fails if the committed one differs; `OPENDRONE_WRITE_INPUT_TRACKS=1 cargo test -p opendrone-input --test input_tracks` writes them again.
 
-A flight saved in the game with Save Flight is an Input Track too, written beside its Scenario in `scenarios/saved/`: see [Watching a Scenario and saving a flight](watching-and-saving-flights.md).
+A flight saved in the game with Save Flight is an Input Track too, written beside its Scenario in the saved-flights folder (`scenarios/saved/` when a developer commits one): see [Watching a Scenario and saving a flight](watching-and-saving-flights.md).
 
 What the Radio Link does with an Input Track's device ([ADR-0020](../adr/0020-radio-link-locks-to-the-device-report-beat.md), #27):
 

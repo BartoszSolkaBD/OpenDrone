@@ -30,6 +30,16 @@
 //!   Input Track ([`crate::save`]), and says where in the window's title.
 //! - **Watching a Scenario** ([`Pilot::watching`]): no Input Device flies,
 //!   Reset and Save Flight do nothing, and Pause works as always.
+//! - **With the screens** ([`Pilot::with_screens`], #68): the Pause Action
+//!   asks the screens for the Pause Menu instead of freezing the game
+//!   itself, and the pilot has two modes ([`InputMode`]). In flight the
+//!   Input Devices fly. In a menu they move the cursor
+//!   ([`crate::screens::menu_input`]): a Radio by its right stick and a flick
+//!   of yaw, a Gamepad by its D-pad, left stick and buttons, and the keyboard
+//!   by its arrows, Enter and Backspace. The throttle and the switches are
+//!   never read, and Reset and the camera's keys do nothing in a menu. The
+//!   device that selects FLY becomes the Flying Input Device
+//!   ([`Pilot::begin_flight`]).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -42,14 +52,20 @@ use bevy::prelude::*;
 use bevy::window::WindowFocused;
 use opendrone_input::channels::flight_mode_us;
 use opendrone_input::controls::Key;
-use opendrone_input::profile::{Action, FlightMode};
+use opendrone_input::profile::{Action, FlightMode, Kind};
 use opendrone_input::{Batch, DeviceId, InputEvent, InputThread, Inputs, Lost};
 use opendrone_sim::{Channel, Channels, FlightInput, InputDeviceFacts, ReportRate};
 
 use crate::clock::SimulationClock;
 use crate::save::save_flight;
+use crate::screens::menu_input::{MenuInput, PadMenu, RadioMenu};
+use crate::screens::model::{DeviceFacts, InputMode};
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
+
+/// Devices found in the first moments after the input thread starts were
+/// plugged in before the game, so they bring no "connected" notice.
+const PLUGGED_IN_BEFORE: Duration = Duration::from_millis(1500);
 
 /// How long a note about Save Flight stays in the window's title.
 const NOTICE_FOR: Duration = Duration::from_secs(6);
@@ -94,6 +110,29 @@ pub struct Pilot {
     /// Of a run of Channels with nothing between them, only the latest is
     /// kept.
     while_paused: Vec<(Duration, FlightInput)>,
+    /// The screens drive the game (#68): Pause asks them for the Pause Menu.
+    screens: bool,
+    /// Whether the Input Devices fly the Quad or move the cursor.
+    mode: InputMode,
+    /// Each device's menu mapping, while a menu is open.
+    device_menus: BTreeMap<DeviceId, DeviceMenu>,
+    /// What the menus were asked since the screens last took them, with the
+    /// device that asked (`None`: the keyboard).
+    menu_queue: Vec<(Option<DeviceId>, MenuInput)>,
+    /// The last device that moved a menu.
+    last_menu_device: Option<DeviceId>,
+    /// Short notices about devices coming and going, since the screens last
+    /// took them.
+    device_notices: Vec<String>,
+    /// Batches handed over by the caller instead of the input thread, read
+    /// with the next frame's ([`Pilot::hand_over`]).
+    handed: Vec<Batch>,
+}
+
+/// How one device moves around a menu.
+enum DeviceMenu {
+    Radio(RadioMenu),
+    Pad(PadMenu),
 }
 
 impl Pilot {
@@ -138,7 +177,119 @@ impl Pilot {
             watching: false,
             checking_every_step: false,
             while_paused: Vec::new(),
+            screens: false,
+            mode: InputMode::Flight,
+            device_menus: BTreeMap::new(),
+            menu_queue: Vec::new(),
+            last_menu_device: None,
+            device_notices: Vec::new(),
+            handed: Vec::new(),
         }
+    }
+
+    /// Hands over a batch of device reports as the input thread would, to be
+    /// read with the next frame's: for the readable checks, which run the
+    /// game's systems with no SDL.
+    pub fn hand_over(&mut self, batch: Batch) {
+        self.handed.push(batch);
+    }
+
+    /// A press on the keyboard or the mouse, as the menus take it: for the
+    /// readable checks, which have no window to press keys in.
+    pub fn press_in_menu(&mut self, input: MenuInput) {
+        self.menu_queue.push((None, input));
+    }
+
+    /// A pilot whose game has screens ([`crate::screens`]): Pause asks them
+    /// for the Pause Menu, and until a flight starts the Input Devices move
+    /// the cursor.
+    pub fn with_screens(mut self) -> Pilot {
+        self.screens = true;
+        self.mode = InputMode::Menu;
+        self
+    }
+
+    /// Whether the Input Devices fly the Quad or move the cursor.
+    pub fn input_mode(&self) -> InputMode {
+        self.mode
+    }
+
+    /// Sets what the Input Devices do. Going into a menu starts every
+    /// device's mapping afresh, so a stick held at that moment does nothing
+    /// until it is let go; going into flight drops what the menus were asked.
+    pub fn set_input_mode(&mut self, mode: InputMode) {
+        if mode == self.mode {
+            return;
+        }
+        self.mode = mode;
+        self.device_menus.clear();
+        if mode == InputMode::Flight {
+            self.menu_queue.clear();
+        }
+    }
+
+    /// What the menus were asked since the last call, in order, with the
+    /// device that asked (`None`: the keyboard).
+    pub fn take_menu_inputs(&mut self) -> Vec<(Option<DeviceId>, MenuInput)> {
+        std::mem::take(&mut self.menu_queue)
+    }
+
+    /// Short notices about Input Devices connecting and disconnecting, since
+    /// the last call.
+    pub fn take_device_notices(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.device_notices)
+    }
+
+    /// The Input Devices that are plugged in, in the order they were found.
+    pub fn devices(&self) -> Vec<(DeviceId, DeviceFacts)> {
+        self.inputs
+            .devices()
+            .iter()
+            .filter(|d| d.lost() != Some(Lost::Unplugged))
+            .map(|d| {
+                let arm_bound = d
+                    .profile()
+                    .is_some_and(|p| p.setup.switches().arm.is_some());
+                (
+                    d.id(),
+                    DeviceFacts {
+                        name: d.info().name.clone(),
+                        kind: d.kind(),
+                        arm_bound,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// The Input Device that flies, or will fly if the pilot presses FLY
+    /// with the keyboard or the mouse: the Flying Input Device, else the
+    /// last device that moved a menu, else the only one plugged in.
+    pub fn device_to_fly(&self) -> Option<DeviceId> {
+        let plugged_in = self.devices();
+        let is_plugged_in = |id: DeviceId| plugged_in.iter().any(|(d, _)| *d == id);
+        self.flying
+            .filter(|id| is_plugged_in(*id))
+            .or(self.last_menu_device.filter(|id| is_plugged_in(*id)))
+            .or(match plugged_in.as_slice() {
+                [(only, _)] => Some(*only),
+                _ => None,
+            })
+    }
+
+    /// A device's name.
+    pub fn device_name(&self, id: DeviceId) -> Option<&str> {
+        Some(&self.inputs.device(id)?.info().name)
+    }
+
+    /// Whether the device's profile binds an Arm switch.
+    pub fn arm_bound(&self, id: DeviceId) -> Option<bool> {
+        let device = self.inputs.device(id)?;
+        Some(
+            device
+                .profile()
+                .is_some_and(|p| p.setup.switches().arm.is_some()),
+        )
     }
 
     /// The flights this pilot starts also keep the fingerprint of the whole
@@ -235,6 +386,99 @@ impl Pilot {
         for action in fired {
             self.fire(action, now, world);
         }
+
+        if self.mode == InputMode::Menu {
+            self.read_menus(now);
+        }
+    }
+
+    /// What each connected device does to a menu this frame.
+    fn read_menus(&mut self, now: Duration) {
+        let connected: Vec<DeviceId> = self
+            .inputs
+            .devices()
+            .iter()
+            .filter(|d| d.lost().is_none())
+            .map(|d| d.id())
+            .collect();
+        self.device_menus.retain(|id, _| connected.contains(id));
+        for device in self.inputs.devices() {
+            if !connected.contains(&device.id()) {
+                continue;
+            }
+            let menu =
+                self.device_menus
+                    .entry(device.id())
+                    .or_insert_with(|| match device.kind() {
+                        Kind::Radio => DeviceMenu::Radio(RadioMenu::new()),
+                        Kind::Gamepad => DeviceMenu::Pad(PadMenu::new()),
+                    });
+            let moves = match menu {
+                DeviceMenu::Radio(radio) => {
+                    let channels = device.channels();
+                    radio.read(now, channels.roll, channels.pitch, channels.yaw)
+                }
+                DeviceMenu::Pad(pad) => match &device.state().pad {
+                    Some(state) => pad.read(now, state),
+                    None => Vec::new(),
+                },
+            };
+            if !moves.is_empty() {
+                self.last_menu_device = Some(device.id());
+            }
+            self.menu_queue
+                .extend(moves.into_iter().map(|m| (Some(device.id()), m)));
+        }
+    }
+
+    /// Starts a flight, set up from the plan, as the pilot pressed FLY or
+    /// swapped the Map or the Quad: `device` flies it, set up with its
+    /// facts, as a Quad flown from the first stick movement is
+    /// ([`Pilot::read`]). With `None` the Quad waits on the Launch Spot until
+    /// a device's sticks move, and the flight starts afresh then. Anything
+    /// that waited belonged to the old flight.
+    pub fn begin_flight(
+        &mut self,
+        device: Option<DeviceId>,
+        at: Duration,
+        world: &mut FlightWorld<'_>,
+    ) {
+        self.while_paused.clear();
+        self.flying = None;
+        self.silent = false;
+        if let Some(device) = device {
+            let events = self.start_flight(device, at, world);
+            self.handle(events, world);
+            if self.flying == Some(device) {
+                return;
+            }
+        }
+        // No device, or one that can't fly: a flight nobody flies yet.
+        match world.plan.simulation(None).and_then(Flight::new) {
+            Ok(flight) => {
+                *world.flight = flight;
+                self.clock.start_flight(world.fixed_clock);
+                let events = self.inputs.set_flying(None, at);
+                self.handle(events, world);
+            }
+            Err(problem) => error!("the flight can't start: {problem}"),
+        }
+    }
+
+    /// Resets the Quad to its Launch Spot, powered up afresh: the Pause
+    /// Menu's Reset.
+    pub fn reset(&mut self, at: Duration, world: &mut FlightWorld<'_>) {
+        info!("Reset");
+        self.forward(world, at, FlightInput::Reset);
+    }
+
+    /// The flight is left (Back to the Hub): no Input Device flies.
+    pub fn stop_flying(&mut self, at: Duration, world: &mut FlightWorld<'_>) {
+        self.while_paused.clear();
+        self.flying = None;
+        self.silent = false;
+        let events = self.inputs.set_flying(None, at);
+        self.handle(events, world);
     }
 
     /// The Flying Input Device's name, once the pilot has picked one.
@@ -275,7 +519,7 @@ impl Pilot {
 
     /// The input thread's clock at this frame's moment: the time since it
     /// started, as Bevy's real clock read it this frame.
-    fn input_clock(&self, real: &Time<Real>) -> Duration {
+    pub fn input_clock(&self, real: &Time<Real>) -> Duration {
         let started = match &self.thread {
             Some(thread) => thread.lock().map_or(real.startup(), |t| t.started()),
             None => real.startup(),
@@ -295,6 +539,7 @@ impl Pilot {
                     device,
                     name,
                     profile,
+                    at,
                     ..
                 } => {
                     info!(
@@ -304,6 +549,7 @@ impl Pilot {
                     if let Some(found) = self.inputs.device(device) {
                         self.found_with.insert(device, found.channels());
                     }
+                    self.notice_about(at, format!("{name} connected"));
                 }
                 InputEvent::Channels {
                     device,
@@ -314,12 +560,24 @@ impl Pilot {
                         self.forward(world, at, FlightInput::Channels(self.channels(&channels)));
                     } else if !self.watching
                         && self.flying.is_none()
+                        // With the screens, sticks move the cursor in a menu:
+                        // only in flight does a stick move pick the device.
+                        && self.mode == InputMode::Flight
                         && self.sticks_moved(device, &channels)
                     {
                         queue.extend(self.start_flight(device, at, world));
                     }
                 }
                 InputEvent::Lost { device, at, why } => {
+                    let name = self
+                        .device_name(device)
+                        .unwrap_or("An Input Device")
+                        .to_string();
+                    let text = match why {
+                        Lost::Unplugged => format!("{name} disconnected"),
+                        Lost::Silent => format!("{name} stopped responding"),
+                    };
+                    self.notice_about(at, text);
                     if self.flying == Some(device) {
                         match why {
                             Lost::Unplugged => {
@@ -335,6 +593,11 @@ impl Pilot {
                     }
                 }
                 InputEvent::Back { device, at } => {
+                    let name = self
+                        .device_name(device)
+                        .unwrap_or("An Input Device")
+                        .to_string();
+                    self.notice_about(at, format!("{name} connected"));
                     if self.flying == Some(device) {
                         info!("the Flying Input Device is back");
                         if !std::mem::take(&mut self.silent) {
@@ -343,6 +606,15 @@ impl Pilot {
                     }
                 }
             }
+        }
+    }
+
+    /// Keeps a short notice about a device for the screens, unless the
+    /// device was plugged in before the game started (`at` on the input
+    /// thread's clock).
+    fn notice_about(&mut self, at: Duration, text: String) {
+        if self.screens && at >= PLUGGED_IN_BEFORE {
+            self.device_notices.push(text);
         }
     }
 
@@ -457,9 +729,16 @@ impl Pilot {
     fn fire(&mut self, action: Action, at: Duration, world: &mut FlightWorld<'_>) {
         match action {
             Action::Reset if self.watching => {}
+            // In a menu Reset is the Pause Menu's own item.
+            Action::Reset if self.mode == InputMode::Menu => {}
             Action::Reset => {
                 info!("Reset");
                 self.forward(world, at, FlightInput::Reset);
+            }
+            // With the screens, Pause is theirs to answer: it opens the Pause
+            // Menu, and in the Pause Menu it goes on.
+            Action::Pause if self.screens => {
+                self.menu_queue.push((None, MenuInput::Pause));
             }
             Action::Pause => {
                 toggle_pause(world.game_clock);
@@ -575,7 +854,7 @@ impl Plugin for KeyboardPlugin {
 /// What the pilot's systems reach: the pilot, the flight and the game's
 /// clocks.
 #[derive(SystemParam)]
-struct PilotAndFlight<'w> {
+pub(crate) struct PilotAndFlight<'w> {
     pilot: ResMut<'w, Pilot>,
     flight: NonSendMut<'w, Flight>,
     plan: Res<'w, FlightPlan>,
@@ -602,16 +881,17 @@ impl PilotAndFlight<'_> {
     }
 }
 
-fn read_input_devices(mut reach: PilotAndFlight) {
+pub(crate) fn read_input_devices(mut reach: PilotAndFlight) {
     let (pilot, now, mut world) = reach.split();
-    let batches = match &pilot.thread {
+    let mut batches = match &pilot.thread {
         Some(thread) => thread.lock().map(|t| t.batches()).unwrap_or_default(),
         None => Vec::new(),
     };
+    batches.append(&mut pilot.handed);
     pilot.read(batches, now, &mut world);
 }
 
-fn read_keyboard(
+pub(crate) fn read_keyboard(
     mut keys: MessageReader<KeyboardInput>,
     mut focus: MessageReader<WindowFocused>,
     mut reach: PilotAndFlight,
@@ -619,6 +899,25 @@ fn read_keyboard(
     let (pilot, now, mut world) = reach.split();
     for key in keys.read() {
         let down = key.state.is_pressed();
+        if down && pilot.mode == InputMode::Menu {
+            // In a menu the arrows move the cursor, and a held arrow repeats.
+            let input = match key.key_code {
+                KeyCode::ArrowUp => Some(MenuInput::Up),
+                KeyCode::ArrowDown => Some(MenuInput::Down),
+                KeyCode::ArrowLeft => Some(MenuInput::Left),
+                KeyCode::ArrowRight => Some(MenuInput::Right),
+                KeyCode::Enter | KeyCode::NumpadEnter | KeyCode::Space if !key.repeat => {
+                    Some(MenuInput::Select)
+                }
+                KeyCode::Backspace if !key.repeat => Some(MenuInput::Back),
+                KeyCode::KeyQ if !key.repeat => Some(MenuInput::PreviousTab),
+                KeyCode::KeyE if !key.repeat => Some(MenuInput::NextTab),
+                _ => None,
+            };
+            if let Some(input) = input {
+                pilot.menu_queue.push((None, input));
+            }
+        }
         if down && !key.repeat {
             match key.key_code {
                 KeyCode::KeyR => pilot.fire(Action::Reset, now, &mut world),
