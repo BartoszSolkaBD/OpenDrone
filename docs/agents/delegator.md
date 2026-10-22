@@ -134,13 +134,14 @@ Place a ticket by the files its "What to build" will change. A ticket that spans
 
 ## Starting an author
 
-1. **Claim the ticket.** Set yourself as its assignee and say which model builds it:
+1. **Check the free space.** Run `df -h /`. If under 15 GB is free, start no author: several authors build side by side, each in its own `target/` folder, and a full disk goes unnoticed (it filled twice on 21 to 22 Oct 2026). Remove the worktrees, and their `target/` folders, of merged PRs and of Reviewers whose Verdict is posted, as [After a merge](#merging) says, then check again.
+2. **Claim the ticket.** Set yourself as its assignee and say which model builds it:
 
    ```sh
    gh issue edit <N> -R BartoszSolkaBD/OpenDrone --add-assignee @me
    gh issue comment <N> -R BartoszSolkaBD/OpenDrone --body "Started: author on <model>"
    ```
-2. **Start the agent.** Set `isolation: "worktree"` and the tier's `model`, and run it in the background. Keep the prompt short:
+3. **Start the agent.** Set `isolation: "worktree"` and the tier's `model`, and run it in the background. Keep the prompt short:
 
    > You are the author for ticket #N on BartoszSolkaBD/OpenDrone. Follow `docs/agents/author.md` on origin/main exactly. The reference sources are in `<folder>`.
 
