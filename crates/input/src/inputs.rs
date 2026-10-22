@@ -85,6 +85,9 @@ pub struct Device {
     /// When its Channels last changed, on the input thread's clock.
     channels_at: Duration,
     stick_changes: VecDeque<Duration>,
+    /// The Actions on a button that was pressed since the game last called
+    /// [`Inputs::forget_presses`], even if let go again since.
+    pressed: Vec<Action>,
 }
 
 impl Device {
@@ -149,6 +152,22 @@ impl Device {
     /// when its control moves into that position, and may take this lookup
     /// over in #62.
     pub fn actions_held(&self) -> Vec<Action> {
+        self.actions_held_where(|_| true)
+    }
+
+    /// The Actions on a button (a Gamepad button or a Radio button channel)
+    /// that went down since the game last called [`Inputs::forget_presses`].
+    /// A button pressed and let go within one poll isn't down any more when
+    /// the game looks, so [`Device::actions_held`] never shows it, but it
+    /// shows here: it still counts as a press. A button already down when
+    /// the device was found isn't a press. Switches and sticks don't count:
+    /// a switch swept past a position isn't a press of it.
+    pub fn actions_pressed(&self) -> &[Action] {
+        &self.pressed
+    }
+
+    /// The held Actions whose source passes `of`.
+    fn actions_held_where(&self, of: impl Fn(&ActionSource) -> bool) -> Vec<Action> {
         let Some(profile) = &self.profile else {
             return Vec::new();
         };
@@ -156,6 +175,7 @@ impl Device {
             .setup
             .actions()
             .iter()
+            .filter(|(_, source)| of(source))
             .filter(|(_, source)| match source {
                 ActionSource::Channel { channel, on } => {
                     channel_position(&self.state, *channel) == Some(*on)
@@ -324,7 +344,19 @@ impl Inputs {
                         device.lost = None;
                         events.push(InputEvent::Back { device: id, at });
                     }
-                    if device.state.apply(&raw) && !touched.contains(&id) {
+                    let button = matches!(raw, Raw::Button { .. } | Raw::PadButton { .. });
+                    let before = button.then(|| device.actions_held_where(on_a_button));
+                    let changed = device.state.apply(&raw);
+                    if let Some(before) = before
+                        && changed
+                    {
+                        for action in device.actions_held_where(on_a_button) {
+                            if !before.contains(&action) && !device.pressed.contains(&action) {
+                                device.pressed.push(action);
+                            }
+                        }
+                    }
+                    if changed && !touched.contains(&id) {
                         touched.push(id);
                     }
                 }
@@ -334,6 +366,14 @@ impl Inputs {
             self.refresh(id, at, &mut events);
         }
         events
+    }
+
+    /// The game has read the presses [`Device::actions_pressed`] holds: call
+    /// it once a frame, after reading them, so a press counts once.
+    pub fn forget_presses(&mut self) {
+        for device in &mut self.devices {
+            device.pressed.clear();
+        }
     }
 
     /// Counts a device as lost when it keeps reporting at rest and has said
@@ -465,6 +505,7 @@ impl Inputs {
             last_heard: at,
             channels_at: at,
             stick_changes: VecDeque::new(),
+            pressed: Vec::new(),
         });
         self.seed(id);
         let device = &mut self.devices[id.0 as usize];
@@ -534,6 +575,15 @@ impl Inputs {
             at,
             channels: new,
         });
+    }
+}
+
+/// Whether an Action's source is a button: a Gamepad's, or a Radio's button
+/// channel (CH9 and up).
+fn on_a_button(source: &ActionSource) -> bool {
+    match source {
+        ActionSource::Button(_) => true,
+        ActionSource::Channel { channel, .. } => *channel > crate::controls::RADIO_AXIS_CHANNELS,
     }
 }
 

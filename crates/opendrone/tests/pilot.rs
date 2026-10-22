@@ -9,13 +9,17 @@ mod common;
 
 use std::time::Duration;
 
+use bevy::input::ButtonInput;
 use bevy::prelude::*;
+use opendrone::camera::controls::{Repeater, camera_inputs};
 use opendrone::pilot::{FlightWorld, Pilot};
 use opendrone::set_up::FlightPlan;
 use opendrone::stepping::Flight;
 use opendrone_input::controls::{PadAxis, PadButton};
-use opendrone_input::profile::Connection;
+use opendrone_input::profile::{Action, Connection};
 use opendrone_input::{Batch, DeviceInfo, DeviceState, Lost, Raw, SdlId};
+use opendrone_pack::input_device::controls::Position;
+use opendrone_pack::input_device::{ActionSource, Setup};
 use opendrone_sim::{Channel, EscState, FlightInput, QuadOutput};
 
 const POCKET: SdlId = SdlId(1);
@@ -68,12 +72,16 @@ struct Game {
 
 impl Game {
     fn new() -> Game {
-        let plan = common::plan("whoop-65");
         let profiles = common::packs()
             .input_devices()
             .into_iter()
             .cloned()
             .collect();
+        Game::with_profiles(profiles)
+    }
+
+    fn with_profiles(profiles: Vec<opendrone_input::InputDeviceProfile>) -> Game {
+        let plan = common::plan("whoop-65");
         Game {
             flight: Flight::new(plan.simulation(None).unwrap()).unwrap(),
             pilot: Pilot::without_input_thread(&plan, profiles),
@@ -363,4 +371,273 @@ fn unplugging_and_plugging_in_the_flying_input_device_during_a_pause_still_reach
     let lost = position(FlightInput::InputDeviceLost).expect("the unplug arrives");
     let back = position(FlightInput::InputDeviceBack).expect("the plug-in arrives");
     assert!(lost < back, "{arrived:?}");
+}
+
+// ---------------------------------------------------------------------------
+// A button tap shorter than a frame (#264)
+
+/// The built-in profiles with the camera's Actions bound to buttons, as a
+/// pilot can rebind them: on the DualSense, Camera Tilt up is D-pad Up and
+/// FOV wider is D-pad Right; on the Pocket, Camera Tilt up is the button
+/// channel CH12 and FOV wider is CH13. Pause stays where the Pack puts it:
+/// Options on the DualSense, CH11 on the Pocket.
+fn profiles_with_the_camera_on_buttons() -> Vec<opendrone_input::InputDeviceProfile> {
+    common::packs()
+        .input_devices()
+        .into_iter()
+        .cloned()
+        .map(|mut profile| {
+            match &mut profile.setup {
+                Setup::Gamepad(pad) => {
+                    pad.actions.insert(
+                        Action::CameraTiltUp,
+                        ActionSource::Button(PadButton::DpadUp),
+                    );
+                    pad.actions
+                        .insert(Action::FovWider, ActionSource::Button(PadButton::DpadRight));
+                }
+                Setup::Radio(radio) => {
+                    for (action, channel) in [(Action::CameraTiltUp, 12), (Action::FovWider, 13)] {
+                        radio.actions.insert(
+                            action,
+                            ActionSource::Channel {
+                                channel,
+                                on: Position::Pressed,
+                            },
+                        );
+                    }
+                }
+            }
+            profile
+        })
+        .collect()
+}
+
+/// A button the checks press: a DualSense button, or a Pocket button channel
+/// (CH9 is button 0).
+#[derive(Clone, Copy)]
+enum Pressed {
+    Pad(PadButton),
+    Channel(u8),
+}
+
+impl Pressed {
+    fn raw(self, down: bool) -> Raw {
+        match self {
+            Pressed::Pad(button) => Raw::PadButton {
+                device: DUALSENSE,
+                button,
+                down,
+            },
+            Pressed::Channel(channel) => Raw::Button {
+                device: POCKET,
+                button: channel - 9,
+                down,
+            },
+        }
+    }
+
+    /// Down and up again, both in one batch.
+    fn tap(self) -> Vec<Raw> {
+        vec![self.raw(true), self.raw(false)]
+    }
+}
+
+const TILT_UP: [Pressed; 2] = [Pressed::Pad(PadButton::DpadUp), Pressed::Channel(12)];
+const PAUSE: [Pressed; 2] = [Pressed::Pad(PadButton::Start), Pressed::Channel(11)];
+
+/// A game with both devices plugged in and the camera's Actions on buttons,
+/// with the camera's Repeater.
+struct CameraGame {
+    game: Game,
+    repeater: Repeater,
+    keys: ButtonInput<KeyCode>,
+}
+
+impl CameraGame {
+    fn new() -> CameraGame {
+        CameraGame {
+            game: both_devices(),
+            repeater: Repeater::new(),
+            keys: ButtonInput::default(),
+        }
+    }
+
+    /// A frame at `ms` reading `events` in one batch, then what the camera
+    /// acts on, as `read_the_camera_keys` works it out.
+    fn camera_frame(&mut self, ms: u64, mut events: Vec<Raw>) -> Vec<Action> {
+        // The DualSense reports at rest: silent for a second, it is lost.
+        events.push(Raw::Report { device: DUALSENSE });
+        self.game.frame(ms, events);
+        self.keys.clear();
+        let (held, tapped) = camera_inputs(
+            &self.keys,
+            self.game.pilot.actions_held(),
+            self.game.pilot.actions_tapped(),
+        );
+        self.repeater
+            .update_with_taps(Duration::from_millis(ms), &held, &tapped)
+    }
+}
+
+/// A game with a Pocket and a DualSense plugged in at 0 ms, the camera's
+/// Actions on buttons.
+fn both_devices() -> Game {
+    let mut game = Game::with_profiles(profiles_with_the_camera_on_buttons());
+    game.frame(0, vec![pocket(), dualsense()]);
+    game
+}
+
+#[test]
+fn a_button_pressed_and_let_go_within_one_frame_fires_its_action_once() {
+    // Basis: Rule. docs/context/input.md: an Action fires once, when its
+    // button moves into the bound position. A tap shorter than a frame is up
+    // again when the frame looks, and still counts (#264), as a key tap does
+    // (#186). Pause toggles each time it fires, so one tap pauses and a
+    // second unpauses; both reports of a tap are in one batch.
+    for button in PAUSE {
+        let mut game = both_devices();
+        game.frame(4, button.tap());
+        assert!(game.game_clock.is_paused(), "the tap paused the game");
+        game.frames(4, 400, 4, &[]);
+        assert!(
+            game.game_clock.is_paused(),
+            "the frames after it do nothing"
+        );
+        game.frame(404, button.tap());
+        assert!(!game.game_clock.is_paused(), "a second tap fires again");
+    }
+}
+
+#[test]
+fn a_held_button_fires_once_and_not_every_frame() {
+    // Basis: Rule. Held for 400 ms of 4 ms frames, Pause fired once: the
+    // game is paused, and stays paused.
+    for button in PAUSE {
+        let mut game = both_devices();
+        game.frame(4, vec![button.raw(true)]);
+        assert!(game.game_clock.is_paused());
+        game.frames(4, 400, 4, &[]);
+        assert!(
+            game.game_clock.is_paused(),
+            "a held button doesn't fire again"
+        );
+        game.frame(404, vec![button.raw(false)]);
+        assert!(game.game_clock.is_paused(), "letting go doesn't fire");
+        game.frame(408, button.tap());
+        assert!(!game.game_clock.is_paused());
+    }
+}
+
+#[test]
+fn a_camera_button_tapped_within_one_frame_acts_once_as_a_key_does() {
+    // Basis: Rule. The camera's Actions act the same from a button as from a
+    // key (#186, #264): once for a tap, then nothing on the frames after it.
+    for button in TILT_UP {
+        let mut camera = CameraGame::new();
+        assert_eq!(
+            camera.camera_frame(10, button.tap()),
+            vec![Action::CameraTiltUp]
+        );
+        for ms in [20, 30, 1500] {
+            assert!(camera.camera_frame(ms, vec![]).is_empty());
+        }
+        assert_eq!(
+            camera.camera_frame(2000, button.tap()),
+            vec![Action::CameraTiltUp],
+            "a second tap acts again"
+        );
+    }
+}
+
+#[test]
+fn a_held_camera_button_acts_at_once_then_repeats_after_1_s_and_every_200_ms_as_a_key_does() {
+    // Basis: Source. #14 §2: "Holding a key repeats it after 1 s, every
+    // 200 ms", and a button bound to the same Action does the same.
+    for button in TILT_UP {
+        let mut camera = CameraGame::new();
+        let mut acted = Vec::new();
+        let mut events = vec![button.raw(true)];
+        for ms in (10..=1410).step_by(10) {
+            if !camera
+                .camera_frame(ms, std::mem::take(&mut events))
+                .is_empty()
+            {
+                acted.push(ms);
+            }
+        }
+        assert_eq!(acted, vec![10, 1010, 1210, 1410]);
+    }
+}
+
+#[test]
+fn a_held_camera_button_let_go_and_pressed_again_within_one_frame_acts_again_at_once() {
+    // Basis: Rule. The second press is a press: it acts at once and waits a
+    // second again, as a key does.
+    for button in TILT_UP {
+        let mut camera = CameraGame::new();
+        assert_eq!(
+            camera.camera_frame(10, vec![button.raw(true)]),
+            vec![Action::CameraTiltUp]
+        );
+        assert_eq!(
+            camera.camera_frame(500, vec![button.raw(false), button.raw(true)]),
+            vec![Action::CameraTiltUp]
+        );
+        assert!(camera.camera_frame(1000, vec![]).is_empty());
+        assert_eq!(
+            camera.camera_frame(1500, vec![]),
+            vec![Action::CameraTiltUp]
+        );
+    }
+}
+
+#[test]
+fn a_key_tap_and_button_taps_within_one_frame_each_act_once() {
+    // Basis: Rule. FOV wider from the keyboard and from a button, and Camera
+    // Tilt up from a button, all tapped within the frame: each acts once.
+    let mut camera = CameraGame::new();
+    let right = Pressed::Pad(PadButton::DpadRight);
+    let mut events = TILT_UP[0].tap();
+    events.extend(right.tap());
+    camera.game.frame(10, events);
+    camera.keys.clear();
+    camera.keys.press(KeyCode::ArrowRight);
+    camera.keys.release(KeyCode::ArrowRight);
+    let (held, tapped) = camera_inputs(
+        &camera.keys,
+        camera.game.pilot.actions_held(),
+        camera.game.pilot.actions_tapped(),
+    );
+    assert!(held.is_empty());
+    assert_eq!(tapped, vec![Action::CameraTiltUp, Action::FovWider]);
+}
+
+#[test]
+fn a_switch_swept_through_a_position_is_not_a_press_of_it() {
+    // Basis: Rule. Only a button's press counts between frames: a Radio's
+    // axis channel that passes through its bound position within one frame
+    // and ends elsewhere fires nothing, since a sweep isn't a press.
+    let mut profiles = profiles_with_the_camera_on_buttons();
+    for profile in &mut profiles {
+        if let Setup::Radio(radio) = &mut profile.setup {
+            radio.actions.insert(
+                Action::FovWider,
+                ActionSource::Channel {
+                    channel: 8,
+                    on: Position::Middle,
+                },
+            );
+        }
+    }
+    let mut game = Game::with_profiles(profiles);
+    game.frame(0, vec![pocket()]);
+    let axis = |value| Raw::Axis {
+        device: POCKET,
+        axis: 7,
+        value,
+    };
+    game.frame(5, vec![axis(-30000)]);
+    game.frame(10, vec![axis(0), axis(30000)]);
+    assert!(game.pilot.actions_tapped().is_empty());
 }

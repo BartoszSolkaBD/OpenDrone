@@ -69,6 +69,28 @@ pub fn camera_keys(keys: &ButtonInput<KeyCode>) -> (Vec<Action>, Vec<Action>) {
     (held, tapped)
 }
 
+/// What the keyboard and the Input Devices' buttons did to the camera's
+/// Actions in one frame: the Actions held now, and the Actions pressed during
+/// the frame (see [`camera_keys`]), each once. `held` and `tapped` are what
+/// the Input Devices report ([`crate::pilot::Pilot::actions_held`] and
+/// [`crate::pilot::Pilot::actions_tapped`]), so a button counts as a key does.
+pub fn camera_inputs(
+    keys: &ButtonInput<KeyCode>,
+    mut held: Vec<Action>,
+    mut tapped: Vec<Action>,
+) -> (Vec<Action>, Vec<Action>) {
+    let (keys_held, keys_tapped) = camera_keys(keys);
+    for (list, more) in [(&mut held, keys_held), (&mut tapped, keys_tapped)] {
+        for action in more {
+            if !list.contains(&action) {
+                list.push(action);
+            }
+        }
+        list.retain(|action| CAMERA_ACTIONS.contains(action));
+    }
+    (held, tapped)
+}
+
 /// One Quad's Camera Tilt and FOV as the pilot has them, in degrees.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct QuadCamera {
