@@ -24,9 +24,11 @@
 //!
 //! **Which device flies.** The device that pressed FLY: a Radio by a flick of
 //! yaw, a Gamepad by ✕. FLY pressed with the keyboard or the mouse uses the
-//! last device that moved a menu, or the only one plugged in. With none of
-//! those the Quad waits on the Launch Spot, and the first device whose sticks
-//! move flies, as before the screens (#62).
+//! Flying device setting (#271): Auto flies a Radio, else a Gamepad; a device
+//! the pilot named flies whatever pressed FLY, and when it isn't plugged in
+//! Auto picks and says so. Where two Radios or two Gamepads tie, or nothing
+//! is plugged in, the Quad waits on the Launch Spot, and the first of the
+//! tied devices whose sticks move flies, as before the screens (#62).
 
 pub mod menu_input;
 pub mod model;
@@ -394,6 +396,10 @@ fn drive_the_screens(
         }
     }
 
+    // The Flying device setting reaches the pilot before it picks a device.
+    game.pilot
+        .set_flying_device(menus.settings().flying_device.clone());
+
     // What the screens show of the game.
     let plugged_in = game.pilot.devices();
     let devices: Vec<model::DeviceFacts> = plugged_in.iter().map(|(_, d)| d.clone()).collect();
@@ -486,7 +492,7 @@ fn drive_the_screens(
                     match FlightPlan::from_packs(packs, settings) {
                         Ok(new_plan) => {
                             *game.plan = new_plan;
-                            let device = state.by.or_else(|| game.pilot.device_to_fly());
+                            let device = game.pilot.device_for_flight(state.by);
                             let mut world = FlightWorld {
                                 flight: &mut game.flight,
                                 plan: &game.plan,
