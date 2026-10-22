@@ -318,7 +318,7 @@ The session note dies with its session, but a PR that waits for the maintainer c
 
   ```sh
   gh pr list -R BartoszSolkaBD/OpenDrone --state merged --search "\"Delegator's hand-off\" in:comments" --limit 50 \
-    --json number,comments --jq '.[] | select([.comments[].body | startswith("Hand-off done")] | any | not) | .number'
+    --json number,comments --jq '.[] | select(([.comments[].body | startswith("Delegator'"'"'s hand-off")] | any) and ([.comments[].body | startswith("Hand-off done")] | any | not)) | .number'
   ```
 
 ## Ending a batch
