@@ -13,7 +13,10 @@
 //!
 //! 1. It works out every library the core crates (the `core` list in
 //!    `walls.toml`) are built with, leaving out code-writing macros, which
-//!    only run while building.
+//!    only run while building. `cargo tree` works it out for the same
+//!    packages and target as the build in step 2, so a library only another
+//!    operating system uses, or one only a package outside that build turns
+//!    on, isn't counted.
 //! 2. It builds the core crates, plus any packages named with `--with`, in one
 //!    `cargo build`, so the features every package turns on are merged as they
 //!    are in the real build. CI runs it `--with opendrone --with
@@ -41,8 +44,11 @@
 //! Any call not allowed in `walls.toml`'s `[core-platform-maths]`, with its
 //! reason, fails the check with a plain sentence naming the library, the
 //! maths function, the Rust operation behind it and where it is called from.
-//! Two more things fail it:
+//! Three more things fail it:
 //!
+//! - A library the core is built with that cargo reported no build for, such
+//!   as a core crate with no library in it: none of its code was read, so
+//!   nothing in it was checked.
 //! - A reference to a maths function from outside any function, such as a
 //!   table of function pointers. No allowance covers one, because nothing
 //!   says what calls through it. That includes a table that points at a
@@ -71,7 +77,7 @@ use std::process::ExitCode;
 
 use crate::walls::{RULES_FILE, Rules};
 pub(crate) use build::compile_keeping_programs;
-use build::{Packages, build, cargo_metadata, host_triple};
+use build::{Packages, build, cargo_metadata, core_closure, host_triple};
 use code::{Code, Depth, Place};
 
 /// The C maths library's functions whose results can differ from one
@@ -220,7 +226,7 @@ pub fn run(args: &[String]) -> ExitCode {
         .calls
         .iter()
         .partition(|call| rules.platform_maths_reason(call).is_some());
-    if refused.is_empty() && found.bitcode.is_empty() {
+    if refused.is_empty() && found.bitcode.is_empty() && found.unbuilt.is_empty() {
         let others = match found.others_read {
             0 => String::new(),
             1 => format!(
@@ -253,11 +259,18 @@ pub fn run(args: &[String]) -> ExitCode {
         }
         return ExitCode::SUCCESS;
     }
-    if !found.bitcode.is_empty() {
+    if !found.bitcode.is_empty() || !found.unbuilt.is_empty() {
         println!(
             "This check can't read all of the core's compiled code, so it can't tell whether the \
              core calls the operating system's maths (ADR-0001):"
         );
+        for library in &found.unbuilt {
+            println!(
+                "- cargo reported no build for `{library}`; nothing was checked. The core is \
+                 built with it, but cargo built no library from it, so there was no compiled \
+                 code to read."
+            );
+        }
         for crate_name in &found.bitcode {
             println!(
                 "- `{crate_name}` was compiled to LLVM bitcode, not machine code. Link-time \
@@ -397,6 +410,9 @@ struct Found {
     /// The crates whose compiled code is LLVM bitcode, which this check
     /// can't read.
     bitcode: Vec<String>,
+    /// The libraries the core is built with that cargo reported no build
+    /// for, so none of their code was read.
+    unbuilt: Vec<String>,
 }
 
 /// Builds the core with `with` and reads the compiled code.
@@ -407,26 +423,31 @@ fn check(
     target: &str,
 ) -> Result<Found, String> {
     let packages = Packages::read(&cargo_metadata(manifest_path)?)?;
-    let core = packages.core_closure(&rules.core);
+    let core = core_closure(&packages, &rules.core, with, manifest_path, target)?;
     let built = build(&packages, &rules.core, with, manifest_path, target)?;
     let mut calls: BTreeMap<(String, String), BTreeSet<Caller>> = BTreeMap::new();
     let mut bitcode = Vec::new();
 
     // The core's own libraries first: their code also says which crates are
     // the core's, for finding the core's functions in other crates' code.
+    // A library cargo reported no build for has no compiled code to read, so
+    // nothing in it was checked: that fails the check, not passes it.
     let mut owners = Owners::default();
     let mut core_code = Vec::new();
+    let mut unbuilt = Vec::new();
     for (id, name) in &core {
-        let code = read_code(
-            built.rlibs.get(id).map(Vec::as_slice).unwrap_or_default(),
-            Depth::Calls,
-        )?;
+        let Some(files) = built.rlibs.get(id) else {
+            unbuilt.push(name.clone());
+            continue;
+        };
+        let code = read_code(files, Depth::Calls)?;
         if code.bitcode {
             bitcode.push(name.clone());
         }
         owners.learn(packages.crate_name(id), name, &code);
         core_code.push((name, code));
     }
+    unbuilt.sort();
     for (name, code) in &core_code {
         core_calls(name, code, &owners, &mut calls);
     }
@@ -490,6 +511,7 @@ fn check(
             })
             .collect(),
         bitcode,
+        unbuilt,
     })
 }
 
