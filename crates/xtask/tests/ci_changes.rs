@@ -9,7 +9,7 @@
 //! The script runs under Git Bash in CI on Windows, but these checks skip
 //! Windows, where `bash` may start Windows' own Linux shell instead.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -200,18 +200,14 @@ fn a_push_to_main_rebuilds_the_maps() {
     assert_eq!(outputs["maps"], "true", "{outputs:?}");
 }
 
-/// One file under each path whose change can move a flight result, as listed
-/// in the script's header.
-const FLIGHT_FILES: [&str; 22] = [
-    "crates/maths/src/lib.rs",
-    "crates/physics/src/lib.rs",
-    "crates/flight-controller/src/lib.rs",
-    "crates/sim/src/lib.rs",
-    "crates/test-pilot/src/lib.rs",
-    "crates/scenario/src/lib.rs",
-    "crates/pack/src/lib.rs",
+/// One file under each flight path that isn't a crate, and under `packs/`.
+/// The script's `flight_paths` is the list. The crates are read from Cargo
+/// instead, by
+/// `a_pull_request_that_changes_any_crate_the_scenario_runner_is_built_with_runs_the_scenarios_on_every_os`,
+/// except one data file a crate builds in: the Pack reader's built-in Test
+/// Maps, which the Scenarios fly.
+const FLIGHT_FILES: [&str; 14] = [
     "crates/pack/test-maps/wall.toml",
-    "crates/blackbox/src/lib.rs",
     "scenarios/physics/free-fall.toml",
     "scenarios/physics/free-fall.results.toml",
     "scenarios/test-quads/whoop-65-no-drag.toml",
@@ -239,6 +235,125 @@ fn a_pull_request_that_changes_anything_a_flight_depends_on_runs_the_scenarios_o
             assert_eq!(outputs["scenarios"], "true", "{file} on {os}: {outputs:?}");
         }
     }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_any_crate_the_scenario_runner_is_built_with_runs_the_scenarios_on_every_os()
+ {
+    // #253: a crate the runner starts being built with, and that nobody adds
+    // to the flight paths, could change a flight result while macOS and
+    // Windows skip the Scenarios. So the crates come from Cargo, not a list.
+    let crates = crates_the_scenario_runner_is_built_with();
+    assert!(
+        crates.contains("crates/scenario/") && crates.contains("crates/maths/"),
+        "the runner's crates as Cargo reads them: {crates:?}"
+    );
+    // The crate's code, and its own Cargo.toml (its features and libraries),
+    // which sits outside src/. So a flight path narrowed to a crate's src/
+    // fails here: it would miss the crate's other files too, such as the Pack
+    // reader's Test Maps (Reviewer's case on #260).
+    for folder in &crates {
+        for (kind, file) in [
+            ("code", format!("{folder}src/lib.rs")),
+            ("manifest", format!("{folder}Cargo.toml")),
+        ] {
+            for os in ["macOS", "Windows", "Linux"] {
+                let case = format!("runner-crate-{}-{kind}-{os}", folder.replace('/', "-"));
+                let repo = Repo::new(&case);
+                repo.write(&file, "changed\n");
+                let outputs = repo.commit_and_check_on("pull_request", os);
+                assert!(
+                    outputs["flight"] == "true" && outputs["scenarios"] == "true",
+                    "The Scenario runner is built with {folder}, but a change to {file} doesn't \
+                     run the Scenarios on {os}. Add `{folder}`, the whole folder, to flight_paths \
+                     in .github/scripts/changes.sh. Outputs: {outputs:?}"
+                );
+            }
+        }
+    }
+}
+
+/// The folders, relative to the repo root and ending in "/", of the Scenario
+/// runner (`opendrone-scenario`) and every crate of ours it is built with,
+/// directly or through another, as `cargo metadata` reads them. A crate it
+/// only tests with (a dev-dependency) doesn't count: it isn't in the runner.
+/// A library from crates.io isn't a folder of ours; its version is in
+/// Cargo.lock, which is a flight path.
+fn crates_the_scenario_runner_is_built_with() -> BTreeSet<String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml");
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+    let output = Command::new(cargo)
+        .args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--no-deps",
+            "--manifest-path",
+        ])
+        .arg(&root)
+        .output()
+        .expect("cargo runs");
+    assert!(
+        output.status.success(),
+        "cargo metadata failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("cargo metadata prints JSON");
+    let workspace_root = PathBuf::from(
+        metadata["workspace_root"]
+            .as_str()
+            .expect("cargo metadata names the workspace root"),
+    );
+    let packages = metadata["packages"]
+        .as_array()
+        .expect("cargo metadata lists the packages");
+    let package = |name: &str| {
+        packages
+            .iter()
+            .find(|package| package["name"] == name)
+            .unwrap_or_else(|| {
+                panic!("the runner is built with {name}, which isn't in the workspace, so this check can't see what it is built with")
+            })
+    };
+    let folder = |manifest: &str| {
+        let folder = Path::new(manifest)
+            .parent()
+            .expect("a Cargo.toml is in a folder")
+            .strip_prefix(&workspace_root)
+            .unwrap_or_else(|_| panic!("{manifest} is outside the repo"));
+        let parts: Vec<_> = folder
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy().into_owned())
+            .collect();
+        format!("{}/", parts.join("/"))
+    };
+
+    let mut folders = BTreeSet::new();
+    let mut to_visit = vec!["opendrone-scenario".to_owned()];
+    while let Some(name) = to_visit.pop() {
+        let package = package(&name);
+        let manifest = package["manifest_path"]
+            .as_str()
+            .expect("a package has a Cargo.toml");
+        if !folders.insert(folder(manifest)) {
+            continue;
+        }
+        for dependency in package["dependencies"]
+            .as_array()
+            .expect("a package lists its dependencies")
+        {
+            // Only our own crates have a path; "dev" is a test-only one.
+            if dependency.get("path").is_some() && dependency["kind"] != "dev" {
+                let name = dependency["name"]
+                    .as_str()
+                    .expect("a dependency has a name");
+                to_visit.push(name.to_owned());
+            }
+        }
+    }
+    folders
 }
 
 #[test]
