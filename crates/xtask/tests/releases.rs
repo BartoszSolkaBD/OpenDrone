@@ -97,6 +97,28 @@ impl Repo {
         self.write("LICENSE-MIT", "MIT\n");
         self.write("LICENSE-APACHE", "Apache\n");
         self.write("built/opendrone", "the game's program");
+        self.track();
+    }
+
+    /// Makes the scratch repo a git repo, if it isn't yet, and has git track
+    /// every file that isn't ignored: a download takes only tracked files.
+    fn track(&self) {
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&self.root)
+                .output()
+                .expect("git runs");
+            assert!(
+                output.status.success(),
+                "git {args:?}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        if !self.root.join(".git").exists() {
+            git(&["init", "--quiet"]);
+        }
+        git(&["add", "--all"]);
     }
 
     fn with_the_textures(&self) {
@@ -238,6 +260,121 @@ fn a_download_holds_the_game_with_its_packs_and_scenarios_beside_it() {
         .find(|(n, _, _)| n == &format!("{top}/opendrone"))
         .unwrap();
     assert_eq!(program.2, b"the game's program");
+}
+
+/// The names of the files in a zip.
+fn file_names(path: &Path) -> Vec<String> {
+    unzip(path)
+        .into_iter()
+        .map(|(n, _, _)| n)
+        .filter(|n| !n.ends_with('/'))
+        .collect()
+}
+
+#[test]
+fn downloaded_neurobem_data_never_goes_into_a_download() {
+    // Basis: Rule (#251, docs/data-policy.md): NeuroBEM states no licence, so
+    // its CSVs, which `cargo xtask download neurobem` writes beside the
+    // Scenarios that play them and a .gitignore keeps out of git, must not be
+    // redistributed, even when they sit on the machine that packages.
+    let repo = Repo::new("neurobem");
+    repo.write("scenarios/quads/freestyle-5/neurobem/.gitignore", "*.csv\n");
+    repo.write(
+        "scenarios/quads/freestyle-5/neurobem/rolling-out-of-a-hover.toml",
+        "# plays back a NeuroBEM flight\n",
+    );
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    // Downloaded after everything was committed, as on a developer's machine.
+    repo.write(
+        "scenarios/quads/freestyle-5/neurobem/merged_2021-02-18-17-22-36_seg_1.csv",
+        "t,x,y,z\n",
+    );
+    repo.track();
+    let (ok, out, err) = repo.run(&[
+        "package",
+        "--game",
+        "built/opendrone",
+        "--os",
+        "linux",
+        "--name",
+        "x",
+        "--out",
+        "dist",
+    ]);
+    assert!(ok, "{err}");
+    assert!(!out.contains(".csv"), "{out}");
+    let files = file_names(&repo.root.join("dist/OpenDrone-x-linux.zip"));
+    let top = "OpenDrone-x-linux";
+    assert!(
+        files.contains(&format!(
+            "{top}/scenarios/quads/freestyle-5/neurobem/rolling-out-of-a-hover.toml"
+        )),
+        "{files:?}"
+    );
+    assert!(
+        files.iter().all(|f| !f.ends_with(".csv")),
+        "no downloaded data in {files:?}"
+    );
+}
+
+#[test]
+fn a_file_git_does_not_track_never_goes_into_a_download() {
+    // Basis: Rule (#251): a download holds only committed files, so whatever
+    // else sits in packs/ or scenarios/ on this machine stays out, whether or
+    // not a .gitignore names it.
+    let repo = Repo::new("untracked");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    repo.write("scenarios/physics/not-committed.toml", "# new\n");
+    repo.write("packs/opendrone/data.bin", "downloaded");
+    let (ok, _, err) = repo.run(&[
+        "package",
+        "--game",
+        "built/opendrone",
+        "--os",
+        "macos",
+        "--name",
+        "x",
+        "--out",
+        "dist",
+    ]);
+    assert!(ok, "{err}");
+    let files = file_names(&repo.root.join("dist/OpenDrone-x-macos.zip"));
+    assert_eq!(
+        files.len(),
+        11,
+        "the same files as a clean checkout: {files:?}"
+    );
+    assert!(
+        files
+            .iter()
+            .all(|f| !f.contains("not-committed") && !f.contains("data.bin"))
+    );
+}
+
+#[test]
+fn a_folder_that_is_not_a_git_checkout_is_refused_with_a_plain_message() {
+    // Basis: Rule (#251): with no git to say which files are committed, a
+    // download can't promise it holds no downloaded data, so it isn't made.
+    let repo = Repo::new("no-git");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    fs::remove_dir_all(repo.root.join(".git")).unwrap();
+    let (ok, _, err) = repo.run(&[
+        "package",
+        "--game",
+        "built/opendrone",
+        "--os",
+        "linux",
+        "--name",
+        "x",
+        "--out",
+        "dist",
+    ]);
+    assert!(!ok);
+    assert!(err.contains("isn't a git checkout"), "{err}");
+    assert!(!repo.root.join("dist").exists());
 }
 
 #[test]
