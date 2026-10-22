@@ -29,6 +29,7 @@
 //! endless_battery = false
 //! auto_arm = false
 //! packet_rate = 250        # Hz
+//! flying_device = "auto"   # or the name of an Input Device profile, such as "DualSense"
 //!
 //! [camera]
 //! video_look = "analog"
@@ -143,6 +144,50 @@ impl TextSize {
     }
 }
 
+/// Which Input Device flies when the pilot presses FLY with the keyboard or
+/// the mouse (#271).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum FlyingDevice {
+    /// Of the Input Devices plugged in, a Radio first, then a Gamepad.
+    #[default]
+    Auto,
+    /// The device whose Input Device profile has this name, such as
+    /// "Radiomaster Pocket". When it isn't plugged in, Auto picks.
+    Named(String),
+}
+
+impl FlyingDevice {
+    /// The word for Auto, on screen.
+    pub const AUTO: &'static str = "Auto";
+
+    /// The words on screen: "Auto", or the device's name.
+    pub fn label(&self) -> &str {
+        match self {
+            FlyingDevice::Auto => FlyingDevice::AUTO,
+            FlyingDevice::Named(name) => name,
+        }
+    }
+
+    /// In the file, "auto" is Auto, and any other text is a name.
+    fn from_text(text: &str) -> Option<FlyingDevice> {
+        let text = text.trim();
+        if text.is_empty() {
+            None
+        } else if text.eq_ignore_ascii_case(FlyingDevice::AUTO) {
+            Some(FlyingDevice::Auto)
+        } else {
+            Some(FlyingDevice::Named(text.to_string()))
+        }
+    }
+
+    fn to_text(&self) -> String {
+        match self {
+            FlyingDevice::Auto => "auto".to_string(),
+            FlyingDevice::Named(name) => name.clone(),
+        }
+    }
+}
+
 /// Everything the pilot has set, as the settings file keeps it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PilotSettings {
@@ -161,6 +206,9 @@ pub struct PilotSettings {
     pub endless_battery: bool,
     pub auto_arm: bool,
     pub packet_rate: PacketRate,
+    /// Which Input Device flies, when FLY is pressed with the keyboard or
+    /// the mouse.
+    pub flying_device: FlyingDevice,
     /// The Video Look, the Aspect ratio, and each Quad's Camera Tilt and FOV.
     pub camera: CameraSettings,
 }
@@ -181,6 +229,7 @@ impl Default for PilotSettings {
             endless_battery: false,
             auto_arm: false,
             packet_rate: PacketRate::from_hz(250).expect("250 Hz is a Packet Rate"),
+            flying_device: FlyingDevice::Auto,
             camera: CameraSettings::default(),
         }
     }
@@ -380,6 +429,16 @@ pub fn settings_from(table: &Table, problems: &mut Vec<String>) -> PilotSettings
             ),
         }
     }
+    if let Some(text) = reader.string("flying", "flying_device") {
+        match FlyingDevice::from_text(&text) {
+            Some(device) => settings.flying_device = device,
+            None => reader.refuse(
+                "flying",
+                "flying_device",
+                "auto, or the name of an Input Device profile",
+            ),
+        }
+    }
     if let Some(look) = reader.string("camera", "video_look") {
         match look.as_str() {
             "analog" => settings.camera.look = VideoLook::Analog,
@@ -556,6 +615,10 @@ pub fn table_of(settings: &PilotSettings, mut base: Table) -> Table {
         flying.insert(
             "packet_rate".into(),
             Value::Integer(i64::from(settings.packet_rate.hz())),
+        );
+        flying.insert(
+            "flying_device".into(),
+            Value::String(settings.flying_device.to_text()),
         );
     }
     {

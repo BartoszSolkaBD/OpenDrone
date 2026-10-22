@@ -36,6 +36,8 @@ pub(super) struct Packages {
     /// Each package's normal dependencies (not build or test ones).
     uses: BTreeMap<String, Vec<String>>,
     members: Vec<String>,
+    /// Each package's version, and the folder its `Cargo.toml` sits in.
+    versions: BTreeMap<String, (String, String)>,
     target_directory: PathBuf,
 }
 
@@ -47,9 +49,18 @@ impl Packages {
         let mut names = BTreeMap::new();
         let mut crate_names = BTreeMap::new();
         let mut macros = BTreeSet::new();
+        let mut versions = BTreeMap::new();
         for package in list {
             let id = package["id"].as_str().unwrap_or_default().to_owned();
             let name = package["name"].as_str().unwrap_or_default().to_owned();
+            let folder = package["manifest_path"]
+                .as_str()
+                .map(Path::new)
+                .and_then(Path::parent)
+                .map(|folder| folder.display().to_string())
+                .unwrap_or_default();
+            let version = package["version"].as_str().unwrap_or_default().to_owned();
+            versions.insert(id.clone(), (version, folder));
             let targets = package["targets"].as_array().into_iter().flatten();
             for target in targets {
                 let kinds: Vec<&str> = target["kind"]
@@ -106,6 +117,7 @@ impl Packages {
             macros,
             uses,
             members,
+            versions,
             target_directory,
         })
     }
@@ -119,29 +131,6 @@ impl Packages {
             .get(id)
             .map(String::as_str)
             .unwrap_or_default()
-    }
-
-    /// Every package the core crates are built with (their normal
-    /// dependencies, all the way down, and themselves), by id, with its name,
-    /// in order of name. Code-writing macros only run while building, so they
-    /// are left out.
-    pub(super) fn core_closure(&self, core: &[String]) -> BTreeMap<String, String> {
-        let mut queue: VecDeque<&String> = self
-            .members
-            .iter()
-            .filter(|id| core.iter().any(|name| name == self.name(id)))
-            .collect();
-        let mut reached: BTreeMap<String, String> = BTreeMap::new();
-        while let Some(id) = queue.pop_front() {
-            if self.macros.contains(id) || reached.contains_key(id) {
-                continue;
-            }
-            reached.insert(id.clone(), self.name(id).to_owned());
-            queue.extend(self.uses.get(id).into_iter().flatten());
-        }
-        let mut by_name: Vec<(String, String)> = reached.into_iter().collect();
-        by_name.sort_by(|a, b| (&a.1, &a.0).cmp(&(&b.1, &b.0)));
-        by_name.into_iter().collect()
     }
 
     /// Whether the package uses any of `libraries`, directly or through
@@ -162,6 +151,135 @@ impl Packages {
         }
         false
     }
+
+    /// The packages [`build`] asks cargo for: the core crates the workspace has
+    /// (a test's small workspace may hold a few), then `with`.
+    fn selected<'a>(&self, core: &'a [String], with: &'a [String]) -> Vec<&'a str> {
+        let present: BTreeSet<&str> = self.names.values().map(String::as_str).collect();
+        core.iter()
+            .filter(|name| present.contains(name.as_str()))
+            .chain(with)
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// The packages a line of `cargo tree` names, by id: its name and
+    /// version, as `glamx v0.1.0 (/path/to/glamx) (*)`. Two packages can share
+    /// a name and version only from different places, so then the place
+    /// printed after them picks; failing that, both count.
+    fn ids_of(&self, line: &str) -> Result<Vec<&str>, String> {
+        let mut words = line.split_whitespace();
+        let name = words.next().unwrap_or_default();
+        let version = words
+            .next()
+            .and_then(|word| word.strip_prefix('v'))
+            .unwrap_or_default();
+        let named: Vec<&str> = self
+            .versions
+            .iter()
+            .filter(|(id, (package_version, _))| {
+                package_version == version && self.name(id) == name
+            })
+            .map(|(id, _)| id.as_str())
+            .collect();
+        if named.is_empty() {
+            return Err(format!(
+                "cargo tree names {line:?}, a package cargo metadata doesn't describe"
+            ));
+        }
+        let placed: Vec<&str> = named
+            .iter()
+            .copied()
+            .filter(|id| {
+                self.versions
+                    .get(*id)
+                    .is_some_and(|(_, folder)| line.contains(&format!("({folder})")))
+            })
+            .collect();
+        Ok(if placed.len() == 1 { placed } else { named })
+    }
+}
+
+/// Every library the core crates are built with in the build [`build`]
+/// makes (their normal dependencies, all the way down, and themselves), by
+/// id, with its name. A dependency counts only if that build turns it on:
+/// one only another operating system uses, or one turned on only by a
+/// feature of a package outside the build, isn't built, so it isn't the
+/// core's. `cargo tree`, asked for the same packages and target as the build,
+/// works that out as the build does. Code-writing macros only run while
+/// building, so they are left out.
+pub(super) fn core_closure(
+    packages: &Packages,
+    core: &[String],
+    with: &[String],
+    manifest_path: Option<&str>,
+    target: &str,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut command = cargo();
+    command.args([
+        "tree",
+        "--target",
+        target,
+        "--edges",
+        "normal,no-proc-macro",
+        "--prefix",
+        "depth",
+        "--format",
+        "{p}",
+        "--color",
+        "never",
+    ]);
+    if let Some(path) = manifest_path {
+        command.args(["--manifest-path", path]);
+    }
+    for package in packages.selected(core, with) {
+        command.args(["-p", package]);
+    }
+    let output = command
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(|error| format!("couldn't run cargo tree: {error}"))?;
+    if !output.status.success() {
+        return Err("cargo tree failed (its messages are above)".to_owned());
+    }
+    // Each line is a package, after its depth in the tree it's printed in, as
+    // `3glamx v0.1.0`; it uses the packages printed one deeper right below
+    // it. A package printed in full once is marked `(*)` after that, with
+    // nothing below it, so every package's dependencies are printed once.
+    let mut uses: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut above: Vec<Vec<&str>> = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let digits = line
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(line.len());
+        let Ok(depth) = line[..digits].parse::<usize>() else {
+            continue;
+        };
+        if depth > above.len() {
+            return Err(format!("cargo tree printed {line:?} below nothing"));
+        }
+        let ids = packages.ids_of(&line[digits..])?;
+        above.truncate(depth);
+        for parent in above.last().into_iter().flatten() {
+            uses.entry(parent).or_default().extend(&ids);
+        }
+        above.push(ids);
+    }
+    let mut waiting: VecDeque<&str> = packages
+        .members
+        .iter()
+        .map(String::as_str)
+        .filter(|id| core.iter().any(|name| name == packages.name(id)))
+        .collect();
+    let mut reached: BTreeMap<String, String> = BTreeMap::new();
+    while let Some(id) = waiting.pop_front() {
+        if packages.macros.contains(id) || reached.contains_key(id) {
+            continue;
+        }
+        reached.insert(id.to_owned(), packages.name(id).to_owned());
+        waiting.extend(uses.get(id).into_iter().flatten());
+    }
+    Ok(reached)
 }
 
 /// The computer's own target, such as `aarch64-apple-darwin`. The core is
@@ -280,13 +398,7 @@ fn build_once(
     if let Some(path) = manifest_path {
         command.args(["--manifest-path", path]);
     }
-    // Only the core crates the workspace has (a test's small workspace may
-    // hold a few).
-    let present: BTreeSet<&str> = packages.names.values().map(String::as_str).collect();
-    for package in core.iter().filter(|name| present.contains(name.as_str())) {
-        command.args(["-p", package]);
-    }
-    for package in with {
+    for package in packages.selected(core, with) {
         command.args(["-p", package]);
     }
     let output = command
