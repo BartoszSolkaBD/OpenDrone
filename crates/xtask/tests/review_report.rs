@@ -324,6 +324,127 @@ fn a_changed_test_quad_under_a_scenario_with_rule_expectations_is_for_the_review
     }
 }
 
+// The data files a Scenario names: its Input Track and its recorded flight.
+
+#[test]
+fn a_changed_motor_input_track_under_a_source_expectation_is_for_the_reviewer_to_decide() {
+    // replay.toml doesn't change, but the motor commands it plays do.
+    let pull_request = PullRequest::new("input-track-changed")
+        .with_a_replay()
+        .write(REPLAY_TRACK, &REPLAY_TRACK_TEXT.replace("0.40", "0.45"));
+    // Read from two folders, and from two git commits, as CI reads them.
+    for review in [pull_request.review(), pull_request.review_as_commits()] {
+        assert!(review.gate_passed, "{}", review.output);
+        review.reviewer_decides(
+            "A Scenario's data changed under its Source or Rule Expectations",
+            "`scenarios/physics/replay.toml`: its Input Track \
+             `scenarios/physics/replay-motors.csv` changed under the Source and Rule \
+             Expectations it keeps, so they now check against different data.",
+        );
+    }
+}
+
+#[test]
+fn a_changed_recorded_flight_under_a_source_expectation_is_for_the_reviewer_to_decide() {
+    let review = PullRequest::new("recorded-flight-changed")
+        .with_a_replay()
+        .write(
+            REPLAY_RECORDED,
+            &REPLAY_RECORDED_TEXT.replace("9.81", "9.70"),
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A Scenario's data changed under its Source or Rule Expectations",
+        "`scenarios/physics/replay.toml`: its recorded flight \
+         `scenarios/physics/replay-recorded.csv` changed under the Source and Rule \
+         Expectations it keeps, so they now check against different data.",
+    );
+}
+
+#[test]
+fn an_input_track_under_a_new_name_under_a_source_expectation_is_for_the_reviewer_to_decide() {
+    // The Scenario now names another file, with the same motor commands.
+    let review = PullRequest::new("input-track-renamed")
+        .with_a_replay()
+        .rename(REPLAY_TRACK, "scenarios/physics/replay-motors-trimmed.csv")
+        .edit(
+            REPLAY,
+            "\"replay-motors.csv\"",
+            "\"replay-motors-trimmed.csv\"",
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.reviewer_decides(
+        "A Scenario's data changed under its Source or Rule Expectations",
+        "`scenarios/physics/replay.toml`: its Input Track \
+         `scenarios/physics/replay-motors-trimmed.csv` (was \
+         `scenarios/physics/replay-motors.csv`) changed under the Source and Rule \
+         Expectations it keeps, so they now check against different data.",
+    );
+}
+
+#[test]
+fn an_unchanged_input_track_raises_no_red_flag() {
+    // The Scenario's comment changes; its Input Track and recorded flight
+    // don't.
+    let review = PullRequest::new("input-track-unchanged")
+        .with_a_replay()
+        .edit(
+            REPLAY,
+            "format = 2\n",
+            "# Plays TII's motor commands.\nformat = 2\n",
+        )
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.has_no_red_flags();
+}
+
+#[test]
+fn a_new_input_track_used_only_by_a_new_scenario_raises_no_red_flag() {
+    let review = PullRequest::new("input-track-new")
+        .write(REPLAY, REPLAY_TEXT)
+        .write(REPLAY_TRACK, REPLAY_TRACK_TEXT)
+        .write(REPLAY_RECORDED, REPLAY_RECORDED_TEXT)
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.has_no_red_flags();
+}
+
+#[test]
+fn moving_a_scenario_with_its_input_track_and_recorded_flight_unchanged_raises_no_red_flag() {
+    let review = PullRequest::new("replay-moved")
+        .with_a_replay()
+        .rename(REPLAY, "scenarios/quads/replay.toml")
+        .rename(REPLAY_TRACK, "scenarios/quads/replay-motors.csv")
+        .rename(REPLAY_RECORDED, "scenarios/quads/replay-recorded.csv")
+        .review();
+    assert!(review.gate_passed, "{}", review.output);
+    review.has_no_red_flags();
+}
+
+#[test]
+fn a_changed_input_track_under_a_changed_source_expectation_only_waits_for_the_maintainer() {
+    // The Source Expectation itself changed too, so it already waits; the
+    // Scenario keeps no Source or Rule Expectation for the data to move under.
+    let review = PullRequest::new("input-track-and-source-changed")
+        .with_a_replay()
+        .write(REPLAY_TRACK, &REPLAY_TRACK_TEXT.replace("0.40", "0.45"))
+        .edit(REPLAY, "± 0.5 m/s²", "± 0.6 m/s²")
+        .review();
+    assert!(!review.gate_passed, "{}", review.output);
+    review.waits_for_the_maintainer(
+        "A Source Expectation changed",
+        "\"vertical acceleration, mean gap from the recorded flight over 0.1 s to 0.5 s\" went \
+         from `0 m/s² ± 0.5 m/s²` to `0 m/s² ± 0.6 m/s²`, a loosened tolerance.",
+    );
+    assert!(
+        !review.report.contains("data changed"),
+        "no Source or Rule Expectation is kept unchanged:\n{}",
+        review.report
+    );
+}
+
 // Expectations inside a Flight Controller Scenario's table of cases.
 
 #[test]
@@ -1499,6 +1620,21 @@ const TEST_QUAD: &str = "scenarios/test-quads/whoop-65-no-drag.toml";
 /// flies.
 const MIXER: &str = "scenarios/flight-controller/mixer.toml";
 const FILTERS_OFF: &str = "scenarios/test-quads/freestyle-5-filters-off.toml";
+/// A Physics Scenario that plays a motor Input Track and compares the flight
+/// with a recorded one, both CSV files beside it, under a Source Expectation.
+const REPLAY: &str = "scenarios/physics/replay.toml";
+const REPLAY_TRACK: &str = "scenarios/physics/replay-motors.csv";
+const REPLAY_RECORDED: &str = "scenarios/physics/replay-recorded.csv";
+const REPLAY_TEXT: &str = "format = 2\nname = \"The replay feels its weight\"\n\
+                           recorded_flight = \"replay-recorded.csv\"\n\n[start]\n\
+                           kind = \"physics\"\nquad = \"test/whoop-65-no-drag\"\n\n[inputs]\n\
+                           input_track = \"replay-motors.csv\"\n\n[[expect]]\n\
+                           what = \"vertical acceleration\"\nover = \"0.1 s to 0.5 s\"\n\
+                           mean_gap = \"0 m/s² ± 0.5 m/s²\"\n\
+                           basis = \"source: TII's logs, flight 01a\"\n";
+const REPLAY_TRACK_TEXT: &str = "time,motor 1,motor 2,motor 3,motor 4\n\
+                                 0 s,0.40,0.40,0.40,0.40\n0.5 s,0.40,0.40,0.40,0.40\n";
+const REPLAY_RECORDED_TEXT: &str = "time,vertical acceleration\n0 s,9.81 m/s²\n0.5 s,9.81 m/s²\n";
 /// The start of a crate's `lib.rs`, up to a line inside a function that
 /// reads the first byte of `x` into `first`.
 const SIM_START: &str = "//! A fixture crate.\n\nmacro_rules! ignore {\n    ($($t:tt)*) => {};\n}\n\n\
@@ -1617,6 +1753,13 @@ impl PullRequest {
         fs::create_dir_all(target.parent().expect("a folder")).expect("can make the folder");
         fs::write(target, text).expect("can write the file");
         self.write(path, text)
+    }
+
+    /// [`REPLAY`], its motor Input Track and its recorded flight, on main.
+    fn with_a_replay(self) -> PullRequest {
+        self.on_main(REPLAY, REPLAY_TEXT)
+            .on_main(REPLAY_TRACK, REPLAY_TRACK_TEXT)
+            .on_main(REPLAY_RECORDED, REPLAY_RECORDED_TEXT)
     }
 
     fn copy(self, from: &str, to: &str) -> PullRequest {

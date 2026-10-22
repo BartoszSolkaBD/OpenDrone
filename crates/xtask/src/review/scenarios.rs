@@ -18,7 +18,9 @@
 //! A Scenario's setup, the flight its Expectations check, is compared too:
 //! every field but its Expectations and the cases they sit in, and the Test
 //! Quad it flies. When a deleted Scenario's Expectations went to several new
-//! files, each new file's setup is compared with the old one.
+//! files, each new file's setup is compared with the old one. So are the data
+//! files it names beside it, its Input Track and its recorded flight, under
+//! the Source and Rule Expectations it keeps unchanged.
 //!
 //! Both sides are read in the newest Scenario format this xtask knows: an
 //! older file is upgraded in memory by `SCENARIO_STEPS` first, so a format
@@ -47,6 +49,14 @@ const TEST_QUADS: &str = "scenarios/test-quads/";
 /// The setup field naming the Quad a Scenario flies, such as
 /// `test/whoop-65-no-drag`.
 const QUAD_FIELD: &str = "start.quad";
+/// The setup fields naming a data file beside the Scenario, a CSV file, with
+/// what the Report calls each: the Input Track it plays (a motor Input Track
+/// in a Physics or Thrust Stand Scenario) and the recorded flight its
+/// Expectations compare with.
+const DATA_FIELDS: [(&str, &str); 2] = [
+    ("inputs.input_track", "Input Track"),
+    ("recorded_flight", "recorded flight"),
+];
 
 /// The keys that hold an Expectation's expected value, one per kind: at a
 /// moment, or a statistic over a stretch (`first` for when something
@@ -128,6 +138,17 @@ impl ScenarioFile {
                 .collect(),
             _ => BTreeSet::new(),
         }
+    }
+
+    /// The data file its `field` names (one of [`DATA_FIELDS`]), from the
+    /// repository's root: the file beside the Scenario at `path`, such as
+    /// `scenarios/physics/replay-motors.csv`.
+    fn data_file(&self, path: &str, field: &str) -> Option<String> {
+        let name = self.setup.get(field)?.as_str()?;
+        Some(match path.rsplit_once('/') {
+            Some((folder, _)) => format!("{folder}/{name}"),
+            None => name.to_string(),
+        })
     }
 }
 
@@ -554,6 +575,7 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                     if holds_a_locked_one {
                         setup_changed(path, now, &base, head, &test_quads, &mut flags);
                     }
+                    data_changed(path, now, &base, head, changes, &mut flags);
                 }
                 if !all_found {
                     let name = base
@@ -575,6 +597,7 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                 Some(head) => {
                     compare(path, &base, &[(path, &head)], &mut flags);
                     setup_changed(path, path, &base, &head, &test_quads, &mut flags);
+                    data_changed(path, path, &base, &head, changes, &mut flags);
                 }
                 None => {
                     let locked = base
@@ -598,8 +621,9 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
         }
     }
     // A changed Test Quad changes the flight of every Scenario that flies it,
-    // even one the pull request leaves alone.
-    if !test_quads.is_empty() {
+    // and a changed CSV file the data of every Scenario that names it, even
+    // one the pull request leaves alone.
+    if !test_quads.is_empty() || changes.under(FOLDER).any(|p| p.ends_with(".csv")) {
         for path in changes.base.files_under(FOLDER) {
             if !is_scenario(&path) || changes.touches(&path) {
                 continue;
@@ -610,6 +634,7 @@ pub fn flags(changes: &Changes) -> Vec<RedFlag> {
                 .and_then(|t| ScenarioFile::read(&t))
             {
                 setup_changed(&path, &path, &file, &file, &test_quads, &mut flags);
+                data_changed(&path, &path, &file, &file, changes, &mut flags);
             }
         }
     }
@@ -669,11 +694,7 @@ fn setup_changed(
     if changed.is_empty() {
         return;
     }
-    let place = if now == path {
-        code(path)
-    } else {
-        format!("{}, moved from {}", code(now), code(path))
-    };
+    let place = place(path, now);
     let shown: Vec<String> = changed.iter().take(10).cloned().collect();
     let more = match changed.len().saturating_sub(10) {
         0 => String::new(),
@@ -686,6 +707,79 @@ fn setup_changed(
             "{place}: {}{more} changed, so its Source and Rule Expectations now check a \
              different flight.",
             shown.join(", ")
+        ),
+    ));
+}
+
+/// Where a Scenario is now, as the Report shows it: its file, and where it
+/// moved from if it moved.
+fn place(path: &str, now: &str) -> String {
+    if now == path {
+        code(path)
+    } else {
+        format!("{}, moved from {}", code(now), code(path))
+    }
+}
+
+/// A change to a data file a Scenario names beside it, its Input Track or
+/// its recorded flight, under a Source or Rule Expectation it keeps
+/// unchanged: the file's content changed, or the Scenario names another file
+/// (its folder may move with it). That Expectation keeps its value while the
+/// data it was checked against moved, so the Reviewer decides, as for a
+/// changed setup. A Source or Rule Expectation that changed too already waits
+/// for the maintainer, and a new Scenario has none to keep. `path` and `base`
+/// are the Scenario on main, `now` and `head` where it is in the pull
+/// request.
+fn data_changed(
+    path: &str,
+    now: &str,
+    base: &ScenarioFile,
+    head: &ScenarioFile,
+    changes: &Changes,
+    flags: &mut Vec<RedFlag>,
+) {
+    let new = base.new_case_inputs(head);
+    let keeps_a_locked_one = base.expectations.iter().any(|before| {
+        before.basis().locked() && head.expectations.iter().any(|e| e.same_as(before, &new))
+    });
+    if !keeps_a_locked_one {
+        return;
+    }
+    let mut changed = Vec::new();
+    for (field, kind) in DATA_FIELDS {
+        // A Scenario that starts or stops naming one changed its setup.
+        let (Some(before), Some(after)) = (base.data_file(path, field), head.data_file(now, field))
+        else {
+            continue;
+        };
+        let named = |file: &ScenarioFile| file.setup.get(field).cloned();
+        let renamed = named(base) != named(head);
+        let moved = if before == after {
+            changes.touches(&before)
+        } else {
+            renamed || changes.base.read(&before) != changes.head.read(&after)
+        };
+        if !moved {
+            continue;
+        }
+        let was = if renamed {
+            format!(" (was {})", code(&before))
+        } else {
+            String::new()
+        };
+        changed.push(format!("its {kind} {}{was}", code(&after)));
+    }
+    if changed.is_empty() {
+        return;
+    }
+    flags.push(RedFlag::new(
+        Level::ReviewerDecides,
+        "A Scenario's data changed under its Source or Rule Expectations",
+        format!(
+            "{}: {} changed under the Source and Rule Expectations it keeps, so they now \
+             check against different data.",
+            place(path, now),
+            changed.join(" and ")
         ),
     ));
 }
