@@ -615,3 +615,77 @@ fn with_no_sound_device_the_game_says_so_once_and_runs_silent() {
     host.frames(500);
     assert!(!says(&host));
 }
+
+/// A Radio the built-in Pack knows only as "Any Radio": an EdgeTX-style
+/// joystick with other ids and another name than the Pocket's, the throttle
+/// stick at the bottom.
+fn generic_radio() -> Vec<Raw> {
+    vec![
+        Raw::Added {
+            device: POCKET,
+            info: DeviceInfo {
+                name: "Some Flight Stick".to_string(),
+                usb_vendor: 0x1234,
+                usb_product: 0x5678,
+                sdl_gamepad: false,
+                connection: Some(Connection::Usb),
+                heartbeat: false,
+            },
+            state: DeviceState::new(8, 24, false),
+        },
+        Raw::Axis {
+            device: POCKET,
+            axis: 2,
+            value: -32767,
+        },
+    ]
+}
+
+/// The switch on CH10 of a Radio (button 1 of CH9–CH32), pressed and let go.
+fn flip_the_pause_switch(host: &mut Host) {
+    for down in [true, false] {
+        host.devices_report(vec![Raw::Button {
+            device: POCKET,
+            button: 1,
+            down,
+        }]);
+        host.frames(2);
+    }
+}
+
+/// A Radio alone, with no key pressed: it picks FLY, flies, pauses and goes
+/// on.
+fn a_radio_alone_pauses_and_goes_on(test: &str, radio: Vec<Raw>) {
+    let mut host = Host::returning(test);
+    host.devices_report(radio);
+    host.frames(5);
+    flick_right_and_let_go(&mut host);
+    host.until(400, |h| h.screen() == Screen::Flying);
+    host.frames(30);
+    assert!(!host.paused());
+
+    flip_the_pause_switch(&mut host);
+    assert_eq!(host.screen(), Screen::PauseMenu);
+    assert!(host.paused());
+    assert_eq!(host.cursor_label(), "Resume");
+
+    // The same switch closes the menu again: the Quad is on the ground, so
+    // there is no count.
+    flip_the_pause_switch(&mut host);
+    assert_eq!(host.screen(), Screen::Flying);
+    host.frames(30);
+    assert!(!host.paused());
+}
+
+#[test]
+fn the_pocket_alone_opens_the_pause_menu_with_its_pause_switch_and_closes_it_again() {
+    // Basis: Rule (#258: a Radio alone can reach the Pause Menu; the
+    // radiomaster-pocket profile binds Pause to CH10).
+    a_radio_alone_pauses_and_goes_on("pocket-pause", pocket());
+}
+
+#[test]
+fn any_radio_alone_opens_the_pause_menu_with_its_pause_switch_and_closes_it_again() {
+    // Basis: Rule (#258: the any-radio profile binds Pause to CH10 too).
+    a_radio_alone_pauses_and_goes_on("any-radio-pause", generic_radio());
+}
