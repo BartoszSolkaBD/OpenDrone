@@ -166,6 +166,99 @@ fn a_key_this_version_does_not_know_stays_in_the_file_when_it_saves() {
 }
 
 #[test]
+fn a_hand_edited_camera_entry_the_game_rejects_stays_in_the_file_when_it_saves() {
+    // Basis: Rule (#259: a pilot's own edit is never silently dropped). Angles
+    // in degrees.
+    let folder = folder("rejected-quad-entry");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[camera.quads.\"opendrone/whoop-65\"]\ntilt = 95.0\nfov = 160.0\n[camera.quads.\"opendrone/freestyle-5\"]\ntilt = 42.0\nfov = 133.5\n[camera.quads.\"opendrone/typo\"]\ntilt = \"steep\"\nfov = 120.0\n",
+    )
+    .unwrap();
+    let mut file = SettingsFile::in_folder(folder);
+    let loaded = file.load();
+    assert_eq!(loaded.problems.len(), 2, "{:?}", loaded.problems);
+    let mut settings = loaded.settings;
+    settings.reduce_motion = true;
+    file.save(&settings).unwrap();
+    let text = std::fs::read_to_string(file.path()).unwrap();
+    assert!(text.contains("reduce_motion = true"), "{text}");
+
+    // Read again: the two rejected entries are still there as they were, so
+    // they are rejected and told again, and the good one is exactly as before.
+    let again = file.load();
+    assert_eq!(again.problems, loaded.problems);
+    assert_eq!(again.settings, settings);
+    let kept: toml::Table = text.parse().unwrap();
+    let quads = kept["camera"]["quads"].as_table().unwrap();
+    assert_eq!(quads["opendrone/whoop-65"]["tilt"].as_float(), Some(95.0));
+    assert_eq!(quads["opendrone/whoop-65"]["fov"].as_float(), Some(160.0));
+    assert_eq!(quads["opendrone/typo"]["tilt"].as_str(), Some("steep"));
+    assert_eq!(quads["opendrone/typo"]["fov"].as_float(), Some(120.0));
+    assert_eq!(
+        quads["opendrone/freestyle-5"]["tilt"].as_float(),
+        Some(42.0)
+    );
+    assert_eq!(
+        quads["opendrone/freestyle-5"]["fov"].as_float(),
+        Some(133.5)
+    );
+}
+
+#[test]
+fn a_rejected_camera_entry_is_replaced_once_the_pilot_sets_that_quads_camera() {
+    // Basis: Rule: the pilot's new value wins over the entry the game ignored.
+    let folder = folder("rejected-then-set");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[camera.quads.\"opendrone/whoop-65\"]\ntilt = 95.0\nfov = 160.0\n",
+    )
+    .unwrap();
+    let mut file = SettingsFile::in_folder(folder);
+    let mut settings = file.load().settings;
+    settings.camera.set_quad(
+        "opendrone/whoop-65",
+        QuadCamera {
+            tilt: 20.0,
+            fov: 150.0,
+        },
+    );
+    file.save(&settings).unwrap();
+    let again = file.load();
+    assert_eq!(again.problems, Vec::<String>::new());
+    assert_eq!(again.settings, settings);
+}
+
+#[test]
+fn the_pilot_is_told_which_camera_entry_was_ignored_and_why() {
+    // Basis: Rule (#259). Angles in degrees.
+    let folder = folder("rejected-quad-says-why");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join(FILE_NAME),
+        "format = 1\n[camera.quads.\"opendrone/whoop-65\"]\ntilt = 95.0\nfov = 160.0\n[camera.quads.\"opendrone/typo\"]\nfov = \"wide\"\n",
+    )
+    .unwrap();
+    let problems = SettingsFile::in_folder(folder).load().problems;
+    assert_eq!(problems.len(), 2, "{problems:?}");
+    assert!(problems[0].contains("opendrone/typo"), "{problems:?}");
+    assert!(problems[0].contains("tilt is missing"), "{problems:?}");
+    assert!(
+        problems[0].contains("fov should be a number"),
+        "{problems:?}"
+    );
+    assert!(problems[0].contains("stays in the file"), "{problems:?}");
+    assert!(problems[1].contains("opendrone/whoop-65"), "{problems:?}");
+    assert!(
+        problems[1].contains("tilt is 95, which is outside 0 to 80 degrees"),
+        "{problems:?}"
+    );
+    assert!(problems[1].contains("stays in the file"), "{problems:?}");
+}
+
+#[test]
 fn a_file_that_is_not_toml_is_kept_aside_and_the_game_starts_fresh() {
     let folder = folder("broken");
     std::fs::create_dir_all(&folder).unwrap();
