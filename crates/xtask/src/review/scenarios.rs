@@ -27,7 +27,10 @@
 //! step that writes a new input into every case changes no case (#189). A
 //! newer format than it knows, as in the pull request that brings a step,
 //! has its new case inputs left out of the match and listed as a setup
-//! change for the Reviewer.
+//! change for the Reviewer, but only those that every case holds with one
+//! value, as a format step writes them (#265). Any other new case input stays
+//! in the match, so a case that holds it is another case, and the Report
+//! says it couldn't tell that a format step brought it.
 
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -123,13 +126,35 @@ impl ScenarioFile {
     }
 
     /// The case inputs `newer` brings in a newer format than this file's,
-    /// such as `case.crash_flip`: inputs that none of this file's cases has.
-    /// Only a format step this xtask doesn't know leaves any, such as the one
-    /// the pull request itself brings: a step it knows wrote them into this
-    /// file too. They're left out when a case's Expectations are matched, and
-    /// listed as a setup change for the Reviewer. Without a newer format
-    /// there are none, so a new input in a case makes it another case.
+    /// such as `case.crash_flip`: inputs that none of this file's cases has,
+    /// and that every case of `newer` holds with one value, as a format step
+    /// writes them. Only a format step this xtask doesn't know leaves any,
+    /// such as the one the pull request itself brings: a step it knows wrote
+    /// them into this file too. They're left out when a case's Expectations
+    /// are matched, and listed as a setup change for the Reviewer. Without a
+    /// newer format there are none, so a new input in a case makes it another
+    /// case.
     fn new_case_inputs(&self, newer: &ScenarioFile) -> BTreeSet<String> {
+        self.newer_only_case_inputs(newer)
+            .into_iter()
+            .filter(|input| newer.one_value_in_every_case(input))
+            .collect()
+    }
+
+    /// The case inputs `newer` brings in a newer format than this file's that
+    /// can't be a format step's, because some of its cases lack them or hold
+    /// another value. They stay in the match, so each case that holds one is
+    /// another case, and the Report says it couldn't tell.
+    fn unclear_case_inputs(&self, newer: &ScenarioFile) -> BTreeSet<String> {
+        self.newer_only_case_inputs(newer)
+            .into_iter()
+            .filter(|input| !newer.one_value_in_every_case(input))
+            .collect()
+    }
+
+    /// The case inputs of `newer`, in a newer format than this file's, that
+    /// none of this file's cases has. None without a newer format.
+    fn newer_only_case_inputs(&self, newer: &ScenarioFile) -> BTreeSet<String> {
         match (self.format, newer.format) {
             (Some(before), Some(after)) if after > before => newer
                 .case_inputs
@@ -137,6 +162,28 @@ impl ScenarioFile {
                 .cloned()
                 .collect(),
             _ => BTreeSet::new(),
+        }
+    }
+
+    /// Whether every case of this file that `input` could sit in, such as
+    /// every `[[case]]` for `case.beeper`, holds it with the same value (read
+    /// as a value, so "0%" and "0.0 %" are the same). Only the cases that
+    /// hold Expectations are looked at: no other case is matched.
+    fn one_value_in_every_case(&self, input: &str) -> bool {
+        let mut values = self
+            .expectations
+            .iter()
+            .flat_map(|e| &e.place.path)
+            .filter_map(|part| match part {
+                Part::Case(array, fields) => {
+                    let name = input.strip_prefix(array.as_str())?.strip_prefix('.')?;
+                    Some(fields.get(name))
+                }
+                Part::Section(_) => None,
+            });
+        match values.next() {
+            Some(Some(first)) => values.all(|value| value == Some(first)),
+            _ => false,
         }
     }
 
@@ -799,6 +846,32 @@ fn compare(
         .iter()
         .map(|(p, file)| (*p, *file, base.new_case_inputs(file)))
         .collect();
+    // Why an Expectation in a case may not be found: a new case input in a
+    // newer format that no format step would write, so the case that holds
+    // it counts as another case.
+    let cant_tell: String = candidates
+        .iter()
+        .filter_map(|(p, file, _)| {
+            let unclear: Vec<String> = base
+                .unclear_case_inputs(file)
+                .iter()
+                .map(|input| code(input))
+                .collect();
+            let (they_are, holds) = match unclear.len() {
+                0 => return None,
+                1 => ("it is", "holds it"),
+                _ => ("they are", "holds one"),
+            };
+            Some(format!(
+                " The Report can't tell that {} came from a format step: {they_are} new in the \
+                 cases of {}, in format {}, but not in every case with one value, so a case \
+                 that {holds} counts as another case.",
+                unclear.join(" and "),
+                code(p),
+                file.format.unwrap_or_default(),
+            ))
+        })
+        .collect();
     let find = |test: &dyn Fn(&Expectation, &BTreeSet<String>) -> bool| {
         candidates.iter().find_map(|(p, file, new)| {
             file.expectations
@@ -824,9 +897,14 @@ fn compare(
             }
         };
         let removed = format!(
-            "{}: \"{what}\" ({}) was removed, or now measures something else.",
+            "{}: \"{what}\" ({}) was removed, or now measures something else.{}",
             code(path),
-            code(before.expected())
+            code(before.expected()),
+            if before.place.inputs().is_empty() {
+                ""
+            } else {
+                &cant_tell
+            }
         );
         if basis.locked() {
             let detail = match after {

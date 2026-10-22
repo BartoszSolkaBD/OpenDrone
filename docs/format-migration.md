@@ -55,7 +55,7 @@ In the pull request that brings the item:
 3. **Run it:** `cargo xtask migrate add-auto-arm`. It lists every file it rewrote.
 4. **Check nothing moved:** `cargo scenarios check` must find every Results file up to date, and after a Pack step `cargo xtask packs` must pass. Then run the rest of the checks in [Setup and CI](book/contributing.md).
 5. **Update the docs that show the format,** such as the starting-state table in [Reading a Scenario](verification/reading-a-scenario.md) or a section in [Checking a Pack](verification/checking-a-pack.md).
-6. **Say so in the pull request:** the step's name, and that no Result moved. CI's Review Report doesn't know the step until it is on main, so it lists each new input the step wrote into Flight Controller Scenarios' cases for the Reviewer, rather than flagging every Expectation in those cases ([Format steps](review-report.md#format-steps)).
+6. **Say so in the pull request:** the step's name, and that no Result moved. CI's Review Report doesn't know the step until it is on main, so it lists each new input the step wrote into Flight Controller Scenarios' cases for the Reviewer, rather than flagging every Expectation in those cases ([Format steps](review-report.md#format-steps)). That holds only for an input the step writes into every case with the same value: one that some cases lack, or that differs between cases, makes the Expectations in those cases wait for the maintainer.
 
 ## What the tool does
 
