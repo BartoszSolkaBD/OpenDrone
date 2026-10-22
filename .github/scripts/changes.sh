@@ -113,8 +113,13 @@ fi
 echo "rust=$rust" >> "$GITHUB_OUTPUT"
 
 # Markdown outside packs/ never reaches a flight, so it is left out first.
+# It is kept in a variable, never piped into `grep -q`: that stops at its
+# first match, the first grep then dies writing the rest (SIGPIPE), and
+# pipefail counts the whole test as failed (Reviewer's case on #250).
+# `|| true`: grep -v finds nothing to keep when every path is Markdown.
+not_markdown="$(grep -vE '\.md$' <<< "$changed" || true)"
 flight=false
-if grep -vE '\.md$' <<< "$changed" | grep -qE '^(crates/(maths|physics|flight-controller|sim|test-pilot|scenario|pack|blackbox)/|scenarios/|\.cargo/|\.config/)|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|\.github/workflows/ci\.yml|\.github/scripts/changes\.sh)$' \
+if grep -qE '^(crates/(maths|physics|flight-controller|sim|test-pilot|scenario|pack|blackbox)/|scenarios/|\.cargo/|\.config/)|^(Cargo\.lock|Cargo\.toml|rust-toolchain\.toml|\.github/workflows/ci\.yml|\.github/scripts/changes\.sh)$' <<< "$not_markdown" \
   || grep -qE '^packs/' <<< "$changed"; then
   echo "Something that can change a flight result changed, so the Scenarios run on every OS and the agreement check compares them."
   flight=true

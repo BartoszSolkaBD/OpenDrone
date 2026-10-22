@@ -243,6 +243,31 @@ fn a_pull_request_that_changes_anything_a_flight_depends_on_runs_the_scenarios_o
 
 #[test]
 #[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
+fn a_pull_request_that_changes_a_flight_path_among_thousands_of_other_files_runs_the_scenarios_on_every_os()
+ {
+    // Reviewer's case on #250: piping one grep into a `grep -q` under
+    // pipefail fails when `grep -q` stops at its first match while the first
+    // grep is still writing, past the pipe's buffer. Cargo.lock sorts first,
+    // then over 64 KB of the game's paths follow it.
+    for os in ["macOS", "Windows", "Linux"] {
+        let repo = Repo::new(&format!("flight-among-many-{os}"));
+        repo.write("Cargo.lock", "version = 4\n# a library was upgraded\n");
+        for index in 0..2000 {
+            repo.write(
+                &format!(
+                    "crates/opendrone/src/generated/a-game-file-with-a-long-name-{index:04}.rs"
+                ),
+                "changed\n",
+            );
+        }
+        let outputs = repo.commit_and_check_on("pull_request", os);
+        assert_eq!(outputs["flight"], "true", "{os}: {outputs:?}");
+        assert_eq!(outputs["scenarios"], "true", "{os}: {outputs:?}");
+    }
+}
+
+#[test]
+#[cfg_attr(windows, ignore = "bash may not be Git Bash on Windows")]
 fn a_pull_request_runs_every_rust_check_on_linux_and_only_the_scenarios_on_macos_and_windows() {
     for (os, every_check) in [("Linux", "true"), ("macOS", "false"), ("Windows", "false")] {
         let repo = Repo::new(&format!("flight-checks-{os}"));
