@@ -18,6 +18,11 @@
 //!   picture on disk is drawn in its flat colour from the `.glb`, so the Map
 //!   is always flyable.
 //!
+//! - **No visible repeat.** A material with `break_repeat` or
+//!   `macro_strength` in the library is drawn as a [`VariedMaterial`]
+//!   ([`crate::repeat_breaking`]): its picture's repeat is broken when it is
+//!   drawn and the Map's large-scale picture (`[macro]`) is laid over it
+//!   (#304). Every other material is drawn as before.
 //! - **Baked light.** A Map with `[light]` and a light atlas
 //!   ([`MapLighting`], [`read_light_atlas`]) draws its parts lit by the atlas,
 //!   through Bevy's own lightmaps, on each mesh's second picture coordinates
@@ -37,11 +42,13 @@ use bevy::image::{
     ImageSamplerDescriptor, ImageType,
 };
 use bevy::mesh::PrimitiveTopology;
+use bevy::pbr::ExtendedMaterial;
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use opendrone_pack::{DrawnPart, MapLight};
 
 use crate::light_atlas::read_exr;
+use crate::repeat_breaking::{BreakerSettings, RepeatBreaker, VariedMaterial};
 
 /// Two faces are one smooth surface when their normals are closer than this
 /// (the cosine of 35°); further apart, the edge between them is sharp.
@@ -169,10 +176,94 @@ struct Pictures {
     normal: PathBuf,
 }
 
+/// What a material asks of the game beyond its pictures (#304). A material
+/// asks for none of it, and is drawn as before, unless the library says so.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Variation {
+    /// `break_repeat`: draw the picture in hex tiles, so it doesn't repeat.
+    pub break_repeat: bool,
+    /// `turn_cells`: each tile also turns and mirrors the picture, for a
+    /// material with no grain (dirt, grass).
+    pub turn_cells: bool,
+    /// `snap`: a tile shifts the picture by whole multiples of 1/`u` and 1/`v`
+    /// of it (0 for any shift), which keeps the lines of a picture with a
+    /// grid (bricks, ridges) in line from one tile to the next.
+    pub snap: [u32; 2],
+    /// `macro_strength`: how strongly the large-scale picture shows; 0 for
+    /// none.
+    pub macro_strength: f32,
+}
+
 #[derive(Clone, Debug)]
 struct Entry {
     roughness: f32,
     pictures: Option<Pictures>,
+    variation: Option<Variation>,
+}
+
+/// The large-scale picture over the world (`[macro]` in the library): the
+/// file, and how many metres one repeat of it covers.
+#[derive(Clone, Debug)]
+struct WidePicture {
+    file: PathBuf,
+    metres: f32,
+}
+
+/// What a material's entry asks for, if anything: `break_repeat = true` and
+/// a `macro_strength` above 0 are the two ways in.
+fn variation_of(entry: &toml::Value) -> Option<Variation> {
+    let break_repeat = entry
+        .get("break_repeat")
+        .and_then(toml::Value::as_bool)
+        .unwrap_or(false);
+    let macro_strength = entry
+        .get("macro_strength")
+        .and_then(|v| v.as_float().or_else(|| v.as_integer().map(|i| i as f64)))
+        .unwrap_or(0.0)
+        .max(0.0) as f32;
+    if !break_repeat && macro_strength <= 0.0 {
+        return None;
+    }
+    let snap = entry
+        .get("snap")
+        .and_then(toml::Value::as_array)
+        .map(|a| {
+            let at = |i: usize| {
+                a.get(i)
+                    .and_then(toml::Value::as_integer)
+                    .unwrap_or(0)
+                    .max(0)
+            };
+            [at(0) as u32, at(1) as u32]
+        })
+        .unwrap_or([0, 0]);
+    Some(Variation {
+        break_repeat,
+        turn_cells: entry
+            .get("turn_cells")
+            .and_then(toml::Value::as_bool)
+            .unwrap_or(false),
+        snap,
+        macro_strength,
+    })
+}
+
+/// What `materials.toml` says about a material's drawing. A material that
+/// asks for nothing is a [`StandardMaterial`], and one that does a
+/// [`VariedMaterial`].
+pub enum Surface {
+    Plain(StandardMaterial),
+    Varied(VariedMaterial),
+}
+
+impl Surface {
+    /// The standard material underneath, for what both kinds share.
+    pub fn standard_mut(&mut self) -> &mut StandardMaterial {
+        match self {
+            Surface::Plain(m) => m,
+            Surface::Varied(m) => &mut m.base,
+        }
+    }
 }
 
 /// The material library: each name a Map's parts use, and the fetched
@@ -180,6 +271,7 @@ struct Entry {
 #[derive(Clone, Debug, Default)]
 pub struct MaterialLibrary {
     entries: BTreeMap<String, Entry>,
+    wide: Option<WidePicture>,
 }
 
 impl MaterialLibrary {
@@ -222,11 +314,15 @@ impl MaterialLibrary {
                     Entry {
                         roughness,
                         pictures,
+                        variation: variation_of(entry),
                     },
                 );
             }
         }
-        MaterialLibrary { entries }
+        MaterialLibrary {
+            entries,
+            wide: wide_picture(&doc, repo),
+        }
     }
 
     /// How many materials have their pictures on disk.
@@ -237,14 +333,27 @@ impl MaterialLibrary {
             .count()
     }
 
+    /// Whether the library asks for the material `name` to be drawn with its
+    /// repeat broken or the large-scale picture over it (#304), pictures on
+    /// disk or not.
+    pub fn asks_for_variation(&self, name: &str) -> bool {
+        self.entries
+            .get(name)
+            .is_some_and(|e| e.variation.is_some())
+    }
+
+    /// How many materials are drawn with their repeat broken, of those that
+    /// have their pictures on disk.
+    pub fn varied(&self) -> usize {
+        self.entries
+            .values()
+            .filter(|e| e.pictures.is_some() && e.variation.is_some())
+            .count()
+    }
+
     /// The material called `name`: its pictures if they're fetched, else the
     /// flat colour the `.glb` gives it (linear red, green, blue, alpha).
-    pub fn material(
-        &self,
-        name: &str,
-        flat: [f32; 4],
-        images: &mut Assets<Image>,
-    ) -> StandardMaterial {
+    pub fn material(&self, name: &str, flat: [f32; 4], images: &mut Assets<Image>) -> Surface {
         let entry = self.entries.get(name);
         let roughness = entry.map_or(0.9, |e| e.roughness);
         let pictures = entry.and_then(|e| e.pictures.as_ref()).and_then(|p| {
@@ -253,21 +362,75 @@ impl MaterialLibrary {
                 load(&p.normal, false, images)?,
             ))
         });
-        match pictures {
-            Some((diffuse, normal)) => StandardMaterial {
+        match (pictures, entry.and_then(|e| e.variation)) {
+            (Some((diffuse, normal)), Some(variation)) => {
+                let wide = self
+                    .wide
+                    .as_ref()
+                    .filter(|_| variation.macro_strength > 0.0)
+                    .and_then(|w| Some((load(&w.file, false, images)?, w.metres)));
+                let (wide_picture, per_metre) = match wide {
+                    Some((picture, metres)) => (Some(picture), 1.0 / metres),
+                    None => (None, 0.0),
+                };
+                Surface::Varied(ExtendedMaterial {
+                    base: StandardMaterial {
+                        base_color: Color::WHITE,
+                        perceptual_roughness: roughness,
+                        ..default()
+                    },
+                    extension: RepeatBreaker {
+                        settings: BreakerSettings {
+                            snap_turn: Vec4::new(
+                                variation.snap[0] as f32,
+                                variation.snap[1] as f32,
+                                f32::from(u8::from(variation.turn_cells)),
+                                f32::from(u8::from(variation.break_repeat)),
+                            ),
+                            wide: Vec4::new(
+                                if wide_picture.is_some() {
+                                    variation.macro_strength
+                                } else {
+                                    0.0
+                                },
+                                per_metre,
+                                0.0,
+                                0.0,
+                            ),
+                        },
+                        diffuse,
+                        normal,
+                        wide: wide_picture,
+                    },
+                })
+            }
+            (Some((diffuse, normal)), None) => Surface::Plain(StandardMaterial {
                 base_color: Color::WHITE,
                 base_color_texture: Some(diffuse),
                 normal_map_texture: Some(normal),
                 perceptual_roughness: roughness,
                 ..default()
-            },
-            None => StandardMaterial {
+            }),
+            (None, _) => Surface::Plain(StandardMaterial {
                 base_color: Color::linear_rgba(flat[0], flat[1], flat[2], flat[3]),
                 perceptual_roughness: roughness,
                 ..default()
-            },
+            }),
         }
     }
+}
+
+/// The large-scale picture the library's `[macro]` table names, if its
+/// pictures are on disk, with the metres one repeat of it covers.
+fn wide_picture(doc: &toml::Table, repo: &Path) -> Option<WidePicture> {
+    let name = doc.get("macro")?.get("texture")?.as_str()?;
+    let size = doc.get("textures")?.get(name)?.get("size")?.as_str()?;
+    let metres: f32 = size.trim().strip_suffix('m')?.trim().parse().ok()?;
+    let file = [TEXTURES, GENERATED]
+        .into_iter()
+        .map(|folder| repo.join(folder).join(name).join("diffuse.jpg"))
+        .find(|file| file.is_file())?;
+    (metres > 0.0).then_some(WidePicture { file, metres })
 }
 
 /// Reads a picture from disk, with its mipmaps worked out and its edges

@@ -230,10 +230,17 @@ pub fn parse(text: &str) -> Result<Manifest, String> {
             materials.push((name.clone(), texture));
         }
     }
+    // The large-scale picture the [macro] table names (#304) is used by the
+    // game for every material that asks for it, not by one material.
+    let wide = doc
+        .get("macro")
+        .and_then(|m| m.get("texture"))
+        .and_then(Value::as_str);
     for texture in &textures {
-        if !materials
-            .iter()
-            .any(|(_, t)| t.as_deref() == Some(&texture.name))
+        if wide != Some(texture.name.as_str())
+            && !materials
+                .iter()
+                .any(|(_, t)| t.as_deref() == Some(&texture.name))
         {
             problems.push(format!(
                 "the texture \"{}\" is listed but no material uses it: take it out, so nothing is credited for nothing",

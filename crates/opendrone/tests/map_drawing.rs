@@ -176,7 +176,8 @@ fn a_material_with_no_pictures_on_disk_is_its_flat_colour_from_the_glb() {
     let library = MaterialLibrary::read(&repo);
     assert_eq!(library.textured(), 0);
     let mut images = Assets::<Image>::default();
-    let material = library.material("concrete_plaza", [0.4, 0.4, 0.38, 1.0], &mut images);
+    let mut surface = library.material("concrete_plaza", [0.4, 0.4, 0.38, 1.0], &mut images);
+    let material = surface.standard_mut();
     assert!(material.base_color_texture.is_none());
     assert_eq!(material.base_color.to_linear().red, 0.4);
     assert_eq!(material.perceptual_roughness, 0.9);
@@ -189,7 +190,8 @@ fn a_picture_that_cant_be_read_falls_back_to_the_flat_colour_too() {
     let library = MaterialLibrary::read(&repo);
     assert_eq!(library.textured(), 1);
     let mut images = Assets::<Image>::default();
-    let material = library.material("concrete_plaza", [0.4, 0.4, 0.38, 1.0], &mut images);
+    let mut surface = library.material("concrete_plaza", [0.4, 0.4, 0.38, 1.0], &mut images);
+    let material = surface.standard_mut();
     assert!(material.base_color_texture.is_none());
     assert_eq!(images.len(), 0);
 }
@@ -200,7 +202,8 @@ fn a_repo_with_no_library_draws_every_material_flat() {
     let _ = fs::create_dir_all(&repo);
     let library = MaterialLibrary::read(&repo);
     let mut images = Assets::<Image>::default();
-    let material = library.material("anything", [0.1, 0.2, 0.3, 1.0], &mut images);
+    let mut surface = library.material("anything", [0.1, 0.2, 0.3, 1.0], &mut images);
+    let material = surface.standard_mut();
     assert_eq!(material.base_color.to_linear().green, 0.2);
 }
 

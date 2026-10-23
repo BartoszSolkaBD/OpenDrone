@@ -176,15 +176,15 @@ A detailed Map (the Factory is the first) doesn't use downloaded pictures: its s
 | Material | One repeat | Picture | Cost |
 |---|---|---|---|
 | `brick_red_weathered` | 1.8 m | 1K | 638 KB |
-| `brick_painted_peeling` (paint over plaster over brick, a faded safety band, generic graffiti) | 1.8 m | 1K | 475 KB |
+| `brick_painted_peeling` (paint over plaster over brick) | 1.8 m | 1K | 456 KB |
 | `concrete_floor_worn` (the hero surface) | 3 m | 2K | 1.8 MB |
-| `concrete_wall_rough` (board-formed, tie holes, a spalled rebar) | 2 m | 1K | 490 KB |
+| `concrete_wall_rough` (board-formed, tie holes) | 2 m | 1K | 486 KB |
 | `steel_beam_rusted` | 1 m | 1K | 566 KB |
 | `roof_corrugated_rusted` | 1.2 m | 1K | 495 KB |
 | `ground_dirt_rubble` | 2 m | 1K | 936 KB |
 | `grass_weeds` | 2 m | 1K | 1.3 MB |
 
-Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map today, and draws a part with them as it does a downloaded texture; the roughness picture waits for the ticket that reads it. All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A one-off mark (the graffiti, the spalled rebar, the stencilled block) repeats with every repeat of the picture, so put such a material where its repeats are not side by side in plain view, or cover the repeats with other things.
+Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map today, and draws a part with them as it does a downloaded texture; the roughness picture waits for the ticket that reads it. All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or decals ([below](#surfaces-that-dont-repeat)).
 
 ### In the material library
 
@@ -228,6 +228,35 @@ blender --background --factory-startup --python-exit-code 1 --python assets-src/
 ```
 
 They prove that a seed gives the same bytes and another seed doesn't, that each picture repeats without a seam, and that each normal map points out of the surface. The size is yours to watch: a normal map of a busy surface is the biggest picture, so keep fine detail out of the height if the normal map grows past about half a megabyte.
+
+## Surfaces that don't repeat
+
+A picture is one tile of 1 to 3 m laid edge to edge, so a 60 m floor shows the same blocks again and again, which reads at once from above and from far. Two things in the game fix that, and a material asks for each in `assets-src/materials.toml`. A material that asks for neither is drawn as before: Skate Park and Bando, and their render counts, don't change. The eight materials made from scratch ask for both.
+
+```toml
+[materials.concrete_floor_worn]
+colour         = [0.17, 0.17, 0.15]
+roughness      = 0.78
+texture        = "concrete_floor_worn"
+break_repeat   = true       # draw the picture in hex tiles, so its repeat can't be seen
+snap           = [2, 2]     # tiles shift the picture by whole halves of it, so its joints stay in line
+macro_strength = 0.60       # how strongly the large picture shows; 0 or left out for none
+```
+
+| Key | Says | If left out |
+|---|---|---|
+| `break_repeat` | `true` draws the picture in hex tiles: the surface is cut into triangles, each corner shows the picture at its own random shift, and a pixel blends the three copies round it. The blend is narrow, so most of a tile is one clean copy and nothing blurs, and the colour keeps its spread. | the picture repeats |
+| `turn_cells` | `true` also turns and mirrors the picture in each tile. Only for a picture with no grain, such as dirt or grass. Bricks, boards and ridges look wrong turned, so leave it out for them. | tiles only shift |
+| `snap = [u, v]` | tiles shift the picture by whole multiples of 1/`u` and 1/`v` of it, so a picture with a grid keeps its lines in line from one tile to the next. Bricks use `[8, 12]` (a course is 1/24 of the picture and a running bond repeats every two), ridges that run up and down `[12, 1]`. A 0 is any shift. | any shift |
+| `macro_strength` | how strongly the large picture shows: 0 for none, 1 for all of it. | 0 |
+
+**The large picture.** `[macro]` in the library names a texture, `macro_variation` (`assets-src/generators/macro_variation.py`, 512 pixels over 80 m, 154 KB). The game lays it over the world by where a surface is, a floor by east and north and a wall by along-the-wall and up, so a stain or a damp zone carries on from one mesh to the next and round a corner. It multiplies the colour, and nudges the roughness: lighter patches are a little rougher and darker ones smoother. It is looked up twice, at two sizes and angles, so its own repeat doesn't show. Its colour picture is a multiplier, not a colour: mid-grey (128) is 1.
+
+**Where it shows.** A part drawn this way needs `assets-src/textures/` or `assets-src/generated/` on disk, as any picture does; without it the part is its flat colour. The Map's script asks for nothing: it names the material as ever.
+
+**Marks that must not repeat.** A picture repeats its marks too, so a mark that appears once to the picture appears over and over, and hex tiling would only scatter the copies. Don't paint one into a generator. Graffiti, a spalled patch with a bare rebar, a stencilled block of marks and a painted band are separate geometry or decals in the Map's script, put where the Map wants them. The two materials that had such marks, `brick_painted_peeling` (graffiti, a chevron band) and `concrete_wall_rough` (the spalled patch and its rebar, a rebar's faint line, a stencilled block), no longer draw them; the Map's script has to add them back. There is no decal system yet, so for now that means geometry.
+
+**Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)): one view from 40 m straight down (`at=0,0,40 pitch=-90`) and one low along a floor show a repeat at once. The game logs how many of a Map's materials are drawn this way ("with the repeat broken"). One or two views a run: more than two stall the command ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)).
 
 ## What CI checks
 

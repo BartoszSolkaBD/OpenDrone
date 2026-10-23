@@ -174,6 +174,25 @@ fn a_generated_texture_no_material_uses_is_refused_like_any_other() {
 }
 
 #[test]
+fn the_texture_the_macro_table_names_needs_no_material_of_its_own() {
+    // The large-scale picture (#304) is laid over the whole world, so no one
+    // material uses it.
+    let repo = Repo::new("macro-texture");
+    repo.manifest(GENERATED);
+    let text = repo.read("assets-src/materials.toml");
+    repo.write(
+        "assets-src/materials.toml",
+        format!(
+            "{}\n[macro]\ntexture = \"wide\"\n\n[textures.wide]\ngenerator = \"zinc_sheet\"\nseed = 1\npixels = 512\nsize = \"80 m\"\n",
+            text
+        )
+        .as_bytes(),
+    );
+    let (ok, text) = xtask(&repo.root, &["credits"], &[]);
+    assert!(ok, "{text}");
+}
+
+#[test]
 fn a_generator_with_no_script_is_refused_before_blender_is_asked() {
     let repo = Repo::new("no-script");
     repo.manifest(GENERATED);

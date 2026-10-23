@@ -24,7 +24,8 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
-use crate::map_drawing::{MapLighting, MaterialLibrary, part_mesh, read_light_atlas};
+use crate::map_drawing::{MapLighting, MaterialLibrary, Surface, part_mesh, read_light_atlas};
+use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
 
@@ -102,7 +103,8 @@ pub struct DrawingPlugin;
 
 impl Plugin for DrawingPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<View>()
+        app.add_plugins(RepeatBreakingPlugin)
+            .init_resource::<View>()
             .init_resource::<WorldDrawing>()
             .insert_resource(ClearColor(Color::srgb(0.55, 0.7, 0.9)))
             .insert_resource(GlobalAmbientLight {
@@ -137,6 +139,7 @@ fn draw_the_world(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut varied: ResMut<Assets<VariedMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
     draw_the_map(
@@ -144,6 +147,7 @@ fn draw_the_world(
         &mut commands,
         &mut meshes,
         &mut materials,
+        &mut varied,
         &mut images,
     );
     draw_the_quad(
@@ -177,6 +181,13 @@ fn set_up_the_grid(mut gizmos: ResMut<GizmoConfigStore>) {
     config.line.width = 1.5;
 }
 
+/// A material of the Map, drawn plain or with its repeat broken (#304).
+#[derive(Clone)]
+enum DrawnMaterial {
+    Plain(Handle<StandardMaterial>),
+    Varied(Handle<VariedMaterial>),
+}
+
 /// The Map's own parts, drawn from its `.glb`: every part with its material
 /// from the library ([`MaterialLibrary`]), the sun with shadows and a sky's
 /// worth of fill light, or, for a Map with baked light, lit by its atlas. A
@@ -186,29 +197,36 @@ fn draw_the_map_from_its_file(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    varied: &mut Assets<VariedMaterial>,
     images: &mut Assets<Image>,
 ) {
     let library = MaterialLibrary::read(&repo_folder());
     let baked = baked_light(plan, images);
-    let mut by_name: BTreeMap<String, Handle<StandardMaterial>> = BTreeMap::new();
+    let mut by_name: BTreeMap<String, DrawnMaterial> = BTreeMap::new();
     for part in &plan.map.drawing {
         let material = by_name
             .entry(part.material.clone())
             .or_insert_with(|| {
-                let mut material = library.material(&part.material, part.colour, images);
+                let mut surface = library.material(&part.material, part.colour, images);
                 if let Some((_, lighting)) = &baked {
-                    material.lightmap_exposure = lighting.lightmap_exposure;
+                    surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
                 }
-                materials.add(material)
+                match surface {
+                    Surface::Plain(material) => DrawnMaterial::Plain(materials.add(material)),
+                    Surface::Varied(material) => DrawnMaterial::Varied(varied.add(material)),
+                }
             })
             .clone();
         let mut part_entity = commands.spawn((
             InTheWorld,
             Mesh3d(meshes.add(part_mesh(part))),
-            MeshMaterial3d(material),
             Transform::IDENTITY,
             Name::new(part.name.clone()),
         ));
+        match material {
+            DrawnMaterial::Plain(handle) => part_entity.insert(MeshMaterial3d(handle)),
+            DrawnMaterial::Varied(handle) => part_entity.insert(MeshMaterial3d(handle)),
+        };
         if let Some((atlas, _)) = &baked
             && !part.light_uvs.is_empty()
         {
@@ -219,11 +237,15 @@ fn draw_the_map_from_its_file(
         }
     }
     info!(
-        "drew {} on {} parts, {} of its {} materials with their pictures",
+        "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken",
         plan.map.name,
         plan.map.drawing.len(),
         by_name.len().min(library.textured()),
-        by_name.len()
+        by_name.len(),
+        by_name
+            .values()
+            .filter(|m| matches!(m, DrawnMaterial::Varied(_)))
+            .count()
     );
     if let Some((_, lighting)) = baked {
         return light_what_the_atlas_doesnt(commands, &lighting);
@@ -323,10 +345,11 @@ pub fn draw_the_map(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    varied: &mut Assets<VariedMaterial>,
     images: &mut Assets<Image>,
 ) {
     if !plan.map.drawing.is_empty() {
-        return draw_the_map_from_its_file(plan, commands, meshes, materials, images);
+        return draw_the_map_from_its_file(plan, commands, meshes, materials, varied, images);
     }
     commands.insert_resource(GlobalAmbientLight {
         color: Color::WHITE,
