@@ -450,22 +450,42 @@ mod maps {
     /// asked to run a script, writes `bytes` where `--out` says (and a
     /// picture where `--previews` says).
     fn fake_blender(repo: &Repo, version: &str, bytes: &str) -> PathBuf {
+        fake_blender_with_light(repo, version, bytes, "", false)
+    }
+
+    /// The same stand-in, for a Map whose script asks for baked light when
+    /// `asks_for_light`: it writes the info file `--light-info` names, and
+    /// when asked to `--bake` it writes an atlas where `--bake` says and
+    /// `report` where `--bake-report` says.
+    fn fake_blender_with_light(
+        repo: &Repo,
+        version: &str,
+        bytes: &str,
+        report: &str,
+        asks_for_light: bool,
+    ) -> PathBuf {
+        let asks = if asks_for_light { "yes" } else { "" };
         let script = format!(
             r#"#!/bin/sh
 if [ "$1" = "--version" ]; then
   echo "Blender {version} LTS"
   exit 0
 fi
-out=""; previews=""
+out=""; previews=""; info=""; bake=""; bake_report=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) out="$2"; shift ;;
     --previews) previews="$2"; shift ;;
+    --light-info) info="$2"; shift ;;
+    --bake) bake="$2"; shift ;;
+    --bake-report) bake_report="$2"; shift ;;
   esac
   shift
 done
 printf '%s' '{bytes}' > "$out"
 if [ -n "$previews" ]; then printf 'a picture' > "$previews/three-quarter.png"; printf 'a smaller picture' > "$previews/preview.png"; fi
+if [ -n "{asks}" ] && [ -n "$info" ]; then printf 'texel_cm = 25.0\n' > "$info"; fi
+if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$bake_report"; fi
 "#
         );
         let path = repo.write("fake-blender", script.as_bytes());
@@ -611,5 +631,166 @@ if [ -n "$previews" ]; then printf 'a picture' > "$previews/three-quarter.png"; 
         let ci = fs::read_to_string(repo.join(".github/workflows/ci.yml")).unwrap();
         assert!(ci.contains("assets-src/blender-version.toml"));
         assert!(ci.contains("cargo xtask maps --check"));
+    }
+
+    const LIGHT_TOML: &str =
+        "name = \"Yard\"\n\n[light]\nsun_elevation = \"37 °\"\nsky_colour = \"#a5c4f0\"\n";
+
+    /// What `maps --bake` is told the bake was made from, as the Python
+    /// script writes it: the `.glb`'s hash, and the `[light]` values' (the
+    /// keys in order, each as `key = value` on a line).
+    fn bake_report(glb: &str, light: &str) -> String {
+        format!(
+            "atlas = \"yard.light.exr\"\nglb_sha256 = \"{}\"\nlight_sha256 = \"{}\"\nwidth = 2048\n",
+            sha256(glb.as_bytes()),
+            sha256(light.as_bytes())
+        )
+    }
+
+    const LIGHT_LINES: &str = "sky_colour = #a5c4f0\nsun_elevation = 37 °\n";
+
+    fn repo_with_baked_light(case: &str) -> Repo {
+        let repo = repo_with_a_map(case, "the glb");
+        repo.write("packs/opendrone/maps/yard/map.toml", LIGHT_TOML.as_bytes());
+        repo
+    }
+
+    #[test]
+    fn check_says_a_map_that_asks_for_baked_light_has_no_atlas_until_it_is_baked() {
+        let repo = repo_with_baked_light("maps-light-unbaked");
+        let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", "", true);
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(!ok, "{text}");
+        assert!(
+            text.contains("yard: its script asks for baked light, but there is no yard.bake.toml")
+                && text.contains("run `cargo xtask maps --bake yard`"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn bake_writes_the_atlas_and_what_it_was_baked_from_and_then_check_passes() {
+        let repo = repo_with_baked_light("maps-light-baked");
+        let report = bake_report("the glb", LIGHT_LINES);
+        let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", &report, true);
+        let (ok, text) = run(
+            &repo,
+            &blender,
+            &["maps", "--bake", "yard", "--samples", "64"],
+        );
+        assert!(ok, "{text}");
+        assert_eq!(
+            repo.read("packs/opendrone/maps/yard/yard.light.exr"),
+            "an atlas"
+        );
+        let sidecar = repo.read("packs/opendrone/maps/yard/yard.bake.toml");
+        assert!(
+            sidecar
+                .starts_with("# Written by `cargo xtask maps --bake yard`; never edit it by hand.")
+        );
+        assert!(sidecar.contains(&format!("glb_sha256 = \"{}\"", sha256(b"the glb"))));
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(ok, "{text}");
+        assert!(
+            text.contains(
+                "yard: the atlas yard.light.exr was baked from this .glb and these [light] values"
+            ),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn check_says_the_atlas_is_out_of_date_when_the_glb_or_the_light_changes() {
+        let repo = repo_with_baked_light("maps-light-stale");
+        let report = bake_report("the glb", LIGHT_LINES);
+        let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", &report, true);
+        let (ok, text) = run(&repo, &blender, &["maps", "--bake", "yard"]);
+        assert!(ok, "{text}");
+        // The shapes changed: Blender now builds other bytes.
+        let rebuilt = fake_blender_with_light(&repo, "5.2.2", "another glb", &report, true);
+        let (ok, text) = run(&repo, &rebuilt, &["maps", "--check"]);
+        assert!(!ok, "{text}");
+        assert!(
+            text.contains("the atlas yard.light.exr was baked from another yard.glb than the one Blender builds now"),
+            "{text}"
+        );
+        // The sun moved in map.toml, with Blender building the same bytes
+        // again (the stand-in is one file, so it is written once more).
+        let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", &report, true);
+        repo.write(
+            "packs/opendrone/maps/yard/map.toml",
+            LIGHT_TOML.replace("37 °", "40 °").as_bytes(),
+        );
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(!ok, "{text}");
+        assert!(
+            text.contains("was baked with other [light] values than map.toml has now"),
+            "{text}"
+        );
+        // The atlas file went missing.
+        repo.write("packs/opendrone/maps/yard/map.toml", LIGHT_TOML.as_bytes());
+        fs::remove_file(repo.root.join("packs/opendrone/maps/yard/yard.light.exr")).unwrap();
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(
+            !ok && text
+                .contains("names the atlas yard.light.exr, but the file isn't in the Map's folder"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn the_second_uv_set_is_proven_by_a_committed_hash_which_a_plain_run_rewrites() {
+        let repo = repo_with_a_map("maps-uv-proof", "the glb");
+        repo.write("assets-src/lightmap-uv.toml", b"[maps]\nyard = \"00\"\n");
+        let blender = fake_blender(&repo, "5.2.2", "the glb");
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(!ok, "{text}");
+        assert!(
+            text.contains("yard: the .glb built with a second UV set at 25 cm per texel hashes to"),
+            "{text}"
+        );
+        let (ok, text) = run(&repo, &blender, &["maps"]);
+        assert!(ok, "{text}");
+        assert!(
+            repo.read("assets-src/lightmap-uv.toml")
+                .contains(&sha256(b"the glb"))
+        );
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(ok, "{text}");
+        assert!(
+            text.contains("yard: the second UV set is the very same bytes"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn bake_refuses_a_map_that_isnt_there_and_options_that_dont_go_with_it() {
+        let repo = repo_with_baked_light("maps-bake-options");
+        let blender = fake_blender(&repo, "5.2.2", "the glb");
+        let (ok, text) = run(&repo, &blender, &["maps", "--bake", "nowhere"]);
+        assert!(
+            !ok && text.contains("there's no Map with that id; the Maps with a script are yard"),
+            "{text}"
+        );
+        let (ok, text) = run(&repo, &blender, &["maps", "--bake", "yard", "--check"]);
+        assert!(
+            !ok && text.contains("not with --check or --previews"),
+            "{text}"
+        );
+        let (ok, text) = run(&repo, &blender, &["maps", "--samples", "8"]);
+        assert!(!ok && text.contains("--samples is for --bake"), "{text}");
+    }
+
+    #[test]
+    fn the_repo_proves_the_second_uv_set_of_every_map_with_a_script() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let proof = fs::read_to_string(repo.join("assets-src/lightmap-uv.toml")).unwrap();
+        for entry in fs::read_dir(repo.join("assets-src/maps")).unwrap() {
+            let id = entry.unwrap().file_name().into_string().unwrap();
+            assert!(
+                proof.contains(&format!("{id} = \"")),
+                "assets-src/lightmap-uv.toml has no hash for {id}"
+            );
+        }
     }
 }

@@ -69,8 +69,8 @@ pub use input_device::{
 };
 pub use manifest::{LicenceOverride, Manifest, Retired, is_an_id, read_manifest};
 pub use map::{
-    BackgroundSound, MapDefinition, TEST_MAPS_FOLDER, read_map_file, read_map_file_with_steps,
-    test_map, test_map_ids,
+    BackgroundSound, MapDefinition, MapLight, TEST_MAPS_FOLDER, read_map_file,
+    read_map_file_with_steps, test_map, test_map_ids,
 };
 pub use quad::{
     Battery, Board, Camera, Chemistry, Collision, Confidence, Ducts, Feel, Frame, Motors,

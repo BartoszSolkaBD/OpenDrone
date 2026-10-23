@@ -127,9 +127,17 @@ air_density = "1.225 kg/m³"
 [background_sound]                  # optional: the Background Sound slot
 file  = "background.ogg"            # an Ogg loop in this folder
 level = "-12 dB"                    # from -60 dB to 12 dB: 0 plays it as recorded
+
+[light]                             # optional: a Map with baked light
+sun_elevation = "37 °"              # how high the sun is: 0 ° on the horizon, 90 ° overhead
+sun_azimuth   = "225 °"             # the compass direction the sun is in: 0 north, 90 east
+sun_colour    = "#fff2d6"           # sRGB, as in a paint program
+sun_strength  = "3.0"               # 1 lights a white surface square-on as an open sky of strength 1 does
+sky_colour    = "#a5c4f0"
+sky_strength  = "0.5"
 ```
 
-Every key is required except `[background_sound]`, and nothing else may appear. The world values are the Map's alone: nothing a pilot sets changes them ([the World and content rules](../context/world.md)).
+Every key is required except `[background_sound]` and `[light]`, and nothing else may appear. In `[light]` every value is required, the angles are degrees (radians are refused), the colours are `#rrggbb` and the strengths are plain numbers from 0 up to 1000; a wrong one is refused with a sentence that says what it should be. What the values mean, and how the atlas is baked from them: [Building a Map](../building-a-map.md#baked-light). The world values are the Map's alone: nothing a pilot sets changes them ([the World and content rules](../context/world.md)).
 
 ### What the `.glb` holds
 
@@ -154,7 +162,7 @@ The checker refuses, listing every problem with the `.glb`'s file and the object
 
 What reaches the Simulation is each solid part, in the file's order and named after its object, and the Launch Spot. They change the Map's fingerprint; the names, the pictures and what is only drawn don't. The game draws every part that isn't `od_collision_only`, with its material's name and flat colour from the file, and gives it its pictures from the material library ([Building a Map](../building-a-map.md)).
 
-`map.toml` names its files, and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
+`map.toml` names its files (the checker doesn't yet look for a light atlas: the game's ticket does), and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
 
 ## The Tune, `tune.txt`
 

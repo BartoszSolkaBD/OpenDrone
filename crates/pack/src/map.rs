@@ -7,7 +7,7 @@
 use opendrone_maths::{Fingerprint, Fingerprinter};
 use opendrone_physics::{MapShape, World};
 
-use crate::document::{Document, FORMAT, Problems};
+use crate::document::{Document, FORMAT, Item, Problems};
 use crate::glb::{DrawnPart, LaunchSpot};
 use crate::migration::{self, FileKind, PACK_STEPS, Step};
 use crate::test_maps::TEST_MAPS;
@@ -41,6 +41,30 @@ pub struct MapDefinition {
     pub preview: Option<String>,
     /// The Map's Background Sound, if `map.toml` has the slot filled.
     pub background_sound: Option<BackgroundSound>,
+    /// The Map's baked light, if `map.toml` has a `[light]` table: where its
+    /// sun is and the colours of sun and sky.
+    pub light: Option<MapLight>,
+}
+
+/// A Map's `[light]`: what its baked light was made from, and what the game
+/// lights a Quad with. The atlas itself is a file in the Map's folder.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MapLight {
+    /// How high the sun is above the horizon, in radians: 0 on the horizon,
+    /// a quarter turn overhead.
+    pub sun_elevation: f64,
+    /// The compass direction the sun is in, in radians clockwise from north:
+    /// a quarter turn is east.
+    pub sun_azimuth: f64,
+    /// The sun's colour, sRGB as written in `#rrggbb`.
+    pub sun_colour: [u8; 3],
+    /// How bright the sun lights a white surface square-on to it; 1 is as
+    /// bright as `sky_strength` 1 lights a white surface under open sky.
+    pub sun_strength: f64,
+    /// The sky's colour, sRGB as written in `#rrggbb`.
+    pub sky_colour: [u8; 3],
+    /// How bright an open sky lights a white surface facing up.
+    pub sky_strength: f64,
 }
 
 /// A Map's Background Sound: an Ogg loop in the Map's folder, and how loud it
@@ -141,6 +165,7 @@ pub fn read_map_file_with_steps(
             "model",
             "preview",
             "background_sound",
+            "light",
         ],
         &mut problems,
     );
@@ -182,6 +207,9 @@ pub fn read_map_file_with_steps(
             level_db: level?,
         })
     });
+    let light = root
+        .get("light")
+        .and_then(|item| read_light(&item, &mut problems));
     let world = root.table("world", &mut problems);
     let mut value = |key: &str, dimension: Dimension| -> Option<f64> {
         let world = world.as_ref()?;
@@ -219,5 +247,90 @@ pub fn read_map_file_with_steps(
         model,
         preview,
         background_sound,
+        light,
+    })
+}
+
+/// Reads `[light]`: every value is needed, and each is checked in plain words.
+fn read_light(item: &Item<'_, '_>, problems: &mut Problems) -> Option<MapLight> {
+    let table = item.table(problems)?;
+    table.refuse_unknown(
+        &[
+            "sun_elevation",
+            "sun_azimuth",
+            "sun_colour",
+            "sun_strength",
+            "sky_colour",
+            "sky_strength",
+        ],
+        problems,
+    );
+    let mut angle = |key: &str, to: f64, range: &str| -> Option<f64> {
+        let (text, item) = table.text(key, problems)?;
+        match units::parse_quantity(text).and_then(|q| q.as_a(Dimension::ANGLE)) {
+            Ok(radians) if (0.0..=to).contains(&radians) => Some(radians),
+            Ok(_) => {
+                problems.push(item.problem(format!("`light.{key}` must be {range}")));
+                None
+            }
+            Err(p) => {
+                problems.push(item.problem(p.0));
+                None
+            }
+        }
+    };
+    let sun_elevation = angle(
+        "sun_elevation",
+        std::f64::consts::FRAC_PI_2,
+        "from 0 ° (on the horizon) to 90 ° (overhead)",
+    );
+    let sun_azimuth = angle(
+        "sun_azimuth",
+        std::f64::consts::TAU,
+        "a compass direction from 0 ° (north) to 360 °, such as \"225 °\" for south-west",
+    );
+    let mut colour = |key: &str| -> Option<[u8; 3]> {
+        let (text, item) = table.text(key, problems)?;
+        let digits = text
+            .strip_prefix('#')
+            .filter(|d| d.len() == 6 && d.is_ascii());
+        let byte = |i: usize| digits.and_then(|d| u8::from_str_radix(&d[i..i + 2], 16).ok());
+        match (byte(0), byte(2), byte(4)) {
+            (Some(r), Some(g), Some(b)) => Some([r, g, b]),
+            _ => {
+                problems.push(item.problem(format!(
+                    "`light.{key}` is a colour written like \"#fff2d6\" (sRGB, as in a paint program), not \"{text}\""
+                )));
+                None
+            }
+        }
+    };
+    let sun_colour = colour("sun_colour");
+    let sky_colour = colour("sky_colour");
+    let mut strength = |key: &str| -> Option<f64> {
+        let (text, item) = table.text(key, problems)?;
+        match units::parse_quantity(text).and_then(|q| q.as_a(Dimension::NONE)) {
+            Ok(value) if (0.0..=1000.0).contains(&value) => Some(value),
+            Ok(_) => {
+                problems.push(item.problem(format!(
+                    "`light.{key}` must be 0 or more, and at most 1000: 1 lights a white surface as an open sky of strength 1 does"
+                )));
+                None
+            }
+            Err(p) => {
+                problems.push(item.problem(p.0));
+                None
+            }
+        }
+    };
+    let sun_strength = strength("sun_strength");
+    let sky_strength = strength("sky_strength");
+    Some(MapLight {
+        sun_elevation: sun_elevation?,
+        sun_azimuth: sun_azimuth?,
+        sun_colour: sun_colour?,
+        sun_strength: sun_strength?,
+        sky_colour: sky_colour?,
+        sky_strength: sky_strength?,
     })
 }

@@ -1,0 +1,8 @@
+# The SHA-256 of each Map's .glb built with a second UV set at 25 cm per texel:
+# `cargo xtask maps` writes this file and `maps --check` (CI, on Linux) demands it, so the
+# unwrap in assets-src/lib/odlight.py is proven to give the same bytes on every computer (#293).
+# Never edit it by hand.
+
+[maps]
+bando = "99b07c1cc9b9248294c48b16ba4a387cb05d80b2825662b3dbab505dce3e77d3"
+skate-park = "bc78aa1f75afb75eda094b51bccd0c567861b272b26d61c9b1305336ec25e7fb"

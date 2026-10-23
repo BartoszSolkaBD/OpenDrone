@@ -44,6 +44,10 @@ _Avoid_: Mod, plugin, DLC
 The part of OpenDrone that reads a Pack and refuses anything that breaks the Pack rules, listing every problem with its file, its line and a plain sentence. It checks the game's own Pack in CI and a dropped Pack when the game loads it ([Checking a Pack](../verification/checking-a-pack.md)).
 _Avoid_: Validator, linter
 
+**Baked light**:
+The sun and sky light of a detailed Map, worked out once by Blender's Cycles from the Map's `[light]` values in `map.toml` (where the sun is, the colour and strength of sun and sky) and stored in a light atlas: a picture that lays every drawn surface of the Map flat, so the game lights the Map by looking each spot up, with no real-time sun or shadows. A Map at another time of day is another Map with its own bake. How one is made: [Building a Map](../building-a-map.md#baked-light).
+_Avoid_: Static lighting
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
