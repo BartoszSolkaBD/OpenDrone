@@ -169,9 +169,9 @@ Pictures are drawn with the Map's textures when `cargo xtask textures` has run, 
 
 ## Materials made from scratch
 
-A detailed Map (the Factory is the first) doesn't use downloaded pictures: its surfaces are drawn by scripts that agents write, and the pictures they make are committed ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Nothing is downloaded, no outside picture goes in, and the pictures are CC0 like everything agents make. Skate Park and Bando keep their downloaded textures. The first eight materials, which are the Factory slice's, look like this (the colour picture of each, the way [`cargo xtask generate-textures`](#adding-one) makes it):
+A detailed Map (the Factory is the first) doesn't use downloaded pictures: its surfaces are drawn by scripts that agents write, and the pictures they make are committed ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Nothing is downloaded, no outside picture goes in, and the pictures are CC0 like everything agents make. Skate Park and Bando keep their downloaded textures. The materials, which are the Factory slice's, look like this (the colour picture of each, the way [`cargo xtask generate-textures`](#adding-one) makes it):
 
-![The eight materials made from scratch: painted brick with the plaster peeling, weathered red brick, worn concrete floor and rough concrete wall in the top row; grass and weeds, dirt and rubble ground, rusted corrugated roof and a rusted steel beam in the bottom row](images/materials-made-from-scratch.jpg)
+![The materials made from scratch, in alphabetical order, four to a row: bark, painted brick with the plaster peeling, weathered red brick and worn concrete floor; rough concrete wall, wired glass, graffiti on brick and grass with weeds; dirt and rubble ground, leaves, the large-scale variation picture and rusted corrugated roof; a faded sign, a rusted steel beam and charred timber](images/materials-made-from-scratch.jpg)
 
 | Material | One repeat | Picture | Cost |
 |---|---|---|---|
@@ -183,8 +183,14 @@ A detailed Map (the Factory is the first) doesn't use downloaded pictures: its s
 | `roof_corrugated_rusted` | 1.2 m | 1K | 495 KB |
 | `ground_dirt_rubble` | 2 m | 1K | 936 KB |
 | `grass_weeds` | 2 m | 1K | 1.3 MB |
+| `glass_wired_grimy` (window glass, opaque) | 1 m | 512 | 214 KB |
+| `wood_charred` (burnt timber) | 1 m | 512 | 339 KB |
+| `bark_rough` | 1 m | 512 | 153 KB |
+| `leaves_mixed` (leaves and weeds) | 0.6 m | 512 | 118 KB |
+| `sign_faded` (one board, shown once) | 4 m | 1K | 242 KB |
+| `graffiti_brick` (one patch, shown once) | 3.6 m | 1K | 935 KB |
 
-Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map today, and draws a part with them as it does a downloaded texture; the roughness picture waits for the ticket that reads it. All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or decals ([below](#surfaces-that-dont-repeat)).
+Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map today, and draws a part with them as it does a downloaded texture; the roughness picture waits for the ticket that reads it. All fourteen and the large-scale picture together are about 8.9 MB, and the contact sheet above is 0.6 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or decals ([below](#surfaces-that-dont-repeat)).
 
 ### In the material library
 
@@ -257,6 +263,39 @@ macro_strength = 0.60       # how strongly the large picture shows; 0 or left ou
 **Marks that must not repeat.** A picture repeats its marks too, so a mark that appears once to the picture appears over and over, and hex tiling would only scatter the copies. Don't paint one into a generator. Graffiti, a spalled patch with a bare rebar, a stencilled block of marks and a painted band are separate geometry or decals in the Map's script, put where the Map wants them. The two materials that had such marks, `brick_painted_peeling` (graffiti, a chevron band) and `concrete_wall_rough` (the spalled patch and its rebar, a rebar's faint line, a stencilled block), no longer draw them; the Map's script has to add them back. There is no decal system yet, so for now that means geometry.
 
 **Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)): one view from 40 m straight down (`at=0,0,40 pitch=-90`) and one low along a floor show a repeat at once. The game logs how many of a Map's materials are drawn this way ("with the repeat broken"). One or two views a run: more than two stall the command ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)).
+
+## The Factory's first slice
+
+The first piece of the Factory (`opendrone/factory`, [#295](https://github.com/BartoszSolkaBD/OpenDrone/issues/295)) is one 30 × 30 m bay of an abandoned brick hall and its yard, built by [`assets-src/maps/factory/build.py`](../assets-src/maps/factory/build.py). It is the example for the next detailed Map: every surface is a material made from scratch, the light is baked, and the damage and the plants come from two helpers in `assets-src/lib/`, written the way the rest of a Map is (plain Python from a seed, the same bytes on every computer):
+
+- [`odruin.py`](../assets-src/lib/odruin.py): `Random` (numbers from a seed and keys), `Batch` (many small solids drawn as one part, such as a pile of rubble), `plate` (a flat outline of any shape with a thickness, on any plane: a torn roof sheet, a pane, a skin of plaster), `breach` (a hole broken through a wall, stepped to the bricks, as openings for `wall`), `missing_bricks` (pockets where single bricks fell out, cut from one leaf of a wall built in two), `lump`, `brick`, `scatter` and `mound` (rubble), `bent_bar` (a buckled beam) and `shards` (what is left of a broken pane).
+- [`odplants.py`](../assets-src/lib/odplants.py): `weeds` (a clump of thin, bent blades and a rosette of broad leaves) and `tree` (a leaning trunk, branches and twigs, and a crown of leaf sprays). A leaf is a card drawn from both sides. Leaves and weeds are only drawn, on purpose: a Quad flies through them; the wood is solid.
+
+Their readable checks run with the unwrap's: `python3 -m unittest discover -s assets-src/lib`.
+
+**One-off marks.** A sign or a patch of graffiti must show once, so it is a material of its own whose generator puts the mark in one part of one repeat, and the script lays a thin skin (a box 2 to 4 mm thick) over exactly that part. A picture coordinate is the Map's metres divided by the repeat size, so the skin's corners sit on whole repeats: `sign_faded` repeats every 4 m and its board covers x = 16.4 to 19.6 m and z = 5.2 to 6.8 m of the repeat from 16 to 20 m and 4 to 8 m. Such a material doesn't ask for `break_repeat`.
+
+**What it costs**, measured on the maintainer's M4 Mac mini, so the next detailed Map has a budget to start from:
+
+| | The slice |
+|---|---|
+| Parts and triangles | 483 parts (each a draw), 97,908 triangles; the `.glb` is 6.0 MB |
+| Pictures | 14 materials made from scratch, 8.9 MB in all (the six new for the slice, 2.0 MB) |
+| Light atlas | 2048 × 3632 at 10 cm a texel (7 cm for leaves, 2 to 3 cm for weed blades and window bars, 20 cm for the yard, coarse beyond it); a 14.3 MB EXR, 60 MB in the graphics card |
+| Bake | 379 s at 1024 samples, 47 s at 128 for a quick look |
+| Frame | about 6.0 ms a frame (1661 frames in 10 s, Analog Look, 2560 × 1440, release build), against about 5.2 ms for Bando |
+
+A whole Factory of about 200 × 100 m is some twenty bays like this one: at the same density its atlas would not fit in one 8192 × 8192 picture, so the full Map needs coarser light on its outsides and roofs, or the second atlas that "Not here yet" names.
+
+**Traps, for the next one:**
+
+- A triangle smaller than a texel of the light atlas can cover no texel's middle, and bakes black: leaves at 25 cm a texel came out as black cards. Give thin parts a fine `light_cm` (leaves 7 cm, weed blades 2 cm, window bars 3 cm).
+- A thin box on a slope isn't a box any more once its corners are rounded to 0.1 mm, and the Pack checker refuses it; tag tilted sheets `trimesh`.
+- `prism` wants its outline clockwise (seen with `along` to the right and `up` up). An anticlockwise one makes a solid whose ends face inwards: the bake lights the inside of the face, and the gables came out black.
+- A plain view of `--render-views` can leave out some of a baked Map's parts ([#316](https://github.com/BartoszSolkaBD/OpenDrone/issues/316)): judge a baked Map in a Video Look view (`look=digital` is the cleanest).
+- Openings that nearly meet leave slivers that `wall` can't make; round them to a common grid (the script uses 5 mm).
+- A picture's one-off lines repeat with it: the roof's lap and its row of screws striped a whole roof seen from above until `snap` let tiles shift up and down the ridges (`snap = [12, 0]`).
+- The ground to the horizon gets coarse light (a chart is at most 512 texels across, so 4 m a texel for 2 km), which shows as blotches near the camera: give the yard its own slab with finer light.
 
 ## What CI checks
 

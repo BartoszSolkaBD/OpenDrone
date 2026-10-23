@@ -161,8 +161,10 @@ colour    = [0.21, 0.18, 0.16]
 roughness = 0.74
 texture   = "roof_corrugated_rusted"
 break_repeat   = true
-snap           = [12, 1]
-macro_strength = 0.40
+# Any shift up and down the ridges: the picture's lap and its row of screws
+# would otherwise line up from tile to tile and stripe a whole roof (#295).
+snap           = [12, 0]
+macro_strength = 1.00
 
 [materials.ground_dirt_rubble]
 colour    = [0.12, 0.08, 0.05]
@@ -179,6 +181,56 @@ texture   = "grass_weeds"
 break_repeat   = true
 turn_cells     = true
 macro_strength = 0.60
+
+# Made from scratch for the Factory's slice (#295): the window glass, burnt
+# timber, and the bark and leaves of the plants. The glass's wire mesh keeps
+# in line from tile to tile (40 wires to the picture).
+[materials.glass_wired_grimy]
+colour    = [0.06, 0.07, 0.06]
+roughness = 0.44
+texture   = "glass_wired_grimy"
+break_repeat   = true
+snap           = [40, 40]
+macro_strength = 0.30
+
+[materials.wood_charred]
+colour    = [0.02, 0.02, 0.02]
+roughness = 0.70
+texture   = "wood_charred"
+break_repeat   = true
+turn_cells     = true
+macro_strength = 0.30
+
+[materials.bark_rough]
+colour    = [0.06, 0.05, 0.04]
+roughness = 0.86
+texture   = "bark_rough"
+break_repeat   = true
+macro_strength = 0.20
+
+# Leaves are drawn with the repeat broken too, each tile turned: a leaf's
+# picture has no grain to keep in line.
+[materials.leaves_mixed]
+colour    = [0.05, 0.10, 0.03]
+roughness = 0.63
+texture   = "leaves_mixed"
+break_repeat   = true
+turn_cells     = true
+macro_strength = 0.30
+
+# One-off marks (#295, #304): a picture repeats, so a mark that must show once
+# is its own material on one thin skin, laid over the one repeat that holds it
+# and never tiled again. The Map's script puts the skin where the generator's
+# docstring says the mark is.
+[materials.sign_faded]
+colour    = [0.30, 0.26, 0.20]
+roughness = 0.76
+texture   = "sign_faded"
+
+[materials.graffiti_brick]
+colour    = [0.12, 0.07, 0.06]
+roughness = 0.76
+texture   = "graffiti_brick"
 
 # No picture: leaves are a flat colour.
 [materials.foliage]
@@ -364,6 +416,42 @@ generator = "grass_weeds"
 seed      = 1
 pixels    = 1024
 size      = "2 m"
+
+[textures.glass_wired_grimy]
+generator = "glass_wired_grimy"
+seed      = 1
+pixels    = 512
+size      = "1 m"
+
+[textures.wood_charred]
+generator = "wood_charred"
+seed      = 1
+pixels    = 512
+size      = "1 m"
+
+[textures.bark_rough]
+generator = "bark_rough"
+seed      = 1
+pixels    = 512
+size      = "1 m"
+
+[textures.leaves_mixed]
+generator = "leaves_mixed"
+seed      = 1
+pixels    = 512
+size      = "0.6 m"
+
+[textures.sign_faded]
+generator = "sign_faded"
+seed      = 1
+pixels    = 1024
+size      = "4 m"
+
+[textures.graffiti_brick]
+generator = "graffiti_brick"
+seed      = 1
+pixels    = 1024
+size      = "3.6 m"
 
 # Not a material's picture: the large-scale one the [macro] table names.
 [textures.macro_variation]

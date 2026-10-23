@@ -16,6 +16,10 @@ _Avoid_: Skatepark (one word)
 A Map of an abandoned, unfinished building and its site, flown inside and out. The name is FPV slang for an abandoned building.
 _Avoid_: Ruin, abandoned building (as the Map's name)
 
+**Factory**:
+A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is its first slice: one 30 × 30 m bay of a brick hall and its yard ([Building a Map](../building-a-map.md#the-factorys-first-slice)).
+_Avoid_: Warehouse, plant
+
 **Gap**:
 An opening on a Map that a Quad can fly through, such as a doorway, a window, a ring or the space between slats.
 _Avoid_: Gate (a gate is a racing object), hole
