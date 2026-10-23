@@ -397,6 +397,31 @@ jobs:
         if: steps.changes.outputs.maps == 'true'
         run: cargo xtask maps --check --previews target/map-previews
 
+      - name: Check the texture generators with Blender's Python
+        # assets-src/generators/test_generators.py: the same seed gives the same
+        # bytes, each picture repeats, each normal map points out (#292).
+        if: steps.changes.outputs.maps == 'true'
+        run: >-
+          "$BLENDER" --background --factory-startup --python-exit-code 1
+          --python assets-src/generators/test_generators.py
+
+      - name: Regenerate the textures made from scratch and require the same bytes as the committed pictures
+        # ADR-0024: the pictures are committed, and made by the generators in
+        # assets-src/generators/ with the pinned Blender's Python.
+        if: steps.changes.outputs.maps == 'true'
+        run: cargo xtask generate-textures --check
+
+      - name: Keep the textures Blender made
+        # Kept even when they differ: textures made on another computer can
+        # take the ones CI made, which are the ones this check compares with.
+        if: ${{ !cancelled() && steps.changes.outputs.maps == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: textures
+          path: target/textures-check/
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Keep the Maps Blender built
         # Kept even when they differ: a Map built on another computer can
         # take the one CI built, which is the one this check compares with.

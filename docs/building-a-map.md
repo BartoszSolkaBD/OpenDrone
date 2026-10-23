@@ -91,6 +91,68 @@ Pictures are drawn with the Map's textures when `cargo xtask textures` has run, 
 
 **Checking it by hand.** The window part has no automated check. To see that a picture is what the game shows, fly to the same camera and compare: `cargo run -p opendrone -- --map bando --no-screens --screenshot target/game.bmp --seconds 20 --size 1280x960` saves the game's own picture from the Launch Spot, and `--render-views` with `--view "look=analog"` should show the same picture, apart from the noise.
 
+## Materials made from scratch
+
+A detailed Map (the Factory is the first) doesn't use downloaded pictures: its surfaces are drawn by scripts that agents write, and the pictures they make are committed ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Nothing is downloaded, no outside picture goes in, and the pictures are CC0 like everything agents make. Skate Park and Bando keep their downloaded textures. The first eight materials, which are the Factory slice's, look like this (the colour picture of each, the way [`cargo xtask generate-textures`](#adding-one) makes it):
+
+![The eight materials made from scratch: painted brick with the plaster peeling, weathered red brick, worn concrete floor and rough concrete wall in the top row; grass and weeds, dirt and rubble ground, rusted corrugated roof and a rusted steel beam in the bottom row](images/materials-made-from-scratch.jpg)
+
+| Material | One repeat | Picture | Cost |
+|---|---|---|---|
+| `brick_red_weathered` | 1.8 m | 1K | 638 KB |
+| `brick_painted_peeling` (paint over plaster over brick, a faded safety band, generic graffiti) | 1.8 m | 1K | 475 KB |
+| `concrete_floor_worn` (the hero surface) | 3 m | 2K | 1.8 MB |
+| `concrete_wall_rough` (board-formed, tie holes, a spalled rebar) | 2 m | 1K | 490 KB |
+| `steel_beam_rusted` | 1 m | 1K | 566 KB |
+| `roof_corrugated_rusted` | 1.2 m | 1K | 495 KB |
+| `ground_dirt_rubble` | 2 m | 1K | 936 KB |
+| `grass_weeds` | 2 m | 1K | 1.3 MB |
+
+Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map today, and draws a part with them as it does a downloaded texture; the roughness picture waits for the ticket that reads it. All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A one-off mark (the graffiti, the spalled rebar, the stencilled block) repeats with every repeat of the picture, so put such a material where its repeats are not side by side in plain view, or cover the repeats with other things.
+
+### In the material library
+
+A generated material is a material like any other, plus a texture that names a generator instead of a download:
+
+```toml
+[materials.brick_red_weathered]
+colour    = [0.30, 0.10, 0.06]      # the picture's average: what the Map shows without the pictures
+roughness = 0.90
+texture   = "brick_red_weathered"
+
+[textures.brick_red_weathered]
+generator = "brick_red_weathered"   # the script assets-src/generators/brick_red_weathered.py
+seed      = 1
+pixels    = 1024                    # 512, 1024 or 2048; the picture is square
+size      = "1.8 m"                 # what one repeat covers
+```
+
+`cargo xtask textures` and `cargo xtask credits` leave such a texture alone: there is nothing to fetch, no licence to credit and no checksum to pin. A texture that has neither a download (`source`, `diffuse`, `normal`) nor a generator, or has both, is refused.
+
+### Making and checking them
+
+```sh
+cargo xtask generate-textures          # make every generated texture and the contact sheet
+cargo xtask generate-textures --check  # make them into target/textures-check/ and say whether the committed ones are the very same bytes
+```
+
+The command runs the pinned Blender (the one [`cargo xtask maps`](#building-and-checking) uses) with no window, and takes about half a minute. It prints what each picture costs. CI runs the check on Linux, with the generators' readable checks, in the **Maps** check; if a picture made on a Mac differs from Linux's, the `textures` download of that check holds the ones CI made: commit those.
+
+The same bytes on every computer is the hard part, as it is for the `.glb` files. The generators run in Blender's Python because its numpy is the same everywhere, use only whole-number maths and the four basic operations on 64-bit numbers (never `sin`, `exp` or a matrix product, which processors may round differently), take their randomness from a hash of the position and the seed (never a random generator), and write the JPG with a writer of their own, [`odjpeg.py`](../assets-src/lib/odjpeg.py), instead of Blender's. [`odtex.py`](../assets-src/lib/odtex.py) explains the rules at its top.
+
+### Adding one
+
+1. Write `assets-src/generators/<generator>.py` with a `make(seed, pixels)` that returns three `uint8` pictures: colour `(pixels, pixels, 3)`, normal map `(pixels, pixels, 3)` and roughness `(pixels, pixels)`. Build it from the blocks of [`odtex.py`](../assets-src/lib/odtex.py): seeded multi-scale noise (`fbm`), cellular noise (`voronoi`), cracks, brick and plank layouts, edge wear, streaks and drips, stains, rust that spreads from edges and seams, peeling paint, moss and dirt in low places (`cavity`), loose stones, blades of grass, generic graffiti and faded sign marks. Lay marks out in tile units (0 to 1), so the picture is the same at any size, and keep to the rules at the top of `odtex.py`: **the picture has to repeat**, so a mark placed with a gradient from top to bottom, or any `Y > 0.9`, leaves a seam. [`brick_red_weathered.py`](../assets-src/generators/brick_red_weathered.py) is a short example.
+2. Add the material and its texture to `assets-src/materials.toml` as above, run `cargo xtask generate-textures` and commit the pictures with the script.
+3. Look at the pictures: open `assets-src/generated/<name>/diffuse.jpg` and the contact sheet, and, from 1 to 2 m, ask the game for views of a Map that uses the material ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)). Nothing in the picture may be a real brand, person or artist's work.
+4. Run the generators' readable checks, which also run in CI:
+
+```sh
+blender --background --factory-startup --python-exit-code 1 --python assets-src/generators/test_generators.py
+```
+
+They prove that a seed gives the same bytes and another seed doesn't, that each picture repeats without a seam, and that each normal map points out of the surface. The size is yours to watch: a normal map of a busy surface is the biggest picture, so keep fine detail out of the height if the normal map grows past about half a megabyte.
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs. It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
