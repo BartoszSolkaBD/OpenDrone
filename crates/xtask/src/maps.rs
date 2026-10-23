@@ -419,11 +419,20 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
     fs::create_dir_all(&scratch).map_err(|e| format!("can't make {}: {e}", scratch.display()))?;
     let golden_file = root.join(LIGHT_UV_FILE);
     let golden_text = fs::read_to_string(&golden_file).ok();
+    // Every computer must prove the second UV set, so `--check` demands the
+    // committed hashes, and a plain run writes them when the file is gone.
+    let prove = options.only.is_empty() && options.bake.is_none();
+    if prove && options.check && golden_text.is_none() {
+        return Err(format!(
+            "{LIGHT_UV_FILE} is missing: it holds the SHA-256 of each Map's .glb built with a second UV set, which `maps --check` compares with, so run `cargo xtask maps` to write it and commit it"
+        ));
+    }
     let golden = golden_text
         .as_deref()
-        .filter(|_| options.only.is_empty())
+        .filter(|_| prove)
         .map(read_light_uv_hashes)
-        .transpose()?;
+        .transpose()?
+        .unwrap_or_default();
     let mut proven: Vec<(String, String)> = Vec::new();
     let mut report = Vec::new();
     let mut stale = Vec::new();
@@ -534,7 +543,7 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
         }
         // The second UV set, at one density for every Map, must be the same
         // bytes everywhere: only the hash is committed.
-        if golden.is_some() && options.bake.is_none() {
+        if prove {
             let proof = scratch.join(format!("{id}.light-uv.glb"));
             let args: Vec<std::ffi::OsString> =
                 vec!["--light-uv-proof".into(), PROOF_TEXEL_CM.into()];
@@ -544,7 +553,7 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
             proven.push((id.clone(), sha256(&bytes)));
         }
     }
-    if let Some(golden) = &golden {
+    if prove {
         if options.check {
             for (id, hash) in &proven {
                 if golden.iter().any(|(g, h)| g == id && h == hash) {
@@ -558,7 +567,7 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
                     ));
                 }
             }
-        } else if options.bake.is_none() {
+        } else {
             let text = write_light_uv_hashes(&proven);
             if golden_text.as_deref() != Some(text.as_str()) {
                 fs::write(&golden_file, text)

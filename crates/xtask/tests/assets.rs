@@ -511,6 +511,16 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
         xtask(&repo.root, args, &[("BLENDER", blender.to_str().unwrap())])
     }
 
+    /// Commits the second-UV-set proof for the Map `yard`, as `maps` writes
+    /// it when Blender builds `glb_bytes`, so that `maps --check` has the
+    /// file it demands.
+    fn with_the_uv_proof(repo: &Repo, glb_bytes: &str) {
+        repo.write(
+            "assets-src/lightmap-uv.toml",
+            format!("[maps]\nyard = \"{}\"\n", sha256(glb_bytes.as_bytes())).as_bytes(),
+        );
+    }
+
     #[test]
     fn maps_writes_each_maps_glb_into_the_built_in_pack_with_the_pinned_blender() {
         let repo = repo_with_a_map("maps-build", "old bytes");
@@ -542,6 +552,7 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
     #[test]
     fn check_says_the_committed_glb_is_what_blender_builds_and_changes_nothing() {
         let repo = repo_with_a_map("maps-check-same", "the same");
+        with_the_uv_proof(&repo, "the same");
         let blender = fake_blender(&repo, "5.2.2", "the same");
         let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
         assert!(ok, "{text}");
@@ -555,6 +566,7 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
     #[test]
     fn check_fails_when_the_committed_glb_isnt_the_very_same_bytes() {
         let repo = repo_with_a_map("maps-check-differs", "out of date");
+        with_the_uv_proof(&repo, "rebuilt");
         let blender = fake_blender(&repo, "5.2.2", "rebuilt");
         let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
         assert!(!ok);
@@ -658,6 +670,7 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
     #[test]
     fn check_says_a_map_that_asks_for_baked_light_has_no_atlas_until_it_is_baked() {
         let repo = repo_with_baked_light("maps-light-unbaked");
+        with_the_uv_proof(&repo, "the glb");
         let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", "", true);
         let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
         assert!(!ok, "{text}");
@@ -671,6 +684,7 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
     #[test]
     fn bake_writes_the_atlas_and_what_it_was_baked_from_and_then_check_passes() {
         let repo = repo_with_baked_light("maps-light-baked");
+        with_the_uv_proof(&repo, "the glb");
         let report = bake_report("the glb", LIGHT_LINES);
         let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", &report, true);
         let (ok, text) = run(
@@ -702,6 +716,7 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
     #[test]
     fn check_says_the_atlas_is_out_of_date_when_the_glb_or_the_light_changes() {
         let repo = repo_with_baked_light("maps-light-stale");
+        with_the_uv_proof(&repo, "the glb");
         let report = bake_report("the glb", LIGHT_LINES);
         let blender = fake_blender_with_light(&repo, "5.2.2", "the glb", &report, true);
         let (ok, text) = run(&repo, &blender, &["maps", "--bake", "yard"]);
@@ -736,6 +751,24 @@ if [ -n "$bake" ]; then printf 'an atlas' > "$bake"; printf '%s' '{report}' > "$
                 .contains("names the atlas yard.light.exr, but the file isn't in the Map's folder"),
             "{text}"
         );
+    }
+
+    #[test]
+    fn check_fails_when_the_file_of_second_uv_set_hashes_is_missing_and_a_plain_run_writes_it() {
+        let repo = repo_with_a_map("maps-uv-proof-missing", "the glb");
+        let blender = fake_blender(&repo, "5.2.2", "the glb");
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(!ok, "{text}");
+        assert!(
+            text.contains("assets-src/lightmap-uv.toml is missing")
+                && text.contains("run `cargo xtask maps` to write it"),
+            "{text}"
+        );
+        let (ok, text) = run(&repo, &blender, &["maps"]);
+        assert!(ok, "{text}");
+        assert!(repo.exists("assets-src/lightmap-uv.toml"), "{text}");
+        let (ok, text) = run(&repo, &blender, &["maps", "--check"]);
+        assert!(ok, "{text}");
     }
 
     #[test]
