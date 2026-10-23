@@ -55,8 +55,8 @@ _Avoid_: Sandbox, practice mode
 - A Map has no invisible walls. Its ground runs to the horizon inside a solid Backdrop, with nothing worth flying to beyond about 100 m.
 - A Launch Spot is on open, flat ground, with at least 3 m clear all round and open sky above, facing the Map's main feature.
 - A Map's solid parts and its Launch Spot come from tags in its `.glb`, which a Blender script makes ([Building a Map](../building-a-map.md)); every object says whether it is solid.
-- A Map looks realistic: real-world materials such as concrete, brick, rust and plywood. No real graffiti or brand logos.
-- Each Map has one fixed time of day. The alpha's Skate Park and Bando are both in sunny early afternoon.
+- A Map looks realistic: real-world materials such as concrete, brick, rust and plywood. Graffiti and signs are fine when an agent made them and they're generic: no real brand, person or artist's work ([ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)).
+- Each Map has one fixed time of day, which its sun values in `map.toml` set. The alpha's Skate Park and Bando are both in sunny early afternoon. A Map at another time of day is a copy with its own sun and its own baked light, so it's another Map ([ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)).
 - A Map sets the world's physical values: gravity, air density and, later, wind. Pilot settings never change them.
 - Every part of a Map states whether it is solid. Nothing is solid, or passable, by accident.
 - Every Quad, Map and Input Device profile has a fixed id made of its Pack's id and its own, such as `opendrone/skate-park`. Scenarios and settings use the id. The on-screen name is separate and may change.

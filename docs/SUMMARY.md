@@ -54,6 +54,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
   - [0021 Bevy 0.20](adr/0021-alpha-starts-on-bevy-0-20.md)
   - [0022 The OSD beside the Simulation](adr/0022-osd-worked-out-beside-the-simulation.md)
   - [0023 Quad sound on Firewheel](adr/0023-quad-sound-made-live-on-firewheel.md)
+  - [0024 Detailed Maps from scratch, baked light](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)
 
 # Proving the physics
 
