@@ -35,6 +35,9 @@
 //!   checks each against its checksum ([`textures`]).
 //! - `credits`: writes `CREDITS.md` from the material library and the list
 //!   of datasets, or checks it is up to date ([`textures`], [`datasets`]).
+//! - `licences`: writes the licence texts of the libraries built into the game
+//!   for each operating system, which every download carries, or checks they
+//!   are up to date ([`licences`]).
 //! - `tii-logs` and `download neurobem`: turn real flight logs into the
 //!   motor Input Tracks and recorded flights Physics Scenarios play back
 //!   ([`flight_logs`]).
@@ -53,6 +56,7 @@ mod datasets;
 mod flight_logs;
 mod import_tune;
 mod input_monitor;
+mod licences;
 mod maps;
 mod materials;
 mod migrate;
@@ -123,6 +127,12 @@ Commands:
       Write CREDITS.md from assets-src/materials.toml and
       assets-src/datasets.toml, with the checksum of every committed data
       file, or with --check say whether it is up to date.
+  licences [--check] [--os <macos|windows|linux>]
+      Write licences/third-party-<os>.txt for each system (or the one --os
+      names): every library built into the game there, with its version,
+      its licence and the full text of its licence files, which every
+      download carries. With --check, say whether they are up to date with
+      Cargo.lock.
   tii-logs <folder>
       Trim TII's Race Against the Machine flights (CC BY 4.0), as their
       downloader unpacks them into <folder>, into the motor Input Tracks and
@@ -147,7 +157,8 @@ Commands:
       Lay a built game out as a download, OpenDrone-<name>-<os>.zip in
       <folder> (default target/dist): the game, with its Packs, the
       Scenarios, the material library and its textures beside it, where it
-      looks for them, and the licences, the credits and a README.txt.
+      looks for them, and the licences (the game's own, and the libraries'
+      in THIRD-PARTY-LICENSES.txt), the credits and a README.txt.
   bevy-upgrade <index file>
       From crates.io's index entry for bevy, print the \"Upgrade to Bevy 0.N\"
       issues to open, as JSON, from .github/bevy-upgrade-issue.md: one for
@@ -189,6 +200,7 @@ fn main() -> ExitCode {
         "maps" => maps::run(rest),
         "textures" => textures::run_textures(rest),
         "credits" => textures::run_credits(rest),
+        "licences" => licences::run(rest),
         "tii-logs" => flight_logs::run_tii(rest),
         "download" => flight_logs::run_download(rest),
         "release-version" => release::run_release_version(rest),
