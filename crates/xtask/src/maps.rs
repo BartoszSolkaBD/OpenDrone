@@ -95,6 +95,8 @@ pub fn is_pinned_version(first_line: &str, pin: &BlenderPin) -> bool {
 
 struct Options {
     check: bool,
+    /// Only these Maps, by id; empty means every Map.
+    only: Vec<String>,
     previews: Option<PathBuf>,
     update_preview: bool,
     /// The Map to bake light for, by id.
@@ -105,6 +107,7 @@ struct Options {
 fn options(args: &[String]) -> Result<Options, String> {
     let mut options = Options {
         check: false,
+        only: Vec::new(),
         previews: None,
         update_preview: false,
         bake: None,
@@ -213,8 +216,22 @@ fn blender_version_line(blender: &Path) -> Result<String, String> {
         .to_string())
 }
 
+/// Builds just the Maps named, into the Pack, for `cargo xtask play`: the
+/// report, or why Blender can't.
+pub(crate) fn rebuild(root: &Path, ids: &[String]) -> Result<String, String> {
+    let options = Options {
+        check: false,
+        only: ids.to_vec(),
+        previews: None,
+        update_preview: false,
+        bake: None,
+        samples: None,
+    };
+    build(root, &options)
+}
+
 /// The Maps with a script, by id, in order.
-fn map_ids(root: &Path) -> Result<Vec<String>, String> {
+pub(crate) fn map_ids(root: &Path) -> Result<Vec<String>, String> {
     let folder = root.join("assets-src/maps");
     let mut ids = Vec::new();
     for entry in fs::read_dir(&folder).map_err(|e| format!("can't read assets-src/maps: {e}"))? {
@@ -395,12 +412,16 @@ fn build(root: &Path, options: &Options) -> Result<String, String> {
         }
         ids = vec![bake.clone()];
     }
+    if !options.only.is_empty() {
+        ids.retain(|id| options.only.contains(id));
+    }
     let scratch = root.join("target/maps-check");
     fs::create_dir_all(&scratch).map_err(|e| format!("can't make {}: {e}", scratch.display()))?;
     let golden_file = root.join(LIGHT_UV_FILE);
     let golden_text = fs::read_to_string(&golden_file).ok();
     let golden = golden_text
         .as_deref()
+        .filter(|_| options.only.is_empty())
         .map(read_light_uv_hashes)
         .transpose()?;
     let mut proven: Vec<(String, String)> = Vec::new();

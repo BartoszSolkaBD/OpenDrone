@@ -31,6 +31,9 @@
 //!   definition's `tune.txt` ([`import_tune`]).
 //! - `maps`: builds the built-in Pack's Maps with the pinned Blender, or
 //!   checks the committed `.glb` files are what it builds ([`maps`]).
+//! - `play [--map <id>]`: gets the game running from any checkout, with its
+//!   toolchain checked, its textures fetched and its Maps built if they need
+//!   it ([`play`]).
 //! - `textures`: downloads the CC0 textures the material library lists and
 //!   checks each against its checksum ([`textures`]).
 //! - `credits`: writes `CREDITS.md` from the material library and the list
@@ -61,6 +64,7 @@ mod maps;
 mod materials;
 mod migrate;
 mod packs;
+mod play;
 mod release;
 mod review;
 mod scenario_catalogue;
@@ -119,6 +123,14 @@ Commands:
       those bytes (CI does this on Linux). --previews renders pictures of each
       Map into <folder>, and --update-preview copies its preview.png render
       into the Pack as the Map's picture.
+  play [--map <id>] [--no-launch]
+      Get the game running from any checkout or worktree, saying what it does
+      and what it skips: check the Rust the repo pins and CMake, fetch the
+      textures (only what is missing), rebuild a Map's .glb only if you
+      edited its script and Blender is installed (else use the committed
+      one), then build the game in release mode and start it, on the Map
+      named. --no-launch stops before the build. ./play (play.cmd on
+      Windows) calls it.
   textures [--pin]
       Download the CC0 textures assets-src/materials.toml lists into
       assets-src/textures/ (git ignores it) and refuse any file whose SHA-256
@@ -198,6 +210,7 @@ fn main() -> ExitCode {
         "input-monitor" => input_monitor::run(rest),
         "import-tune" => import_tune::run(rest),
         "maps" => maps::run(rest),
+        "play" => play::run(rest),
         "textures" => textures::run_textures(rest),
         "credits" => textures::run_credits(rest),
         "licences" => licences::run(rest),
