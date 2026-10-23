@@ -4,6 +4,8 @@
 //! ([`crate::glb`]) as the same plain [`MapShape`]s the Test Maps are written
 //! as.
 
+use std::path::PathBuf;
+
 use opendrone_maths::{Fingerprint, Fingerprinter};
 use opendrone_physics::{MapShape, World};
 
@@ -44,6 +46,9 @@ pub struct MapDefinition {
     /// The Map's baked light, if `map.toml` has a `[light]` table: where its
     /// sun is and the colours of sun and sky.
     pub light: Option<MapLight>,
+    /// Where the Map's light atlas is (`<id>.light.exr` in its folder), if it
+    /// has one. Not on a Test Map.
+    pub light_atlas: Option<PathBuf>,
 }
 
 /// A Map's `[light]`: what its baked light was made from, and what the game
@@ -248,6 +253,7 @@ pub fn read_map_file_with_steps(
         preview,
         background_sound,
         light,
+        light_atlas: None,
     })
 }
 

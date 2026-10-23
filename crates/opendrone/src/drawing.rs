@@ -15,6 +15,7 @@ use bevy::camera::Exposure;
 use bevy::camera::visibility::NoCpuCulling;
 use bevy::light::CascadeShadowConfigBuilder;
 use bevy::mesh::PrimitiveTopology;
+use bevy::pbr::Lightmap;
 use bevy::prelude::*;
 use opendrone_maths::{Attitude, Vec3 as Vec3d};
 use opendrone_physics::{DUCT_RING_SEGMENTS, PROP_DISC_THICKNESS};
@@ -23,7 +24,7 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
-use crate::map_drawing::{MaterialLibrary, part_mesh};
+use crate::map_drawing::{MapLighting, MaterialLibrary, part_mesh, read_light_atlas};
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
 
@@ -178,8 +179,8 @@ fn set_up_the_grid(mut gizmos: ResMut<GizmoConfigStore>) {
 
 /// The Map's own parts, drawn from its `.glb`: every part with its material
 /// from the library ([`MaterialLibrary`]), the sun with shadows and a sky's
-/// worth of fill light. A Test Map has no `.glb`, and is drawn from its solid
-/// parts instead.
+/// worth of fill light, or, for a Map with baked light, lit by its atlas. A
+/// Test Map has no `.glb`, and is drawn from its solid parts instead.
 fn draw_the_map_from_its_file(
     plan: &FlightPlan,
     commands: &mut Commands,
@@ -188,19 +189,34 @@ fn draw_the_map_from_its_file(
     images: &mut Assets<Image>,
 ) {
     let library = MaterialLibrary::read(&repo_folder());
+    let baked = baked_light(plan, images);
     let mut by_name: BTreeMap<String, Handle<StandardMaterial>> = BTreeMap::new();
     for part in &plan.map.drawing {
         let material = by_name
             .entry(part.material.clone())
-            .or_insert_with(|| materials.add(library.material(&part.material, part.colour, images)))
+            .or_insert_with(|| {
+                let mut material = library.material(&part.material, part.colour, images);
+                if let Some((_, lighting)) = &baked {
+                    material.lightmap_exposure = lighting.lightmap_exposure;
+                }
+                materials.add(material)
+            })
             .clone();
-        commands.spawn((
+        let mut part_entity = commands.spawn((
             InTheWorld,
             Mesh3d(meshes.add(part_mesh(part))),
             MeshMaterial3d(material),
             Transform::IDENTITY,
             Name::new(part.name.clone()),
         ));
+        if let Some((atlas, _)) = &baked
+            && !part.light_uvs.is_empty()
+        {
+            part_entity.insert(Lightmap {
+                image: atlas.clone(),
+                ..default()
+            });
+        }
     }
     info!(
         "drew {} on {} parts, {} of its {} materials with their pictures",
@@ -209,6 +225,9 @@ fn draw_the_map_from_its_file(
         by_name.len().min(library.textured()),
         by_name.len()
     );
+    if let Some((_, lighting)) = baked {
+        return light_what_the_atlas_doesnt(commands, &lighting);
+    }
     // Sunny early afternoon: the sun about 50° up, from the south-south-east,
     // with shadows, and a bright sky's fill light (about 3 stops down in the
     // shade, as a clear day's is).
@@ -237,7 +256,69 @@ fn draw_the_map_from_its_file(
     ));
 }
 
-fn draw_the_map(
+/// How much of the Map's sun a Quad is lit with. The atlas holds the sun and
+/// its shade for the Map itself, but a Quad has no shadows, so a full sun
+/// would light it inside a building. A share of it gives the Quad a lit side
+/// and a shaded one.
+pub const QUAD_SUN_SHARE: f32 = 0.15;
+
+/// The Map's light atlas and what to light the rest with, if the Map has
+/// baked light and the atlas reads. A Map whose atlas won't read is drawn as
+/// one with no baked light, with a warning.
+fn baked_light(
+    plan: &FlightPlan,
+    images: &mut Assets<Image>,
+) -> Option<(Handle<Image>, MapLighting)> {
+    let (light, path) = plan.map.light.as_ref().zip(plan.map.light_atlas.as_ref())?;
+    match read_light_atlas(path, images) {
+        Ok(atlas) => {
+            if let Some(image) = images.get(&atlas) {
+                let size = image.texture_descriptor.size;
+                info!(
+                    "{} is lit by its baked light: {} x {} atlas, {:.1} MB in the graphics card",
+                    plan.map.name,
+                    size.width,
+                    size.height,
+                    (size.width * size.height * 8) as f64 / 1e6
+                );
+            }
+            Some((atlas, MapLighting::of(light)))
+        }
+        Err(why) => {
+            warn!(
+                "{}'s light atlas {} {why}: drawing it with the real-time sun instead",
+                plan.map.name,
+                path.display()
+            );
+            None
+        }
+    }
+}
+
+/// What the atlas doesn't light: the Quad. The Map's own parts take their
+/// light from the atlas alone, so the sky's ambient light and the sun skip
+/// them, and the sun casts no shadows.
+fn light_what_the_atlas_doesnt(commands: &mut Commands, lighting: &MapLighting) {
+    commands.insert_resource(GlobalAmbientLight {
+        color: lighting.sky_colour,
+        brightness: lighting.sky_brightness,
+        affects_lightmapped_meshes: false,
+    });
+    commands.spawn((
+        InTheWorld,
+        DirectionalLight {
+            color: lighting.sun_colour,
+            illuminance: lighting.sun_illuminance * QUAD_SUN_SHARE,
+            shadow_maps_enabled: false,
+            affects_lightmapped_mesh_diffuse: false,
+            ..default()
+        },
+        Transform::IDENTITY.looking_to(lighting.light_travels, Vec3::Y),
+    ));
+}
+
+/// Draws the Map: from its `.glb` if it has one, else from its solid parts.
+pub fn draw_the_map(
     plan: &FlightPlan,
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,

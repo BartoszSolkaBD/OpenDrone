@@ -56,7 +56,7 @@ The game reads the library from the repo, so it draws a Map with pictures only w
 
 ## Baked light
 
-A detailed Map is lit by **baked light** ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)): Blender works out, once, how much sun and sky light reaches every spot of every surface, with bounces off the walls and the shade that crowding makes, and keeps the answer in a picture, the **light atlas**. The game then lights the Map by looking the answer up (the game's part is [#294](https://github.com/BartoszSolkaBD/OpenDrone/issues/294)). The Skate Park and Bando don't ask for it and are lit as before.
+A detailed Map is lit by **baked light** ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)): Blender works out, once, how much sun and sky light reaches every spot of every surface, with bounces off the walls and the shade that crowding makes, and keeps the answer in a picture, the **light atlas**. The game then lights the Map by looking the answer up ([what the game does with it](#what-the-game-does-with-it)). The Skate Park and Bando don't ask for it and are lit as before.
 
 ### Asking for it, in the script
 
@@ -102,6 +102,20 @@ It rebuilds the Map's `.glb` and, with Blender's Cycles on the processor, bakes 
 - **The format, `.exr`.** The atlas is an OpenEXR picture of half-size floats (16 bits a channel), ZIP-compressed. Sunlit and shaded parts differ by a factor of ten and more, and the Factory's halls will differ by 5 to 6 stops, which an 8-bit picture can't hold without banding or a scale that `map.toml` would have to carry (a PNG of the same atlas is a third of the size, but sun above 1.0 would be cut off). EXR holds the real numbers, so the game needs no decoding rule, and it is what Blender writes without help. It costs size (about 1.7 to 14 MB for Bando, below; ZIP gives about a fifth of the raw size, DWAA a tenth, but the game's reader may not open it) and, in the graphics card, 8 bytes a texel if the game keeps it in half floats, or 16 if the loader makes full floats: the game's ticket measures the load time and the memory, and may turn the atlas into a compressed form at load time.
 - **The atlas isn't rebuilt in CI**, because Cycles is allowed to differ a little from run to run. So that the committed atlas can't quietly go out of date, `cargo xtask maps --check` reads `<id>.bake.toml` and fails if the atlas file is missing, if the `.glb` Blender builds now isn't the one it was baked from (the shapes or the second UV set changed), or if the `[light]` values aren't the ones it was baked with. The fix is the `--bake` command above.
 - **The unwrap is checked everywhere.** `assets-src/lightmap-uv.toml` holds the SHA-256 of each Map's `.glb` built with a second UV set at 25 cm per texel, whether the Map asks for one or not. `cargo xtask maps` writes it and `--check` demands it, so CI proves on Linux that the unwrap gives the same bytes as on a Mac. The unwrap's own rules (charts, margins, density, no overlap) are checked in plain Python by `python3 -m unittest discover -s assets-src/lib`, which CI runs too.
+
+### What the game does with it
+
+A Map is baked when all three go together: a `[light]` table in `map.toml`, a second set of picture coordinates (`TEXCOORD_1`) on every drawn mesh in the `.glb`, and the atlas `<id>.light.exr` in the Map's folder. The Pack checker refuses a Map that has some and not the others, in a sentence that says which is missing. A Map with none of the three is drawn as before.
+
+For a baked Map the game:
+
+- draws every part of the Map lit by the atlas alone, looking each spot up on the part's second coordinates and multiplying what it finds by the surface's own colour and picture. There is no real-time sun on the Map's parts, so no cascaded shadow maps either: all the shade is in the atlas;
+- lights the Quad, which isn't in the atlas, with the Map's **sky** as ambient light (`sky_colour` and `sky_strength`) and, for a little shading, a share (15%) of the Map's **sun** from where `sun_elevation` and `sun_azimuth` put it, with no shadows. A Quad flying into a building is lit like one outside it, apart from the sun's share: it isn't shaded by the atlas;
+- reads the atlas into half floats in the graphics card, so it takes 8 bytes a texel (the table above has the sizes). It reads the OpenEXR file itself ([`light_atlas.rs`](../crates/opendrone/src/light_atlas.rs)) rather than through Bevy's `exr` feature, which would turn on `num-complex`'s `std` for the whole workspace and break the [wall round the core](adr/0003-crate-split-and-flight-inputs.md). So it reads what the bake writes, one picture in scanlines with red, green and blue as half or 32-bit floats, uncompressed or `ZIP` or `ZIPS`, and refuses any other form in a sentence.
+
+A strength of 1 is as bright as the real-time sun the Skate Park and Bando have: a white surface square-on to a `sun_strength` of 1 is drawn as a white surface is under that sun. A strength of 3 is three times as bright (bright enough to look washed out in a plain view, which has a fixed exposure), so a Map meant to sit beside the other two uses strengths near 1. If the atlas can't be read, the game says so in its log and draws the Map with the real-time sun, as a Map with no atlas.
+
+To see it, use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)): the pictures show the baked light.
 
 ### What it costs: Bando
 
@@ -219,11 +233,11 @@ They prove that a seed gives the same bytes and another seed doesn't, that each 
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the unwrap's plain-Python checks. It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
 
-The Blender pictures don't show baked light: they are drawn with a plain sun. A Map's look under its baked light is judged with `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)), once the game reads the atlas.
+The Blender pictures don't show baked light: they are drawn with a plain sun. A Map's look under its baked light is judged with `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)).
 
 ## Not here yet
 
-- Baked light for a Map in the built-in Pack: Bando and the Skate Park don't use it, and the game doesn't read it yet ([#294](https://github.com/BartoszSolkaBD/OpenDrone/issues/294)). Pictures drawn with `--render-views` will show it when it does.
+- Baked light for a Map in the built-in Pack: Bando and the Skate Park don't use it. The game reads it, and the Factory's Maps will use it.
 - A denoising pass for the atlas, a second atlas for a Map too big for one, and a smarter cut of the undersides of boxes: later, if the Factory needs them.
 - A material on collider surfaces, which the Video Signal can use to tell concrete from glass.
 - The Quad models: they have their own ticket.

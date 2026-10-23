@@ -89,6 +89,8 @@ const KINDS: &[&str] = &["quads", "maps", "input-devices"];
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
 
 /// The first bytes of every Ogg file, a Background Sound's.
+/// The first bytes of an OpenEXR picture, the light atlas's format.
+const EXR_SIGNATURE: &[u8] = &[0x76, 0x2f, 0x31, 0x01];
 const OGG_SIGNATURE: &[u8] = b"OggS";
 
 /// Why the Pack checker refuses a folder whose name starts with a dot,
@@ -818,7 +820,92 @@ fn read_map_folder(folder: &Folder, id: &str) -> Result<MapDefinition, Problems>
             Err(found) => problems.extend(found),
         }
     }
+    check_the_light(folder, &toml.label, id, &mut map, &mut problems);
     problems.or(map)
+}
+
+/// A Map's baked light is three things that go together: `[light]` in
+/// `map.toml`, a second set of coordinates (`TEXCOORD_1`) on its drawn
+/// meshes, and the atlas `<id>.light.exr` in its folder. All three, or none:
+/// a Map with only some of them can't be lit, and says which is missing.
+fn check_the_light(
+    folder: &Folder,
+    toml: &str,
+    id: &str,
+    map: &mut MapDefinition,
+    problems: &mut Problems,
+) {
+    let short = id.rsplit('/').next().unwrap_or(id);
+    let prefix = format!("{short}.light.");
+    let atlases: Vec<String> = folder
+        .names()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|name| name.starts_with(&prefix))
+        .collect();
+    let wanted = format!("{short}.light.exr");
+    let has_second_set = map.drawing.iter().any(|part| !part.light_uvs.is_empty());
+    let atlas = atlases.iter().find(|name| **name == wanted).cloned();
+    for other in atlases.iter().filter(|name| **name != wanted) {
+        problems.push(Problem::of(
+            &folder.child(other).label,
+            0,
+            format!("a Map's light atlas is an OpenEXR picture named {wanted}, not {other}"),
+        ));
+    }
+    if let Some(name) = &atlas {
+        let file = folder.child(name);
+        match file.read_bytes() {
+            Ok(bytes) if bytes.starts_with(EXR_SIGNATURE) => {
+                map.light_atlas = Some(file.path.clone());
+            }
+            Ok(_) => problems.extend(Problems::of_file(&file.label, "isn't an OpenEXR picture")),
+            Err(found) => problems.extend(found),
+        }
+    }
+    match (has_second_set, atlas.is_some()) {
+        (true, false) if atlases.is_empty() => problems.push(Problem::of(
+            &folder.label,
+            0,
+            format!(
+                "the .glb has light atlas coordinates (TEXCOORD_1), which a baked Map needs, but the folder has no {wanted}: bake it, or leave the coordinates out"
+            ),
+        )),
+        (false, true) => problems.push(Problem::of(
+            &folder.child(&wanted).label,
+            0,
+            "is a light atlas, but no mesh in the .glb has light atlas coordinates (TEXCOORD_1) to look it up with: remove the atlas, or give the Map's meshes the coordinates",
+        )),
+        _ => {}
+    }
+    if has_second_set {
+        for part in map.drawing.iter().filter(|part| part.light_uvs.is_empty()) {
+            problems.push(Problem::of(
+                &folder.label,
+                0,
+                format!(
+                    "the object \"{}\" in the .glb has no light atlas coordinates (TEXCOORD_1) while other objects do, so it would be drawn unlit: give every drawn object coordinates, or none",
+                    part.name
+                ),
+            ));
+        }
+    }
+    if map.light.is_none() && (atlas.is_some() || has_second_set) {
+        problems.push(Problem::of(
+            toml,
+            0,
+            "this Map has a light atlas or light atlas coordinates, so it needs a `[light]` table too: the game lights Quads with its sun and sky values",
+        ));
+    }
+    if map.light.is_some() && atlas.is_none() && atlases.is_empty() && !has_second_set {
+        problems.push(Problem::of(
+            toml,
+            0,
+            format!(
+                "has a `[light]` table, which asks for baked light, but the folder has no {wanted} and the .glb has no light atlas coordinates (TEXCOORD_1): bake the Map, or remove `[light]`"
+            ),
+        ));
+    }
 }
 
 /// A file `map.toml` names in `key`, which must be in the Map's own folder,

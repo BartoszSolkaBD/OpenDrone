@@ -24,6 +24,8 @@ bevy.workspace = true
 wgpu.workspace = true
 # Reads a Scenario's Results file, for the reference check.
 toml.workspace = true
+# Inflates a Map's light atlas, an OpenEXR picture the game reads itself.
+flate2.workspace = true
 
 # No `[lints] workspace = true` here: this crate may use `unsafe`, because
 # it talks to Bevy, SDL and the operating system (#15 §4). Every other crate forbids it.
