@@ -67,8 +67,8 @@ use crate::clock::SimulationClock;
 use crate::save::save_flight;
 use crate::screens::menu_input::{MenuInput, PadMenu, RadioMenu};
 use crate::screens::model::{DeviceFacts, InputMode};
-use crate::set_up::{FlightPlan, repo_folder};
-use crate::settings_file::FlyingDevice;
+use crate::set_up::{FlightPlan, repo_folder, saved_flights_folder};
+use crate::settings_file::{FlyingDevice, SettingsFile};
 use crate::stepping::Flight;
 
 /// Devices found in the first moments after the input thread starts were
@@ -108,7 +108,8 @@ pub struct Pilot {
     /// Whether the Quad was armed after the last frame's steps.
     armed: bool,
     flight_mode: FlightMode,
-    /// Where Save Flight writes: `scenarios/saved/` in the repo.
+    /// Where Save Flight writes: `scenarios/saved/` in the repo, unless the
+    /// game is a macOS app ([`saved_flights_folder`]).
     saves_to: PathBuf,
     /// What the last Save Flight said, and when, on the input thread's clock.
     notice: Option<(String, Duration)>,
@@ -185,7 +186,7 @@ impl Pilot {
             actions_tapped: Vec::new(),
             armed: false,
             flight_mode: plan.settings.flight_mode,
-            saves_to: repo_folder().join("scenarios").join("saved"),
+            saves_to: saved_flights_folder(&repo_folder(), SettingsFile::usual_folder().as_deref()),
             notice: None,
             watching: false,
             checking_every_step: false,
@@ -378,7 +379,8 @@ impl Pilot {
         self
     }
 
-    /// Where Save Flight writes, instead of `scenarios/saved/` in the repo.
+    /// Where Save Flight writes, instead of `scenarios/saved/` in the repo
+    /// ([`saved_flights_folder`]).
     pub fn saving_to(mut self, folder: PathBuf) -> Pilot {
         self.saves_to = folder;
         self

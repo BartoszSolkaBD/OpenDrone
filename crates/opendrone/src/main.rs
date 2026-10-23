@@ -1,5 +1,10 @@
 //! Starts the game. Run `opendrone --help` for what it can do.
 
+// A release build on Windows opens no console window beside the game's
+// (#297): it starts as a window, the way a double-clicked app does. A debug
+// build, which `cargo run` and the tests start, keeps its console.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::path::PathBuf;
 use std::process::ExitCode;
 

@@ -142,21 +142,62 @@ pub fn repo_folder() -> PathBuf {
 /// Where the game finds its files, a folder that holds both `packs/` and
 /// `scenarios/`:
 ///
-/// - the folder the program itself is in, when it holds them: a downloaded
-///   build, which `cargo xtask package` lays out that way (#81), so it finds
-///   its own files wherever it's started from, by a double-click too;
+/// - the folder the program itself is in, when it holds them: the Windows
+///   and Linux downloads, which `cargo xtask package` lays out that way
+///   (#81), so the game finds its own files wherever it's started from, by a
+///   double-click too;
+/// - else, when the program is a macOS app's
+///   (`OpenDrone.app/Contents/MacOS/OpenDrone`), the app's own
+///   `Contents/Resources/`, where the macOS download keeps them (#297);
 /// - else the nearest folder at or above the working folder that holds them:
 ///   the repo, when the game runs with `cargo run`.
 pub fn find_repo_folder(program: Option<&Path>, here: Option<&Path>) -> Option<PathBuf> {
     let holds_the_game = |f: &Path| f.join("packs").is_dir() && f.join("scenarios").is_dir();
-    program
+    let beside = program.and_then(Path::parent);
+    let in_the_app = beside
+        .filter(|f| f.file_name() == Some("MacOS".as_ref()))
         .and_then(Path::parent)
-        .filter(|f| holds_the_game(f))
+        .map(|contents| contents.join("Resources"));
+    beside
         .map(Path::to_path_buf)
+        .into_iter()
+        .chain(in_the_app)
+        .find(|f| holds_the_game(f))
         .or_else(|| {
             here.and_then(|here| here.ancestors().find(|f| holds_the_game(f)))
                 .map(Path::to_path_buf)
         })
+}
+
+/// Whether the game's folder is inside a macOS app (`<name>.app/Contents/
+/// Resources/`). An app isn't the pilot's to write into: macOS may run it
+/// from a read-only copy, and a file added to a signed app breaks its
+/// signature.
+pub fn is_inside_an_app(game: &Path) -> bool {
+    let mut up = game
+        .components()
+        .rev()
+        .map(|c| c.as_os_str().to_string_lossy());
+    let resources = up.next().is_some_and(|c| c == "Resources");
+    let contents = up.next().is_some_and(|c| c == "Contents");
+    resources && contents && up.next().is_some_and(|c| c.ends_with(".app"))
+}
+
+/// Where Save Flight writes without the screens (`--no-screens`; with them,
+/// it is always `saved-flights/` beside the settings file):
+/// `scenarios/saved/` in the game's folder, which is the repo when the game
+/// runs with `cargo run`. Inside a macOS app it is `saved-flights/` in
+/// `settings_folder` instead, as with the screens, when the computer says
+/// where that is
+/// ([`SettingsFile::usual_folder`](crate::settings_file::SettingsFile::usual_folder)).
+pub fn saved_flights_folder(game: &Path, settings_folder: Option<&Path>) -> PathBuf {
+    match settings_folder {
+        Some(settings) if is_inside_an_app(game) => {
+            crate::settings_file::SettingsFile::in_folder(settings.to_path_buf())
+                .saved_flights_folder()
+        }
+        _ => game.join("scenarios").join("saved"),
+    }
 }
 
 /// The built-in Pack and the other Packs in the repo's `packs/` folder, each
