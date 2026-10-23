@@ -1,9 +1,10 @@
 """Rough concrete wall: 2 m of board-formed concrete to the picture, ten
 boards of 20 cm with the wood's grain printed into the surface, a panel seam
 down the middle, form-tie holes on a 1 m grid with rust running down from
-each, air holes, hairline cracks, and one place where the face has spalled off
-and a rusted rebar shows. A faded stencilled block of marks sits near the top
-and the foot of the wall is dark with damp."""
+each, air holes and hairline cracks, and the foot of the wall is dark with
+damp. No spalled patch with a rebar and no stencilled block: a mark that
+appears once to the picture would repeat every 2 m, so those are separate
+geometry or decals (#304)."""
 
 import numpy as np
 
@@ -72,34 +73,9 @@ def make(seed, n):
     grime = tex.streaks(tex.clamp(seam + fin * 0.5), 260, s(), X, Y, 40, 0.995)
     albedo = albedo * (1.0 - 0.3 * grime)[..., None]
 
-    # Rebar near the surface: a rusty line shows through the face, and one
-    # place where the concrete has spalled and the bar is bare.
-    bar_y = 0.64
-    bar_d = np.abs(Y - bar_y)
-    ghost = (1.0 - tex.smoothstep(0.003, 0.012, bar_d)) * tex.smoothstep(0.35, 0.6, tex.fbm(X, Y, 14, 3, s()))
-    albedo = tex.mix(albedo, tex.colour(142, 92, 60), ghost * 0.4)
-    spall_n = tex.fbm(X, Y, 14, 4, s())
-    ellipse = np.sqrt((X - 0.7) * (X - 0.7) / (0.17 * 0.17) + (Y - bar_y) * (Y - bar_y) / (0.06 * 0.06))
-    spall = 1.0 - tex.smoothstep(0.75, 1.0, ellipse + (spall_n - 0.5) * 0.9)
-    bar_r = 0.011
-    bar = (1.0 - tex.smoothstep(bar_r * 0.6, bar_r, bar_d)) * spall
-    bar_rust = tex.mix(tex.colour(124, 66, 34), tex.colour(76, 40, 28), tex.fbm(X, Y, 90, 3, s()))
-    agg, _f2, _i, _dx, _dy = tex.voronoi(X, Y, 46, s())
-    inner = tex.mix(tex.colour(84, 82, 78), tex.colour(140, 134, 124), tex.fbm(X, Y, 90, 3, s()))
-    inner = tex.mix(inner, tex.colour(168, 160, 146), tex.smoothstep(0.34, 0.2, agg) * 0.7)
-    albedo = tex.mix(albedo, inner, spall)
-    albedo = tex.mix(albedo, bar_rust, bar)
-    spall_stain = tex.streaks(spall * 0.7, 120, s(), X, Y, 50, 0.99)
-    albedo = tex.mix(albedo, albedo * tex.colour(210, 150, 110) * 1.1, tex.clamp(spall_stain) * 0.5 * (1.0 - spall))
-
     # Hairline cracks.
     crack = tex.cracks(X, Y, 3, s(), 0.0018, 0.05, 0.0) * tex.smoothstep(0.5, 0.68, tex.fbm(X, Y, (2, 2), 3, s()))
     albedo = tex.mix(albedo, tex.colour(40, 38, 36), crack * 0.8)
-
-    # A faded stencilled block of marks, once the paint of a depot code.
-    marks = tex.sign_marks(X, Y, s(), (0.08, 0.1, 0.46, 0.17), "bar")
-    marks = marks * tex.smoothstep(0.3, 0.6, tex.fbm(X, Y, 30, 4, s())) * 0.8
-    albedo = tex.mix(albedo, tex.colour(190, 186, 170), marks * 0.7)
 
     # Damp patches: dark, with a greenish bloom in the wettest.
     foot = tex.smoothstep(0.55, 0.75, tex.fbm(X, Y, (3, 2), 4, s()))
@@ -108,11 +84,10 @@ def make(seed, n):
     stain = tex.stains(X, Y, s(), 0.3, 3)
     albedo = albedo * (1.0 - 0.18 * stain)[..., None]
 
-    # Height: board grain, fins, seams, holes and pits, the spall deep.
+    # Height: board grain, fins, seams, holes and pits.
     height = 0.62 + 0.14 * grain + 0.06 * tone - 0.5 * hole + 0.08 * rim + 0.12 * fin
-    height = height - 0.3 * pit - 0.12 * seam - 0.25 * crack - 0.35 * spall + 0.55 * bar
+    height = height - 0.3 * pit - 0.12 * seam - 0.25 * crack
     height = tex.clamp(height + 0.05 * flecks)
 
     rough = 0.88 - 0.08 * grain + 0.06 * stain
-    rough = tex.mix(rough, 0.7, bar)
     return tex.finish(albedo, height, rough, 6.0, seed=seed)

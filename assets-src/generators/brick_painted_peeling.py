@@ -2,9 +2,9 @@
 `brick_red_weathered`, 1.8 m to the picture, under a skim of grey-cream
 plaster and a coat of faded mint-green paint. The paint has blistered and
 come off in flakes where damp has got in; where the plaster has gone too the
-brick shows. A faded safety band of chevrons runs across the wall, a scrawl of
-generic graffiti has been sprayed over the paint and dripped, and rust-brown
-water stains run from the joints."""
+brick shows. Rust-brown water stains run from the joints. No graffiti and no
+painted band: a mark that appears once to the picture would repeat every 1.8 m,
+so those are drawn apart from the wall, as decals (#304)."""
 
 import numpy as np
 
@@ -51,23 +51,6 @@ def make(seed, n):
     blister = blister * tex.smoothstep(0.45, 0.6, tex.fbm(X, Y, 12, 3, s()))
     paint = tex.mix(paint, tex.colour(208, 216, 202), blister * 0.5)
 
-    # Faded safety band: chevrons across the whole width of the wall.
-    in_band = tex.band(Y, 0.46, 0.04, 0.002)
-    chevrons = tex.sign_marks(X, Y, s(), (0.0, 0.42, 1.0, 0.5), "stripes")
-    sun_fade = 0.4 + 0.5 * tex.fbm(X, Y, 12, 4, s())
-    paint = tex.mix(paint, tex.colour(58, 60, 54), in_band * (1.0 - chevrons) * sun_fade * 0.7)
-    paint = tex.mix(paint, tex.colour(196, 168, 66), chevrons * sun_fade * 0.9)
-
-    # Graffiti: a loose scrawl in one red-orange, faded, with overspray and
-    # its drips.
-    tag = tex.scribbles(X, Y, s(), 3, 0.0045, (0.12, 0.08, 0.62, 0.34))
-    haze = tex.blur(tag, 6, 2) * 2.5
-    tag = tex.clamp(tag * (0.75 + 0.25 * tex.fbm(X, Y, 60, 3, s())) + haze * 0.12) * (1.0 - gone_paint)
-    drips = tex.streaks(tex.smoothstep(0.3, 0.9, tag), 80, s(), X, Y, 160, 0.975)
-    drips = drips * (1.0 - tex.smoothstep(0.2, 0.6, tag)) * 0.7
-    spray = tex.clamp(tag + drips * (1.0 - gone_paint))
-    paint = tex.mix(paint, tex.colour(198, 72, 40), spray * 0.8)
-
     # Plaster underneath: pale warm grey, crumbly.
     crumb = tex.fbm(X, Y, 50, 4, s())
     plaster = tex.mix(tex.colour(166, 158, 142), tex.colour(206, 198, 180), crumb)
@@ -87,7 +70,7 @@ def make(seed, n):
     # Heights: paint on plaster on brick, each layer a step.
     brick_level = 0.15 + 0.35 * brick_height
     plaster_level = 0.62 + 0.1 * crumb
-    paint_level = 0.72 + 0.05 * fade + 0.1 * blister + 0.03 * spray + 0.02 * stipple
+    paint_level = 0.72 + 0.05 * fade + 0.1 * blister + 0.02 * stipple
     height = tex.mix(paint_level, plaster_level, gone_paint)
     height = tex.mix(height, brick_level, gone_plaster)
     # The brick's joints show faintly through the skim of plaster as a groove.
@@ -96,5 +79,4 @@ def make(seed, n):
 
     rough = tex.mix(0.5 + 0.25 * chalk, 0.92, gone_paint)
     rough = tex.mix(rough, fresh["rough"], gone_plaster)
-    rough = rough - spray * 0.1
     return tex.finish(albedo, height, rough, 7.0, seed=seed)

@@ -107,53 +107,89 @@ roughness = 0.95
 texture   = "concrete_floor_worn_001"
 
 # Made from scratch (ADR-0024, #292): the eight materials of the Factory's
-# first slice. Each names a texture below that a generator makes; the flat
-# colour and the roughness are the picture's averages, what the Map shows
-# without the pictures.
+# first slice. They also ask the game not to show where their picture repeats
+# (#304): `break_repeat` draws the picture in hex tiles, `turn_cells` lets each
+# tile turn and mirror it (only for a picture with no grain), `snap = [u, v]`
+# shifts tiles by whole multiples of 1/u and 1/v of the picture so that its
+# bricks or ridges stay in line (0 for any shift), and `macro_strength` is how
+# strongly the large [macro] picture shows (0 for none).
+# Each names a texture below that a generator makes; the flat colour and the
+# roughness are the picture's averages, what the Map shows without the
+# pictures.
 [materials.brick_red_weathered]
 colour    = [0.15, 0.06, 0.03]
 roughness = 0.82
 texture   = "brick_red_weathered"
+break_repeat   = true
+snap           = [8, 12]
+macro_strength = 0.50
 
 [materials.brick_painted_peeling]
 colour    = [0.24, 0.28, 0.20]
 roughness = 0.58
 texture   = "brick_painted_peeling"
+break_repeat   = true
+snap           = [8, 12]
+macro_strength = 0.50
 
 [materials.concrete_floor_worn]
 colour    = [0.17, 0.17, 0.15]
 roughness = 0.78
 texture   = "concrete_floor_worn"
+break_repeat   = true
+snap           = [2, 2]
+macro_strength = 0.60
 
 [materials.concrete_wall_rough]
 colour    = [0.20, 0.19, 0.17]
 roughness = 0.84
 texture   = "concrete_wall_rough"
+break_repeat   = true
+snap           = [2, 2]
+macro_strength = 0.50
 
 [materials.steel_beam_rusted]
 colour    = [0.10, 0.07, 0.08]
 roughness = 0.66
 texture   = "steel_beam_rusted"
+break_repeat   = true
+snap           = [0, 1]
+macro_strength = 0.30
 
 [materials.roof_corrugated_rusted]
 colour    = [0.21, 0.18, 0.16]
 roughness = 0.74
 texture   = "roof_corrugated_rusted"
+break_repeat   = true
+snap           = [12, 1]
+macro_strength = 0.40
 
 [materials.ground_dirt_rubble]
 colour    = [0.12, 0.08, 0.05]
 roughness = 0.92
 texture   = "ground_dirt_rubble"
+break_repeat   = true
+turn_cells     = true
+macro_strength = 0.70
 
 [materials.grass_weeds]
 colour    = [0.09, 0.11, 0.02]
 roughness = 0.84
 texture   = "grass_weeds"
+break_repeat   = true
+turn_cells     = true
+macro_strength = 0.60
 
 # No picture: leaves are a flat colour.
 [materials.foliage]
 colour    = [0.10, 0.24, 0.07]
 roughness = 0.95
+
+# The large-scale picture that the materials above ask for with `macro_strength`
+# (#304): made from scratch like the textures below, laid over the world by where
+# a surface is, 80 m to the picture. See `assets-src/generators/macro_variation.py`.
+[macro]
+texture = "macro_variation"
 
 [textures]
 
@@ -328,3 +364,10 @@ generator = "grass_weeds"
 seed      = 1
 pixels    = 1024
 size      = "2 m"
+
+# Not a material's picture: the large-scale one the [macro] table names.
+[textures.macro_variation]
+generator = "macro_variation"
+seed      = 1
+pixels    = 512
+size      = "80 m"

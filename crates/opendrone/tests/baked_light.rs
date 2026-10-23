@@ -22,6 +22,7 @@ use opendrone::drawing::{QUAD_SUN_SHARE, draw_the_map};
 use opendrone::map_drawing::{
     MapLighting, ONE_STRENGTH_LUX, half_bits, part_mesh, read_light_atlas,
 };
+use opendrone::repeat_breaking::VariedMaterial;
 use opendrone::set_up::FlightPlan;
 use opendrone::settings::Settings;
 use opendrone_pack::{DrawnPart, MapLight};
@@ -107,18 +108,21 @@ fn drawn(plan: FlightPlan) -> World {
     let mut world = World::new();
     world.insert_resource(Assets::<Mesh>::default());
     world.insert_resource(Assets::<StandardMaterial>::default());
+    world.insert_resource(Assets::<VariedMaterial>::default());
     world.insert_resource(Assets::<Image>::default());
     world
         .run_system_once(
             move |mut commands: Commands,
                   mut meshes: ResMut<Assets<Mesh>>,
                   mut materials: ResMut<Assets<StandardMaterial>>,
+                  mut varied: ResMut<Assets<VariedMaterial>>,
                   mut images: ResMut<Assets<Image>>| {
                 draw_the_map(
                     &plan,
                     &mut commands,
                     &mut meshes,
                     &mut materials,
+                    &mut varied,
                     &mut images,
                 );
             },

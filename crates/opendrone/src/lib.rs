@@ -55,6 +55,7 @@ pub mod map_drawing;
 pub mod map_views;
 pub mod pilot;
 pub mod reference;
+pub mod repeat_breaking;
 pub mod save;
 pub mod screens;
 pub mod set_up;
