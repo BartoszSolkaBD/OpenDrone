@@ -18,6 +18,12 @@
 //!   picture on disk is drawn in its flat colour from the `.glb`, so the Map
 //!   is always flyable.
 //!
+//! - **Baked light.** A Map with `[light]` and a light atlas
+//!   ([`MapLighting`], [`read_light_atlas`]) draws its parts lit by the atlas,
+//!   through Bevy's own lightmaps, on each mesh's second picture coordinates
+//!   (#294). Its Quads get the Map's sky as ambient light and its sun as
+//!   a direction.
+//!
 //! Nothing here touches the Simulation: it only draws what the Pack checker
 //! already handed over.
 
@@ -32,7 +38,10 @@ use bevy::image::{
 };
 use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
-use opendrone_pack::DrawnPart;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use opendrone_pack::{DrawnPart, MapLight};
+
+use crate::light_atlas::read_exr;
 
 /// Two faces are one smooth surface when their normals are closer than this
 /// (the cosine of 35°); further apart, the edge between them is sharp.
@@ -85,6 +94,7 @@ pub fn part_mesh(part: &DrawnPart) -> Mesh {
     let mut normals = Vec::with_capacity(part.triangles.len() * 3);
     let mut uvs = Vec::with_capacity(part.triangles.len() * 3);
     let mut tangents = Vec::with_capacity(part.triangles.len() * 3);
+    let mut light_uvs = Vec::new();
     for (index, triangle) in part.triangles.iter().enumerate() {
         let own = faces[index].normalize_or_zero();
         let [a, b, c] = triangle.map(|i| corners[i as usize]);
@@ -110,17 +120,31 @@ pub fn part_mesh(part: &DrawnPart) -> Mesh {
             positions.push(corner.to_array());
             normals.push(normal.to_array());
             uvs.push(uv[k]);
+            if !part.light_uvs.is_empty() {
+                light_uvs.push(
+                    part.light_uvs
+                        .get(triangle[k] as usize)
+                        .copied()
+                        .unwrap_or([0.0, 0.0]),
+                );
+            }
             tangents.push([t.x, t.y, t.z, sign]);
         }
     }
-    Mesh::new(
+    let mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::RENDER_WORLD,
     )
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_TANGENT, tangents)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_TANGENT, tangents);
+    if light_uvs.is_empty() {
+        mesh
+    } else {
+        // Where the part is in the light atlas: the lightmap looks it up here.
+        mesh.with_inserted_attribute(Mesh::ATTRIBUTE_UV_1, light_uvs)
+    }
 }
 
 /// Which way picture coordinates `u` and `v` grow across a triangle, in the
@@ -310,4 +334,125 @@ pub fn with_mipmaps(mut image: Image) -> Image {
     image.data = Some(all);
     image.texture_descriptor.mip_level_count = count;
     image
+}
+
+/// How bright a strength of 1 is, in the game's own light: what a direct sun
+/// of this many lux lights a white surface square-on to it with, which
+/// `Exposure::SUNLIGHT` is set for. The real-time sun the Skate Park and
+/// Bando have is 1 in these units, so a baked Map with `sun_strength` 1 is as
+/// bright as they are.
+pub const ONE_STRENGTH_LUX: f32 = 100_000.0;
+
+/// What the game lights a baked Map with, worked out from its `[light]`
+/// ([`MapLight`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapLighting {
+    /// How bright the atlas is drawn: the material's `lightmap_exposure`. An
+    /// atlas value of 1 (a white surface that a strength of 1 lights) becomes
+    /// what a sun of [`ONE_STRENGTH_LUX`] gives such a surface, which is
+    /// `ONE_STRENGTH_LUX / pi`, as Bevy's own diffuse light divides by pi.
+    pub lightmap_exposure: f32,
+    /// The sun's illuminance, in lux, for what the atlas doesn't light
+    /// (Quads).
+    pub sun_illuminance: f32,
+    pub sun_colour: Color,
+    /// The way the sun's light travels, in Bevy's axes: away from the sun.
+    pub light_travels: Vec3,
+    /// The sky's colour and brightness (cd/m2) as ambient light, for what
+    /// the atlas doesn't light. An open sky of strength 1 lights a white
+    /// surface facing up as much as a sun of strength 1 lights one square-on.
+    pub sky_colour: Color,
+    pub sky_brightness: f32,
+}
+
+impl MapLighting {
+    pub fn of(light: &MapLight) -> MapLighting {
+        let unit = ONE_STRENGTH_LUX / std::f32::consts::PI;
+        let (sin_az, cos_az) = (
+            light.sun_azimuth.sin() as f32,
+            light.sun_azimuth.cos() as f32,
+        );
+        let (sin_el, cos_el) = (
+            light.sun_elevation.sin() as f32,
+            light.sun_elevation.cos() as f32,
+        );
+        // To the sun in the Map's axes (east, north, up), then in Bevy's.
+        let to_sun = Vec3::new(sin_az * cos_el, sin_el, -cos_az * cos_el);
+        let [sr, sg, sb] = light.sun_colour;
+        let [kr, kg, kb] = light.sky_colour;
+        MapLighting {
+            lightmap_exposure: unit,
+            sun_illuminance: light.sun_strength as f32 * ONE_STRENGTH_LUX,
+            sun_colour: Color::srgb_u8(sr, sg, sb),
+            light_travels: -to_sun,
+            sky_colour: Color::srgb_u8(kr, kg, kb),
+            sky_brightness: light.sky_strength as f32 * unit,
+        }
+    }
+}
+
+/// Reads a Map's light atlas (an OpenEXR picture, [`crate::light_atlas`])
+/// into a picture of half floats, which every graphics card can filter and
+/// which takes half the memory of 32-bit ones.
+pub fn read_light_atlas(path: &Path, images: &mut Assets<Image>) -> Result<Handle<Image>, String> {
+    let bytes = fs::read(path).map_err(|e| format!("can't be read: {e}"))?;
+    let picture = read_exr(&bytes)?;
+    let data: Vec<u8> = picture
+        .texels
+        .iter()
+        .flatten()
+        .flat_map(|bits| bits.to_le_bytes())
+        .collect();
+    let mut atlas = Image::new(
+        Extent3d {
+            width: picture.width,
+            height: picture.height,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba16Float,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    atlas.sampler = ImageSampler::linear();
+    Ok(images.add(atlas))
+}
+
+/// A number as the bits of a 16-bit decimal number, rounded to the nearest
+/// (ties to even). One too big is infinity, a tiny one a denormal or zero.
+pub fn half_bits(value: f32) -> u16 {
+    let bits = value.to_bits();
+    let sign = ((bits >> 16) & 0x8000) as u16;
+    let exponent = ((bits >> 23) & 0xff) as i32;
+    let fraction = bits & 0x007f_ffff;
+    if exponent == 0xff {
+        // Infinity, or a NaN that stays one.
+        return sign | 0x7c00 | if fraction != 0 { 0x0200 } else { 0 };
+    }
+    let unbiased = exponent - 127;
+    if unbiased > 15 {
+        return sign | 0x7c00;
+    }
+    if unbiased >= -14 {
+        let mut half = (((unbiased + 15) as u32) << 10) | (fraction >> 13);
+        let rest = fraction & 0x1fff;
+        if rest > 0x1000 || (rest == 0x1000 && half & 1 == 1) {
+            // A carry out of the fraction raises the exponent, as it should.
+            half += 1;
+        }
+        return sign | half as u16;
+    }
+    if unbiased < -25 {
+        return sign;
+    }
+    // A denormal: the leading one is written out.
+    let mantissa = fraction | 0x0080_0000;
+    let shift = (-unbiased - 14 + 13) as u32;
+    let mut half = mantissa >> shift;
+    let rest = mantissa & ((1 << shift) - 1);
+    let middle = 1 << (shift - 1);
+    if rest > middle || (rest == middle && half & 1 == 1) {
+        half += 1;
+    }
+    sign | half as u16
 }

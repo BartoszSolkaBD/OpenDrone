@@ -22,6 +22,7 @@ fn part(corners: Vec<[f32; 3]>, triangles: Vec<[u32; 3]>) -> DrawnPart {
         colour: [0.4, 0.4, 0.38, 1.0],
         uvs: corners.iter().map(|c| [c[0], c[1]]).collect(),
         corners,
+        light_uvs: Vec::new(),
         triangles,
     }
 }

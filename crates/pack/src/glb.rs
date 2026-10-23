@@ -80,6 +80,9 @@ pub struct DrawnPart {
     pub corners: Vec<[f32; 3]>,
     /// One picture coordinate per corner, if the mesh has them.
     pub uvs: Vec<[f32; 2]>,
+    /// One coordinate per corner into the Map's light atlas (the second set,
+    /// `TEXCOORD_1`), if the mesh has them: empty when it hasn't.
+    pub light_uvs: Vec<[f32; 2]>,
     /// Corner numbers, anticlockwise seen from the front.
     pub triangles: Vec<[u32; 3]>,
 }
@@ -409,6 +412,7 @@ impl Reader<'_> {
                                 })
                                 .collect(),
                             uvs: read.uvs,
+                            light_uvs: read.light_uvs,
                             triangles: read.triangles,
                         });
                     }
@@ -593,6 +597,7 @@ struct Primitive {
     /// In glTF's own axes, already turned and moved by the node.
     corners: Vec<Vec3>,
     uvs: Vec<[f32; 2]>,
+    light_uvs: Vec<[f32; 2]>,
     triangles: Vec<[u32; 3]>,
     material: String,
     colour: [f32; 4],
@@ -766,6 +771,23 @@ impl Gltf<'_> {
                 .collect(),
             None => Vec::new(),
         };
+        let light_uvs: Vec<[f32; 2]> = match attributes.get("TEXCOORD_1").and_then(Value::as_u64) {
+            Some(index) => self
+                .floats(index as usize, 2, "light atlas coordinates")?
+                .into_iter()
+                .map(|c| [c[0], c[1]])
+                .collect(),
+            None => Vec::new(),
+        };
+        if light_uvs.iter().flatten().any(|n| !n.is_finite()) {
+            return Err("has a light atlas coordinate that isn't a real number".to_string());
+        }
+        if !light_uvs.is_empty() && light_uvs.len() != corners.len() {
+            return Err(
+                "has light atlas coordinates (TEXCOORD_1) that aren't one for every corner"
+                    .to_string(),
+            );
+        }
         let listed = match primitive.get("indices").and_then(Value::as_u64) {
             Some(index) => self.indices(index as usize)?,
             None => (0..corners.len() as u32).collect(),
@@ -810,6 +832,7 @@ impl Gltf<'_> {
         Ok(Primitive {
             corners: corners.iter().map(|c| transform(world, *c)).collect(),
             uvs,
+            light_uvs,
             triangles,
             material,
             colour,

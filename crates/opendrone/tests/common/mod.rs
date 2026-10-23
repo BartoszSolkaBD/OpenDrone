@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod exr;
+
 use opendrone::set_up::{FlightPlan, open_packs, repo_folder};
 use opendrone::settings::Settings;
 use opendrone_pack::Packs;

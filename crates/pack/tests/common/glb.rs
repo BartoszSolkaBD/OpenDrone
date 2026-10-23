@@ -131,6 +131,19 @@ impl Glb {
         self
     }
 
+    /// Gives the last object's mesh a second set of coordinates, into the
+    /// Map's light atlas: `uvs` is one `[u, v]` per corner.
+    pub fn light_uvs(mut self, uvs: &[[f32; 2]]) -> Glb {
+        let bytes: Vec<u8> = uvs.iter().flatten().flat_map(|n| n.to_le_bytes()).collect();
+        let accessor = self.add_view(&bytes, uvs.len(), "VEC2", 5126);
+        let mesh = self
+            .meshes
+            .last_mut()
+            .expect("an object to give coordinates to");
+        mesh["primitives"][0]["attributes"]["TEXCOORD_1"] = json!(accessor);
+        self
+    }
+
     /// An object with tags and no mesh, such as the Launch Spot: an empty at
     /// `at` (east, north, up).
     pub fn empty(mut self, name: &str, extras: Value, at: [f32; 3]) -> Glb {

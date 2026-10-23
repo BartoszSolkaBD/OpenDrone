@@ -162,7 +162,16 @@ The checker refuses, listing every problem with the `.glb`'s file and the object
 
 What reaches the Simulation is each solid part, in the file's order and named after its object, and the Launch Spot. They change the Map's fingerprint; the names, the pictures and what is only drawn don't. The game draws every part that isn't `od_collision_only`, with its material's name and flat colour from the file, and gives it its pictures from the material library ([Building a Map](../building-a-map.md)).
 
-`map.toml` names its files (the checker doesn't yet look for a light atlas: the game's ticket does), and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
+`map.toml` names its files, and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
+
+**Baked light** is three things that go together: `[light]` in `map.toml`, a second set of picture coordinates (`TEXCOORD_1`, one for every corner) on every drawn mesh in the `.glb`, and a light atlas, an OpenEXR picture named `<id>.light.exr` after the Map's folder, in that folder. A Map has all three or none. The checker refuses, each in a sentence:
+
+- coordinates and no atlas (and says to bake it, or leave the coordinates out);
+- an atlas and no coordinates, or one object with coordinates while another has none (it would be drawn unlit, and the sentence names it);
+- an atlas, or coordinates, with no `[light]`; and `[light]` with neither;
+- a light file that isn't an OpenEXR picture, or has another name.
+
+What the game does with them: [Building a Map](../building-a-map.md#what-the-game-does-with-it).
 
 ## The Tune, `tune.txt`
 

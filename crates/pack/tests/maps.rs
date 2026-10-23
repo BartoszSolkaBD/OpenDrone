@@ -568,10 +568,160 @@ fn a_map_without_a_light_table_has_no_baked_light() {
     assert_eq!(yard_map("map-no-light").light, None);
 }
 
+/// The first bytes of an OpenEXR picture, which is all the checker looks at.
+const ATLAS: &[u8] = &[0x76, 0x2f, 0x31, 0x01, 0, 0, 0, 0];
+const ATLAS_FILE: &str = "packs/fixture/maps/yard/yard.light.exr";
+
+/// A Map whose ground has a second set of coordinates into a light atlas.
+fn baked_yard() -> Glb {
+    Glb::new()
+        .object(
+            "ground",
+            json!({ "od_collider": "box" }),
+            box_mesh([0.0, 0.0, -1.0], [100.0, 100.0, 2.0]),
+            "concrete_plaza",
+        )
+        .light_uvs(&[[0.0, 0.0]; 8])
+        .launch_spot("launch_spot", [0.0, -3.0, 0.0], 90.0)
+}
+
+/// A baked Map as it is when right: `[light]`, the coordinates and the atlas.
+fn baked_fixture(case: &str) -> Fixture {
+    let fixture = Fixture::new(case).with_map(baked_yard().build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    fixture.write_bytes(ATLAS_FILE, ATLAS);
+    fixture
+}
+
+#[test]
+fn a_map_with_light_coordinates_an_atlas_and_a_light_table_passes_and_names_its_atlas() {
+    let fixture = baked_fixture("map-baked");
+    assert_eq!(fixture.problems(), Vec::<String>::new());
+    let map = fixture.packs().map("fixture/yard").unwrap();
+    assert!(map.light.is_some());
+    assert!(
+        map.light_atlas
+            .unwrap()
+            .ends_with("maps/yard/yard.light.exr")
+    );
+    assert_eq!(map.drawing[0].light_uvs.len(), 8);
+}
+
+#[test]
+fn a_map_without_light_has_no_atlas_and_no_light_coordinates() {
+    let map = yard_map("map-unbaked");
+    assert_eq!(map.light_atlas, None);
+    assert!(map.drawing.iter().all(|part| part.light_uvs.is_empty()));
+}
+
+#[test]
+fn a_map_with_light_coordinates_but_no_atlas_is_refused_in_plain_words() {
+    let fixture = baked_fixture("map-no-atlas");
+    fixture.remove(ATLAS_FILE);
+    let problems = fixture.map_problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("has light atlas coordinates (TEXCOORD_1)")
+            && problems[0].contains("has no yard.light.exr"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_map_with_an_atlas_but_no_light_coordinates_is_refused_in_plain_words() {
+    let fixture = Fixture::new("map-no-coordinates").with_map(yard().build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    fixture.write_bytes(ATLAS_FILE, ATLAS);
+    let problems = fixture.map_problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("yard.light.exr: is a light atlas, but no mesh")
+            && problems[0].contains("TEXCOORD_1"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_baked_map_with_no_light_table_is_refused_because_its_quads_need_the_sky() {
+    let fixture = baked_fixture("map-baked-no-table");
+    fixture.write(MAP_TOML, YARD_TOML);
+    let problems = fixture.map_problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("needs a `[light]` table too"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn a_light_table_with_nothing_baked_is_refused_and_says_to_bake_or_remove_it() {
+    let fixture = Fixture::new("map-table-only").with_map(yard().build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    let problems = fixture.map_problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("bake the Map, or remove `[light]`"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn an_atlas_that_isnt_an_openexr_picture_or_has_another_name_is_refused() {
+    let fixture = baked_fixture("map-atlas-wrong");
+    fixture.write_bytes(ATLAS_FILE, b"not a picture");
+    assert!(fixture.map_problems()[0].contains("isn't an OpenEXR picture"));
+    fixture.remove(ATLAS_FILE);
+    fixture.write_bytes("packs/fixture/maps/yard/yard.light.png", ATLAS);
+    let problems = fixture.map_problems().join("\n");
+    assert!(
+        problems.contains("an OpenEXR picture named yard.light.exr, not yard.light.png"),
+        "{problems}"
+    );
+}
+
+#[test]
+fn an_object_left_without_light_coordinates_in_a_baked_map_is_named_and_refused() {
+    let glb = baked_yard().object(
+        "mural",
+        json!({ "od_collider": "none" }),
+        sheet_mesh([0.0, 8.0, 3.0], 2.0),
+        "backdrop",
+    );
+    let fixture = Fixture::new("map-unlit-object").with_map(glb.build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    fixture.write_bytes(ATLAS_FILE, ATLAS);
+    let problems = fixture.map_problems();
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(
+        problems[0].contains("the object \"mural\" in the .glb has no light atlas coordinates"),
+        "{problems:?}"
+    );
+}
+
+#[test]
+fn light_coordinates_that_are_not_one_for_every_corner_are_refused() {
+    let glb = Glb::new()
+        .object(
+            "ground",
+            json!({ "od_collider": "box" }),
+            box_mesh([0.0, 0.0, -1.0], [100.0, 100.0, 2.0]),
+            "concrete_plaza",
+        )
+        .light_uvs(&[[0.0, 0.0]; 3])
+        .launch_spot("launch_spot", [0.0, -3.0, 0.0], 90.0);
+    let fixture = Fixture::new("map-short-coordinates").with_map(glb.build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    fixture.write_bytes(ATLAS_FILE, ATLAS);
+    let problems = fixture.map_problems().join("\n");
+    assert!(
+        problems.contains("aren't one for every corner"),
+        "{problems}"
+    );
+}
+
 #[test]
 fn the_light_table_gives_the_suns_direction_and_colour_and_the_skys() {
-    let fixture = Fixture::new("map-light").with_map(yard().build());
-    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    let fixture = baked_fixture("map-light");
     let light = fixture.packs().map("fixture/yard").unwrap().light.unwrap();
     assert!((light.sun_elevation - 37.0_f64.to_radians()).abs() < 1e-12);
     assert!((light.sun_azimuth - 225.0_f64.to_radians()).abs() < 1e-12);
