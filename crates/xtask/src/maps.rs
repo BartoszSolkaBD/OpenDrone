@@ -136,7 +136,7 @@ pub fn run(args: &[String]) -> ExitCode {
 
 /// The Blender to run: `BLENDER`, then `blender` on the path, then where each
 /// operating system installs it.
-fn find_blender() -> Result<PathBuf, String> {
+pub(crate) fn find_blender() -> Result<PathBuf, String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(path) = std::env::var_os("BLENDER") {
         candidates.push(PathBuf::from(path));
@@ -162,7 +162,7 @@ fn find_blender() -> Result<PathBuf, String> {
     ))
 }
 
-fn blender_version_line(blender: &Path) -> Result<String, String> {
+pub(crate) fn blender_version_line(blender: &Path) -> Result<String, String> {
     let output = Command::new(blender)
         .arg("--version")
         .output()

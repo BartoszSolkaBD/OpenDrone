@@ -10,9 +10,11 @@
 //!   the normal maps.
 //! - **Materials.** A part names its material (`concrete_smooth`). The
 //!   library, `assets-src/materials.toml`, says which CC0 pictures that name
-//!   means, and `cargo xtask textures` has fetched them into
-//!   `assets-src/textures/`, in the repo or in a downloaded build, which
-//!   `cargo xtask package` lays out the same way (#81). A material with no
+//!   means: `cargo xtask textures` has fetched them into
+//!   `assets-src/textures/`, or, for a texture made from scratch, they are
+//!   committed in `assets-src/generated/`. Either folder is in the repo or in
+//!   a downloaded build, which `cargo xtask package` lays out the same way
+//!   (#81). A material with no
 //!   picture on disk is drawn in its flat colour from the `.glb`, so the Map
 //!   is always flyable.
 //!
@@ -41,6 +43,10 @@ const LIBRARY: &str = "assets-src/materials.toml";
 
 /// Where the fetched pictures are, from the repo's root.
 const TEXTURES: &str = "assets-src/textures";
+
+/// Where the pictures made from scratch are, from the repo's root: committed,
+/// not fetched (ADR-0024).
+const GENERATED: &str = "assets-src/generated";
 
 /// A point in the Map (east, north, up) in Bevy's axes (east +x, up +y,
 /// north -z).
@@ -170,14 +176,23 @@ impl MaterialLibrary {
                     .get("roughness")
                     .and_then(toml::Value::as_float)
                     .unwrap_or(0.9) as f32;
-                let pictures = entry
-                    .get("texture")
-                    .and_then(toml::Value::as_str)
-                    .map(|texture| Pictures {
-                        diffuse: repo.join(TEXTURES).join(texture).join("diffuse.jpg"),
-                        normal: repo.join(TEXTURES).join(texture).join("normal.jpg"),
-                    })
-                    .filter(|p| p.diffuse.is_file() && p.normal.is_file());
+                // A downloaded texture is in the fetched folder, one made from
+                // scratch in the committed one; the first with both pictures.
+                let pictures =
+                    entry
+                        .get("texture")
+                        .and_then(toml::Value::as_str)
+                        .and_then(|texture| {
+                            [TEXTURES, GENERATED].into_iter().find_map(|folder| {
+                                let folder = repo.join(folder).join(texture);
+                                let pictures = Pictures {
+                                    diffuse: folder.join("diffuse.jpg"),
+                                    normal: folder.join("normal.jpg"),
+                                };
+                                (pictures.diffuse.is_file() && pictures.normal.is_file())
+                                    .then_some(pictures)
+                            })
+                        });
                 entries.insert(
                     name.clone(),
                     Entry {
