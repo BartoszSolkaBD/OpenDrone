@@ -1,0 +1,9 @@
+#!/bin/sh
+# Gets OpenDrone running from this checkout, with its textures: see
+# docs/pilot-guide.md. `./play --map bando` starts on another Map.
+cd "$(dirname "$0")" || exit 1
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "Rust isn't installed here: get rustup from https://rustup.rs, open a new terminal, and run ./play again."
+  exit 1
+fi
+exec cargo xtask play "$@"
