@@ -168,9 +168,13 @@ pub(crate) fn fetch(root: &Path, manifest: &Manifest, pin: bool) -> Result<Strin
             pinned.len()
         ));
     }
+    let downloads = manifest
+        .textures
+        .iter()
+        .filter(|t| t.generated.is_none())
+        .count();
     lines.push(format!(
-        "{} texture(s) ready in {TEXTURES_FOLDER}/, which git ignores.",
-        manifest.textures.len()
+        "{downloads} texture(s) ready in {TEXTURES_FOLDER}/, which git ignores."
     ));
     Ok(lines.join("\n"))
 }

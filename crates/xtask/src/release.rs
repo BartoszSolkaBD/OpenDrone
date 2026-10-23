@@ -532,7 +532,7 @@ pub fn package(
     let mut missing = Vec::new();
     let mut textured = 0;
     for texture in &manifest.textures {
-        let folder = format!("{}/{}", materials::TEXTURES_FOLDER, texture.name);
+        let folder = texture.folder();
         let pictures = ["diffuse.jpg", "normal.jpg"].map(|p| format!("{folder}/{p}"));
         if pictures.iter().all(|p| root.join(p).is_file()) {
             textured += 1;

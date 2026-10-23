@@ -38,6 +38,9 @@
 //!   checks each against its checksum ([`textures`]).
 //! - `credits`: writes `CREDITS.md` from the material library and the list
 //!   of datasets, or checks it is up to date ([`textures`], [`datasets`]).
+//! - `generate-textures`: makes the textures that are made from scratch with
+//!   the pinned Blender's Python, or checks the committed pictures are what
+//!   the generators make ([`generated`]).
 //! - `licences`: writes the licence texts of the libraries built into the game
 //!   for each operating system, which every download carries, or checks they
 //!   are up to date ([`licences`]).
@@ -59,6 +62,7 @@ mod book;
 mod core_maths;
 mod datasets;
 mod flight_logs;
+mod generated;
 mod icon;
 mod import_tune;
 mod input_monitor;
@@ -138,6 +142,16 @@ Commands:
       Download the CC0 textures assets-src/materials.toml lists into
       assets-src/textures/ (git ignores it) and refuse any file whose SHA-256
       differs from the manifest's. --pin writes the checksum of a new file.
+      A texture made from scratch (it names a generator) is left alone.
+  generate-textures [--check]
+      Make the textures assets-src/materials.toml marks as made from scratch
+      (a generator, a seed and a size): the script assets-src/generators/
+      <generator>.py runs in the pinned Blender's Python and writes the
+      texture's diffuse.jpg, normal.jpg and roughness.jpg into
+      assets-src/generated/<texture>/, and a contact sheet of them all into
+      docs/images/. --check makes them into target/textures-check/ instead and
+      says whether the committed pictures are the very same bytes (CI does
+      this on Linux). It prints the size each texture costs.
   credits [--check]
       Write CREDITS.md from assets-src/materials.toml and
       assets-src/datasets.toml, with the checksum of every committed data
@@ -225,6 +239,7 @@ fn main() -> ExitCode {
         "play" => play::run(rest),
         "textures" => textures::run_textures(rest),
         "credits" => textures::run_credits(rest),
+        "generate-textures" => generated::run(rest),
         "licences" => licences::run(rest),
         "tii-logs" => flight_logs::run_tii(rest),
         "download" => flight_logs::run_download(rest),
