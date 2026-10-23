@@ -21,13 +21,13 @@ type PictureCameras = Or<(With<FpvDisplay>, With<ChaseCamera>)>;
 
 /// The image the picture is drawn into, in place of the window.
 #[derive(Resource)]
-struct OutputPicture {
-    size: UVec2,
-    image: Option<Handle<Image>>,
+pub(crate) struct OutputPicture {
+    pub(crate) size: UVec2,
+    pub(crate) image: Option<Handle<Image>>,
 }
 
 /// Sends the picture to an image of `size` instead of the window.
-fn draw_into_an_image(app: &mut App, size: UVec2) {
+pub(crate) fn draw_into_an_image(app: &mut App, size: UVec2) {
     app.insert_resource(OutputPicture { size, image: None })
         .add_systems(PostStartup, draw_into_a_picture);
 }
