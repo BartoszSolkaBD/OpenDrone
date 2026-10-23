@@ -18,6 +18,7 @@ Right now OpenDrone is in **Phase 1**: only the maintainer and their agents cont
   cargo xtask core-maths --with opendrone --with opendrone-scenario   # the core's compiled code calls no OS maths
   cargo xtask packs                 # every Pack and Test Quad, through the Pack checker
   cargo xtask credits --check       # CREDITS.md is generated from the material library and up to date
+  cargo xtask generate-textures --check   # the textures made from scratch are the very same bytes as the committed ones (needs the pinned Blender, like `cargo xtask maps`)
   cargo xtask licences --check      # licences/third-party-*.txt, the libraries' licence texts every download carries, are up to date
   cargo xtask feel-tests --base origin/main   # the Feel Test log rules, against main
   cargo scenarios check             # every Scenario, run twice, and its Results

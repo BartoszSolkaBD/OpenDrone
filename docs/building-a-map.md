@@ -178,8 +178,8 @@ A generated material is a material like any other, plus a texture that names a g
 
 ```toml
 [materials.brick_red_weathered]
-colour    = [0.30, 0.10, 0.06]      # the picture's average: what the Map shows without the pictures
-roughness = 0.90
+colour    = [0.15, 0.06, 0.03]      # the picture's average: what the Map shows without the pictures
+roughness = 0.82                    # the roughness picture's average
 texture   = "brick_red_weathered"
 
 [textures.brick_red_weathered]
