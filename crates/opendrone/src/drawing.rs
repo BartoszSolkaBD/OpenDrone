@@ -334,8 +334,8 @@ fn draw_the_grid(plan: Res<FlightPlan>, mut gizmos: Gizmos) {
 }
 
 /// The Quad from its collision shapes, as the physics builds them (the body,
-/// the pack, a prop disc per motor and, on a whoop, the duct rings), with
-/// the FPV Camera at the Quad's camera position and Camera Tilt.
+/// the pack, a prop disc per motor and, on a whoop, the duct rings and the
+/// camera housing), with the FPV Camera at the Quad's camera position and Camera Tilt.
 fn draw_the_quad(
     plan: &FlightPlan,
     flight: &Flight,
@@ -414,6 +414,16 @@ fn draw_the_quad(
                     ));
                 }
             }
+        }
+        if let (Some(housing), View::Chase) = (shape.camera_housing, view) {
+            // Left out of the FPV view, where the camera sits inside it.
+            let sides = size(housing.size);
+            let middle = housing.front - Vec3d::new(housing.size.x / 2.0, 0.0, 0.0);
+            parts.spawn((
+                Mesh3d(meshes.add(Cuboid::new(sides.x, sides.y, sides.z))),
+                MeshMaterial3d(frame.clone()),
+                Transform::from_translation(point(middle)),
+            ));
         }
         if view == View::Fpv {
             // The FPV Camera: its place and tilt are set each frame from the

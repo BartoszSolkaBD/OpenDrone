@@ -20,8 +20,8 @@ use std::collections::BTreeMap;
 use opendrone_flight_controller::Tune as FlightControllerTune;
 use opendrone_maths::{Fingerprint, Fingerprinter, Mat3, Vec3};
 use opendrone_physics::{
-    BatteryParameters, Drag, DuctRings, EscParameters, GroundAndCeiling, MotorParameters,
-    PropParameters, PropWash, QuadParameters, QuadShape, RotorLayout,
+    BatteryParameters, CameraHousing, Drag, DuctRings, EscParameters, GroundAndCeiling,
+    MotorParameters, PropParameters, PropWash, QuadParameters, QuadShape, RotorLayout,
 };
 
 use crate::document::{Document, Item, Problem, Problems, Table};
@@ -760,9 +760,11 @@ pub struct QuadDefinition {
 
 impl QuadDefinition {
     /// The fingerprint of what the Simulation receives from this Quad: its
-    /// physics numbers, counts and choices, the ESC melody and the Tune. Never
-    /// its id, on-screen text, picture, camera, sound block, Confidences,
-    /// sources or comments (#16 §9).
+    /// physics numbers, counts and choices, the ESC melody and the Tune; and,
+    /// on a Quad with a camera housing, the camera's position, since the
+    /// housing is placed from it. Never its id, on-screen text, picture, the
+    /// rest of the camera, sound block, Confidences, sources or comments (#16
+    /// §9).
     pub fn fingerprint(&self) -> Fingerprint {
         self.fingerprint
     }
@@ -793,6 +795,10 @@ pub struct Collision {
     pub pack_height: f64,
     /// Each duct's ring: inside diameter, wall and height.
     pub duct_rings: Option<[f64; 3]>,
+    /// The box that holds the FPV Camera, front to back, side to side and top
+    /// to bottom: its front face's middle is the camera's position, and it
+    /// lies behind it.
+    pub camera_housing: Option<[f64; 3]>,
     pub bounce: f64,
     pub friction: f64,
 }
@@ -1289,6 +1295,9 @@ fn definition(
         duct_rings: r
             .has("collision.duct_rings")
             .then(|| r.three("collision.duct_rings")),
+        camera_housing: r
+            .has("collision.camera_housing")
+            .then(|| r.three("collision.camera_housing")),
         bounce: r.one("collision.bounce"),
         friction: r.one("collision.friction"),
     };
@@ -1365,6 +1374,10 @@ fn definition(
                     wall,
                     height,
                 }),
+            camera_housing: collision.camera_housing.map(|sides| CameraHousing {
+                size: size(sides),
+                front: size(r.three("camera.position")),
+            }),
             bounce: collision.bounce,
             friction: collision.friction,
         },
@@ -1457,6 +1470,10 @@ fn fingerprint(readings: &Readings, tune: &Tune) -> Fingerprint {
                 continue;
             }
             match readings.get(&name) {
+                // An optional key a Quad leaves out writes nothing, so a Quad
+                // without it keeps the fingerprint it had before the key
+                // existed.
+                None if key.need == Need::Optional => {}
                 None => f.write_u64(0),
                 Some(Reading::Numbers(values)) => {
                     f.write_u64(1);
@@ -1477,6 +1494,13 @@ fn fingerprint(readings: &Readings, tune: &Tune) -> Fingerprint {
                 }
             }
         }
+    }
+    // The camera sits outside the Simulation, except where it places a part of
+    // the Quad's shape: a camera housing's front is the camera's position, so
+    // on a Quad with a housing that position counts too.
+    if readings.has("collision.camera_housing") {
+        f.write_u64(5);
+        f.write_f64s(&readings.three("camera.position"));
     }
     f.write_u64(tune.settings.len() as u64);
     for (name, setting) in &tune.settings {

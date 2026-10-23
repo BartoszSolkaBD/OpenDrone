@@ -5,7 +5,7 @@
 # from the ceiling it would sink slowly ("With no ceiling effect, a Whoop 65
 # on a slowly sinking drive sinks away from the ceiling"). Under the ceiling
 # it rises instead, and the closer it gets the harder the ceiling pulls: it is
-# sucked up onto the ceiling and stays there, held by its duct rings (E21 in
+# sucked up onto the ceiling and stays there, held by its camera housing (E21 in
 # #10; user story 31 in #37, "get sucked towards a ceiling", as under the
 # Bando's 3.1 m ceilings; crates/physics/src/ground_and_ceiling.rs).
 #
@@ -15,8 +15,12 @@
 # speed. The ceiling effect at the same power is γ^⅔, with γ = ½ + ½·√(1 +
 # α₀/(8·(z/R)²)) (Hsiao & Chirarattananon 2019, S13; α₀ = 1): +2.0% at one
 # rotor radius, growing to +7.4% at half a radius, the closest the formula is
-# used. Its duct rings stand 7 mm above its props, so pressed against the
-# ceiling its props are 7 mm (0.4 rotor radius) below it.
+# used. Its camera housing stands higher than its duct rings (its top is 20.5
+# mm above the centre of mass, the rings' tops 15 mm), so pressed against the
+# ceiling it rests a few degrees nose down on the housing and the rear rings'
+# tops, its centre about 18 mm below the ceiling and its props about 10 mm
+# (0.56 rotor radius) below it, where the ceiling gives about +6% (#268 added
+# the housing; before it the rings held it level, its props 7 mm below).
 format = 2
 name   = "A Whoop 65 one rotor radius under the ceiling is pulled onto it, on a drive that sinks it in open air"
 
@@ -60,8 +64,8 @@ timeline = [
 [[expect]]
 what    = "height"
 over    = "0 s to 2 s"
-highest = "3.085 m ± 0.0002 m"
-basis   = "rule: it reaches the ceiling at 3.1 m but never passes into it: its duct rings' tops, 15 mm above its centre (8 mm up to its props, then half the rings' 14 mm), stop it"
+highest = "between 3.0795 m and 3.0820 m"
+basis   = "rule: it reaches the ceiling at 3.1 m but never passes into it: the top of its camera housing, 20.5 mm above its centre (the lens 16 mm up, in the middle of the 9 mm tall box's front face), stops it, so its centre can't rise above 3.1 m - 0.0205 m = 3.0795 m while level (the physics lets a part sit at most 0.1 mm inside a surface), nor above 3.1 m - 0.0181 m = 3.0819 m when it tilts onto the housing's back top edge (32 mm ahead of the centre, 20.5 mm up) and the rear rings' tops (43.3 mm behind it, 15 mm up): it tilts by atan(5.5 mm / (32 mm + 43.3 mm)) = 4.2°, which puts the centre 15 mm × cos 4.2° + 43.3 mm × sin 4.2° = 18.1 mm below the ceiling"
 
 [[expect]]
 what   = "height"
@@ -72,11 +76,11 @@ basis  = "observed: it never sinks; from the start it rises"
 [[expect]]
 what  = "height"
 at    = "0.5 s"
-value = "3.085 m ± 0.0002 m"
-basis = "observed: it is on the ceiling by 0.35 s"
+value = "3.082 m ± 0.0005 m"
+basis = "observed: it is on the ceiling by 0.35 s, resting tilted a few degrees on the housing and the rear rings, its centre 18 mm below the ceiling"
 
 [[expect]]
 what  = "height"
 at    = "2 s"
-value = "3.085 m ± 0.0002 m"
-basis = "observed: it stays pressed against the ceiling: there the ceiling's pull is 7.4% of each rotor's thrust, far more than the drive lacks"
+value = "3.082 m ± 0.0005 m"
+basis = "observed: it stays pressed against the ceiling: there the ceiling's pull is about 6% of each rotor's thrust, far more than the drive lacks"

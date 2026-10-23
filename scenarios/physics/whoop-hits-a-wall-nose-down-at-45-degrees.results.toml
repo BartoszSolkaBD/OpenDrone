@@ -1,0 +1,34 @@
+# Results of whoop-hits-a-wall-nose-down-at-45-degrees.toml, written by the Scenario runner (`cargo scenarios run`).
+# Don't edit this file by hand: CI checks that it is up to date. Each value is
+# what this run measured, to 3 significant figures.
+format   = 1
+scenario = "A whoop that hits a wall nose down at 45° stops with its camera housing against it"
+
+[[expect]]
+what     = "distance east, highest over 0 s to 0.3 s"
+basis    = "Rule"
+expected = "between 4.9 m and 4.96 m"
+measured = "4.96 m"
+
+[[expect]]
+what     = "no broken numbers: every number in the state is a real number after every step"
+basis    = "Rule"
+expected = "none broken"
+measured = "none broken"
+
+[fingerprints]
+quad = "3232af5450196812"   # opendrone/whoop-65: what the Simulation receives from it
+map  = "cd2831041fb0f223"   # test/wall
+run  = "93a7db2b68d82362"   # the whole state after each of 2400 steps at 8000 Hz, in order
+
+[fingerprints.checkpoints]   # the whole state after each tenth of the run
+"0.03 s" = "01d016c2c10322a3"
+"0.06 s" = "1839658d965174fc"
+"0.09 s" = "0faa50a7641a95a4"
+"0.12 s" = "c60047e369444839"
+"0.15 s" = "3a895d4619c5f871"
+"0.18 s" = "29dcd3c2caf24fab"
+"0.21 s" = "318df8071e3a0955"
+"0.24 s" = "b5b5599b3600b27f"
+"0.27 s" = "74a3e67821132a7b"
+"0.3 s" = "311befaa15dc2ff8"

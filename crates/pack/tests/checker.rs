@@ -1192,6 +1192,37 @@ fn a_fingerprint_covers_only_what_the_simulation_receives() {
 }
 
 #[test]
+fn the_cameras_position_counts_in_a_fingerprint_only_with_a_camera_housing() {
+    // Basis: Rule (#268): a camera housing's front is the camera's position,
+    // so on a Quad with one, moving the camera changes what the Simulation
+    // receives; on a Quad without one, it changes nothing the Simulation sees.
+    let fingerprint = |fixture: Fixture| {
+        fixture
+            .packs()
+            .quad("fixture/ducted")
+            .unwrap()
+            .fingerprint()
+    };
+    let housing = "camera_housing = { value = \"box 8 × 6 × 9 mm\", confidence = \"Estimate\", range = \"×0.8–×1.2\", source = \"guess\" }\nbounce      =";
+    let with_housing = |name: &str| Fixture::new(name).change(QUAD, "bounce      =", housing);
+    let moved = |fixture: Fixture| {
+        fixture.change(
+            QUAD,
+            "\"15 mm forward, 0 mm left, 12 mm up\"",
+            "\"13 mm forward, 0 mm left, 12 mm up\"",
+        )
+    };
+    let plain = fingerprint(Fixture::new("fp-no-housing"));
+    assert_eq!(
+        fingerprint(moved(Fixture::new("fp-no-housing-moved"))),
+        plain
+    );
+    let housed = fingerprint(with_housing("fp-housing"));
+    assert_ne!(housed, plain);
+    assert_ne!(fingerprint(moved(with_housing("fp-housing-moved"))), housed);
+}
+
+#[test]
 fn the_same_number_written_two_ways_gives_the_same_fingerprint() {
     let plain = Fixture::new("fp-written")
         .packs()

@@ -24,7 +24,10 @@ use crate::geometry::{from_parry, to_parry, turn};
 ///   Map its prop rubs (a Prop Strike: see the crate's "Prop Strikes");
 /// - on a whoop, **a duct ring** round each prop disc, centred on it: a
 ///   ring open at the top and bottom, made of [`DUCT_RING_SEGMENTS`] flat
-///   segments.
+///   segments;
+/// - where a Quad definition gives one, **the camera housing**: a box behind
+///   the FPV Camera's lens, so a wall stops the Quad before the camera's
+///   picture reaches it (#268).
 ///
 /// The motors sit at the corners of a square X: each one half the diagonal
 /// out from the centre, at 45° between forward and the side, in Betaflight's
@@ -46,6 +49,8 @@ pub struct QuadShape {
     pub prop_diameter: f64,
     /// `None` on a Quad without ducts.
     pub duct_rings: Option<DuctRings>,
+    /// `None` on a Quad whose definition gives no camera housing.
+    pub camera_housing: Option<CameraHousing>,
     /// How much of the speed into a surface comes back out of it, from 0 (a
     /// dead stop) to 1 (all of it).
     pub bounce: f64,
@@ -62,6 +67,17 @@ pub struct DuctRings {
     pub wall: f64,
     /// How tall the ring is.
     pub height: f64,
+}
+
+/// The box that holds the FPV Camera, which sticks out past the frame and
+/// canopy on a whoop.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CameraHousing {
+    /// Front to back, side to side and top to bottom, in metres.
+    pub size: Vec3,
+    /// The middle of the box's front face, in body axes from the centre of
+    /// mass: where the FPV Camera's lens sits. The box lies behind it.
+    pub front: Vec3,
 }
 
 /// How thick each prop disc is, in metres. A Quad definition doesn't give a
@@ -81,6 +97,8 @@ pub enum QuadPart {
     /// The duct ring round this motor's prop, by Betaflight's motor number (1
     /// to 4).
     DuctRing(u8),
+    /// The box that holds the FPV Camera.
+    CameraHousing,
     /// This motor's prop disc, by Betaflight's motor number (1 to 4).
     PropDisc(u8),
 }
@@ -106,6 +124,15 @@ impl QuadShape {
             }
         }
         f.write_f64s(&[self.bounce, self.friction]);
+        // Written only when there is one, so a Quad without a camera housing
+        // keeps the fingerprint it had before there were any.
+        if let Some(housing) = self.camera_housing {
+            f.write_u64(2);
+            let Vec3 { x, y, z } = housing.size;
+            f.write_f64s(&[x, y, z]);
+            let Vec3 { x, y, z } = housing.front;
+            f.write_f64s(&[x, y, z]);
+        }
     }
 
     /// True when every size is above zero, every number is a real number,
@@ -125,8 +152,15 @@ impl QuadShape {
         let rings = self.duct_rings.is_none_or(|r| {
             above_zero(r.inside_diameter) && above_zero(r.wall) && above_zero(r.height)
         });
+        let housing = self.camera_housing.is_none_or(|h| {
+            [h.size.x, h.size.y, h.size.z].into_iter().all(above_zero)
+                && [h.front.x, h.front.y, h.front.z]
+                    .into_iter()
+                    .all(f64::is_finite)
+        });
         sizes.into_iter().all(above_zero)
             && rings
+            && housing
             && self.pack_height.is_finite()
             && self.rotor_height.is_finite()
             && (0.0..=1.0).contains(&self.bounce)
@@ -149,7 +183,8 @@ impl QuadShape {
     }
 
     /// Every simple shape, in a fixed order: the body, the pack, then for
-    /// each motor in order its prop disc and its duct ring's segments.
+    /// each motor in order its prop disc and its duct ring's segments, and
+    /// last the camera housing.
     pub(crate) fn parts(&self) -> Vec<Part> {
         let level = Rot3::IDENTITY;
         let mut parts = vec![
@@ -179,6 +214,14 @@ impl QuadShape {
             if let Some(rings) = self.duct_rings {
                 ring_segments(rings, centre, motor, &mut parts);
             }
+        }
+        if let Some(housing) = self.camera_housing {
+            let middle = housing.front - Vec3::new(housing.size.x / 2.0, 0.0, 0.0);
+            parts.push(Part::new(
+                QuadPart::CameraHousing,
+                cuboid(housing.size),
+                Pose::from_parts(to_parry(middle), level),
+            ));
         }
         parts
     }

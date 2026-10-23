@@ -7,20 +7,20 @@ scenario = "A whoop thrown into a ceiling"
 [[expect]]
 what     = "height, highest over 0 s to 0.4 s"
 basis    = "Rule"
-expected = "between 3 m and 3.0851 m"
+expected = "between 3 m and 3.0796 m"
 measured = "3.08 m"
 
 [[expect]]
 what     = "height, lowest over 0 s to 3 s"
 basis    = "Rule"
 expected = "between 0.0099 m and 1 m"
-measured = "0.0106 m"
+measured = "0.0181 m"
 
 [[expect]]
 what     = "vertical speed at 0.4 s"
 basis    = "Observed"
-expected = "-2.17 m/s ± 0.05 m/s"
-measured = "-2.17 m/s"
+expected = "-1.85 m/s ± 0.05 m/s"
+measured = "-1.85 m/s"
 
 [[expect]]
 what     = "speed, highest over 2.5 s to 3 s"
@@ -31,8 +31,8 @@ measured = "0 m/s"
 [[expect]]
 what     = "height at 3 s"
 basis    = "Observed"
-expected = "0.015 m ± 0.0001 m"
-measured = "0.0150 m"
+expected = "0.0181 m ± 0.0001 m"
+measured = "0.0181 m"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -41,18 +41,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "036b39cf96c66fe4"   # test/whoop-65-no-drag: what the Simulation receives from it
+quad = "babdc538da0d8f2c"   # test/whoop-65-no-drag: what the Simulation receives from it
 map  = "c99bed06a155f2a3"   # test/floor-and-ceiling
-run  = "081634280c550b7f"   # the whole state after each of 24000 steps at 8000 Hz, in order
+run  = "defc8955fbfff08e"   # the whole state after each of 24000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "0.3 s" = "23b258125eb28fa1"
-"0.6 s" = "a60f3da10b823a22"
-"0.9 s" = "bc7b924528cc6adc"
-"1.2 s" = "e5895c60a7d93987"
-"1.5 s" = "c6df29738e44e9eb"
-"1.8 s" = "26efe9cda25e7f88"
-"2.1 s" = "9799413c1dfe1d10"
-"2.4 s" = "0249922fcba6879a"
-"2.7 s" = "62fee9f04199536a"
-"3 s" = "bb3b19dbdcf2a1db"
+"0.6 s" = "abca3e895ea1cd89"
+"0.9 s" = "2b29271a0a68a483"
+"1.2 s" = "f829126ac53689bc"
+"1.5 s" = "23dd6882ef2a02a9"
+"1.8 s" = "c42593b0547b7c78"
+"2.1 s" = "ef1762406cb89700"
+"2.4 s" = "1e3a0893decd28de"
+"2.7 s" = "4143ce3b61aaefba"
+"3 s" = "6e3e4d5691215e3b"

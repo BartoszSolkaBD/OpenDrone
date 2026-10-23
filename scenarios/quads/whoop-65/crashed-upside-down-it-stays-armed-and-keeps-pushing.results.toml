@@ -19,8 +19,8 @@ measured = "never"
 [[expect]]
 what     = "tilt at 6 s"
 basis    = "Observed"
-expected = "180° ± 1°"
-measured = "180°"
+expected = "176° ± 1°"
+measured = "176°"
 
 [[expect]]
 what     = "the Quad turns right side up, first over 1 s to 12 s"
@@ -31,14 +31,14 @@ measured = "never"
 [[expect]]
 what     = "roll I term at 6 s"
 basis    = "Observed"
-expected = "94.6 ± 10"
-measured = "94.6"
+expected = "81.6 ± 10"
+measured = "81.6"
 
 [[expect]]
 what     = "motor 1 DShot, lowest over 2 s to 12 s"
 basis    = "Source"
 expected = "between 168 and 2047"
-measured = "168"
+measured = "532"
 
 [[expect]]
 what     = "motor 2 DShot, lowest over 2 s to 12 s"
@@ -56,13 +56,13 @@ measured = "168"
 what     = "motor 4 DShot, lowest over 2 s to 12 s"
 basis    = "Source"
 expected = "between 168 and 2047"
-measured = "168"
+measured = "1120"
 
 [[expect]]
 what     = "motor 4 DShot, mean over 6 s to 12 s"
 basis    = "Observed"
-expected = "986 ± 100"
-measured = "986"
+expected = "1190 ± 100"
+measured = "1190"
 
 [[expect]]
 what     = "no broken numbers: every number in the state is a real number after every step"
@@ -71,18 +71,18 @@ expected = "none broken"
 measured = "none broken"
 
 [fingerprints]
-quad = "c1a723ac6117a0ee"   # opendrone/whoop-65: what the Simulation receives from it
+quad = "3232af5450196812"   # opendrone/whoop-65: what the Simulation receives from it
 map  = "15cbeb4e88c44e72"   # test/flat-floor
-run  = "34a164cbfd9710bc"   # the whole state after each of 96000 steps at 8000 Hz, in order
+run  = "9e0243f1d934b634"   # the whole state after each of 96000 steps at 8000 Hz, in order
 
 [fingerprints.checkpoints]   # the whole state after each tenth of the run
 "1.2 s" = "026f1413ca87ccaa"
-"2.4 s" = "69468c2b29cc5d96"
-"3.6 s" = "e840d38503794e9e"
-"4.8 s" = "ebf10ee78cd11737"
-"6 s" = "d28364b45fc0dada"
-"7.2 s" = "b82ddb75a46479db"
-"8.4 s" = "7ae729ec84f380a4"
-"9.6 s" = "b2dc6ce5bf331dc9"
-"10.8 s" = "91f49437ce7ad57a"
-"12 s" = "24c507593873f2bf"
+"2.4 s" = "fb51e6d6ee393c86"
+"3.6 s" = "d74310ed8df3a809"
+"4.8 s" = "6964d9f8a4c8a8bd"
+"6 s" = "5de452cb821d751f"
+"7.2 s" = "6c0888225e2857e2"
+"8.4 s" = "945a7e55ce422446"
+"9.6 s" = "974b45ef6f429a4b"
+"10.8 s" = "34b0abad32bc489f"
+"12 s" = "fb9075c1fbd413aa"

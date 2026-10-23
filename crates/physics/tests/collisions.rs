@@ -13,8 +13,9 @@ mod common;
 use opendrone_maths::functions::{max, sin_cos};
 use opendrone_maths::{Attitude, DEGREE, Mat3, PilotAngles, Vec3};
 use opendrone_physics::{
-    Contact, Drag, DuctRings, MapCollision, MapShape, MotorCommands, Mount, QuadBody,
-    QuadParameters, QuadPart, QuadShape, QuadStart, QuadState, SetUpProblem, StartingMotors, World,
+    CameraHousing, Contact, Drag, DuctRings, MapCollision, MapShape, MotorCommands, Mount,
+    QuadBody, QuadParameters, QuadPart, QuadShape, QuadStart, QuadState, SetUpProblem,
+    StartingMotors, World,
 };
 
 const WORLD: World = World {
@@ -47,6 +48,7 @@ fn whoop() -> QuadParameters {
                 wall: 0.0015,
                 height: 0.014,
             }),
+            camera_housing: None,
             bounce: 0.3,
             friction: 0.5,
         },
@@ -69,6 +71,7 @@ fn freestyle() -> QuadParameters {
             rotor_height: -0.005,
             prop_diameter: 0.1295,
             duct_rings: None,
+            camera_housing: None,
             bounce: 0.3,
             friction: 0.5,
         },
@@ -407,6 +410,69 @@ fn a_whoop_sliding_along_a_wall_touches_it_with_its_duct_rings_never_its_props()
         parts.iter().all(|p| matches!(p, QuadPart::DuctRing(_))),
         "{parts:?}"
     );
+}
+
+/// The Whoop 65 with the camera housing its Quad definition gives (#268): a
+/// box 8 × 6 × 9 mm behind a lens 40 mm forward and 16 mm up.
+fn whoop_with_a_camera_housing() -> QuadParameters {
+    let mut whoop = whoop();
+    whoop.shape.camera_housing = Some(CameraHousing {
+        size: Vec3::new(0.008, 0.006, 0.009),
+        front: Vec3::new(0.040, 0.0, 0.016),
+    });
+    whoop
+}
+
+/// How far east of a wall's face a point of the Quad (in body axes from its
+/// centre of mass) gets at most, flying east at 5 m/s into it with the nose
+/// down by `degrees` and its motors stopped. The wall's face is 3 m east.
+fn deepest_past_a_wall(parameters: QuadParameters, degrees: f64, point: Vec3) -> f64 {
+    let wall = MapShape::Box {
+        centre: Vec3::new(3.1, 0.0, 2.5),
+        size: Vec3::new(0.2, 20.0, 5.0),
+        attitude: Attitude::BODY_IS_WORLD,
+    };
+    let map = map(vec![ground(), wall]);
+    let attitude = Attitude::from_pilot_angles(PilotAngles {
+        roll: 0.0,
+        pitch: -degrees * DEGREE,
+        heading: 90.0 * DEGREE,
+    });
+    let start = state(Vec3::new(2.9, 0.0, 1.5), Vec3::new(5.0, 0.0, 0.0), attitude);
+    let mut quad = body(parameters, start).unwrap();
+    let mut deepest = f64::NEG_INFINITY;
+    fly(&mut quad, &map, 8000.0, 4000, |quad| {
+        let state = quad.state();
+        let at = state.position + state.attitude.body_to_world(point);
+        deepest = max(deepest, at.x - 3.0);
+    });
+    deepest
+}
+
+#[test]
+fn a_whoops_camera_housing_stops_a_nose_dive_before_the_pictures_top_edge_reaches_the_wall() {
+    // Basis: Rule. The point is 3 mm above the lens, about as high as the
+    // picture's near plane reaches (#268). With the nose down 80° the rings'
+    // front tops are not the first thing the wall meets: the point goes past
+    // the wall without a housing and stays short of it with one. Metres.
+    let point = Vec3::new(0.040, 0.0, 0.019);
+    let without = deepest_past_a_wall(whoop(), 80.0, point);
+    let with = deepest_past_a_wall(whoop_with_a_camera_housing(), 80.0, point);
+    assert!(without > 0.001, "without a housing: {without} m past");
+    assert!(with < 0.0, "with a housing: {with} m past");
+}
+
+#[test]
+fn a_camera_housing_changes_nothing_in_a_level_hit_which_the_rings_take() {
+    // Basis: Rule. Level and nose first, the rings end 43.3 mm ahead of the
+    // centre and the lens is 40 mm ahead, so the rings still take the hit and
+    // the housing does not: the whoop stops where it stopped without one.
+    let level_stop = |parameters: QuadParameters| {
+        deepest_past_a_wall(parameters, 0.0, Vec3::new(0.0433, 0.0, 0.008))
+    };
+    let without = level_stop(whoop());
+    let with = level_stop(whoop_with_a_camera_housing());
+    assert!((without - with).abs() < 1e-9, "{without} and {with}");
 }
 
 #[test]
