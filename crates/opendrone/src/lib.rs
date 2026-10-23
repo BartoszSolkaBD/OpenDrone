@@ -30,6 +30,8 @@
 //! - [`status`]: what the pilot needs to know, in the window's title;
 //! - [`developer`]: commands that draw into an image instead of the window,
 //!   to save the picture or measure what the camera costs a frame;
+//! - [`map_views`] (#291): a developer command that draws a Map as the game
+//!   does, from any camera, into PNG files, for an agent to look at;
 //! - [`reference`](mod@reference): the reference check, a Scenario flown through the game's
 //!   stepping, which must match the headless runner's fingerprint;
 //! - [`watch`]: a developer command that opens a Flight or Thrust Stand
@@ -49,6 +51,7 @@ pub mod clock;
 pub mod developer;
 pub mod drawing;
 pub mod map_drawing;
+pub mod map_views;
 pub mod pilot;
 pub mod reference;
 pub mod save;
@@ -80,6 +83,7 @@ use crate::stepping::{Flight, SteppingPlugin};
 use crate::watch::WatchedScenario;
 
 pub use crate::developer::{measure_camera_cost, screenshot_after};
+pub use crate::map_views::render_map_views;
 
 /// The game in its window: the flight, the pilot's Input Devices and the
 /// keyboard, drawn with no pipelining and no VSync, and the Quad's sound.
