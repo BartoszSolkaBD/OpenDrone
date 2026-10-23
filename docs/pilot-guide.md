@@ -38,7 +38,7 @@ It is `cargo xtask play` with a short name, and it says what it is doing and wha
 
 `./play --no-launch` does steps 1 to 3 and stops before the build. It doesn't replace `cargo run`, which is still how you pass the other options above.
 
-**Or download a build,** with no Rust needed: every push to main, and every release, makes one for macOS, Windows and Linux. Unzip it and double-click `opendrone`. They aren't signed yet, so the system warns the first time. [Builds and releases](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/builds-and-releases.md) says where to find them and how to open them on each system. In a build, every `cargo run --release -p opendrone --` above is just `opendrone`, with the same options after it.
+**Or download a build,** with no Rust needed: every push to main, and every release, makes one for macOS, Windows and Linux. Each is an app you double-click: `OpenDrone.app` in a `.dmg` on macOS, `OpenDrone.exe` in a zip on Windows, and `opendrone` in a tarball on Linux. They aren't signed yet, so the system warns the first time. [Builds and releases](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/builds-and-releases.md) says where to find them and how to open them on each system. In a build, every `cargo run --release -p opendrone --` above is just the program, with the same options after it: `OpenDrone.app/Contents/MacOS/OpenDrone` on macOS, `OpenDrone.exe` on Windows and `./opendrone` on Linux.
 
 ### The screens
 
