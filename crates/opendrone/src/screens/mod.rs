@@ -62,7 +62,7 @@ use crate::pilot::{FlightWorld, Pilot, read_keyboard};
 use crate::set_up::FlightPlan;
 use crate::settings::Settings;
 use crate::settings_file::{Loaded, SettingsFile};
-use crate::sound::QuadSoundPlaying;
+use crate::sound::{QuadSoundPlaying, SoundHeard};
 use crate::stepping::Flight;
 
 pub use self::model::Screen;
@@ -96,8 +96,9 @@ pub struct Screens {
     packs: Packs,
     /// The flight being made behind the loading screen.
     loading: Option<Loading>,
-    /// The game has said (or found nothing to say) about the sound device.
-    said_about_sound: bool,
+    /// What the game has said about the sound device: it says each change
+    /// once.
+    said_about_sound: SoundHeard,
     /// Notices from before the game runs (a settings file that couldn't be
     /// read, a Quad that isn't there any more), said on the first frame.
     to_say: Vec<String>,
@@ -159,7 +160,7 @@ impl Screens {
             catalogue,
             packs,
             loading,
-            said_about_sound: false,
+            said_about_sound: SoundHeard::default(),
             to_say: notices,
         }
     }
@@ -385,15 +386,14 @@ fn drive_the_screens(
     for text in game.pilot.take_device_notices() {
         menus.notice(text, now);
     }
-    if !*said_about_sound {
-        match sound.as_deref().map(QuadSoundPlaying::device) {
-            Some(opendrone_sound::Device::Opening) => {}
-            Some(opendrone_sound::Device::Playing { .. }) => *said_about_sound = true,
-            Some(opendrone_sound::Device::None(_)) | None => {
-                menus.notice("No sound device: OpenDrone runs silent.", now);
-                *said_about_sound = true;
-            }
-        }
+    // No device at the start, a device lost in flight, and a device found
+    // again each get one short notice.
+    let device = sound.as_deref().map(QuadSoundPlaying::device);
+    if let Some(text) = said_about_sound
+        .hear(device.as_ref())
+        .and_then(|change| change.notice)
+    {
+        menus.notice(text, now);
     }
 
     // The Flying device setting reaches the pilot before it picks a device.

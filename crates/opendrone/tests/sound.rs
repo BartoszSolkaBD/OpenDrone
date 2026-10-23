@@ -6,8 +6,9 @@ mod common;
 
 use std::f64::consts::TAU;
 
-use opendrone::sound::{quad_frame, quad_sound, top_speed_and_current};
+use opendrone::sound::{SoundHeard, quad_frame, quad_sound, top_speed_and_current};
 use opendrone::stepping::Flight;
+use opendrone_sound::Device;
 
 fn rpm(rad_per_s: f64) -> f64 {
     rad_per_s * 60.0 / TAU
@@ -83,4 +84,66 @@ fn a_quad_landed_with_its_motors_stopped_hands_the_sound_stopped_motors_and_no_a
     assert_eq!(frame.airspeed, 0.0);
     assert!(!frame.paused);
     assert!(quad_frame(&flight, true).paused);
+}
+
+fn playing_on(name: &str) -> Device {
+    Device::Playing {
+        name: Some(name.to_string()),
+        block_frames: 256,
+        sample_rate: 48_000,
+    }
+}
+
+fn says(heard: &mut SoundHeard, device: &Device) -> Option<String> {
+    heard.hear(Some(device)).and_then(|change| change.notice)
+}
+
+#[test]
+fn a_device_lost_in_flight_gets_one_notice_and_the_new_device_another() {
+    // Rule: the Hub says what is happening to the sound: no device, trying
+    // again, playing (#263), each change once.
+    let mut heard = SoundHeard::default();
+    assert_eq!(says(&mut heard, &Device::Opening), None);
+    assert_eq!(says(&mut heard, &playing_on("headphones")), None);
+    let lost = Device::Lost("the sound device went away".to_string());
+    assert_eq!(
+        says(&mut heard, &lost).as_deref(),
+        Some("Sound device lost: looking for a new one.")
+    );
+    // Still trying: a changed reason is no news.
+    let still = Device::Lost("no sound device".to_string());
+    assert_eq!(says(&mut heard, &still), None);
+    assert_eq!(
+        says(&mut heard, &playing_on("speakers")).as_deref(),
+        Some("Sound is playing on speakers.")
+    );
+    assert_eq!(says(&mut heard, &playing_on("speakers")), None);
+}
+
+#[test]
+fn no_device_at_the_start_says_so_once_and_a_device_that_turns_up_later_says_so() {
+    // Rule: with no sound device the game runs silent and says so once
+    // (sound.md); one that turns up later is used and said (#263).
+    let mut heard = SoundHeard::default();
+    let none = Device::None("no sound device".to_string());
+    assert_eq!(
+        says(&mut heard, &none).as_deref(),
+        Some("No sound device: OpenDrone runs silent.")
+    );
+    assert_eq!(says(&mut heard, &none), None);
+    assert_eq!(
+        says(&mut heard, &playing_on("speakers")).as_deref(),
+        Some("Sound is playing on speakers.")
+    );
+}
+
+#[test]
+fn a_quad_whose_sound_cannot_be_made_says_the_game_runs_silent_once() {
+    // Rule: as above; the game has no sound at all.
+    let mut heard = SoundHeard::default();
+    assert_eq!(
+        heard.hear(None).and_then(|c| c.notice).as_deref(),
+        Some("No sound device: OpenDrone runs silent.")
+    );
+    assert_eq!(heard.hear(None), None);
 }

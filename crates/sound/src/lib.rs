@@ -20,8 +20,9 @@
 //!
 //! [`Sound::start`] plays it on the sound device, asking for a 256-frame
 //! block and taking the device's own if it can't do that. With no sound
-//! device it runs silent; if the device goes away it moves to the new
-//! default one. [`Offline`] makes the same sound with no device, for tests.
+//! device it runs silent and keeps trying; if the device goes away it moves
+//! to the new default one, and keeps trying until one opens or the game
+//! stops. [`Offline`] makes the same sound with no device, for tests.
 //!
 //! Where you stand, the beeps, Prop Strike ticks, hits and Background Sounds
 //! come with #75.
@@ -36,7 +37,7 @@ mod offline;
 mod on_the_quad;
 mod voice;
 
-pub use live::{BLOCK_FRAMES_ASKED, Device, Sound};
+pub use live::{BLOCK_FRAMES_ASKED, Device, Output, Sound};
 pub use offline::Offline;
 
 /// What the sound needs to know about a Quad, from its Quad definition.
