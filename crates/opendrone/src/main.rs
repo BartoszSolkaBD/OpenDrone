@@ -13,6 +13,7 @@ use opendrone::camera::controls::{CameraSettings, FOV_RANGE, QuadCamera, TILT_RA
 use opendrone::camera::lens::Aspect;
 use opendrone::camera::look::VideoLook;
 use opendrone::drawing::View;
+use opendrone::map_views::{DEFAULT_SIZE, ViewRequest};
 use opendrone::pilot::Pilot;
 use opendrone::screens::{Screen, Screens};
 use opendrone::set_up::{FlightPlan, open_packs, repo_folder};
@@ -20,7 +21,8 @@ use opendrone::settings::Settings;
 use opendrone::settings_file::{Loaded, PilotSettings, SettingsFile};
 use opendrone::watch::open_scenario;
 use opendrone::{
-    game, headless, measure_camera_cost, reference, screens_game, screenshot_after, watching_game,
+    game, headless, measure_camera_cost, reference, render_map_views, screens_game,
+    screenshot_after, watching_game,
 };
 
 /// The Quads `--quad` takes, by the id after `opendrone/`.
@@ -99,6 +101,21 @@ Launch; after that you land on the Hub, and FLY takes you to the Launch Spot.
                                   N seconds of each Video Look (5 if not
                                   given), in a 2560x1440 picture unless
                                   --size says otherwise
+  opendrone --render-views DIR [--view \"WORDS\"]... [--views FILE] [--size WxH]
+                                  a developer command: draw the Map (--map,
+                                  or --quad for its camera) as the game draws
+                                  it, from each view, into one PNG in DIR
+                                  apiece, and quit. A view is words such as
+                                  name=front at=0,-5,1.5 toward=0,0,2 fov=100
+                                  look=digital: name, at (east,north,up in
+                                  metres), toward (a point) or heading and
+                                  pitch (degrees), fov (degrees across the
+                                  picture's diagonal) and look (plain, analog
+                                  or digital). What a view leaves out is the
+                                  Quad's camera on the Launch Spot. --views
+                                  reads one view a line. With none, one view
+                                  from the Launch Spot. The picture is
+                                  1280x960 unless --size says otherwise
   opendrone --chase               a developer command: watch the Quad from a
                                   camera that follows it, instead of flying
                                   from the camera on its frame
@@ -129,6 +146,7 @@ enum Mode {
     CameraCost { seconds: f64 },
     Headless { seconds: f64 },
     Reference(Vec<PathBuf>),
+    RenderViews { folder: PathBuf },
 }
 
 fn main() -> ExitCode {
@@ -145,6 +163,7 @@ fn main() -> ExitCode {
     let mut no_screens = false;
     let mut screen: Option<Screen> = None;
     let mut settings_folder: Option<PathBuf> = None;
+    let mut views: Vec<ViewRequest> = Vec::new();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--help" | "-h" => {
@@ -231,6 +250,28 @@ fn main() -> ExitCode {
                 Some(folder) => settings_folder = Some(PathBuf::from(folder)),
                 None => return usage("--settings-folder takes a folder"),
             },
+            "--render-views" => match args.next() {
+                Some(folder) => {
+                    mode = Mode::RenderViews {
+                        folder: PathBuf::from(folder),
+                    }
+                }
+                None => return usage("--render-views takes the folder to save the pictures in"),
+            },
+            "--view" => match args.next().map(|words| ViewRequest::parse(&words)) {
+                Some(Ok(view)) => views.push(view),
+                Some(Err(problem)) => return usage(&format!("--view: {problem}")),
+                None => return usage("--view takes the words of one view"),
+            },
+            "--views" => match args.next().map(|file| {
+                std::fs::read_to_string(&file)
+                    .map_err(|e| format!("can't read {file}: {e}"))
+                    .and_then(|text| ViewRequest::parse_list(&text))
+            }) {
+                Some(Ok(more)) => views.extend(more),
+                Some(Err(problem)) => return usage(&format!("--views: {problem}")),
+                None => return usage("--views takes a file with one view a line"),
+            },
             "--reference" => mode = Mode::Reference(Vec::new()),
             path => match &mut mode {
                 Mode::Reference(paths) => paths.push(PathBuf::from(path)),
@@ -248,13 +289,32 @@ fn main() -> ExitCode {
             "--scenario opens a window: it goes with --screenshot, but not with --headless, --camera-cost or --reference",
         );
     }
+    if !views.is_empty() && !matches!(mode, Mode::RenderViews { .. }) {
+        return usage("--view and --views go with --render-views");
+    }
+    if matches!(mode, Mode::RenderViews { .. })
+        && (look.is_some()
+            || aspect.is_some()
+            || tilt.is_some()
+            || fov.is_some()
+            || scenario.is_some()
+            || view == View::Chase)
+    {
+        return usage(
+            "--render-views sets look and fov in each view, and takes no --look, --aspect, --tilt, --fov, --scenario or --chase",
+        );
+    }
     if scenario.is_some() && quad.is_some() {
         return usage("--scenario names its own Quad, so it doesn't go with --quad");
     }
     // A Test Map, a chase view and a watched Scenario are the developers':
     // they fly at once, with no screens.
     let test_map = map.as_ref().is_some_and(|(_, id)| id.starts_with("test/"));
-    let direct = no_screens || test_map || scenario.is_some() || view == View::Chase;
+    let direct = no_screens
+        || test_map
+        || scenario.is_some()
+        || view == View::Chase
+        || matches!(mode, Mode::RenderViews { .. });
     if screen.is_some() && (direct || !matches!(mode, Mode::Game | Mode::Screenshot { .. })) {
         return usage(
             "--screen goes with the screens: not with --no-screens, a Test Map, --scenario, --chase, --headless or --camera-cost",
@@ -312,6 +372,31 @@ fn main() -> ExitCode {
             Err(problem) => return fail(&problem),
         },
     };
+    let rendering = match &mode {
+        Mode::RenderViews { folder } => {
+            if views.is_empty() {
+                views.push(ViewRequest::launch());
+            }
+            let resolved: Result<Vec<_>, String> = views
+                .iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    v.resolve(&plan)
+                        .map_err(|problem| format!("view {} ({}): {problem}", i + 1, v.name))
+                })
+                .collect();
+            match resolved {
+                Ok(resolved) => {
+                    if let Err(problem) = std::fs::create_dir_all(folder) {
+                        return fail(&format!("can't make {}: {problem}", folder.display()));
+                    }
+                    Some((resolved, plan.map.id.clone()))
+                }
+                Err(problem) => return fail(&problem),
+            }
+        }
+        _ => None,
+    };
     let pilot = Pilot::start(&plan, profiles);
     // A window flying the pilot's own flight, or watching the Scenario.
     let window = |plan, pilot| match watched {
@@ -338,6 +423,17 @@ fn main() -> ExitCode {
         Mode::CameraCost { seconds } => window(plan, pilot).map(|mut app| {
             let size = size.unwrap_or(UVec2::new(2560, 1440));
             measure_camera_cost(&mut app, seconds, size);
+            app
+        }),
+        Mode::RenderViews { folder } => window(plan, pilot).map(|mut app| {
+            let (resolved, map_id) = rendering.expect("the views were resolved");
+            render_map_views(
+                &mut app,
+                resolved,
+                folder,
+                &map_id,
+                size.unwrap_or(DEFAULT_SIZE),
+            );
             app
         }),
         _ => window(plan, pilot),
