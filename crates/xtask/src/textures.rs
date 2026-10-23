@@ -122,7 +122,7 @@ fn fetch_bytes(file: &TextureFile, scratch: &Path) -> Result<Vec<u8>, String> {
     }
 }
 
-fn fetch(root: &Path, manifest: &Manifest, pin: bool) -> Result<String, String> {
+pub(crate) fn fetch(root: &Path, manifest: &Manifest, pin: bool) -> Result<String, String> {
     let cache = root.join(TEXTURES_FOLDER);
     let scratch = root.join("target/textures-download");
     let mut lines = Vec::new();

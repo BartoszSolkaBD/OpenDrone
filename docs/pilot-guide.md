@@ -20,6 +20,24 @@ cargo run --release -p opendrone -- --map flat-floor    # developer command: fly
 
 The first build takes a few minutes. `--release` matters: without it the picture is slow.
 
+### Starting the game from any checkout
+
+If you work from the repo, or from a fresh copy of it (an Orca worktree, say), one command gets the game running with everything it needs:
+
+```sh
+./play                  # Mac and Linux; on Windows, play.cmd
+./play --map bando      # start on another Map (skate-park, bando or flat-floor)
+```
+
+It is `cargo xtask play` with a short name, and it says what it is doing and what it skipped, step by step:
+
+1. **The tools.** It checks you have the Rust the repo pins and CMake, and says how to get one that's missing.
+2. **The pictures.** It downloads the CC0 textures the Maps are drawn with (`cargo xtask textures`), only the ones missing or damaged. Without a network the game still starts, with every surface in its flat colour, and the command says so; run it again once you're online. A later run fetches nothing.
+3. **The Maps.** It uses the Maps' committed `.glb` files, which CI has checked are what the scripts build. Only if you've edited a Map's script in `assets-src/` does it rebuild that Map's `.glb`, and only with the Blender version `assets-src/blender-version.toml` pins; with no such Blender it says so and uses the committed file. Apart from that rebuilt `.glb`, it changes no file the repo tracks.
+4. **The game.** It builds in release mode and starts it. Each checkout builds in its own `target/` folder, so the first start in a new one takes a few minutes and the next ones start at once.
+
+`./play --no-launch` does steps 1 to 3 and stops before the build. It doesn't replace `cargo run`, which is still how you pass the other options above.
+
 **Or download a build,** with no Rust needed: every push to main, and every release, makes one for macOS, Windows and Linux. Unzip it and double-click `opendrone`. They aren't signed yet, so the system warns the first time. [Builds and releases](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/builds-and-releases.md) says where to find them and how to open them on each system. In a build, every `cargo run --release -p opendrone --` above is just `opendrone`, with the same options after it.
 
 ### The screens
@@ -38,7 +56,7 @@ The first build takes a few minutes. `--release` matters: without it the picture
 
 **Your settings** are kept in one file, `settings.toml`, saved the moment a setting changes: in `~/Library/Application Support/OpenDrone` on macOS, `%APPDATA%\OpenDrone` on Windows, and `~/.config/opendrone` on Linux. Saved flights go beside it, in `saved-flights/`. `--settings-folder DIR` uses another folder. If the file can't be read, the game keeps it aside as `settings.broken.toml`, tells you, and starts fresh.
 
-**The Skate Park.** An outdoor concrete park, 62 × 40 m, sunk into the ground: a pool bowl, a round cradle, a snake run that winds along the south side, a full pipe, and on the east a street corner with stairs, handrails, a ring and a pergola with slats to fly between, all at real-world size. The Quad starts on the flat deck between the two bowls, facing the pool. Everything solid is solid: there are no invisible walls, and the ground runs to the horizon. Its surfaces are real concrete, steel, plywood and grass pictures (CC0, from Poly Haven and ambientCG), which `cargo xtask textures` downloads the first time; without them the Map is drawn in flat colours, and flies the same. [Building a Map](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/building-a-map.md) says where they come from.
+**The Skate Park.** An outdoor concrete park, 62 × 40 m, sunk into the ground: a pool bowl, a round cradle, a snake run that winds along the south side, a full pipe, and on the east a street corner with stairs, handrails, a ring and a pergola with slats to fly between, all at real-world size. The Quad starts on the flat deck between the two bowls, facing the pool. Everything solid is solid: there are no invisible walls, and the ground runs to the horizon. Its surfaces are real concrete, steel, plywood and grass pictures (CC0, from Poly Haven and ambientCG), which `./play` (or `cargo xtask textures`) downloads the first time; without them the Map is drawn in flat colours, and flies the same. [Building a Map](https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/building-a-map.md) says where they come from.
 
 **Bando.** A five-floor concrete frame on a 70 × 50 m building site where work stopped, inside city blocks. The frame is 24 × 15 m and 16.9 m tall, with 3.1 m under each ceiling and holes 2 to 5 m across in every floor, one of them a collapsed bay. The west half of the two lowest floors is brick: four rooms a floor off a corridor, with doorways, one smashed gap and windows to fly through, while the three floors above stay open. An open lift shaft is a 17 m dive from the roof to the ground, and a tower crane stands beside the building with a hook hanging on a thin cable. The yard has shipping containers (one stacked), rubble, a site office, a dirt mound and the site fence. The Quad starts in the yard, 17 m south of the building, facing it. Everything solid is solid, thin parts included: the handrails and fence rails are 6 cm across, the crane's hook cable 5 cm and the rebar on the roof 3 cm, and a Quad never passes through them, even at 30 m/s. Inside the building, concrete and brick stand between the Quad and you: the Video Signal, when it arrives, will weaken there.
 
