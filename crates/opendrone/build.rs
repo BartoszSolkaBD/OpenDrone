@@ -64,9 +64,7 @@ fn resource(res: &mut Vec<u8>, kind: u16, number: u16, flags: u16, data: &[u8]) 
     res.extend(0_u32.to_le_bytes());
     res.extend(0_u32.to_le_bytes());
     res.extend(data);
-    while res.len() % 4 != 0 {
-        res.push(0);
-    }
+    res.resize(res.len().next_multiple_of(4), 0);
 }
 
 /// The `.res` file holding the `.ico`'s pictures as icon 1, 2, … and the
