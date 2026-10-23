@@ -49,7 +49,7 @@ use crate::screens::model::InputMode;
 use crate::set_up::FlightPlan;
 use crate::stepping::{Flight, TICK_HZ, step_the_flight};
 
-use self::controls::{CAMERA_ACTIONS, CameraSettings, READOUT_FOR, Repeater, camera_keys};
+use self::controls::{CameraSettings, READOUT_FOR, Repeater, camera_inputs};
 use self::exposure::{METERING_RANGE, compensation_points, metering_mask};
 use self::lens::{Lens, Picture};
 use self::look::{VideoLook, camera_limits};
@@ -233,14 +233,7 @@ fn read_the_camera_keys(
     if pilot.input_mode() != InputMode::Flight {
         return;
     }
-    let mut held = pilot.actions_held();
-    let (keys_held, tapped) = camera_keys(&keys);
-    for action in keys_held {
-        if !held.contains(&action) {
-            held.push(action);
-        }
-    }
-    held.retain(|action| CAMERA_ACTIONS.contains(action));
+    let (held, tapped) = camera_inputs(&keys, pilot.actions_held(), pilot.actions_tapped());
     let now = real.elapsed();
     for action in repeating.0.update_with_taps(now, &held, &tapped) {
         if let Some(changed) = settings.press(&plan.quad.id, &plan.quad.camera, action) {

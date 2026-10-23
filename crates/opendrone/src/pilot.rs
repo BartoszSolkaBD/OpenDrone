@@ -102,6 +102,9 @@ pub struct Pilot {
     found_with: BTreeMap<DeviceId, opendrone_input::Channels>,
     /// The Actions each device held last frame.
     actions_held: BTreeMap<DeviceId, Vec<Action>>,
+    /// The Actions pressed on a button during the last frame, each once,
+    /// including a button pressed and let go within the frame.
+    actions_tapped: Vec<Action>,
     /// Whether the Quad was armed after the last frame's steps.
     armed: bool,
     flight_mode: FlightMode,
@@ -179,6 +182,7 @@ impl Pilot {
             silent: false,
             found_with: BTreeMap::new(),
             actions_held: BTreeMap::new(),
+            actions_tapped: Vec::new(),
             armed: false,
             flight_mode: plan.settings.flight_mode,
             saves_to: repo_folder().join("scenarios").join("saved"),
@@ -444,19 +448,36 @@ impl Pilot {
         let silence = self.inputs.check_silence(now);
         self.handle(silence, world);
 
-        // Actions, from every connected device.
+        // Actions, from every connected device: a button that went down since
+        // the last frame, even one let go again within it, and any other
+        // control that moved into its bound position.
         let mut fired = Vec::new();
+        let mut tapped = Vec::new();
         for device in self.inputs.devices() {
             if device.lost().is_some() {
                 continue;
             }
             let held = device.actions_held();
-            match self.actions_held.insert(device.id(), held.clone()) {
+            let mut fresh = match self.actions_held.insert(device.id(), held.clone()) {
                 // Held when it was found: not a press.
-                None => {}
-                Some(before) => fired.extend(held.into_iter().filter(|a| !before.contains(a))),
+                None => Vec::new(),
+                Some(before) => held
+                    .into_iter()
+                    .filter(|a| !before.contains(a))
+                    .collect::<Vec<_>>(),
+            };
+            for &action in device.actions_pressed() {
+                if !fresh.contains(&action) {
+                    fresh.push(action);
+                }
+                if !tapped.contains(&action) {
+                    tapped.push(action);
+                }
             }
+            fired.extend(fresh);
         }
+        self.inputs.forget_presses();
+        self.actions_tapped = tapped;
         for action in fired {
             self.fire(action, now, world);
         }
@@ -577,6 +598,17 @@ impl Pilot {
         held.sort();
         held.dedup();
         held
+    }
+
+    /// The Actions pressed on a button of a connected Input Device during
+    /// the last frame, each once, in a fixed order. A button pressed and let
+    /// go within the frame is in here but not in [`Pilot::actions_held`].
+    /// A button that stays down shows here only in the frame it went down,
+    /// and in `actions_held` for as long as it is down.
+    pub fn actions_tapped(&self) -> Vec<Action> {
+        let mut tapped = self.actions_tapped.clone();
+        tapped.sort();
+        tapped
     }
 
     /// How many Input Devices are plugged in.
