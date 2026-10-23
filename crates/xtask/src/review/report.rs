@@ -110,8 +110,9 @@ impl Review {
             text,
             "### Downloads\n\nNo Blackbox logs yet: they arrive with #55. To Feel Test this PR, \
              add the `build` label: the Build workflow then makes the game, unsigned, for macOS, \
-             Windows and Linux, again on every push while the label stays. Each build is a zip \
-             among the downloads of that run, on this PR's Checks tab, kept 30 days."
+             Windows and Linux, again on every push while the label stays. Each build is an app \
+             to double-click (a .dmg, a zip and a tarball) among the downloads of that run, on \
+             this PR's Checks tab, kept 30 days."
         );
         text
     }

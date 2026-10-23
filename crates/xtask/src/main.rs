@@ -45,6 +45,8 @@
 //!   parts of the Build, Release, Bevy upgrade and Security workflows: a
 //!   release tag's version, a build laid out as a download, and the issues
 //!   the two scheduled workflows open ([`release`]).
+//! - `icon`: draws the app icon every download carries, or checks the
+//!   committed files are what it draws ([`icon`]).
 //!
 //! [ADR-0003]: https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/adr/0003-crate-split-and-flight-inputs.md
 
@@ -54,6 +56,7 @@ mod book;
 mod core_maths;
 mod datasets;
 mod flight_logs;
+mod icon;
 mod import_tune;
 mod input_monitor;
 mod licences;
@@ -153,12 +156,21 @@ Commands:
   release-version <tag>
       Print the version a release tag releases (v0.1.0-alpha.N before the
       0.1.0 alpha, vX.Y.Z from 0.1.0 on), or say why it isn't one.
-  package --game <built program> --os <macos|windows|linux> --name <name> [--out <folder>] [--no-textures]
-      Lay a built game out as a download, OpenDrone-<name>-<os>.zip in
-      <folder> (default target/dist): the game, with its Packs, the
-      Scenarios, the material library and its textures beside it, where it
-      looks for them, and the licences (the game's own, and the libraries'
-      in THIRD-PARTY-LICENSES.txt), the credits and a README.txt.
+  package --game <built program> --os <macos|windows|linux> --name <name> [--out <folder>] [--no-textures] [--dmg [--sign <identity>]]
+      Lay a built game out as a download in <folder> (default target/dist),
+      an app a pilot double-clicks: on macOS OpenDrone.app, in a zip, or with
+      --dmg (on a Mac) signed and in OpenDrone-<name>-macos.dmg; on Windows
+      OpenDrone.exe in OpenDrone-<name>-windows.zip; on Linux opendrone in
+      OpenDrone-<name>-linux.tar.gz, with its icon and add-to-app-menu.sh.
+      Each carries the Packs, the Scenarios, the material library and its
+      textures where the game looks for them, the licences (the game's own,
+      and the libraries' in THIRD-PARTY-LICENSES.txt), the credits and a
+      README.txt. --sign takes the Developer ID to sign the app with; it is
+      signed ad hoc (-) without one.
+  icon [--check]
+      Draw the app icon into crates/opendrone/icon/ (opendrone.png for Linux,
+      .ico for Windows, .icns for macOS), from shapes, with no outside
+      picture. --check fails when a committed file isn't what it draws.
   bevy-upgrade <index file>
       From crates.io's index entry for bevy, print the \"Upgrade to Bevy 0.N\"
       issues to open, as JSON, from .github/bevy-upgrade-issue.md: one for
@@ -203,6 +215,7 @@ fn main() -> ExitCode {
         "licences" => licences::run(rest),
         "tii-logs" => flight_logs::run_tii(rest),
         "download" => flight_logs::run_download(rest),
+        "icon" => icon::run(rest),
         "release-version" => release::run_release_version(rest),
         "package" => release::run_package(rest),
         "bevy-upgrade" => release::run_bevy_upgrade(rest),

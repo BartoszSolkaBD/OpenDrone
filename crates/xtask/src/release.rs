@@ -4,8 +4,10 @@
 //!
 //! - `release-version <tag>`: the version a tag such as `v0.1.0-alpha.1`
 //!   releases, or why it isn't a release tag.
-//! - `package`: lays out a built game as a download, one zip per operating
-//!   system, in the layout the game looks for beside itself
+//! - `package`: lays out a built game as a download, one per operating
+//!   system, each an app a pilot double-clicks (#297): `OpenDrone.app` in a
+//!   `.dmg` (or a zip), `OpenDrone.exe` in a zip, and `opendrone` in a
+//!   tarball, with the game's files where it looks for them
 //!   (`opendrone::set_up::find_repo_folder`). Packs and Scenarios come from
 //!   the files git tracks, so data downloaded onto this machine (NeuroBEM's,
 //!   which has no licence to redistribute) never goes in. The libraries'
@@ -115,12 +117,14 @@ pub fn release_version(tag: &str) -> Result<String, String> {
 
 // ----- package -------------------------------------------------------------
 
-/// The operating systems a build is made for, by the name in its zip.
+/// The operating systems a build is made for, by the name in its download.
 const SYSTEMS: [&str; 3] = ["macos", "windows", "linux"];
 
 /// What a download holds besides the game itself, from the repo's root. The
-/// game finds `packs/` and `scenarios/` beside itself, and the material
-/// library and its textures under `assets-src/`, as in the repo.
+/// game finds `packs/` and `scenarios/` in its own folder, and the material
+/// library and its textures under `assets-src/`, as in the repo: beside the
+/// program on Windows and Linux, in the app's `Contents/Resources/` on macOS
+/// (`opendrone::set_up::find_repo_folder`).
 const FOLDERS: [&str; 2] = ["packs", "scenarios"];
 const FILES: [&str; 4] = [
     materials::MANIFEST,
@@ -133,14 +137,37 @@ const FILES: [&str; 4] = [
 /// from `crate::licences::file_for(os)`.
 const THIRD_PARTY_LICENCES: &str = "THIRD-PARTY-LICENSES.txt";
 
+/// The licences and credits, which also sit beside the macOS app, where a
+/// pilot sees them, as well as inside it, where they travel with it.
+const LICENCE_FILES: [&str; 4] = [
+    "CREDITS.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    THIRD_PARTY_LICENCES,
+];
+
+/// The macOS app, from the download's top.
+const APP: &str = "OpenDrone.app/Contents";
+
+/// The macOS app's id. It names the app to macOS, so it never changes.
+const BUNDLE_ID: &str = "io.github.bartoszsolkabd.opendrone";
+
+/// The Linux download's script that adds the game to the desktop's app menu.
+const MENU_SCRIPT: &str = "add-to-app-menu.sh";
+
 pub fn run_package(args: &[String]) -> ExitCode {
     const USAGE: &str = "Usage: cargo xtask package --game <built program> --os <macos|windows|linux> \
-                         --name <version or build name> [--out <folder>] [--no-textures]";
+                         --name <version or build name> [--out <folder>] [--no-textures] \
+                         [--dmg [--sign <identity>]]";
     let mut game = None;
     let mut os = None;
     let mut name = None;
     let mut out = PathBuf::from("target/dist");
-    let mut textures = true;
+    let mut options = Options {
+        textures: true,
+        dmg: false,
+        sign: None,
+    };
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         let given = match arg.as_str() {
@@ -148,8 +175,13 @@ pub fn run_package(args: &[String]) -> ExitCode {
             "--os" => rest.next().map(|v| os = Some(v.clone())),
             "--name" => rest.next().map(|v| name = Some(v.clone())),
             "--out" => rest.next().map(|v| out = PathBuf::from(v)),
+            "--sign" => rest.next().map(|v| options.sign = Some(v.clone())),
             "--no-textures" => {
-                textures = false;
+                options.textures = false;
+                Some(())
+            }
+            "--dmg" => {
+                options.dmg = true;
                 Some(())
             }
             _ => None,
@@ -163,7 +195,21 @@ pub fn run_package(args: &[String]) -> ExitCode {
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
-    finish(repo().and_then(|root| package(&root, &game, &os, &name, &out, textures)))
+    finish(repo().and_then(|root| package(&root, &game, &os, &name, &out, &options)))
+}
+
+/// How `package` makes a download, beyond what it holds.
+pub struct Options {
+    /// Whether the Maps' textures go in. Without them the Maps are drawn in
+    /// flat colours.
+    pub textures: bool,
+    /// macOS only, on a Mac: the app is signed and put in a `.dmg`, instead
+    /// of a zip.
+    pub dmg: bool,
+    /// The identity `codesign` signs the app with, such as "Developer ID
+    /// Application: …". Without one, it's signed ad hoc (`-`), which needs
+    /// no certificate: Apple Silicon runs only signed programs.
+    pub sign: Option<String>,
 }
 
 /// Every file git tracks under `folder`, as paths from the repo's root with
@@ -213,53 +259,236 @@ fn files_under(root: &Path, folder: &str) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
-/// The short note at the top of every download.
+/// The short note at the top of every download, with Windows' line ends,
+/// which every system's text editor reads.
 fn read_me(name: &str, os: &str) -> String {
-    let start = match os {
-        "macos" => {
-            "Double-click `opendrone`. It opens in a Terminal window, which shows what the game \
-             says. The build isn't signed, so the first time macOS refuses to open it: open \
-             System Settings, then Privacy & Security, and click Open Anyway beside opendrone's \
-             name. (Or, in Terminal, in this folder: xattr -dr com.apple.quarantine . )"
-        }
-        "windows" => {
-            "Double-click `opendrone.exe`. The build isn't signed, so the first time Windows \
-             SmartScreen may say it protected your PC: click More info, then Run anyway."
-        }
-        _ => {
-            "Run ./opendrone from this folder, or double-click it if your file manager runs \
-             programs. It needs the system's sound library (alsa-lib) and a Vulkan driver, \
-             which most desktops have."
-        }
+    let (start, keep) = match os {
+        "macos" => (
+            "Double-click OpenDrone. To keep it, drag OpenDrone onto Applications first, \
+             then open it from there.\r\n\
+             \r\n\
+             The build isn't signed by a registered developer yet, so the first time, macOS \
+             says it could not verify that OpenDrone is free of malware, and offers only Done \
+             or Move to Trash: click Done. Then open System Settings, then Privacy & Security, \
+             scroll down to Security, and click Open Anyway beside \"OpenDrone was blocked\". \
+             Confirm with Open Anyway and your password. From then on it opens with a \
+             double-click. (On macOS 14 or older: right-click OpenDrone, choose Open, then \
+             Open.)",
+            "Everything the game reads is inside OpenDrone.app. It keeps your settings, and \
+             the flights you save, in ~/Library/Application Support/OpenDrone/ (saved flights \
+             in its saved-flights/ folder), never inside the app.",
+        ),
+        "windows" => (
+            "First take the files out of the zip: right-click it, choose Extract All, then \
+             Extract. Then, in the folder it makes, double-click OpenDrone.exe. (Opened \
+             straight from inside the zip, Windows copies out only the program, and it can't \
+             find its Maps.)\r\n\
+             \r\n\
+             The build isn't signed yet, so the first time, Windows SmartScreen may say \
+             \"Windows protected your PC\": click More info, then Run anyway.",
+            "Keep this folder together: the game reads its Packs (packs\\), the Scenarios \
+             (scenarios\\) and the Maps' textures (assets-src\\) from beside OpenDrone.exe. It \
+             keeps your settings, and the flights you save, in %APPDATA%\\OpenDrone\\ (saved \
+             flights in its saved-flights\\ folder).",
+        ),
+        _ => (
+            "Double-click opendrone, or run ./opendrone in this folder. It needs a Vulkan \
+             driver and the system's sound library (alsa-lib), which most desktops have.\r\n\
+             \r\n\
+             To add OpenDrone to your desktop's app menu, with its icon, run \
+             ./add-to-app-menu.sh in this folder once (./add-to-app-menu.sh --remove takes it \
+             out again). It points the menu at this folder, so run it again if you move the \
+             folder.",
+            "Keep this folder together: the game reads its Packs (packs/), the Scenarios \
+             (scenarios/) and the Maps' textures (assets-src/) from beside itself. It keeps \
+             your settings, and the flights you save, in ~/.config/opendrone/ (saved flights \
+             in its saved-flights/ folder).",
+        ),
     };
     format!(
-        "OpenDrone {name}, an unsigned test build of the FPV simulator.\r\n\
+        "OpenDrone {name}, a test build of the FPV simulator.\r\n\
          \r\n\
          Starting it: {start}\r\n\
          \r\n\
-         Keep this folder together: the game reads its Packs (packs/), the Scenarios \
-         (scenarios/) and the Maps' textures (assets-src/) from beside itself, and saves \
-         flights into scenarios/saved/.\r\n\
+         {keep}\r\n\
          \r\n\
          How to fly it, and what there is so far: \
          https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/pilot-guide.md\r\n\
+         How to open a build on each system: \
+         https://github.com/BartoszSolkaBD/OpenDrone/blob/main/docs/builds-and-releases.md\r\n\
          Licences: LICENSE-MIT and LICENSE-APACHE for OpenDrone; THIRD-PARTY-LICENSES.txt for \
          the libraries built into the game; the textures and where they come from: \
          CREDITS.md.\r\n"
     )
 }
 
-/// Writes `<out>/OpenDrone-<name>-<os>.zip`: one folder of that name holding
-/// the game and everything it reads beside itself. The entries are in name
-/// order with a fixed date, so the same files always give the same zip, and
-/// the game keeps its permission to run on macOS and Linux.
+/// The macOS app's description of itself, which macOS reads to start it:
+/// its name, program, icon and version. `version` is three whole numbers.
+fn info_plist(version: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>OpenDrone</string>
+	<key>CFBundleExecutable</key>
+	<string>OpenDrone</string>
+	<key>CFBundleIconFile</key>
+	<string>OpenDrone</string>
+	<key>CFBundleIdentifier</key>
+	<string>{BUNDLE_ID}</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>OpenDrone</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>{version}</string>
+	<key>CFBundleVersion</key>
+	<string>{version}</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.simulation-games</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>
+"#
+    )
+}
+
+/// The version macOS shows for the app: three whole numbers, as it wants
+/// them. A release's own version (`0.1.0-alpha.1` gives `0.1.0`), or else the
+/// version in the repo's `Cargo.toml`, for a build of main or a PR.
+fn app_version(root: &Path, name: &str) -> Result<String, String> {
+    let version = match release_version(&format!("v{name}")) {
+        Ok(version) => version,
+        Err(_) => {
+            let text = fs::read_to_string(root.join("Cargo.toml"))
+                .map_err(|e| format!("Cargo.toml: {e}"))?;
+            let doc: toml::Table = text.parse().map_err(|e| format!("Cargo.toml: {e}"))?;
+            doc.get("workspace")
+                .and_then(|w| w.get("package"))
+                .and_then(|p| p.get("version"))
+                .and_then(toml::Value::as_str)
+                .ok_or("Cargo.toml's [workspace.package] has no version")?
+                .to_string()
+        }
+    };
+    let core = version.split(['-', '+']).next().unwrap_or(&version);
+    match core.split('.').map(number).collect::<Vec<_>>()[..] {
+        [Some(_), Some(_), Some(_)] => Ok(core.to_string()),
+        _ => Err(format!(
+            "the version {version:?} doesn't start with three whole numbers, as macOS wants"
+        )),
+    }
+}
+
+/// The script that adds the Linux build to the desktop's app menu: a desktop
+/// entry, the file every Linux desktop reads its menu from, written for this
+/// user only, pointing at the folder the script is in. A desktop entry needs
+/// the program's full path, which only the pilot's computer knows, so the
+/// download carries this script rather than the entry itself.
+fn menu_script() -> String {
+    format!(
+        r#"#!/bin/sh
+# Adds OpenDrone to your desktop's app menu, with its icon, for you only:
+# it writes a desktop entry pointing at this folder. Run it again if you move
+# the folder. ./{MENU_SCRIPT} --remove takes the entry out again.
+set -eu
+here=$(cd "$(dirname "$0")" && pwd)
+menu="${{XDG_DATA_HOME:-$HOME/.local/share}}/applications"
+entry="$menu/opendrone.desktop"
+if [ "${{1:-}}" = "--remove" ]; then
+  rm -f "$entry"
+  echo "OpenDrone is out of the app menu."
+  exit 0
+fi
+case "$here" in
+  *'"'*|*'\'*|*'`'*|*'$'*|*'%'*)
+    echo "This folder's path holds a character a desktop entry can't name: move the folder, then run this again." >&2
+    exit 1
+    ;;
+esac
+mkdir -p "$menu"
+cat > "$entry" <<ENTRY
+[Desktop Entry]
+Type=Application
+Name=OpenDrone
+Comment=An open-source FPV flight simulator
+Exec="$here/opendrone"
+Path=$here
+Icon=$here/opendrone.png
+Terminal=false
+Categories=Game;Simulation;
+ENTRY
+echo "OpenDrone is in the app menu: $entry"
+"#
+    )
+}
+
+/// One file of a download: where it goes, from the download's top folder,
+/// with `/` between folders, its bytes, and its Unix permissions.
+struct Item {
+    path: String,
+    bytes: Vec<u8>,
+    mode: u32,
+}
+
+impl Item {
+    fn new(path: impl Into<String>, bytes: impl Into<Vec<u8>>, mode: u32) -> Item {
+        Item {
+            path: path.into(),
+            bytes: bytes.into(),
+            mode,
+        }
+    }
+}
+
+/// Every folder the items sit in, the top one (`""`) first, then in name
+/// order.
+fn folders_of(items: &[Item]) -> Vec<String> {
+    let mut folders: Vec<String> = vec![String::new()];
+    for item in items {
+        for (i, c) in item.path.char_indices() {
+            if c == '/' {
+                folders.push(item.path[..i].to_string());
+            }
+        }
+    }
+    folders.sort();
+    folders.dedup();
+    folders
+}
+
+/// Lays a built game out as a download, in `out`, and says what it wrote:
+///
+/// - **macOS:** `OpenDrone.app`, with the game's files in its
+///   `Contents/Resources/` and the licences and a README beside it, in
+///   `OpenDrone-<name>-macos.zip`; or, with `--dmg` on a Mac, signed and in
+///   `OpenDrone-<name>-macos.dmg`, with a link to Applications to drag it
+///   onto;
+/// - **Windows:** `OpenDrone.exe` with the game's files beside it, in one
+///   folder in `OpenDrone-<name>-windows.zip`;
+/// - **Linux:** `opendrone` with the game's files, its icon and the script
+///   that adds it to the app menu beside it, in one folder in
+///   `OpenDrone-<name>-linux.tar.gz`.
+///
+/// A zip or tarball has its entries in name order with a fixed date, so the
+/// same files always give the same download, and the programs keep their
+/// permission to run on macOS and Linux.
 pub fn package(
     root: &Path,
     game: &Path,
     os: &str,
     name: &str,
     out: &Path,
-    textures: bool,
+    options: &Options,
 ) -> Result<String, String> {
     if !SYSTEMS.contains(&os) {
         return Err(format!(
@@ -272,6 +501,12 @@ pub fn package(
         return Err(format!(
             "--name goes into the file name, so it takes only letters, digits and . - + _, not {name:?}"
         ));
+    }
+    if (options.dmg || options.sign.is_some()) && os != "macos" {
+        return Err("--dmg and --sign are for the macOS app: they go with --os macos".into());
+    }
+    if options.sign.is_some() && !options.dmg {
+        return Err("--sign signs the app on its way into the .dmg: it goes with --dmg".into());
     }
     let program =
         fs::read(game).map_err(|e| format!("the game, {}, can't be read: {e}", game.display()))?;
@@ -301,50 +536,108 @@ pub fn package(
         let pictures = ["diffuse.jpg", "normal.jpg"].map(|p| format!("{folder}/{p}"));
         if pictures.iter().all(|p| root.join(p).is_file()) {
             textured += 1;
-            if textures {
+            if options.textures {
                 files.extend(pictures);
             }
         } else {
             missing.push(texture.name.clone());
         }
     }
-    if textures && !missing.is_empty() {
+    if options.textures && !missing.is_empty() {
         return Err(format!(
             "these textures aren't fetched yet, so the Maps would be drawn in flat colours: {}. \
              Run `cargo xtask textures` first, or pass --no-textures.",
             missing.join(", ")
         ));
     }
-    files.sort();
+    let icon = |path: &str| {
+        fs::read(root.join(path))
+            .map_err(|e| format!("{path} can't be read ({e}): run `cargo xtask icon`"))
+    };
+
+    // The game's own files, where it reads them from: beside the program, or
+    // in the macOS app's Resources.
+    let data = if os == "macos" {
+        format!("{APP}/Resources/")
+    } else {
+        String::new()
+    };
+    let mut items = Vec::new();
+    for path in &files {
+        let bytes = fs::read(root.join(path)).map_err(|e| format!("{path}: {e}"))?;
+        items.push(Item::new(format!("{data}{path}"), bytes, 0o644));
+    }
+    items.push(Item::new(
+        format!("{data}{THIRD_PARTY_LICENCES}"),
+        third_party_text.clone(),
+        0o644,
+    ));
+    items.push(Item::new("README.txt", read_me(name, os), 0o644));
+    let program_name = match os {
+        "macos" => {
+            items.push(Item::new(
+                format!("{APP}/Info.plist"),
+                info_plist(&app_version(root, name)?),
+                0o644,
+            ));
+            items.push(Item::new(
+                format!("{APP}/Resources/OpenDrone.icns"),
+                icon(crate::icon::ICNS)?,
+                0o644,
+            ));
+            for file in LICENCE_FILES {
+                let bytes = if file == THIRD_PARTY_LICENCES {
+                    third_party_text.clone()
+                } else {
+                    fs::read(root.join(file)).map_err(|e| format!("{file}: {e}"))?
+                };
+                items.push(Item::new(file, bytes, 0o644));
+            }
+            format!("{APP}/MacOS/OpenDrone")
+        }
+        "windows" => "OpenDrone.exe".to_string(),
+        _ => {
+            items.push(Item::new("opendrone.png", icon(crate::icon::PNG)?, 0o644));
+            items.push(Item::new(MENU_SCRIPT, menu_script(), 0o755));
+            "opendrone".to_string()
+        }
+    };
+    items.push(Item::new(program_name.clone(), program, 0o755));
+    items.sort_by(|a, b| a.path.cmp(&b.path));
 
     let top = format!("OpenDrone-{name}-{os}");
-    let program_name = if os == "windows" {
-        "opendrone.exe"
-    } else {
-        "opendrone"
-    };
     fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
-    let zip_path = out.join(format!("{top}.zip"));
-    let file = fs::File::create(&zip_path).map_err(|e| format!("{}: {e}", zip_path.display()))?;
+    let written = match os {
+        "macos" if options.dmg => {
+            write_dmg(out, &top, &items, options.sign.as_deref().unwrap_or("-"))?
+        }
+        "linux" => write_tarball(&out.join(format!("{top}.tar.gz")), &top, &items)?,
+        _ => write_zip(&out.join(format!("{top}.zip")), &top, &items)?,
+    };
+
+    let textures_line = if options.textures {
+        format!("{textured} textures")
+    } else {
+        "no textures (--no-textures): the Maps are drawn in flat colours".to_string()
+    };
+    Ok(format!(
+        "{}: the game ({program_name}), {} files of Packs, Scenarios, licences and credits, and {textures_line}.",
+        written.display(),
+        files.len() + 1 - if options.textures { 2 * textured } else { 0 },
+    ))
+}
+
+/// Writes the items into one folder, `top`, in a zip.
+fn write_zip(path: &Path, top: &str, items: &[Item]) -> Result<PathBuf, String> {
+    let file = fs::File::create(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let mut zip = ZipWriter::new(std::io::BufWriter::new(file));
     // Unix permissions whichever system makes the zip, so a Windows-made zip
     // still lets the game run on macOS and Linux.
     let options = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
         .system(System::Unix);
-    let problem = |e: &dyn std::fmt::Display| format!("{}: {e}", zip_path.display());
-
-    let mut folders: Vec<String> = vec![String::new()];
-    for path in &files {
-        for (i, c) in path.char_indices() {
-            if c == '/' {
-                folders.push(path[..i].to_string());
-            }
-        }
-    }
-    folders.sort();
-    folders.dedup();
-    for folder in &folders {
+    let problem = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
+    for folder in folders_of(items) {
         let entry = if folder.is_empty() {
             format!("{top}/")
         } else {
@@ -353,39 +646,189 @@ pub fn package(
         zip.add_directory(entry, options.unix_permissions(0o755))
             .map_err(|e| problem(&e))?;
     }
-
-    let mut write = |entry: String, bytes: &[u8], mode: u32| -> Result<(), String> {
-        zip.start_file(entry, options.unix_permissions(mode))
-            .map_err(|e| problem(&e))?;
-        zip.write_all(bytes).map_err(|e| problem(&e))
-    };
-    write(format!("{top}/{program_name}"), &program, 0o755)?;
-    write(
-        format!("{top}/README.txt"),
-        read_me(name, os).as_bytes(),
-        0o644,
-    )?;
-    write(
-        format!("{top}/{THIRD_PARTY_LICENCES}"),
-        &third_party_text,
-        0o644,
-    )?;
-    for path in &files {
-        let bytes = fs::read(root.join(path)).map_err(|e| format!("{path}: {e}"))?;
-        write(format!("{top}/{path}"), &bytes, 0o644)?;
+    for item in items {
+        zip.start_file(
+            format!("{top}/{}", item.path),
+            options.unix_permissions(item.mode),
+        )
+        .map_err(|e| problem(&e))?;
+        zip.write_all(&item.bytes).map_err(|e| problem(&e))?;
     }
     zip.finish().map_err(|e| problem(&e))?;
+    Ok(path.to_path_buf())
+}
 
-    let textures_line = if textures {
-        format!("{textured} textures")
+/// The fixed date every tarball entry carries: 1 January 1980, as a zip's
+/// entries do, in seconds since 1970.
+const TAR_DATE: u64 = 315_532_800;
+
+/// One 512-byte tar header, in the POSIX (ustar) layout every `tar` reads:
+/// a path of up to 100 bytes, or up to 255 split at a `/` into a prefix and
+/// a name. `kind` is `b'0'` for a file and `b'5'` for a folder.
+fn tar_header(path: &str, size: u64, mode: u32, kind: u8) -> Result<[u8; 512], String> {
+    let mut header = [0_u8; 512];
+    let (prefix, name) = if path.len() <= 100 {
+        ("", path)
     } else {
-        "no textures (--no-textures): the Maps are drawn in flat colours".to_string()
+        let split = path
+            .char_indices()
+            .filter(|&(i, c)| c == '/' && i <= 155 && path.len() - i - 1 <= 100)
+            .map(|(i, _)| i)
+            .next()
+            .ok_or_else(|| format!("{path} is too long a path for a tarball"))?;
+        (&path[..split], &path[split + 1..])
     };
-    Ok(format!(
-        "{}: the game ({program_name}), {} files of Packs, Scenarios, licences and credits, and {textures_line}.",
-        zip_path.display(),
-        files.len() + 1 - if textures { 2 * textured } else { 0 },
-    ))
+    let mut put = |at: usize, text: &[u8]| header[at..at + text.len()].copy_from_slice(text);
+    put(0, name.as_bytes());
+    put(100, format!("{mode:07o}\0").as_bytes());
+    put(108, b"0000000\0");
+    put(116, b"0000000\0");
+    put(124, format!("{size:011o}\0").as_bytes());
+    put(136, format!("{TAR_DATE:011o}\0").as_bytes());
+    put(148, b"        ");
+    put(156, &[kind]);
+    put(257, b"ustar\0");
+    put(263, b"00");
+    put(345, prefix.as_bytes());
+    let sum: u32 = header.iter().map(|&b| u32::from(b)).sum();
+    header[148..156].copy_from_slice(format!("{sum:06o}\0 ").as_bytes());
+    Ok(header)
+}
+
+/// Writes the items into one folder, `top`, in a gzipped tarball, the way a
+/// Linux download usually comes.
+fn write_tarball(path: &Path, top: &str, items: &[Item]) -> Result<PathBuf, String> {
+    let mut tar = Vec::new();
+    for folder in folders_of(items) {
+        let entry = if folder.is_empty() {
+            format!("{top}/")
+        } else {
+            format!("{top}/{folder}/")
+        };
+        tar.extend(tar_header(&entry, 0, 0o755, b'5')?);
+    }
+    for item in items {
+        let entry = format!("{top}/{}", item.path);
+        tar.extend(tar_header(
+            &entry,
+            item.bytes.len() as u64,
+            item.mode,
+            b'0',
+        )?);
+        tar.extend(&item.bytes);
+        tar.resize(tar.len().div_ceil(512) * 512, 0);
+    }
+    // Two empty blocks end a tarball.
+    tar.resize(tar.len() + 1024, 0);
+    let file = fs::File::create(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let mut gzip = flate2::GzBuilder::new()
+        .mtime(0)
+        .write(std::io::BufWriter::new(file), flate2::Compression::best());
+    let problem = |e: std::io::Error| format!("{}: {e}", path.display());
+    gzip.write_all(&tar).map_err(problem)?;
+    gzip.finish().map_err(problem)?.flush().map_err(problem)?;
+    Ok(path.to_path_buf())
+}
+
+/// Runs a macOS tool, and says what it said if it fails.
+#[cfg(target_os = "macos")]
+fn run_tool(tool: &str, args: &[&std::ffi::OsStr]) -> Result<(), String> {
+    let output = std::process::Command::new(tool)
+        .args(args)
+        .output()
+        .map_err(|e| format!("can't run {tool}: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{tool} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
+}
+
+/// Lays the items out in `out/<top>/`, signs the app with `identity` (`-`
+/// for ad hoc), checks the signature, and puts the folder, with a link to
+/// Applications, into `out/<top>.dmg`, a disk image macOS opens with a
+/// double-click. Both tools, `codesign` and `hdiutil`, come with macOS.
+#[cfg(target_os = "macos")]
+fn write_dmg(out: &Path, top: &str, items: &[Item], identity: &str) -> Result<PathBuf, String> {
+    use std::ffi::OsStr;
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let stage = out.join(top);
+    let problem = |path: &Path, e: std::io::Error| format!("{}: {e}", path.display());
+    if stage.exists() {
+        fs::remove_dir_all(&stage).map_err(|e| problem(&stage, e))?;
+    }
+    for item in items {
+        let path = stage.join(&item.path);
+        let folder = path.parent().expect("inside the stage");
+        fs::create_dir_all(folder).map_err(|e| problem(folder, e))?;
+        fs::write(&path, &item.bytes).map_err(|e| problem(&path, e))?;
+        fs::set_permissions(&path, fs::Permissions::from_mode(item.mode))
+            .map_err(|e| problem(&path, e))?;
+    }
+    let applications = stage.join("Applications");
+    std::os::unix::fs::symlink("/Applications", &applications)
+        .map_err(|e| problem(&applications, e))?;
+
+    let app = stage.join("OpenDrone.app");
+    let mut sign: Vec<&OsStr> = ["--force", "--sign", identity].map(OsStr::new).to_vec();
+    if identity == "-" {
+        sign.push(OsStr::new("--timestamp=none"));
+    } else {
+        // What notarisation asks for: the hardened runtime and Apple's
+        // timestamp.
+        sign.extend(["--options", "runtime", "--timestamp"].map(OsStr::new));
+    }
+    sign.push(app.as_os_str());
+    run_tool("codesign", &sign)?;
+    run_tool(
+        "codesign",
+        &[
+            OsStr::new("--verify"),
+            OsStr::new("--strict"),
+            app.as_os_str(),
+        ],
+    )?;
+
+    let dmg = out.join(format!("{top}.dmg"));
+    let args: Vec<&OsStr> = vec![
+        OsStr::new("create"),
+        OsStr::new("-volname"),
+        OsStr::new("OpenDrone"),
+        OsStr::new("-srcfolder"),
+        stage.as_os_str(),
+        OsStr::new("-fs"),
+        OsStr::new("HFS+"),
+        OsStr::new("-format"),
+        OsStr::new("UDZO"),
+        OsStr::new("-ov"),
+        dmg.as_os_str(),
+    ];
+    // hdiutil sometimes finds the disk busy on a shared machine, such as
+    // GitHub's: a second or third try works.
+    let mut made = run_tool("hdiutil", &args);
+    for _ in 0..2 {
+        if made.is_ok() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        made = run_tool("hdiutil", &args);
+    }
+    made?;
+    fs::remove_dir_all(&stage).map_err(|e| problem(&stage, e))?;
+    Ok(dmg)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn write_dmg(_: &Path, _: &str, _: &[Item], _: &str) -> Result<PathBuf, String> {
+    Err(
+        "--dmg needs a Mac: it signs the app with codesign and makes the disk image with \
+         hdiutil, which come only with macOS. Without --dmg, the app goes in a zip."
+            .into(),
+    )
 }
 
 // ----- bevy-upgrade --------------------------------------------------------

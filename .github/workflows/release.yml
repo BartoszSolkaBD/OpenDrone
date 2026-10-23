@@ -1,6 +1,7 @@
 # Publishes a GitHub pre-release when the maintainer pushes a version tag
-# (#15 §8, #81): three zips, one per operating system, built by build.yml,
-# and notes made from the titles of the PRs merged since the last release.
+# (#15 §8, #81): three downloads built by build.yml, one per operating
+# system (the macOS .dmg, the Windows zip and the Linux tarball, #297), and
+# notes made from the titles of the PRs merged since the last release.
 #
 # A tag is v0.1.0-alpha.N for a test build before the 0.1.0 alpha, and
 # vX.Y.Z from 0.1.0 on (`cargo xtask release-version` says which tags
@@ -73,6 +74,8 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       version: ${{ needs.version.outputs.version }}
+    # The signing secrets, once the maintainer adds them (build.yml).
+    secrets: inherit
 
   publish:
     name: Publish the pre-release
@@ -89,14 +92,14 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: There is one zip for each operating system
+      - name: There is one download for each operating system
         shell: bash
         env:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          for system in macos windows linux; do
-            test -f "dist/OpenDrone-$VERSION-$system.zip" || { echo "::error::No build for $system"; exit 1; }
+          for file in macos.dmg windows.zip linux.tar.gz; do
+            test -f "dist/OpenDrone-$VERSION-$file" || { echo "::error::No build: OpenDrone-$VERSION-$file"; exit 1; }
           done
           ls -l dist
 
@@ -104,8 +107,8 @@ jobs:
         # GitHub writes the notes: one line per PR merged since the previous
         # tag, with its title, as each PR's squash commit carries. A release
         # made by hand on GitHub's Releases page, which makes its tag too,
-        # gets the three zips added and is marked a pre-release; its notes
-        # are left as written there.
+        # gets the three downloads added and is marked a pre-release; its
+        # notes are left as written there.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,10 +116,11 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
+          files=("dist/OpenDrone-$VERSION-macos.dmg" "dist/OpenDrone-$VERSION-windows.zip" "dist/OpenDrone-$VERSION-linux.tar.gz")
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --prerelease
           else
-            gh release create "$TAG" dist/*.zip --repo "$GITHUB_REPOSITORY" --verify-tag \
+            gh release create "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --verify-tag \
               --prerelease --generate-notes --title "OpenDrone $VERSION"
           fi

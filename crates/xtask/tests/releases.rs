@@ -58,7 +58,8 @@ impl Repo {
         let repo = Repo { root };
         repo.write(
             "Cargo.toml",
-            "[workspace]\n\n[workspace.dependencies]\nbevy = { version = \"=0.20.0\", default-features = false }\n",
+            "[workspace]\n\n[workspace.package]\nversion = \"0.1.0-alpha.0\"\n\n\
+             [workspace.dependencies]\nbevy = { version = \"=0.20.0\", default-features = false }\n",
         );
         repo
     }
@@ -103,6 +104,8 @@ impl Repo {
             );
         }
         self.write("built/opendrone", "the game's program");
+        self.write("crates/opendrone/icon/opendrone.png", "PNG icon");
+        self.write("crates/opendrone/icon/opendrone.icns", "icns icon");
         self.track();
     }
 
@@ -131,6 +134,52 @@ impl Repo {
         self.write("assets-src/textures/concrete/diffuse.jpg", "JPEG d");
         self.write("assets-src/textures/concrete/normal.jpg", "JPEG n");
     }
+}
+
+/// Each entry of a download, a zip or a gzipped tarball: its name, its Unix
+/// permissions and its bytes. A folder's name ends in `/`.
+fn unpack(path: &Path) -> Vec<(String, Option<u32>, Vec<u8>)> {
+    if path.to_string_lossy().ends_with(".tar.gz") {
+        untar(path)
+    } else {
+        unzip(path)
+    }
+}
+
+/// Each entry of a gzipped tarball, read by the POSIX (ustar) layout.
+fn untar(path: &Path) -> Vec<(String, Option<u32>, Vec<u8>)> {
+    let mut tar = Vec::new();
+    flate2::read::GzDecoder::new(fs::File::open(path).unwrap())
+        .read_to_end(&mut tar)
+        .unwrap();
+    let text =
+        |b: &[u8]| String::from_utf8(b.iter().copied().take_while(|&c| c != 0).collect()).unwrap();
+    let octal = |b: &[u8]| u64::from_str_radix(text(b).trim(), 8).unwrap();
+    let mut entries = Vec::new();
+    let mut at = 0;
+    while at + 512 <= tar.len() && tar[at..at + 512].iter().any(|&b| b != 0) {
+        let header = &tar[at..at + 512];
+        assert_eq!(&header[257..263], b"ustar\0", "a POSIX tar header");
+        let stored: u32 = header[..148]
+            .iter()
+            .chain(&[b' '; 8])
+            .chain(&header[156..])
+            .map(|&b| u32::from(b))
+            .sum();
+        assert_eq!(u64::from(stored), octal(&header[148..156]), "its checksum");
+        let (prefix, name) = (text(&header[345..500]), text(&header[..100]));
+        let name = if prefix.is_empty() {
+            name
+        } else {
+            format!("{prefix}/{name}")
+        };
+        let size = octal(&header[124..136]) as usize;
+        let mode = octal(&header[100..108]) as u32;
+        at += 512;
+        entries.push((name, Some(mode & 0o777), tar[at..at + size].to_vec()));
+        at += size.div_ceil(512) * 512;
+    }
+    entries
 }
 
 /// Each entry of a zip: its name, its Unix permissions and its bytes.
@@ -213,15 +262,282 @@ fn a_tag_that_is_not_a_release_version_releases_nothing() {
 
 // ----- Packaging -----------------------------------------------------------
 
+/// What every download carries, from the repo, where the game reads it:
+/// the Packs, a Scenario, the material library and its textures, and the
+/// licences and credits.
+const THE_GAMES_FILES: [&str; 10] = [
+    "packs/opendrone/pack.toml",
+    "packs/opendrone/maps/skate-park/skate-park.glb",
+    "scenarios/physics/free-fall.toml",
+    "assets-src/materials.toml",
+    "assets-src/textures/concrete/diffuse.jpg",
+    "assets-src/textures/concrete/normal.jpg",
+    "CREDITS.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "THIRD-PARTY-LICENSES.txt",
+];
+
+/// Packages the scratch repo's game for `os`, named `name`, into `dist/`,
+/// and gives the download's entries.
+fn package_for(repo: &Repo, os: &str, name: &str) -> Vec<(String, Option<u32>, Vec<u8>)> {
+    let (ok, out, err) = repo.run(&[
+        "package",
+        "--game",
+        "built/opendrone",
+        "--os",
+        os,
+        "--name",
+        name,
+        "--out",
+        "dist",
+    ]);
+    assert!(ok, "{os}: {err}");
+    assert!(out.contains("1 textures"), "{out}");
+    let file = if os == "linux" {
+        format!("dist/OpenDrone-{name}-{os}.tar.gz")
+    } else {
+        format!("dist/OpenDrone-{name}-{os}.zip")
+    };
+    unpack(&repo.root.join(file))
+}
+
 #[test]
-fn a_download_holds_the_game_with_its_packs_and_scenarios_beside_it() {
-    // Basis: Rule (#81): the maintainer unzips a build and double-clicks it,
-    // and the game finds packs/ and scenarios/ beside itself
+fn the_windows_and_linux_downloads_hold_the_game_with_its_packs_and_scenarios_beside_it() {
+    // Basis: Rule (#81, #297): the pilot unpacks a build and double-clicks
+    // it, and the game finds packs/ and scenarios/ beside itself
     // (opendrone::set_up::find_repo_folder), the material library and its
-    // textures under assets-src/ (map_drawing.rs), as in the repo.
+    // textures under assets-src/ (map_drawing.rs), as in the repo. Linux's
+    // also carries its icon and the script that adds it to the app menu.
     let repo = Repo::new("layout");
     repo.with_the_games_files();
     repo.with_the_textures();
+    for (os, program, more) in [
+        ("windows", "OpenDrone.exe", &[][..]),
+        (
+            "linux",
+            "opendrone",
+            &["opendrone.png", "add-to-app-menu.sh"][..],
+        ),
+    ] {
+        let entries = package_for(&repo, os, "0.1.0-alpha.1");
+        let top = format!("OpenDrone-0.1.0-alpha.1-{os}");
+        let files: Vec<&str> = entries
+            .iter()
+            .map(|(n, _, _)| n.as_str())
+            .filter(|n| !n.ends_with('/'))
+            .collect();
+        let mut want: Vec<&str> = vec![program, "README.txt"];
+        want.extend(THE_GAMES_FILES);
+        want.extend(more);
+        for file in &want {
+            assert!(
+                files.contains(&format!("{top}/{file}").as_str()),
+                "{os}: {file} in {files:?}"
+            );
+        }
+        assert_eq!(files.len(), want.len(), "{os}: nothing else: {files:?}");
+        let (_, _, bytes) = entries
+            .iter()
+            .find(|(n, _, _)| n == &format!("{top}/{program}"))
+            .unwrap();
+        assert_eq!(bytes, b"the game's program", "{os}");
+    }
+}
+
+#[test]
+fn the_macos_download_is_an_app_holding_the_game_and_its_files() {
+    // Basis: Rule (#297): macOS opens an app bundle with a double-click and
+    // no Terminal window: the program in Contents/MacOS/, named by
+    // Info.plist's CFBundleExecutable, its icon and files in
+    // Contents/Resources/, where the game looks inside its app
+    // (opendrone::set_up::find_repo_folder). The README and licences also
+    // sit beside the app, where the pilot sees them.
+    let repo = Repo::new("macos-app");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    let entries = package_for(&repo, "macos", "0.1.0-alpha.1");
+    let top = "OpenDrone-0.1.0-alpha.1-macos";
+    let app = format!("{top}/OpenDrone.app/Contents");
+    let files: Vec<&str> = entries
+        .iter()
+        .map(|(n, _, _)| n.as_str())
+        .filter(|n| !n.ends_with('/'))
+        .collect();
+    let mut want: Vec<String> = vec![
+        format!("{app}/Info.plist"),
+        format!("{app}/MacOS/OpenDrone"),
+        format!("{app}/Resources/OpenDrone.icns"),
+        format!("{top}/README.txt"),
+    ];
+    want.extend(THE_GAMES_FILES.map(|f| format!("{app}/Resources/{f}")));
+    want.extend(
+        [
+            "CREDITS.md",
+            "LICENSE-MIT",
+            "LICENSE-APACHE",
+            "THIRD-PARTY-LICENSES.txt",
+        ]
+        .map(|f| format!("{top}/{f}")),
+    );
+    for file in &want {
+        assert!(files.contains(&file.as_str()), "{file} in {files:?}");
+    }
+    assert_eq!(files.len(), want.len(), "nothing else: {files:?}");
+    let read = |name: &str| {
+        let (_, mode, bytes) = entries.iter().find(|(n, _, _)| n == name).unwrap();
+        (*mode, String::from_utf8_lossy(bytes).into_owned())
+    };
+    assert_eq!(
+        read(&format!("{app}/MacOS/OpenDrone")),
+        (Some(0o755), "the game's program".to_string())
+    );
+    assert_eq!(
+        read(&format!("{app}/Resources/OpenDrone.icns")).1,
+        "icns icon"
+    );
+    let (_, plist) = read(&format!("{app}/Info.plist"));
+    for (key, value) in [
+        ("CFBundleExecutable", "<string>OpenDrone</string>"),
+        ("CFBundleIconFile", "<string>OpenDrone</string>"),
+        ("CFBundlePackageType", "<string>APPL</string>"),
+        (
+            "CFBundleIdentifier",
+            "<string>io.github.bartoszsolkabd.opendrone</string>",
+        ),
+        // A release's version, as three whole numbers.
+        ("CFBundleShortVersionString", "<string>0.1.0</string>"),
+    ] {
+        let after = plist
+            .split_once(&format!("<key>{key}</key>"))
+            .unwrap_or_else(|| panic!("{key} in {plist}"))
+            .1;
+        assert!(after.trim_start().starts_with(value), "{key}: {plist}");
+    }
+}
+
+#[test]
+fn a_build_of_main_names_the_app_after_the_repos_version() {
+    // Basis: Rule (#297): macOS wants an app's version as whole numbers, and
+    // main-abc1234 isn't one, so a build of main or a PR takes the version
+    // Cargo.toml gives, without its pre-release.
+    let repo = Repo::new("macos-version");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    let entries = package_for(&repo, "macos", "main-abc1234");
+    let (_, _, plist) = entries
+        .iter()
+        .find(|(n, _, _)| n.ends_with("/Info.plist"))
+        .unwrap();
+    let plist = String::from_utf8_lossy(plist);
+    assert!(
+        plist.contains("<key>CFBundleVersion</key>\n\t<string>0.1.0</string>"),
+        "{plist}"
+    );
+}
+
+#[test]
+fn each_downloads_readme_says_how_to_open_it_on_its_system() {
+    // Basis: Rule (#297): the builds aren't signed, so the README says what
+    // the system's first warning looks like and how to get past it, and
+    // where saved flights go.
+    let repo = Repo::new("readme");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    for (os, says) in [
+        (
+            "macos",
+            &[
+                "Double-click OpenDrone",
+                "Applications",
+                "Open Anyway",
+                "Privacy & Security",
+                "~/Library/Application Support/OpenDrone/",
+            ][..],
+        ),
+        (
+            "windows",
+            &[
+                "Extract All",
+                "OpenDrone.exe",
+                "More info, then Run anyway",
+                "%APPDATA%\\OpenDrone\\",
+            ][..],
+        ),
+        (
+            "linux",
+            &[
+                "Double-click opendrone",
+                "./add-to-app-menu.sh",
+                "Vulkan",
+                "~/.config/opendrone/",
+            ][..],
+        ),
+    ] {
+        let entries = package_for(&repo, os, "x");
+        let (_, _, readme) = entries
+            .iter()
+            .find(|(n, _, _)| n == &format!("OpenDrone-x-{os}/README.txt"))
+            .unwrap_or_else(|| panic!("{os}: a README.txt at the top"));
+        let readme = String::from_utf8_lossy(readme);
+        for text in says {
+            assert!(readme.contains(text), "{os}: {text:?} in {readme}");
+        }
+    }
+}
+
+#[test]
+fn the_linux_script_adds_a_desktop_entry_naming_the_folder_it_is_in() {
+    // Basis: Rule (#297): a Linux desktop lists an app in its menu from a
+    // desktop entry in ~/.local/share/applications/, which must name the
+    // program and icon by their full paths, known only once the pilot has
+    // unpacked the download: so the download carries a script that writes
+    // it, rather than the entry itself.
+    let repo = Repo::new("desktop-entry");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    let entries = package_for(&repo, "linux", "x");
+    let (_, mode, script) = entries
+        .iter()
+        .find(|(n, _, _)| n == "OpenDrone-x-linux/add-to-app-menu.sh")
+        .unwrap();
+    assert_eq!(*mode, Some(0o755), "it runs");
+    let script = String::from_utf8_lossy(script);
+    assert!(script.starts_with("#!/bin/sh\n"), "{script}");
+    for line in [
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=OpenDrone",
+        "Exec=\"$here/opendrone\"",
+        "Icon=$here/opendrone.png",
+        "Terminal=false",
+        "Categories=Game;Simulation;",
+        "--remove",
+    ] {
+        assert!(script.contains(line), "{line:?} in {script}");
+    }
+    assert!(
+        script.contains("${XDG_DATA_HOME:-$HOME/.local/share}/applications"),
+        "{script}"
+    );
+}
+
+#[test]
+fn the_macos_app_is_signed_and_put_in_a_disk_image_with_dmg() {
+    // Basis: Rule (#297): Apple Silicon runs only signed programs, so the
+    // app is signed (ad hoc, with no certificate, until the maintainer has a
+    // Developer ID), and it comes in a .dmg, which macOS opens with a
+    // double-click. Only a Mac has codesign and hdiutil, so elsewhere --dmg
+    // says so.
+    let repo = Repo::new("dmg");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    // A real program to sign: xtask itself.
+    fs::copy(
+        env!("CARGO_BIN_EXE_xtask"),
+        repo.root.join("built/opendrone"),
+    )
+    .unwrap();
     let (ok, out, err) = repo.run(&[
         "package",
         "--game",
@@ -229,49 +545,57 @@ fn a_download_holds_the_game_with_its_packs_and_scenarios_beside_it() {
         "--os",
         "macos",
         "--name",
-        "0.1.0-alpha.1",
+        "x",
         "--out",
         "dist",
+        "--dmg",
     ]);
-    assert!(ok, "{err}");
-    assert!(out.contains("1 textures"), "{out}");
-    let entries = unzip(&repo.root.join("dist/OpenDrone-0.1.0-alpha.1-macos.zip"));
-    let files: Vec<&str> = entries
-        .iter()
-        .map(|(n, _, _)| n.as_str())
-        .filter(|n| !n.ends_with('/'))
-        .collect();
-    let top = "OpenDrone-0.1.0-alpha.1-macos";
-    for want in [
-        "opendrone",
-        "README.txt",
-        "packs/opendrone/pack.toml",
-        "packs/opendrone/maps/skate-park/skate-park.glb",
-        "scenarios/physics/free-fall.toml",
-        "assets-src/materials.toml",
-        "assets-src/textures/concrete/diffuse.jpg",
-        "assets-src/textures/concrete/normal.jpg",
-        "CREDITS.md",
-        "LICENSE-MIT",
-        "LICENSE-APACHE",
-        "THIRD-PARTY-LICENSES.txt",
-    ] {
+    if cfg!(target_os = "macos") {
+        assert!(ok, "{err}");
+        assert!(out.contains("OpenDrone-x-macos.dmg"), "{out}");
+        let dmg = fs::read(repo.root.join("dist/OpenDrone-x-macos.dmg")).unwrap();
+        // A disk image ends with its trailer, which starts "koly".
+        assert_eq!(&dmg[dmg.len() - 512..dmg.len() - 508], b"koly");
         assert!(
-            files.contains(&format!("{top}/{want}").as_str()),
-            "{want} in {files:?}"
+            !repo.root.join("dist/OpenDrone-x-macos").exists(),
+            "the folder it was made from is gone"
         );
+    } else {
+        assert!(!ok);
+        assert!(err.contains("--dmg needs a Mac"), "{err}");
     }
-    assert_eq!(files.len(), 12, "nothing else: {files:?}");
-    let program = entries
-        .iter()
-        .find(|(n, _, _)| n == &format!("{top}/opendrone"))
-        .unwrap();
-    assert_eq!(program.2, b"the game's program");
 }
 
-/// The names of the files in a zip.
+#[test]
+fn dmg_and_sign_go_only_with_the_macos_app() {
+    // Basis: Rule (#297): they are how the macOS app is signed and shipped.
+    let repo = Repo::new("dmg-elsewhere");
+    repo.with_the_games_files();
+    repo.with_the_textures();
+    for (os, flags) in [
+        ("windows", &["--dmg"][..]),
+        ("linux", &["--sign", "Someone"][..]),
+        ("macos", &["--sign", "Someone"][..]),
+    ] {
+        let mut args = vec![
+            "package",
+            "--game",
+            "built/opendrone",
+            "--os",
+            os,
+            "--name",
+            "x",
+        ];
+        args.extend(flags);
+        let (ok, _, err) = repo.run(&args);
+        assert!(!ok, "{os} {flags:?}");
+        assert!(err.contains("--dmg"), "{os}: {err}");
+    }
+}
+
+/// The names of the files in a download.
 fn file_names(path: &Path) -> Vec<String> {
-    unzip(path)
+    unpack(path)
         .into_iter()
         .map(|(n, _, _)| n)
         .filter(|n| !n.ends_with('/'))
@@ -311,7 +635,7 @@ fn downloaded_neurobem_data_never_goes_into_a_download() {
     ]);
     assert!(ok, "{err}");
     assert!(!out.contains(".csv"), "{out}");
-    let files = file_names(&repo.root.join("dist/OpenDrone-x-linux.zip"));
+    let files = file_names(&repo.root.join("dist/OpenDrone-x-linux.tar.gz"));
     let top = "OpenDrone-x-linux";
     assert!(
         files.contains(&format!(
@@ -340,14 +664,14 @@ fn a_file_git_does_not_track_never_goes_into_a_download() {
         "--game",
         "built/opendrone",
         "--os",
-        "macos",
+        "windows",
         "--name",
         "x",
         "--out",
         "dist",
     ]);
     assert!(ok, "{err}");
-    let files = file_names(&repo.root.join("dist/OpenDrone-x-macos.zip"));
+    let files = file_names(&repo.root.join("dist/OpenDrone-x-windows.zip"));
     assert_eq!(
         files.len(),
         12,
@@ -406,15 +730,26 @@ fn every_download_carries_the_licence_texts_of_the_libraries_built_into_its_game
             "dist",
         ]);
         assert!(ok, "{os}: {err}");
-        let entries = unzip(&repo.root.join(format!("dist/OpenDrone-x-{os}.zip")));
-        let (_, _, text) = entries
-            .iter()
-            .find(|(n, _, _)| n == &format!("OpenDrone-x-{os}/THIRD-PARTY-LICENSES.txt"))
-            .unwrap_or_else(|| panic!("{os}: no THIRD-PARTY-LICENSES.txt"));
-        assert_eq!(
-            String::from_utf8_lossy(text),
-            format!("The libraries' licences, for {os}\n")
-        );
+        let file = if os == "linux" { "tar.gz" } else { "zip" };
+        let entries = unpack(&repo.root.join(format!("dist/OpenDrone-x-{os}.{file}")));
+        let mut places = vec![format!("OpenDrone-x-{os}/THIRD-PARTY-LICENSES.txt")];
+        if os == "macos" {
+            // Inside the app too, so it travels with the app when the pilot
+            // drags it to Applications.
+            places.push(format!(
+                "OpenDrone-x-{os}/OpenDrone.app/Contents/Resources/THIRD-PARTY-LICENSES.txt"
+            ));
+        }
+        for place in places {
+            let (_, _, text) = entries
+                .iter()
+                .find(|(n, _, _)| n == &place)
+                .unwrap_or_else(|| panic!("{os}: no {place}"));
+            assert_eq!(
+                String::from_utf8_lossy(text),
+                format!("The libraries' licences, for {os}\n")
+            );
+        }
         let readme = entries
             .iter()
             .find(|(n, _, _)| n.ends_with("/README.txt"))
@@ -454,55 +789,38 @@ fn a_download_without_the_libraries_licence_texts_is_refused() {
 #[test]
 fn the_game_in_a_download_keeps_its_permission_to_run() {
     // Basis: Rule (#81): on macOS and Linux a program runs only with its
-    // execute permission, which a zip keeps only if it's written into it.
+    // execute permission, which a zip or tarball keeps only if it's written
+    // into it. On Linux the app-menu script runs too.
     let repo = Repo::new("permissions");
     repo.with_the_games_files();
     repo.with_the_textures();
-    let (ok, _, err) = repo.run(&[
-        "package",
-        "--game",
-        "built/opendrone",
-        "--os",
-        "linux",
-        "--name",
-        "main-abc1234",
-        "--out",
-        "dist",
-    ]);
-    assert!(ok, "{err}");
-    for (name, mode, _) in unzip(&repo.root.join("dist/OpenDrone-main-abc1234-linux.zip")) {
-        let want = if name.ends_with("/opendrone") || name.ends_with('/') {
-            0o755
-        } else {
-            0o644
-        };
-        assert_eq!(mode, Some(want), "{name}");
+    for (os, programs) in [
+        ("linux", &["/opendrone", "/add-to-app-menu.sh"][..]),
+        ("macos", &["/OpenDrone.app/Contents/MacOS/OpenDrone"][..]),
+    ] {
+        for (name, mode, _) in package_for(&repo, os, "main-abc1234") {
+            let want = if programs.iter().any(|p| name.ends_with(p)) || name.ends_with('/') {
+                0o755
+            } else {
+                0o644
+            };
+            assert_eq!(mode, Some(want), "{name}");
+        }
     }
 }
 
 #[test]
 fn the_windows_download_holds_opendrone_exe() {
-    // Basis: Rule: Windows runs a program by its .exe name.
+    // Basis: Rule (#297): Windows runs a program by its .exe name, and the
+    // pilot looks for the app's own name.
     let repo = Repo::new("windows");
     repo.with_the_games_files();
     repo.with_the_textures();
-    let (ok, _, err) = repo.run(&[
-        "package",
-        "--game",
-        "built/opendrone",
-        "--os",
-        "windows",
-        "--name",
-        "pr81-abc1234",
-        "--out",
-        "dist",
-    ]);
-    assert!(ok, "{err}");
-    let names: Vec<String> = unzip(&repo.root.join("dist/OpenDrone-pr81-abc1234-windows.zip"))
+    let names: Vec<String> = package_for(&repo, "windows", "pr81-abc1234")
         .into_iter()
         .map(|(n, _, _)| n)
         .collect();
-    assert!(names.contains(&"OpenDrone-pr81-abc1234-windows/opendrone.exe".to_string()));
+    assert!(names.contains(&"OpenDrone-pr81-abc1234-windows/OpenDrone.exe".to_string()));
     assert!(!names.contains(&"OpenDrone-pr81-abc1234-windows/opendrone".to_string()));
 }
 
@@ -513,25 +831,28 @@ fn the_same_files_always_make_the_same_download() {
     let repo = Repo::new("repeat");
     repo.with_the_games_files();
     repo.with_the_textures();
-    let args = |out: &'static str| {
-        [
-            "package",
-            "--game",
-            "built/opendrone",
-            "--os",
-            "macos",
-            "--name",
-            "x",
-            "--out",
-            out,
-        ]
-    };
-    assert!(repo.run(&args("one")).0);
-    assert!(repo.run(&args("two")).0);
-    assert_eq!(
-        fs::read(repo.root.join("one/OpenDrone-x-macos.zip")).unwrap(),
-        fs::read(repo.root.join("two/OpenDrone-x-macos.zip")).unwrap()
-    );
+    for (os, file) in [("macos", "zip"), ("linux", "tar.gz")] {
+        let args = |out: &'static str| {
+            [
+                "package",
+                "--game",
+                "built/opendrone",
+                "--os",
+                os,
+                "--name",
+                "x",
+                "--out",
+                out,
+            ]
+        };
+        assert!(repo.run(&args("one")).0);
+        assert!(repo.run(&args("two")).0);
+        assert_eq!(
+            fs::read(repo.root.join(format!("one/OpenDrone-x-{os}.{file}"))).unwrap(),
+            fs::read(repo.root.join(format!("two/OpenDrone-x-{os}.{file}"))).unwrap(),
+            "{os}"
+        );
+    }
 }
 
 #[test]

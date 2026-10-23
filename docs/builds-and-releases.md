@@ -4,23 +4,98 @@ How to get a build of OpenDrone you can double-click, how a release is made, and
 
 ## Getting a build
 
-Every build is a zip: `OpenDrone-<name>-macos.zip`, `-windows.zip` or `-linux.zip`. Unzip it anywhere and keep its folder together.
+Every build is an app you double-click, one download per operating system:
 
-- **The newest main.** Every push to main builds the game for all three operating systems. On GitHub, open **Actions**, then **Build**, then the newest run on main: the three zips are under **Artifacts**, named `main-<commit>`. They're kept for 30 days.
-- **A pull request, to Feel Test it before it merges.** Add the `build` label to the PR. The Build workflow then builds it, and builds it again on every push while the label stays. The zips are under that run's **Artifacts**, from the PR's **Checks** tab, named `pr<number>-<commit>`. The Review Report's Downloads section says the same.
-- **A release.** Each release on the repo's **Releases** page carries the three zips, named after its version.
+- **macOS:** `OpenDrone-<name>-macos.dmg`, a disk image holding `OpenDrone.app`.
+- **Windows:** `OpenDrone-<name>-windows.zip`, a folder holding `OpenDrone.exe`.
+- **Linux:** `OpenDrone-<name>-linux.tar.gz`, a folder holding `opendrone`.
+
+Where to get them:
+
+- **The newest main.** Every push to main builds the game for all three operating systems. On GitHub, open **Actions**, then **Build**, then the newest run on main: the three downloads are under **Artifacts**, named `main-<commit>`. They're kept for 30 days.
+- **A pull request, to Feel Test it before it merges.** Add the `build` label to the PR. The Build workflow then builds it, and builds it again on every push while the label stays. The downloads are under that run's **Artifacts**, from the PR's **Checks** tab, named `pr<number>-<commit>`. The Review Report's Downloads section says the same.
+- **A release.** Each release on the repo's **Releases** page carries the three downloads, named after its version.
 
 The builds are made on GitHub's machines: macOS on Apple Silicon, Windows and Linux on 64-bit Intel or AMD. They're optimised, as `cargo run --release` builds the game.
 
 ## Opening a build
 
-The builds aren't signed, so each system warns about them the first time. Signing and notarisation come later.
+The builds aren't signed by a registered developer yet, so each system warns about them the first time. [Signing, later](#signing-later) says what that would take.
 
-- **macOS.** Double-click `opendrone`. It opens in a Terminal window, which shows what the game says while it runs. The first time, macOS refuses it, because it isn't signed: open **System Settings**, then **Privacy & Security**, and click **Open Anyway** beside opendrone's name. Then double-click it again.
-- **Windows.** Double-click `opendrone.exe`. The first time, SmartScreen may say it protected your PC: click **More info**, then **Run anyway**.
-- **Linux.** Run `./opendrone` in the folder, or double-click it if your file manager runs programs. It needs the system's sound library (alsa-lib) and a Vulkan driver, which most desktops have.
+- **macOS.** Double-click the `.dmg`. A window opens with `OpenDrone`, a link to your Applications folder, a `README.txt` and the licences.
+  - To keep the game, drag `OpenDrone` onto `Applications`, then open it from there. You can also double-click it right in the window.
+  - It opens as an app, with its icon in the Dock and no Terminal window.
+  - The first time, macOS says it could not verify that "OpenDrone" is free of malware, and offers only **Done** or **Move to Trash**. Click **Done**. Then open **System Settings**, then **Privacy & Security**, scroll down to **Security**, and click **Open Anyway** beside "OpenDrone was blocked". Confirm with **Open Anyway** and your password. From then on, it opens with a double-click.
+  - On macOS 14 or older, right-click `OpenDrone` instead, choose **Open**, then **Open**.
+- **Windows.** Take the files out of the zip first: right-click it, choose **Extract All**, then **Extract**.
+  - In the folder that makes, double-click `OpenDrone.exe`, the one with the app's icon. It opens as a window, with no console window beside it.
+  - Opened straight from inside the zip, Windows copies out only the program, and it can't find its Maps.
+  - The first time, SmartScreen may say "Windows protected your PC". Click **More info**, then **Run anyway**.
+- **Linux.** Unpack the tarball: double-click it, or run `tar -xzf OpenDrone-<name>-linux.tar.gz`. In the folder that makes:
+  - Double-click `opendrone`, or run `./opendrone`. It needs a Vulkan driver and the system's sound library (alsa-lib), which most desktops have.
+  - To add OpenDrone to your desktop's app menu, with its icon, run `./add-to-app-menu.sh` once. It writes a desktop entry for you only, in `~/.local/share/applications/`, pointing at this folder, so run it again if you move the folder. `./add-to-app-menu.sh --remove` takes it out again.
+  - A desktop entry has to name the program by its full path, which isn't known until you unpack the build. So the build carries the script that writes the entry, rather than the entry itself.
 
-What's inside, beside the game: the built-in Pack (`packs/`), the Scenarios (`scenarios/`), the Maps' textures and the material library (`assets-src/`), the licences, `THIRD-PARTY-LICENSES.txt`, `CREDITS.md` and a short `README.txt`. The game looks for its Packs in the folder it's in first, so it finds them wherever it's started from. A flight saved with Save Flight goes into the build's own `scenarios/saved/`. [Flying OpenDrone](pilot-guide.md) says how to fly what there is.
+**What's inside, beside the game:**
+
+- the built-in Pack (`packs/`) and the Scenarios (`scenarios/`);
+- the Maps' textures and the material library (`assets-src/`);
+- the licences, `THIRD-PARTY-LICENSES.txt` and `CREDITS.md`;
+- a short `README.txt`, which says how to open the build on its system.
+
+On Windows and Linux, all that sits beside the program, and the game looks for it there first. In the macOS app, it is inside the app, in `OpenDrone.app/Contents/Resources/`, and the game looks there. So the game finds its files wherever it's started from. The `.dmg` also has the licences and the README beside the app, where you see them.
+
+**Your settings and saved flights** go in your own folder, never inside the game:
+
+- `~/Library/Application Support/OpenDrone/` on macOS;
+- `%APPDATA%\OpenDrone\` on Windows;
+- `~/.config/opendrone/` on Linux.
+
+A flight saved with Save Flight goes into that folder's `saved-flights/`. The one exception is `--no-screens` on Windows or Linux, which writes into the build's own `scenarios/saved/`, as it does in the repo. The macOS app never writes inside itself: macOS may run it from a read-only copy, and any file added to a signed app breaks its signature.
+
+[Flying OpenDrone](pilot-guide.md) says how to fly what there is.
+
+### Why a tarball on Linux, not an AppImage
+
+An AppImage is one file you mark as runnable and double-click. It was considered and not used. Every AppImage carries the AppImage runtime, whose licence is MIT, but the runtime has libfuse, which is LGPL-2.1, built into it ([the runtime's licence file](https://github.com/AppImage/type2-runtime/blob/main/LICENSE)). [ADR-0014](adr/0014-licences-for-libraries-and-assets.md) never ships LGPL code inside the game. Its one exception is a library the user's own system provides, and this one would ship inside every download.
+
+The older runtime loads the system's libfuse 2 instead. But Ubuntu 22.04 and newer don't install libfuse 2, so most pilots would need `sudo apt install libfuse2` before it opened. An AppImage could come back if the maintainer accepts that runtime's libfuse in an ADR. A Flatpak is the other usual way, but it is built with its own tools and is published through Flathub.
+
+### The app's icon
+
+The icon is a Quad seen from above, on a dark rounded square. `cargo xtask icon` draws it from shapes, with no outside picture, into `crates/opendrone/icon/`:
+
+- `opendrone.png`, 512 pixels, for the Linux app menu;
+- `opendrone.ico`, which the game's build script builds into `OpenDrone.exe`;
+- `opendrone.icns`, which goes into the macOS app.
+
+Like every asset an agent makes, the icon is CC0 ([ADR-0014](adr/0014-licences-for-libraries-and-assets.md)). A readable check fails if a committed file isn't what the script draws. To change the icon, change the script and run `cargo xtask icon`.
+
+### Signing, later
+
+Signing tells each system who made the app, so it opens with no warning. It needs things only the maintainer can get, so the Build workflow has the steps ready and skips them until their secrets exist (Settings, then Secrets and variables, then Actions).
+
+- **macOS: Apple Developer Program, 99 US dollars a year.**
+  - Join as an individual, or as an organisation, which needs a D-U-N-S number.
+  - Make a "Developer ID Application" certificate, and export it from Keychain Access as a `.p12` file with a password.
+  - Make an app-specific password for the Apple ID, at account.apple.com.
+  - The secrets:
+    - `MACOS_CERTIFICATE`: the `.p12`, in base64 (`base64 -i certificate.p12`);
+    - `MACOS_CERTIFICATE_PASSWORD`: its password;
+    - `MACOS_SIGNING_IDENTITY`: the certificate's name, such as `Developer ID Application: Your Name (TEAMID)`;
+    - `APPLE_ID`: the Apple ID's email;
+    - `APPLE_TEAM_ID`: the ten-character team id;
+    - `APPLE_APP_PASSWORD`: the app-specific password.
+  - With them set, `cargo xtask package --dmg --sign <identity>` signs the app with the hardened runtime, which Apple's notarisation needs. The workflow then signs the `.dmg`, has Apple notarise it, and staples Apple's ticket to it. macOS then opens it with no warning.
+  - Until then, the app is signed ad hoc, with no certificate. Apple Silicon runs only signed programs, and a download whose signature doesn't hold together is called damaged and can't be opened at all.
+- **Windows: a code-signing certificate.**
+  - The step signs `OpenDrone.exe` with `signtool`, from a certificate held as a `.pfx` file. Its secrets are `WINDOWS_CERTIFICATE`, the `.pfx` in base64, and `WINDOWS_CERTIFICATE_PASSWORD`.
+  - Since June 2023, though, certificate authorities hand out new certificates only on a hardware key or in their own cloud service, never as a file. So in practice the maintainer picks a service, and that service's own GitHub step replaces this one. The usual choices:
+    - [SignPath Foundation](https://signpath.org/), free for open-source projects that it accepts;
+    - Microsoft's [Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/), about 10 US dollars a month, for organisations and for individuals in the countries it serves;
+    - a certificate authority's own cloud signing, a few hundred US dollars a year.
+  - Even signed, SmartScreen can warn about a new program until enough people have run it.
+- **Linux** needs no signing: no desktop asks for it.
 
 ## Making a release
 
@@ -34,15 +109,15 @@ What's inside, beside the game: the built-in Pack (`packs/`), the Scenarios (`sc
    ```
 
    Or ask an agent to do it.
-3. **The Release workflow does the rest,** in about the time a build of main takes. It checks the tag, builds the three zips, and publishes a pre-release named "OpenDrone 0.1.0-alpha.1" with them. Its notes list every PR merged since the last release, by its title. Every release is a pre-release for now.
+3. **The Release workflow does the rest,** in about the time a build of main takes. It checks the tag, builds the three downloads, and publishes a pre-release named "OpenDrone 0.1.0-alpha.1" with them. Its notes list every PR merged since the last release, by its title. Every release is a pre-release for now.
 
-The Release workflow refuses a tag that isn't on main, and one that isn't a release version: `v0.0.5`, `v0.1.0-rc.1`, `v0.1.0-beta.1` and `v0.1.0-alpha.0` publish nothing (`cargo xtask release-version <tag>` says why). If you make the release on GitHub's Releases page instead, with a new tag, the workflow adds the three zips to it and marks it a pre-release, and keeps the notes you wrote there.
+The Release workflow refuses a tag that isn't on main, and one that isn't a release version: `v0.0.5`, `v0.1.0-rc.1`, `v0.1.0-beta.1` and `v0.1.0-alpha.0` publish nothing (`cargo xtask release-version <tag>` says why). If you make the release on GitHub's Releases page instead, with a new tag, the workflow adds the three downloads to it and marks it a pre-release, and keeps the notes you wrote there.
 
 ## The libraries' licences
 
-MIT, Zlib and the other licences of the libraries inside the game ask for their texts to travel with every copy of the game, and a download is a copy. So each zip carries `THIRD-PARTY-LICENSES.txt`: every library built into the game for that operating system, each with its version, its licence, where it comes from and the full text of its licence files. A text that several libraries share is written once, and each library points to it.
+MIT, Zlib and the other licences of the libraries inside the game ask for their texts to travel with every copy of the game, and a download is a copy. So each download carries `THIRD-PARTY-LICENSES.txt`: every library built into the game for that operating system, each with its version, its licence, where it comes from and the full text of its licence files. A text that several libraries share is written once, and each library points to it.
 
-- **Where it comes from.** `cargo xtask licences` writes one file per operating system, `licences/third-party-macos.txt`, `-windows.txt` and `-linux.txt`, from `Cargo.lock`. `cargo xtask package` copies the right one into the zip. The files are committed, and CI's `cargo xtask licences --check` fails when one is out of date, so a library added or upgraded in a PR comes with its files written again: run `cargo xtask licences` and commit them.
+- **Where it comes from.** `cargo xtask licences` writes one file per operating system, `licences/third-party-macos.txt`, `-windows.txt` and `-linux.txt`, from `Cargo.lock`. `cargo xtask package` copies the right one into the download, and on macOS into the app as well. The files are committed, and CI's `cargo xtask licences --check` fails when one is out of date, so a library added or upgraded in a PR comes with its files written again: run `cargo xtask licences` and commit them.
 - **Which libraries.** The ones Cargo builds the game with on that system: not the tools that run only while it builds (build scripts, procedural macros), and not the test tools. One exception goes the other way: SDL is built from its C source and linked into the game, so its licence, and the BSD licence of the HIDAPI inside it, are listed although Cargo only builds with its source.
 - **Why this tool.** It uses Cargo's own `cargo tree` and `cargo metadata`, which are already there, so no library and no new tool is added. `cargo about` does the same, but adds a tool and a second list of accepted licences to keep beside `deny.toml`'s.
 - **Packages with no licence file.** Some libraries keep their licence files in their repository, outside the crate that is published: 17 entries on Linux, 19 on Windows and 36 on macOS at the time of writing. Each file says so in a note on the library, and what it carries depends on the licence:
@@ -76,7 +151,8 @@ You can start either scheduled workflow by hand from GitHub's **Actions** tab, o
 
 ## Limits
 
-- The builds aren't signed or notarised, so each system warns the first time, as above.
-- The macOS build runs on Apple Silicon only.
+- The builds aren't signed or notarised by a registered developer, so each system warns the first time, as above.
+- The macOS build runs on Apple Silicon only, on macOS 11 or newer.
 - The Linux build needs a system at least as new as the Ubuntu GitHub builds it on.
 - The Windows build needs Microsoft's Visual C++ runtime, which most Windows PCs already have.
+- Started by a double-click, the game shows no console or Terminal window, so what it prints, such as a problem that stops it starting, isn't seen. To see it, start the game from a terminal: `OpenDrone.app/Contents/MacOS/OpenDrone` on macOS, `./opendrone` on Linux. On Windows, a build made with `cargo run`, which isn't optimised, keeps its console.

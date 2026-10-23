@@ -6,11 +6,27 @@
 #   to the PR while it has it;
 # - for a release, called by release.yml with the version a tag names.
 #
-# Each build is one zip, OpenDrone-<name>-<os>.zip, kept 30 days as a
-# download of this workflow's run. <name> is main-<commit>, pr<N>-<commit> or
-# the release's version. `cargo xtask package` lays it out: the game, with its
-# Packs, the Scenarios, the material library and its textures beside it,
-# where it looks for them. How to open one: docs/builds-and-releases.md.
+# Each build is one file, kept 30 days as a download of this workflow's run,
+# and each is an app a pilot double-clicks (#297):
+#
+# - OpenDrone-<name>-macos.dmg: OpenDrone.app, signed ad hoc until a
+#   Developer ID exists;
+# - OpenDrone-<name>-windows.zip: OpenDrone.exe, with its icon and no
+#   console window;
+# - OpenDrone-<name>-linux.tar.gz: opendrone, its icon, and a script that
+#   adds it to the desktop's app menu.
+#
+# <name> is main-<commit>, pr<N>-<commit> or the release's version. `cargo
+# xtask package` lays each out, with the game's Packs, the Scenarios, the
+# material library and its textures where it looks for them. How to open
+# one: docs/builds-and-releases.md.
+#
+# Signing is off until the maintainer adds its secrets (the list is in
+# docs/builds-and-releases.md): with MACOS_CERTIFICATE set, the macOS app is
+# signed with that Developer ID and the .dmg notarised by Apple; with
+# WINDOWS_CERTIFICATE set, OpenDrone.exe is signed. Without them, those
+# steps are skipped and the builds come out as they do today. A PR from a
+# fork never gets the secrets.
 #
 # It's never a required check: a PR without the label skips every job.
 #
@@ -103,14 +119,24 @@ jobs:
             os: macos-latest
             system: macos
             program: target/release/opendrone
+            download: dmg
+            package: --dmg
           - name: Windows
             os: windows-latest
             system: windows
             program: target/release/opendrone.exe
+            download: zip
+            package: ""
           - name: Linux
             os: ubuntu-latest
             system: linux
             program: target/release/opendrone
+            download: tar.gz
+            package: ""
+    env:
+      # Empty until the maintainer adds them: then the signing steps run.
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
     steps:
       - uses: actions/checkout@v7
 
@@ -159,26 +185,94 @@ jobs:
       - name: Build the game, optimised
         run: cargo build --release --locked --package opendrone
 
+      - name: Sign OpenDrone.exe (off until WINDOWS_CERTIFICATE is set)
+        # A code-signing certificate as a base64 .pfx file, and its password.
+        # signtool comes with the Windows SDK on GitHub's runner.
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          PROGRAM: ${{ matrix.program }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP certificate.pfx
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object { [version]$_.Directory.Parent.Name } | Select-Object -Last 1
+          & $signtool.FullName sign /f $pfx /p $env:PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $env:PROGRAM
+          $signed = $LASTEXITCODE
+          Remove-Item $pfx
+          exit $signed
+
+      - name: Put the Developer ID in a keychain (off until MACOS_CERTIFICATE is set)
+        # A "Developer ID Application" certificate as a base64 .p12 file, and
+        # its password. The keychain lasts as long as this job.
+        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE != ''
+        env:
+          PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          unlock=$(uuidgen)
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$unlock" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$unlock" "$keychain"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$unlock" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          rm "$RUNNER_TEMP/certificate.p12"
+
       - name: Fetch the Maps' textures
         uses: actions/download-artifact@v8
         with:
           name: textures
           path: assets-src/textures
 
-      - name: Lay the build out as a zip (cargo xtask package)
+      - name: Lay the build out as an app (cargo xtask package)
+        # On macOS, the app is signed on its way into the .dmg: with the
+        # Developer ID when there is one, else ad hoc.
         shell: bash
         env:
           NAME: ${{ steps.name.outputs.name }}
           SYSTEM: ${{ matrix.system }}
           PROGRAM: ${{ matrix.program }}
-        run: cargo run --release --locked --quiet --package xtask -- package --game "$PROGRAM" --os "$SYSTEM" --name "$NAME" --out dist
+          PACKAGE: ${{ matrix.package }}
+          IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          sign=()
+          if [[ "$SYSTEM" == macos && -n "$MACOS_CERTIFICATE" ]]; then
+            sign=(--sign "$IDENTITY")
+          fi
+          # $PACKAGE is the matrix's own flag, --dmg or nothing.
+          # shellcheck disable=SC2086
+          cargo run --release --locked --quiet --package xtask -- package --game "$PROGRAM" --os "$SYSTEM" --name "$NAME" --out dist $PACKAGE ${sign[@]+"${sign[@]}"}
+
+      - name: Notarise the .dmg (off until MACOS_CERTIFICATE is set)
+        # Apple checks the signed app and vouches for it, so macOS opens it
+        # with no warning. An app-specific password of the Apple ID in the
+        # Developer Program, and its team's id.
+        if: runner.os == 'macOS' && env.MACOS_CERTIFICATE != ''
+        env:
+          NAME: ${{ steps.name.outputs.name }}
+          IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          dmg="dist/OpenDrone-$NAME-macos.dmg"
+          codesign --sign "$IDENTITY" --timestamp "$dmg"
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
 
       - name: Keep the build as a download
-        # The zip itself, not zipped again, so the game keeps its permission
-        # to run on macOS and Linux.
+        # The file itself, not zipped again, so the programs in the zip and
+        # the tarball keep their permission to run.
         uses: actions/upload-artifact@v7
         with:
-          path: dist/OpenDrone-${{ steps.name.outputs.name }}-${{ matrix.system }}.zip
+          path: dist/OpenDrone-${{ steps.name.outputs.name }}-${{ matrix.system }}.${{ matrix.download }}
           archive: false
           if-no-files-found: error
           retention-days: 30

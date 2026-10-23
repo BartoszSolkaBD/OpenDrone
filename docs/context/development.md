@@ -94,7 +94,7 @@ _Avoid_: FPS test, perf test
 - Bevy and wgpu patch releases each arrive as their own Dependabot PR and follow the normal rules. A wgpu patch PR must re-apply the counting patch, or the counting job fails.
 - Builds, releases and updates ([#81](https://github.com/BartoszSolkaBD/OpenDrone/issues/81); how-to in [Builds and releases](../builds-and-releases.md)):
   - Every push to main builds the unsigned game for macOS, Windows and Linux, kept 30 days. A `build` label on a PR builds that PR, and again on each push while the label stays.
-  - A version tag on main publishes a GitHub pre-release with the three zips and notes made from the PRs' titles. Before 0.1.0, each is 0.1.0-alpha.N, counting from 1.
+  - A version tag on main publishes a GitHub pre-release with the three downloads (the macOS `.dmg`, the Windows zip and the Linux tarball) and notes made from the PRs' titles. Before 0.1.0, each is 0.1.0-alpha.N, counting from 1.
   - Dependabot runs monthly. CI's actions come in one grouped PR and the libraries outside the core in another: Dependabot can't group across kinds of package and still give the core libraries their own PRs. Rust, `libm`, parry3d and every other core library each come in their own PR. Bevy 0.N jumps and wgpu majors are never offered.
   - A daily security scan of main opens one `needs-triage` issue per advisory found, unless one is open already. It never blocks a PR.
 - Agent-made assets are CC0. Outside libraries must be permissive or MPL-2.0 ([ADR-0014](../adr/0014-licences-for-libraries-and-assets.md)).

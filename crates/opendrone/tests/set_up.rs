@@ -1,7 +1,8 @@
 //! Readable checks for how the tracer sets a flight up: the Quad on the flat
 //! floor's origin, landed, and the pilot's Channels as a receiver hands them
 //! over. Lengths in metres, speeds in m/s, Channels in µs and CRSF steps.
-//! And where the game finds its Packs, in the repo and in a downloaded build.
+//! And where the game finds its Packs, in the repo and in a downloaded build
+//! (the macOS app too), and where a flight it saves goes.
 
 mod common;
 
@@ -9,7 +10,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use opendrone::pilot::flight_channels;
-use opendrone::set_up::{FlightPlan, find_repo_folder, landed_height};
+use opendrone::set_up::{
+    FlightPlan, find_repo_folder, is_inside_an_app, landed_height, saved_flights_folder,
+};
 use opendrone::settings::Settings;
 use opendrone::stepping::Flight;
 use opendrone_input::profile::FlightMode;
@@ -228,4 +231,53 @@ fn the_game_run_with_cargo_finds_the_repo_at_or_above_the_working_folder() {
     // (What it finds instead depends on where the scratch folder is: inside
     // a checkout's own target/ folder, that checkout.)
     assert_ne!(find_repo_folder(Some(&program), Some(&root)), Some(repo));
+}
+
+#[test]
+fn the_macos_app_finds_its_packs_inside_itself_wherever_it_is_started_from() {
+    // Basis: Rule (#297): the macOS download is OpenDrone.app, with the
+    // program in Contents/MacOS/ and its files in Contents/Resources/, as an
+    // app bundle keeps them. Finder starts a double-clicked app in /, so the
+    // working folder says nothing.
+    let root = scratch("macos-app");
+    let app = root.join("Applications").join("OpenDrone.app");
+    let resources = app.join("Contents").join("Resources");
+    lay_out_the_game(&resources);
+    let program = app.join("Contents").join("MacOS").join("OpenDrone");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    let home = root.join("home");
+    fs::create_dir_all(&home).unwrap();
+    assert_eq!(
+        find_repo_folder(Some(&program), Some(&home)),
+        Some(resources.clone())
+    );
+    assert_eq!(find_repo_folder(Some(&program), None), Some(resources));
+}
+
+#[test]
+fn a_flight_saved_in_the_macos_app_goes_to_the_pilots_own_folder_never_into_the_app() {
+    // Basis: Rule (#297): an app isn't the pilot's to write into (macOS may
+    // run it from a read-only copy, and a file added to a signed app breaks
+    // its signature), so even with --no-screens a saved flight goes to
+    // saved-flights/ beside the settings file, as it does with the screens.
+    let root = scratch("saving-from-the-app");
+    let resources = root
+        .join("OpenDrone.app")
+        .join("Contents")
+        .join("Resources");
+    let settings = root.join("Library/Application Support/OpenDrone");
+    assert!(is_inside_an_app(&resources));
+    assert_eq!(
+        saved_flights_folder(&resources, Some(&settings)),
+        settings.join("saved-flights")
+    );
+    // Outside an app, in the repo or an unpacked Windows or Linux download,
+    // it stays scenarios/saved/ in the game's folder.
+    let repo = root.join("OpenDrone");
+    assert!(!is_inside_an_app(&repo));
+    assert!(!is_inside_an_app(&root.join("Contents").join("Resources")));
+    assert_eq!(
+        saved_flights_folder(&repo, Some(&settings)),
+        repo.join("scenarios").join("saved")
+    );
 }
