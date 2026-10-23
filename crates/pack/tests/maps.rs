@@ -559,6 +559,68 @@ fn the_background_sound_slot_takes_an_ogg_file_in_the_folder_and_a_level_in_deci
     assert!(fixture.map_problems()[0].contains("must be from -60 dB to 12 dB"));
 }
 
+/// What a Map's `[light]` looks like when it is right: a sun 37 ° up in the
+/// south-west, and a blue sky.
+const LIGHT: &str = "\n[light]\nsun_elevation = \"37 °\"\nsun_azimuth   = \"225 °\"\nsun_colour    = \"#fff2d6\"\nsun_strength  = \"3.0\"\nsky_colour    = \"#a5c4f0\"\nsky_strength  = \"0.5\"\n";
+
+#[test]
+fn a_map_without_a_light_table_has_no_baked_light() {
+    assert_eq!(yard_map("map-no-light").light, None);
+}
+
+#[test]
+fn the_light_table_gives_the_suns_direction_and_colour_and_the_skys() {
+    let fixture = Fixture::new("map-light").with_map(yard().build());
+    fixture.write(MAP_TOML, &format!("{YARD_TOML}{LIGHT}"));
+    let light = fixture.packs().map("fixture/yard").unwrap().light.unwrap();
+    assert!((light.sun_elevation - 37.0_f64.to_radians()).abs() < 1e-12);
+    assert!((light.sun_azimuth - 225.0_f64.to_radians()).abs() < 1e-12);
+    assert_eq!(light.sun_colour, [0xff, 0xf2, 0xd6]);
+    assert_eq!(light.sun_strength, 3.0);
+    assert_eq!(light.sky_colour, [0xa5, 0xc4, 0xf0]);
+    assert_eq!(light.sky_strength, 0.5);
+}
+
+#[test]
+fn a_light_table_that_leaves_out_a_value_or_has_a_wrong_one_is_refused_in_plain_words() {
+    let fixture = Fixture::new("map-light-wrong").with_map(yard().build());
+    let refused = |light: String| {
+        fixture.write(MAP_TOML, &format!("{YARD_TOML}{light}"));
+        fixture.map_problems().join("\n")
+    };
+    let without = LIGHT.replace("sky_strength  = \"0.5\"\n", "");
+    assert!(
+        refused(without).contains("is missing `sky_strength`"),
+        "a value left out"
+    );
+    let low = LIGHT.replace("37 °", "-5 °");
+    assert!(
+        refused(low)
+            .contains("`light.sun_elevation` must be from 0 ° (on the horizon) to 90 ° (overhead)"),
+        "a sun under the horizon"
+    );
+    let radians = LIGHT.replace("225 °", "2 rad");
+    assert!(
+        refused(radians).contains("radians"),
+        "an angle that isn't in degrees"
+    );
+    let colour = LIGHT.replace("#fff2d6", "orange");
+    assert!(
+        refused(colour).contains("`light.sun_colour` is a colour written like \"#fff2d6\""),
+        "a colour that isn't hex"
+    );
+    let strength = LIGHT.replace("\"3.0\"", "\"-1\"");
+    assert!(
+        refused(strength).contains("`light.sun_strength` must be 0 or more"),
+        "a negative strength"
+    );
+    let unknown = LIGHT.replace("[light]\n", "[light]\nmoon = \"1\"\n");
+    assert!(
+        refused(unknown).contains("`moon` isn't something OpenDrone reads in [light]"),
+        "an unknown key"
+    );
+}
+
 #[test]
 fn a_broken_map_is_skipped_and_the_rest_of_the_pack_still_loads() {
     let fixture = Fixture::new("map-skipped").with_map(b"nonsense".to_vec());

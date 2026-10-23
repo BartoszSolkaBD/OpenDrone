@@ -393,6 +393,11 @@ jobs:
           tar --extract --xz --file "$RUNNER_TEMP/blender.tar.xz" --directory "$RUNNER_TEMP/blender" --strip-components=1
           echo "BLENDER=$RUNNER_TEMP/blender/blender" >> "$GITHUB_ENV"
 
+      - name: Check the light atlas's unwrap with plain Python
+        # assets-src/lib/test_odlight.py: no Blender, no Rust (#293).
+        if: steps.changes.outputs.maps == 'true'
+        run: python3 -m unittest discover -s assets-src/lib -p 'test_*.py'
+
       - name: Rebuild the Maps with Blender and require the same bytes as the committed .glb
         if: steps.changes.outputs.maps == 'true'
         run: cargo xtask maps --check --previews target/map-previews

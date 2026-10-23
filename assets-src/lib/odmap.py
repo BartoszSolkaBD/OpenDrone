@@ -15,10 +15,16 @@ shapes to it and calls `export`. What comes out follows the Pack's Map rules
   object sits at the origin with no turn: nothing in Blender's 32-bit maths
   can differ between computers, and the same script gives the same bytes.
 
+A script may ask for baked light with `lightmap(texel_cm)`: every drawn mesh
+then gets a second picture-coordinate set (`TEXCOORD_1`, from a deterministic
+unwrap in `odlight`), and `cargo xtask maps --bake <id>` bakes the Map's sun
+and sky light into an atlas for it (docs/building-a-map.md, "Baked light").
+
 The `.glb` carries no normals: the game works those out, and a Pack's `.glb`
 may leave them out. It has no compressed meshes (Bevy refuses them), no
 animations and no pictures.
 """
+import hashlib
 import os
 import sys
 import tomllib
@@ -27,8 +33,30 @@ import bpy
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import odgeom as g  # noqa: E402
+import odlight  # noqa: E402
 
 COLLIDERS = ("box", "convex", "trimesh", "none")
+
+
+def _arguments():
+    """The `--name value` pairs after `--` on the command line, which
+    `cargo xtask maps` passes. A flag with no value is `True`."""
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    out = {}
+    for i, a in enumerate(argv):
+        if a.startswith("--"):
+            nxt = argv[i + 1] if i + 1 < len(argv) else None
+            out[a[2:]] = nxt if nxt is not None and not nxt.startswith("--") else True
+    return out
+
+
+def _write_toml(path, values):
+    """A flat TOML file of strings and numbers, in the order given."""
+    lines = []
+    for k, v in values.items():
+        lines.append(f"{k} = {v!r}" if isinstance(v, (int, float)) else f'{k} = "{v}"')
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 def _units(text):
@@ -50,6 +78,9 @@ class MapBuilder:
         self.objects = []  # (object, collider, collision_only)
         self.counts = {}
         self.launch = None
+        self.light = None  # what `lightmap()` asked for
+        self.light_cm = {}  # object name -> its own centimetres per texel
+        self.light_result = None  # what the unwrap made, once exported
 
     # ---------- materials ----------
     def material(self, name):
@@ -74,9 +105,21 @@ class MapBuilder:
         self.counts[name] = n + 1
         return name if n == 0 else f"{name}_{n:03d}"
 
-    def solid(self, name, mesh, pose, material, collider, collision_only=False):
+    def lightmap(self, texel_cm, max_chart=odlight.DEFAULT_MAX_CHART, max_size=odlight.DEFAULT_MAX_SIZE):
+        """Asks for baked light: every drawn mesh gets a second picture
+        coordinate set, packed into one atlas at `texel_cm` centimetres per
+        texel (10 is fine, 25 is coarse). A chart longer than `max_chart`
+        texels is made coarser to fit, so far-off ground costs little; the
+        atlas must fit in `max_size` texels a side. A shape's own `light_cm=`
+        overrides the density for that shape."""
+        assert self.light is None, "lightmap() is asked for once"
+        self.light = {"texel_cm": float(texel_cm), "max_chart": max_chart, "max_size": max_size}
+
+    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None):
         """Adds a shape: `mesh` is `(corners, faces)` from `odgeom`, in its own
-        axes; `pose` puts it in the Map (None: it is there already)."""
+        axes; `pose` puts it in the Map (None: it is there already).
+        `light_cm` is the shape's own centimetres per texel in the light atlas,
+        if the Map asks for one (see `lightmap`)."""
         assert collider in COLLIDERS, collider
         corners, faces = g.placed(mesh, pose or g.Pose())
         triangles = g.triangulate(corners, faces, convex=collider == "convex")
@@ -112,6 +155,8 @@ class MapBuilder:
         if collision_only:
             ob["od_collision_only"] = 1
         self.objects.append((ob, collider, collision_only))
+        if light_cm is not None:
+            self.light_cm[ob.name] = float(light_cm)
         return ob
 
     def launch_spot(self, x, y, z, heading):
@@ -243,9 +288,44 @@ class MapBuilder:
         self.box(name + "_lamp", (0.35, 0.9, 0.18), (x + hv[0] * 0.45, y + hv[1] * 0.45, z + h), "steel_grey", heading=heading)
 
     # ---------- the file ----------
+    def _light_uvs(self, request):
+        """Gives every drawn mesh its second picture-coordinate set, from the
+        deterministic unwrap in `odlight`. Returns the atlas's size and what
+        the unwrap did."""
+        meshes = []
+        drawn = [ob for ob, _, only in self.objects if not only]
+        for ob in drawn:
+            me = ob.data
+            corners = [tuple(v.co) for v in me.vertices]
+            triangles = [tuple(p.vertices) for p in me.polygons]
+            meshes.append((corners, triangles, self.light_cm.get(ob.name)))
+        uvs, size, info = odlight.unwrap(
+            meshes, request["texel_cm"], max_chart=request["max_chart"], max_size=request["max_size"]
+        )
+        for ob, flat in zip(drawn, uvs):
+            layer = ob.data.uv_layers.new(name="UVLight")
+            layer.uv.foreach_set("vector", flat)
+        return size, info
+
     def export(self, path):
-        """Writes the `.glb`: every object and the Launch Spot, nothing else."""
+        """Writes the `.glb`: every object and the Launch Spot, nothing else.
+        If the script asked for baked light (or the command line asks for a
+        proof of the unwrap), every drawn mesh also has `TEXCOORD_1`; the
+        command line may then ask for the bake (`cargo xtask maps --bake`)."""
         assert self.launch is not None, "a Map needs a Launch Spot"
+        args = _arguments()
+        request = self.light
+        if request is None and "light-uv-proof" in args:
+            request = {
+                "texel_cm": float(args["light-uv-proof"]),
+                "max_chart": odlight.DEFAULT_MAX_CHART,
+                "max_size": odlight.DEFAULT_MAX_SIZE,
+            }
+        if "bake" in args and request is None:
+            raise SystemExit("--bake: this Map's script never calls lightmap(texel_cm), so it has no second picture-coordinate set to bake into")
+        if request is not None:
+            size, info = self._light_uvs(request)
+            self.light_result = dict(texel_cm=request["texel_cm"], width=size[0], height=size[1], **info)
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         view_layer = bpy.context.view_layer
         view_layer.update()
@@ -277,6 +357,47 @@ class MapBuilder:
             export_meshopt_compression_enable=False,
             export_use_gltfpack=False,
             export_gpu_instances=False,
+        )
+        if "light-info" in args and self.light_result is not None:
+            _write_toml(args["light-info"], self.light_result)
+        if "bake" in args:
+            self._bake(path, args)
+
+    def _bake(self, glb_path, args):
+        """`--bake <atlas.exr> --map-toml <map.toml> --bake-report <file>`:
+        bakes the Map's `[light]` into the atlas and writes the report that
+        `cargo xtask maps` turns into the Map's `<id>.bake.toml`."""
+        with open(args["map-toml"], "rb") as f:
+            table = tomllib.load(f).get("light")
+        if table is None:
+            raise SystemExit(f"--bake: {args['map-toml']} has no [light] table to bake with")
+        light = odlight.read_light(table)
+        drawn = [ob for ob, _, only in self.objects if not only]
+        for ob, _, only in self.objects:
+            if only:
+                ob.hide_render = True  # solid but never drawn: it casts no shade
+        result = odlight.bake(
+            drawn,
+            light,
+            args["bake"],
+            (self.light_result["width"], self.light_result["height"]),
+            samples=int(args.get("samples", odlight.DEFAULT_SAMPLES)),
+        )
+        with open(glb_path, "rb") as f:
+            glb_sha256 = hashlib.sha256(f.read()).hexdigest()
+        _write_toml(
+            args["bake-report"],
+            {
+                "atlas": os.path.basename(args["bake"]),
+                "glb_sha256": glb_sha256,
+                "light_sha256": odlight.light_key(table),
+                "texel_cm": self.light_result["texel_cm"],
+                "width": self.light_result["width"],
+                "height": self.light_result["height"],
+                "samples": result["samples"],
+                "bounces": result["bounces"],
+                "bake_seconds": result["seconds"],
+            },
         )
 
     def stats(self):
