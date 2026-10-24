@@ -66,6 +66,7 @@ pub mod sky;
 pub mod sound;
 pub mod status;
 pub mod stepping;
+pub mod surface_look;
 pub mod watch;
 
 use std::time::Duration;

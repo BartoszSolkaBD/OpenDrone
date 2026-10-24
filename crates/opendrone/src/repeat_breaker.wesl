@@ -2,6 +2,10 @@
 // colour and normal map taken from a picture that is laid out in hex tiles instead of in one grid,
 // and its colour and roughness nudged by a large picture that lies over the world.
 //
+// Roughness, occlusion, metal and wetness (#320): a picture of the three (red occlusion, green
+// roughness, blue metal) is looked up through the same tiles as the colour, and a surface can be
+// wet. The wet numbers are the ones `surface_look::wet` makes: keep the two in step.
+//
 // Hex tiling: the surface's picture coordinates fall on a triangular grid. Every corner of the
 // grid has a random look (a shift of the picture, and for some materials a turn and a mirror),
 // and a pixel blends the three pictures of the three corners round its triangle. Each corner's
@@ -33,6 +37,8 @@ struct Breaker {
     snap_turn: vec4<f32>,
     // x: how strongly the large picture shows (0 for none); y: its repeats to a metre.
     wide: vec4<f32>,
+    // x: 1 if the surface picture is bound; y: how wet the surface is, 0 to 1.
+    surface: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> breaker: Breaker;
@@ -42,11 +48,23 @@ struct Breaker {
 @group(constants::MATERIAL_BIND_GROUP) @binding(104) var normal_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(105) var wide_texture: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(106) var wide_sampler: sampler;
+@group(constants::MATERIAL_BIND_GROUP) @binding(107) var surface_texture: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(108) var surface_sampler: sampler;
 
 // Triangle corners to one repeat of the picture: 2 * sqrt(3), so a hexagon is about 0.58 of a repeat across.
 const CELLS_PER_REPEAT: f32 = 3.4641016;
 // How narrow the blends are: the weights go to this power.
 const SHARPNESS: f32 = 7.0;
+
+// What being wet does (`surface_look.rs`): a fully wet surface keeps this share of its colour, has
+// roughness GLOSS_FLOOR + GLOSS_SCALE * its dry roughness, reflects WET_REFLECTANCE instead of
+// 0.5, and keeps this share of its normal map's slope.
+const WET_KEEPS: f32 = 0.6;
+const WET_GLOSS_FLOOR: f32 = 0.05;
+const WET_GLOSS_SCALE: f32 = 0.30;
+const DRY_REFLECTANCE: f32 = 0.5;
+const WET_REFLECTANCE: f32 = 0.65;
+const WET_KEEPS_SLOPE: f32 = 0.6;
 
 fn pcg(v: u32) -> u32 {
     let state = v * 747796405u + 2891336453u;
@@ -130,13 +148,20 @@ struct Surface {
     colour: vec3<f32>,
     // The normal in the surface's own frame, as the normal map holds it, from -1 to 1.
     normal: vec3<f32>,
+    // Occlusion, roughness and metal, from the surface picture (1, 1, 1 when there is none).
+    pbr: vec3<f32>,
 }
 
 fn surface_at(uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> Surface {
     var out: Surface;
+    out.pbr = vec3<f32>(1.0);
+    let has_surface = breaker.surface.x > 0.5;
     if breaker.snap_turn.w < 0.5 {
         out.colour = textureSampleGrad(diffuse_texture, diffuse_sampler, uv, ddx, ddy).rgb;
         out.normal = textureSampleGrad(normal_texture, normal_sampler, uv, ddx, ddy).rgb * 2.0 - 1.0;
+        if has_surface {
+            out.pbr = textureSampleGrad(surface_texture, surface_sampler, uv, ddx, ddy).rgb;
+        }
         return out;
     }
     let corners = corners_of(uv);
@@ -158,6 +183,13 @@ fn surface_at(uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> Surface {
     // squared weights; put the spread round the picture's average colour back.
     let restore = inverseSqrt(dot(w, w));
     let average = textureSampleLevel(diffuse_texture, diffuse_sampler, vec2<f32>(0.5, 0.5), 16.0).rgb;
+    if has_surface {
+        // Occlusion, roughness and metal are blended as they are: they have no spread to put back.
+        let pbr_a = textureSampleGrad(surface_texture, surface_sampler, a.uv, a.ddx, a.ddy).rgb;
+        let pbr_b = textureSampleGrad(surface_texture, surface_sampler, b.uv, b.ddx, b.ddy).rgb;
+        let pbr_c = textureSampleGrad(surface_texture, surface_sampler, c.uv, c.ddx, c.ddy).rgb;
+        out.pbr = pbr_a * w.x + pbr_b * w.y + pbr_c * w.z;
+    }
     let blended = colour_a * w.x + colour_b * w.y + colour_c * w.z;
     out.colour = max(average + (blended - average) * restore, vec3<f32>(0.0));
     var xy = slope * restore;
@@ -203,6 +235,15 @@ fn fragment(
     var pbr_input = pbr_input_from_standard_material(in, is_front);
     let surface = surface_at(in.uv, ddx, ddy);
     var colour = surface.colour;
+    var normal = surface.normal;
+    if breaker.surface.x > 0.5 {
+        pbr_input.material.perceptual_roughness = surface.pbr.g;
+        pbr_input.material.metallic = pbr_input.material.metallic * surface.pbr.b;
+        // Bevy's lightmap light isn't dimmed by occlusion, so it is dimmed here, with the rest.
+        pbr_input.diffuse_occlusion = vec3<f32>(surface.pbr.r);
+        pbr_input.specular_occlusion = surface.pbr.r;
+        pbr_input.lightmap_light = pbr_input.lightmap_light * surface.pbr.r;
+    }
     if breaker.wide.x > 0.0 {
         let multiplier = mix(vec3<f32>(1.0), wide_multiplier(in.world_position.xyz, in.world_normal), breaker.wide.x);
         colour = colour * multiplier;
@@ -210,11 +251,19 @@ fn fragment(
         let lightness = dot(multiplier, vec3<f32>(0.3, 0.55, 0.15));
         pbr_input.material.perceptual_roughness = clamp(pbr_input.material.perceptual_roughness + (lightness - 1.0) * 0.5, 0.2, 1.0);
     }
+    let wetness = clamp(breaker.surface.y, 0.0, 1.0);
+    if wetness > 0.0 {
+        let dry = pbr_input.material.perceptual_roughness;
+        pbr_input.material.perceptual_roughness = mix(dry, WET_GLOSS_FLOOR + WET_GLOSS_SCALE * dry, wetness);
+        pbr_input.material.reflectance = vec3<f32>(mix(DRY_REFLECTANCE, WET_REFLECTANCE, wetness));
+        colour = colour * mix(1.0, WET_KEEPS, wetness);
+        normal = vec3<f32>(normal.xy * mix(1.0, WET_KEEPS_SLOPE, wetness), normal.z);
+    }
     pbr_input.material.base_color = vec4<f32>(pbr_input.material.base_color.rgb * colour, pbr_input.material.base_color.a);
 @if(VERTEX_TANGENTS) {
     let double_sided = (pbr_input.material.flags & pbr_types::STANDARD_MATERIAL_FLAGS_DOUBLE_SIDED_BIT) != 0u;
     let tbn = calculate_tbn_mikktspace(in.world_normal, in.world_tangent);
-    pbr_input.N = apply_normal_mapping(pbr_input.material.flags, tbn, double_sided, is_front, surface.normal * 0.5 + 0.5);
+    pbr_input.N = apply_normal_mapping(pbr_input.material.flags, tbn, double_sided, is_front, normal * 0.5 + 0.5);
 }
 
     pbr_input.material.base_color = alpha_discard(
