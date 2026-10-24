@@ -621,6 +621,70 @@ s.apply(m)                                          # onto the MapBuilder, after
 
 So a whole hall floor of mess costs about what Bando does, under the depth pass's 8 ms. Plaster chips are the biggest share (25,000 triangles for 1,200 chips) and show least from a few metres away: thin them first, by a lower `per_m2` or a lower weight in the mix, if a Map runs over.
 
+## Relief: floors, walls and roofs with depth
+
+A real derelict works has no flat surface. The yard has ruts and potholes and rises under its heaps, the hall's floor is under a thick layer of crumbled plaster, a brick wall's mortar is sunken and bricks are missing from it in patches, and the roof sheets dip and buckle over purlins that hang bent where the sheets are gone. **Relief** is that depth made as real geometry, not as a picture, by three helpers in [`assets-src/lib/`](../assets-src/lib/), plain Python like the others, so a Map built with them is the same bytes on every computer. The term is in [World and content](context/world.md).
+
+### Uneven ground and floors
+
+[`odrelief.py`](../assets-src/lib/odrelief.py) takes any ground (a [`Ground`](#uneven-ground)'s height, or your own) and adds to it:
+
+| Feature | What it makes |
+|---|---|
+| `rut` | two wheel ruts side by side along a line, with a low ridge of pushed-up dirt at their edges |
+| `pothole` | a steep-sided hole where the surface broke away, its rim ragged |
+| `under_heap` | a broad, low swell under a heap of rubble, so the heap sits on its own spoil |
+| `worn`, `worn_rect` | the floor round a column or a machine's plinth, worn smooth and a little dished |
+| `crumble` | a thick layer of crumbled plaster and debris, in drifts with bare floor between them, up to `depth` deep (14 cm in the test Map) and thicker along the walls it came down from |
+
+```python
+fly = Scatter(7)                                    # the flying lines, as keep-clear zones (#339)
+fly.keep_clear_circle(0.0, -16.0, 3.5)
+fly.keep_clear_rect(-2.0, -22.0, 2.0, 7.0)
+floor = Relief(Ground(8, amplitude=0.012).height, seed=8, clear=fly.clearance)
+floor.crumble((-9.8, -5.8, 10.0, 7.8), depth=0.14, walls=[((-10, 7.8), (10, 7.8))])
+floor.worn(4.0, 3.0, 0.25)                          # round a column
+mesh = graded_mesh((-10, -6, 10, 8), floor.height, fine=[(-10, -6, 10, 8)], fine_step=0.2, coarse_step=0.8)
+m.solid("floor", mesh, None, "concrete_floor_worn", "trimesh",
+        blend=("ground_dirt_rubble", floor.blend_weights(mesh[0])))   # the layer shows the rubble picture
+```
+
+- **Fine where the Quad flies low.** `graded_mesh` cuts the ground into 20 to 30 cm cells inside the rectangles you name (the aisle, the doorway, round a heap, the Launch Spot) and into blocks of about a metre elsewhere, with no crack where they meet. All fine, it costs `2 / fine_step²` triangles a square metre (50 at 20 cm); all coarse, about `4 / coarse_step²` (3 at 1.2 m).
+- **The layer shows.** Seen from above, a 10 cm drift is hard to tell from flat concrete. `blend_weights` gives each corner a weight from how thick the layer is there, and the floor's [blend](#blending-two-materials) shows a rubble picture through the concrete wherever it lies.
+- **Keep-clear zones.** The relief takes the scatter's own zones ([The rules](#the-rules)): inside one, nothing rises more than 2 cm (`clear_rise`) above the plain ground, though a rut or a pothole may stay; it eases back over 60 cm outside. Give it only the flying lines, not the walls, or the layer won't lie against them.
+- **Range.** Nothing takes the ground more than `low` (30 cm) below or `high` (60 cm) above the plain ground.
+- **Under the kit.** Build the [scatter](#the-rules) with the relief's height as its ground, and the kit lies on the drifts and in the ruts.
+
+### Brick walls with depth
+
+[`odbrick.py`](../assets-src/lib/odbrick.py)'s `brick_face` lays a wall's outer leaf (half a brick thick, 10 cm) brick by brick, in the picture's own running bond, so the bricks it makes and the bricks in the picture agree. Each brick stands 1.2 cm proud of its mortar and a few millimetres in or out of its neighbours; bricks are missing in **patches** you place, with brick-shaped ragged edges, and one by one; a few have lost their face; **islands of render** cling on over them, with a thickness and ragged edges. Where a brick is gone, the hole goes back to the wall behind it, which shows its own bricks (the inner leaf). No brick is laid over an opening, and the bricks round it show their ends, so a doorway's or a window's broken edge (from [`broken_wall`](#broken-openings)) has depth all the way through.
+
+Build the wall in two: a [`broken_wall`](#broken-openings) 10 cm (`LEAF`) thinner than the whole, set back, and the leaf in front of it, with the same openings. `cill` makes a window cill; pilasters and a string course are plain boxes. The test Map's south wall shows all of it.
+
+It costs about 10 triangles a brick, close to 600 a square metre: 16,500 triangles for the 10.8 m of wall round the test Map's doorway and window. So lay it brick by brick only on the walls the Quad flies past close (an aisle's doorway, a Gap), and use the plain wall elsewhere: its picture has its own bumpy normal map, and from 5 m on the two are hard to tell apart in a moving picture. No shader trick was needed.
+
+### Buckled roofs on a broken frame
+
+[`odframe.py`](../assets-src/lib/odframe.py)'s `BuckledRoof` is a [sagging roof](#sagging-damaged-roofs) whose sheets also dip between the purlins and buckle in dents, each sheet its own way. `Frame` is the steel under a gable of two: trusses (a top chord under each slope, a tie across that sags, and a web of verticals and diagonals) and purlins every 1.4 m up the slope. Where a bay's sheets are all gone, each purlin may be bent down in its middle, hang by one end or be gone, and some of the trusses' web members there are gone, so the roof's line against the sky is broken. Under sheets nothing is bent more than the sheets sag, so no sheet floats. Give `Frame` the keep-clear zones too (`clear=`): a purlin over a flying line may be gone but never hangs down into it. `colliders()` gives the straight members as boxes for the Quad to meet; bent and hanging ones are only drawn.
+
+### The relief test Map
+
+[`assets-src/demos/relief/build.py`](../assets-src/demos/relief/build.py) is the kit's [look-test hall](#the-look-test-map) given relief: ruts, potholes and a swell under the heap in the yard, the crumbled layer over the hall's floor, the south wall laid brick by brick round its doorway and window, and a buckled roof over a broken frame, most of the south slope's sheets gone. The kit lies on the relief. `--flat` builds the same hall the way the look-test hall is (flat ground and floor, plain walls, no roof): the "before". It isn't a Map of the Pack and nothing builds it in CI; to look at it, do as for the look-test hall, with `relief-demo` for `kit-demo`.
+
+**What it costs.** From what the script prints, the atlas sizes `odlight.flatten` works out at 20 cm a texel, and `--camera-cost --seconds 10 --size 2560x1440` from the Launch Spot on the M4 Mac mini, with no baked light:
+
+| | Before (`--flat`) | With relief | Bando |
+|---|---|---|---|
+| Yard ground | 14,600 triangles (50 cm cells) | 12,200 (30 cm fine, 1.2 m coarse) | |
+| Hall floor | 2,200 (50 cm cells) | 14,400 (20 cm cells) | |
+| South wall | 24 boxes | 16,500 in the brick leaf, 3,500 in the core | |
+| Roof and frame | none | 13,200 in the sheets, 6,200 in the frame (186 members) | |
+| Whole Map | 111,900 triangles, 136 parts | 162,900 triangles, 279 parts | |
+| Frame time, Analog | FRAME_FLAT_A | FRAME_RELIEF_A | FRAME_BANDO_A |
+| Frame time, Digital | FRAME_FLAT_D | FRAME_RELIEF_D | FRAME_BANDO_D |
+
+**The light atlas.** A baked Map's atlas grows with the surface, not the triangles, so the finer floor costs little: 11,800 texels against 7,900 for the flat one (its charts split where the drifts slope). The brick leaf is the dear part: 68 m² of surface where the flat face had 30, in 9,200 small charts, each with its margin, 263,000 texels (341,000 if each is stretched to two texels, as the kit's are). The roof's sheets take 61,000 and the frame 113,000. Together that is about 0.45 million texels, 3.6 MB in the graphics card, a quarter of what the kit takes and well inside one 8192 atlas. Baked light wasn't tried on the test Map.
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers', the decals' and the wear rules'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.

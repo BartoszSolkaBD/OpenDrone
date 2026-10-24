@@ -338,18 +338,3 @@ def graded_mesh(rect, height, fine=(), fine_step=0.25, coarse_step=1.0):
                 faces.append((centre, loop[t], loop[(t + 1) % len(loop)]))
     return corners, faces
 
-
-def fine_share(rect, fine, coarse_step=1.0):
-    """How much of `rect`'s area `graded_mesh` draws fine, 0 to 1 (for the
-    cost report)."""
-    x0, y0, x1, y1 = rect
-    nbx = max(1, round((x1 - x0) / coarse_step))
-    nby = max(1, round((y1 - y0) / coarse_step))
-    n = 0
-    for bj in range(nby):
-        for bi in range(nbx):
-            bx0, bx1 = x0 + (x1 - x0) * bi / nbx, x0 + (x1 - x0) * (bi + 1) / nbx
-            by0, by1 = y0 + (y1 - y0) * bj / nby, y0 + (y1 - y0) * (bj + 1) / nby
-            if any(fx0 < bx1 and fx1 > bx0 and fy0 < by1 and fy1 > by0 for fx0, fy0, fx1, fy1 in fine):
-                n += 1
-    return n / (nbx * nby)
