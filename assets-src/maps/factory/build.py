@@ -61,6 +61,7 @@ from odmap import MapBuilder  # noqa: E402
 from odnoise import Random, fbm2, noise2, smoothstep  # noqa: E402
 from odopening import Opening, broken_wall  # noqa: E402
 from odroof import Roof, Skylight, Tear  # noqa: E402
+from odrelief import Relief  # noqa: E402
 from odscatter import Scatter  # noqa: E402
 from odwear import Face as WearFace  # noqa: E402
 from odwear import Floor, Wear  # noqa: E402
@@ -558,7 +559,7 @@ def slab_layout(rnd):
     return slabs
 
 
-def floor_and_clutter(m, rnd, floor, slabs, kit):
+def floor_and_clutter(m, rnd, floor, slabs, kit, relief):
     """The floor's slabs over a dark bed that shows in the joints, the
     rubble, the fallen roof, burnt timber and fallen beams."""
     def slab_h(s):
@@ -569,10 +570,13 @@ def floor_and_clutter(m, rnd, floor, slabs, kit):
     mesh = ruin.Batch()
     for s in slabs:
         x0, y0, x1, y1 = s[:4]
-        mesh.add(g.heightfield_mesh(x0 + JOINT, y0 + JOINT, x1 - JOINT, y1 - JOINT, 0.4, slab_h(s)))
-    floor_ob = m.solid("floor", mesh.mesh(), None, FLOOR, "none")
+        mesh.add(g.heightfield_mesh(x0 + JOINT, y0 + JOINT, x1 - JOINT, y1 - JOINT, 0.25, relief.height))
+    mesh = mesh.mesh()
+    # The crumbled layer (#340) shows the rubble picture through the
+    # concrete's, as thick as it lies.
+    floor_ob = m.solid("floor", mesh, None, FLOOR, "none", blend=(DIRT, relief.blend_weights(mesh[0])))
     m.box_h("floor_bed", HALL / 2, HALL / 2, HALL - T, HALL - T, -0.14, -0.1, FLOOR, collider="none", light_cm=40)
-    m.solid("floor_solid", floor.collision_mesh((IN, IN, HALL - IN, HALL - IN), 1.0), None, FLOOR, "trimesh", collision_only=True)
+    m.solid("floor_solid", g.heightfield_mesh(IN, IN, HALL - IN, HALL - IN, 0.5, relief.height), None, FLOOR, "trimesh", collision_only=True)
 
     # Under the fallen bay: a heap of rubble from the kit (#339), the roof's
     # sheets and a purlin on it.
@@ -625,15 +629,11 @@ def floor_and_clutter(m, rnd, floor, slabs, kit):
     return floor_ob, heap, ash
 
 
-def aisle_lines(m, slabs, floor):
+def aisle_lines(m, height):
     """The old walkway lines down the aisle from the loading door, 3 m apart,
     painted yellow and worn away in the middle of the way, running on under
-    the rubble heap (the roof fell after the works closed)."""
-    def height(x, y):
-        for x0, y0, x1, y1, off, tx, ty in slabs:
-            if x0 <= x <= x1 and y0 <= y <= y1:
-                return floor.height(x, y) + off + tx * (x - (x0 + x1) / 2) + ty * (y - (y0 + y1) / 2)
-        return floor.height(x, y)
+    the rubble heap (the roof fell after the works closed), on the floor's
+    `height`."""
 
     lines = ruin.Batch()
     rnd = Random(SEED, "aisle")
@@ -726,7 +726,7 @@ def hall_mess(m, kit, floor_ob):
     kit.wall_foot((HALL - IN, 0.4), (HALL - IN, HALL - 0.4), depth=0.9, height=0.12, core="concrete_wall_rough")
     kit.wall_foot((HALL - 0.4, HALL - IN), (0.4, HALL - IN), depth=1.3, height=0.16, core="concrete_wall_rough")
     kit.wall_foot((IN, HALL - 0.4), (IN, 0.4), depth=1.1, height=0.14, core="concrete_wall_rough")
-    kit.strew((IN, IN, HALL - IN, HALL - IN), 1.5, bed="concrete_wall_rough", bed_height=(0.05, 0.12))
+    kit.strew((IN, IN, HALL - IN, HALL - IN), 1.1, bed="concrete_wall_rough", bed_height=(0.04, 0.09))
     kit.anchor_row((16.5, 11.4), (28.5, 11.4), 4.0, missing=0.0)
     kit.anchor_row((3.6, 3.6), (3.6, 11.4), 3.9)
     kit.pallets(2.4, 27.4, 0.0, stacks=(2, 3))
@@ -853,7 +853,7 @@ YARD_GRASS = [(0.5, ("grass", 7, (0.14, 0.5))), (0.15, ("grass", 2.5, (0.08, 0.3
 MID_GRASS = [(0.5, ("grass", 2.0, (0.15, 0.45))), (0.15, ("grass", 0.8, (0.08, 0.3)))]
 
 
-GRASS_REACH = (-40.0, -54.0, 70.0, 68.0)  # no real grass past this: the camera never sees it near
+GRASS_REACH = (-26.0, -42.0, 56.0, 56.0)  # no real grass past this: the camera never sees it near
 
 
 def grass_split(mesh, bands):
@@ -870,8 +870,8 @@ def grass_split(mesh, bands):
         cy = sum(corners[i][1] for i in f) / len(f)
         w = grassiness(cx, cy)
         r0, r1, r2, r3 = GRASS_REACH
-        if not (r0 <= cx <= r2 and r1 <= cy <= r3):
-            w = 0.0
+        if not (r0 <= cx <= r2 and r1 <= cy <= r3) or PATH.weight(cx, cy) > 0.25 or HARD.weight(cx, cy) > 0.25:
+            w = 0.0  # out of reach, or the worn track and the hard standing: bare
         k = next((i for i, (least, _) in enumerate(bands) if w >= least), len(bands))
         groups[k].append(f)
     out = []
@@ -890,12 +890,42 @@ def grass_split(mesh, bands):
     return out
 
 
+def flying_lines(seed):
+    """The lines a pilot flies, as keep-clear zones (#339) for the relief
+    (#340): it keeps them within 2 cm of the plain ground."""
+    fly = Scatter(seed)
+    fly.keep_clear_circle(LAUNCH[0], LAUNCH[1], 3.8)
+    fly.keep_clear_rect(11.0, 10.2, 14.0, HALL - IN)  # the aisle
+    fly.keep_clear_rect(10.2, -1.5, 14.8, 2.6)  # the loading door
+    fly.keep_clear_rect(-2.0, 12.6, 2.0, 16.4)  # the breach
+    fly.keep_clear_rect(28.0, 6.6, 31.5, 8.6)  # the man door
+    for x, y in SKY_DROPS:
+        fly.keep_clear_circle(x, y, 0.6)
+    return fly
+
+
+def yard_relief(plain):
+    """The yard's relief (#340): ruts where the scrappers' vans came in from
+    the east and stood in front of the loading door, potholes in the hard
+    standing, and a swell under each rubble heap."""
+    fly = flying_lines(SEED + 81)
+    yard = Relief(plain.height, seed=SEED + 82, clear=fly.clearance, bumps=0.02)
+    yard.rut((21.0, -29.0), (15.8, -3.0), gauge=1.8, depth=0.08)
+    yard.rut((15.8, -3.0), (6.0, -4.2), gauge=1.8, depth=0.06)
+    for x, y, r, d in ((9.6, -3.6, 0.55, 0.08), (15.6, -1.6, 0.7, 0.1), (17.8, -9.5, 0.5, 0.07), (8.2, -6.8, 0.45, 0.06)):
+        yard.pothole(x, y, r, d)
+    yard.under_heap(22.4, -6.6, 3.4, 0.25)
+    yard.under_heap(-7.2, -13.0, 2.6, 0.15)
+    return yard
+
+
 def yard(m, rnd):
     """Outside: uneven yard ground of dirt with grass thinning into it, a
     path worn through it, trees, weeds and the boundary wall's gate. Returns
     the ground's height and its parts."""
-    ground = Ground(SEED + 21, amplitude=0.12, wavelength=13.0, slope=(0.002, -0.002), base=-0.02,
-                    flats=[Flat(LAUNCH[0], LAUNCH[1], 3.5, blend=1.5, level=0.0)])
+    plain = Ground(SEED + 21, amplitude=0.12, wavelength=13.0, slope=(0.002, -0.002), base=-0.02,
+                   flats=[Flat(LAUNCH[0], LAUNCH[1], 3.5, blend=1.5, level=0.0)])
+    ground = yard_relief(plain)
     pieces = []
     x0, y0, x1, y1 = YARD
     # The yard in four pieces round the hall (the hall's floor is its own),
@@ -904,14 +934,14 @@ def yard(m, rnd):
     # where the yard has gone back to grass, thin over the gravel patches,
     # and none on the track the pilots have worn.
     for tag, rect in (("south", (x0, y0, x1, 0.0)), ("north", (x0, HALL, x1, y1)), ("west", (x0, 0.0, 0.0, HALL)), ("east", (HALL, 0.0, x1, HALL))):
-        for grow, mesh in grass_split(ground.mesh(rect, 0.5), YARD_GRASS):
+        for grow, mesh in grass_split(g.heightfield_mesh(*rect, 0.5, ground.height), YARD_GRASS):
             pieces.append(m.solid("yard", mesh, None, DIRT, "trimesh", light_cm=20, scatter=grow,
                                   blend=(GRASS, [grassiness(c[0], c[1]) for c in mesh[0]])))
     # Beyond, to 70 m out: the same ground on a 2 m grid, easing to level at
     # its edge, reaching 2 m in under the yard and 2 cm lower so no seam shows.
     def mid_h(x, y):
         edge = min(x - MID[0], MID[2] - x, y - MID[1], MID[3] - y)
-        return (ground.height(x, y) - 0.02) * smoothstep(edge / 12.0) - 0.02 * (1.0 - smoothstep(edge / 12.0))
+        return (plain.height(x, y) - 0.02) * smoothstep(edge / 12.0) - 0.02 * (1.0 - smoothstep(edge / 12.0))
     for tag, rect in (("west", (MID[0], MID[1], x0 + 2.0, MID[3])), ("east", (x1 - 2.0, MID[1], MID[2], MID[3])),
                       ("south", (x0 + 2.0, MID[1], x1 - 2.0, y0 + 2.0)), ("north", (x0 + 2.0, y1 - 2.0, x1 - 2.0, MID[3]))):
         for grow, mesh in grass_split(g.heightfield_mesh(*rect, 2.0, mid_h), MID_GRASS):
@@ -1423,14 +1453,26 @@ def build(out):
                 return floor.height(x, y) + off + tx * (x - (x0 + x1) / 2) + ty * (y - (y0 + y1) / 2)
         return floor.height(x, y)
 
+    # The floor's relief (#340): a thick layer of crumbled plaster and
+    # debris, deepest along the walls it fell from, worn round the plinths,
+    # a swell under the fallen bay's heap; the flying lines kept low.
+    relief = Relief(floor_h, seed=SEED + 83, clear=flying_lines(SEED + 84).clearance, bumps=0.01)
+    relief.crumble((IN, IN, HALL - IN, HALL - IN), depth=0.13, grain=0.35, cover=0.7,
+                   walls=[((0.0, HALL - IN), (HALL, HALL - IN)), ((IN, 0.0), (IN, HALL)), ((HALL - IN, 0.0), (HALL - IN, HALL)),
+                          ((0.0, IN), (HALL, IN))])
+    for x, y, sx, sy in ((6.0, 20.0, 3.0, 1.6), (8.9, 23.2, 2.4, 1.4), (18.0, 22.5, 2.0, 1.2)):
+        relief.worn_rect((x - sx / 2, y - sy / 2, x + sx / 2, y + sy / 2), band=1.2)
+    relief.under_heap(12.5, 6.5, 3.8, 0.15)
+    floor_h = relief.height
+
     walls_out = walls(m, rnd.child("walls"), floor_h, yard_ground.height)
     plaster_ob = plaster(m, rnd.child("plaster"))
     graffiti(m)
     roof_out = roof(m, rnd.child("roof"))
     silhouette(m)
     kit = hall_kit(floor_h)
-    floor_ob, heap, ash = floor_and_clutter(m, rnd.child("floor"), floor, slabs, kit)
-    aisle_lines(m, slabs, floor)
+    floor_ob, heap, ash = floor_and_clutter(m, rnd.child("floor"), floor, slabs, kit, relief)
+    aisle_lines(m, floor_h)
     story_out = story(m, rnd.child("story"), heap, ash, yard_ground.height)
     hall_mess(m, kit, floor_ob)
     kit_on_factory(kit)

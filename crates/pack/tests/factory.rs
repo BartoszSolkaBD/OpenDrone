@@ -220,3 +220,81 @@ fn leaves_and_weeds_are_drawn_but_not_solid_and_the_trees_wood_is_solid() {
     }
     assert!(solid("tree"), "the trees' trunks and branches are solid");
 }
+
+/// How many clumps a square metre the yard grows round (`x`, `y`): the
+/// scatter tag of the yard part with a triangle's middle within 0.3 m of it.
+/// None if that part grows no grass.
+fn grass_at(map: &MapDefinition, x: f32, y: f32) -> Option<f32> {
+    let mut nearest = (f32::MAX, None);
+    for p in map
+        .drawing
+        .iter()
+        .filter(|p| p.name == "yard" || p.name.starts_with("yard_0"))
+    {
+        for t in &p.triangles {
+            let c = t.map(|i| p.corners[i as usize]);
+            let mx = (c[0][0] + c[1][0] + c[2][0]) / 3.0;
+            let my = (c[0][1] + c[1][1] + c[2][1]) / 3.0;
+            let d = (mx - x).hypot(my - y);
+            if d < nearest.0 {
+                nearest = (d, p.scatter.map(|s| s.density));
+            }
+        }
+    }
+    assert!(nearest.0 < 0.5, "no yard ground at ({x}, {y})");
+    nearest.1
+}
+
+#[test]
+fn the_yard_grows_real_grass_thick_away_from_the_track_and_none_on_it() {
+    // #341: the yard's grass is real grass (#338), thick where the yard has
+    // gone back to grass; the pilots' worn track from the gate to the Launch
+    // Spot and the hard standing before the loading door grow none.
+    let (map, _) = factory();
+    for (x, y) in [(-8.0, -20.0), (30.0, -24.0), (-10.0, 20.0)] {
+        let density = grass_at(&map, x, y);
+        assert!(
+            density.is_some_and(|d| d >= 2.0),
+            "the yard at ({x}, {y}) grows {density:?} clumps a square metre"
+        );
+    }
+    for (x, y, what) in [
+        (5.0, -17.8, "the track"),
+        (12.6, -11.0, "the track by the Launch Spot"),
+        (12.5, -2.5, "the hard standing"),
+    ] {
+        assert_eq!(grass_at(&map, x, y), None, "{what} grows no grass");
+    }
+}
+
+#[test]
+fn the_kits_rubble_lies_on_the_floor_and_its_pallet_stacks_are_solid() {
+    // #341: the kit (#339) is in the hall: its merged items are drawn, its
+    // heap's core is a surface the Quad lands on, and a stack of pallets has
+    // a collision box.
+    let (map, collision) = factory();
+    let drawn = map
+        .drawing
+        .iter()
+        .filter(|p| p.name.starts_with("kit_") || p.name.starts_with("yard_kit_"))
+        .count();
+    assert!(drawn >= 20, "{drawn} parts of the kit are drawn");
+    assert!(map.solid_names.iter().any(|n| n.starts_with("kit_heap")));
+    assert!(map.solid_names.iter().any(|n| n.starts_with("kit_solid")));
+    // The fallen bay's heap is higher than the aisle beyond it.
+    let heap = first_below(&collision, 12.5, 6.5, 3.0);
+    let aisle = first_below(&collision, 12.5, 12.0, 3.0);
+    assert!(
+        heap > aisle + 0.4,
+        "the heap's top is {heap} m up, the aisle {aisle} m"
+    );
+}
+
+#[test]
+fn the_works_chimney_stands_solid_above_the_hall() {
+    // #341: the silhouette (reference 1): a chimney north-east of the hall,
+    // more than 25 m tall, that a Quad hits.
+    let (_, collision) = factory();
+    let top = first_below(&collision, 38.5, 36.0, 60.0);
+    assert!(top > 25.0, "the chimney's top is {top} m up");
+}
