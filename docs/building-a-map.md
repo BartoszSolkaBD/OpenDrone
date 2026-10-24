@@ -291,6 +291,103 @@ The game reads each picture from the folder of the material's colour picture (`a
 
 **What it costs.** Each pixel of a surface that asks looks the roughness picture up once (three times where its repeat is broken, as the colour is), and a baked Map's surface works out one more reflection. On the maintainer's M4 Mac mini, in a release build, with the picture 2560 × 1440 and `--camera-cost` counting the frames in 4 s (the whole frame, CPU and GPU), a test Map whose every surface asks (a 24 m floor, a wall, eight plates of metal and a ground to the horizon, baked) draws 916 frames in the Analog Look with the keys against 938 without them, 4.37 ms a frame against 4.26 (+0.10 ms, 2.4%), and 1127 against 1154 in the Digital Look, 3.55 ms against 3.47 (+0.08 ms). Bando draws 852 to 854 frames in Analog before and after (4.7 ms), as a material that doesn't ask is drawn by the same code as before.
 
+## Geometry that isn't boxes
+
+A Map made only of boxes and flat sheets looks like a model: the ground and the roof are perfectly flat, every opening is a perfect 90° rectangle, and grass stops along a razor line. Four helpers in [`assets-src/lib/`](../assets-src/lib/) make the shapes that break those habits. They are plain Python like [`odgeom.py`](../assets-src/lib/odgeom.py), so a Map built with them has the same bytes on every computer ([above](#the-same-bytes-on-every-computer)): every number comes from a seed (`Random` in [`odnoise.py`](../assets-src/lib/odnoise.py), never Python's own random), the noise uses only the four basic operations on 64-bit numbers, and what they give back is a mesh `(corners, faces)` that `MapBuilder.solid` takes. Each has readable checks in `assets-src/lib/test_od*.py`, which CI runs with the unwrap's ([What CI checks](#what-ci-checks)), and each shape is checked to survive the builder's rounding to 0.1 mm, so no triangle is left with no area.
+
+| Helper | For | What it makes | Triangles |
+|---|---|---|---|
+| [`odground.py`](../assets-src/lib/odground.py) `Ground` | yards, roads, floors | a height at every point: rolling ground, dips, rubble heaps and a slope, with level patches | 2 / step² a m² |
+| [`odroof.py`](../assets-src/lib/odroof.py) `Roof` | a corrugated roof | sheets that sag between trusses, lift, curl and tear; missing sheets, tears and broken skylights | 9 a m² open, 32 solid |
+| [`odopening.py`](../assets-src/lib/odopening.py) `broken_wall` | a brick wall | a closed wall with stepped openings, bulge, lean, ledges and loose bricks | 10 a m² of wall with no openings; 38 with three |
+| [`odedge.py`](../assets-src/lib/odedge.py) `WanderingEdge` | where two ground materials meet | the weight of material B at any point, for a vertex-colour blend | none: one number a corner |
+
+The triangle counts are measured on the test Map at the end of this section.
+
+### Uneven ground
+
+```python
+from odground import Flat, Ground, Mound, water_dips
+from odnoise import Random
+ground = Ground(
+    seed=3, amplitude=0.10, wavelength=12.0, slope=(0.008, 0.004),
+    flats=[Flat(0.0, -12.0, 3.5)],                                    # the Launch Spot's 3 m, and 0.5 m more
+    mounds=[Mound((7, -4), (-7, -4), 0.40, 1.8, side=1, spills=[(10.4, 1.4, 0.45)])],
+    dips=water_dips(Random(3, "dips"), (-16, -14, 16, 10), count=6),
+)
+m.solid("yard", ground.mesh((-16, -14, 16, 10), 0.5), None, "ground_dirt_rubble", "trimesh")
+m.launch_spot(0.0, -12.0, ground.height(0.0, -12.0), 0.0)             # on the level patch, at its height
+```
+
+- **Rolling ground** is layered seeded noise: swells `wavelength` metres across, and half-size ones on top of them down to about a metre. `amplitude` is how far it strays from the plane, at most: 0.10 to 0.15 m for a yard, 0.03 for a road, 0.01 for a concrete floor. `slope` leans the whole site, `(0.02, 0)` being about a degree.
+- **Flat patches** (`Flat`, round, and `FlatRect`) make the ground exactly level inside them and ease back into the rolling ground over their `blend`. A patch with no `level` is level at the height the ground has at its centre. The Launch Spot has to have 3 m clear all round ([World and content](context/world.md)), so a patch of 3.5 m round it keeps that level to its edge, which the check measures in the finished mesh. A floor you mean to land on is a `FlatRect`.
+- **Dips** are round hollows where water would stand, 3 to 8 cm deep. `water_dips` puts them at seeded places and keeps them out of any keep-out circle you give (the Launch Spot). Each `Dip` keeps its place and size, so the Map can lay a puddle there when decals arrive.
+- **Mounds** are rubble heaped against a wall from one end to the other, tapering off at its ends, uneven along it, on one side of it or both. `spills` raise it where bricks fell out of the wall: put one under each breach.
+- **Triangles.** `ground.mesh(rect, step)` is `odgeom.heightfield_mesh`, so it costs `2 / step²` a square metre: 8 at 0.5 m, 32 at 0.25 m. A coarse step hides small features, so use the step the smallest one needs: swells and dips are fine at 0.5 m, a heap against a wall wants 0.35 m or less.
+- **The collision-only mesh.** Colliders stay simple. Draw the ground at a fine step and, if the ground is big, give the Quad a coarser `ground.collision_mesh(rect, step)` as a collision-only trimesh. `ground.max_gap(rect, step, coarse_step)` says how far the two can be apart: 1.5 cm for the rolling yard ground drawn at 0.5 m with a collider at 2 m, but 0.37 m near a heap of rubble at 1 m. So give a heap a collider as fine as what is drawn.
+
+### Sagging, damaged roofs
+
+```python
+from odroof import Roof, Skylight, Tear
+south, north = Roof.gable(-7.5, -4.5, 7.5, 4.5, eave_z=4.5, ridge_z=6.2, seed=4,
+    south=dict(missing=[3], skylights=[Skylight(5, 6, 2.2, 3.8, "broken"), Skylight(8, 9, 2.2, 3.8, "gone")], bays={4: 3.0}),
+    north=dict(tears=[Tear(6.0, 1.8, 0.55)]))
+for tag, roof in (("south", south), ("north", north)):
+    m.solid(f"roof_{tag}", roof.iron(), None, "roof_corrugated_rusted", "none")
+    m.solid(f"roof_{tag}_glass", roof.glass(), None, "steel_grey", "none")      # a glass material of the Map's own
+    m.solid(f"roof_{tag}_solid", roof.collision_mesh(), None, "roof_corrugated_rusted", "trimesh", collision_only=True)
+    for a in roof.trusses():      # a rafter at every truss, from the eave to the ridge
+        m.beam(f"rafter_{tag}", roof.point(a, 0.0, -0.1), roof.point(a, roof.slope_length, -0.1), 0.14, 0.2, "steel_beam_rusted", collider="none")
+```
+
+- **The layout.** A `Roof` is one slope, and `Roof.gable` makes the two of a gable. `a` runs along the eave and `s` up the slope: `roof.point(a, s)` is the place on the plane roof, for a truss or a purlin. Trusses stand every `truss_spacing` (2.5 m). The sheets are held up at each truss and **sag** between them by up to `sag` metres (8 cm), each bay by its own share; `bays={4: 3.0}` makes bay 4 sag three times as much, and 8 is a bay that has fallen in.
+- **Each sheet** is `sheet_width` wide (1 m), runs from the eave to the ridge, laps 12 cm under the next one and is solid, 12 mm thick (`thick=0` gives a one-sided sheet, which costs a third). From its own seed a sheet may have its exposed edge **lifted**, its eave end **curled** up, and its ridge end **torn** off and flapping.
+- **Holes.** `missing` leaves a sheet out. A `Skylight` cuts a straight-edged opening in the iron and fills it with a glass panel that is `"intact"`, `"broken"` (a ragged hole most of its size, with the glass that is left round it) or `"gone"` (the opening and no panel). A `Tear` is a ragged hole in the iron. The edges are cut triangles, exactly on the line where the hole's function crosses zero ([`odcut.clip_grid`](../assets-src/lib/odcut.py)), so a tear or a broken panel is as ragged as the grid is fine.
+- **Triangles.** At the default 0.45 m grid, 9 a square metre of roof for an open sheet and 32 for a solid one: 30 × 30 m of gable roof is about 30,000 triangles solid. A sheet with a `Tear` in it is cut on a finer 0.2 m grid (`hole_step`), so the tear's edge is ragged, which costs about 1,100 triangles for each sheet the tear touches. A skylight's straight edge is exact on any grid and costs nothing extra. A hall that the pilot flies under needs solid sheets, whose underside is seen; a roof seen only from above can take `thick=0`.
+- **Colliders.** `collision_mesh(step=1.5)` is a coarse open surface over the sag, left open where sheets are missing, torn or skylights are gone, and shut over the glass that remains. Its edges are not ragged: the Quad meets a straight edge where it sees a ragged one.
+
+### Broken openings
+
+```python
+from odopening import Opening, broken_wall
+wall = broken_wall(run=14.0, height=4.5, thick=0.34, seed=2, bulge=0.03, lean=0.05, ledge=0.004, openings=[
+    Opening(2.2, 3.8, 1.2, 2.8, "window", sill_gone=True),    # a window that has lost its sill
+    Opening(5.4, 7.2, 0.0, 2.4, "doorway"),
+    Opening(9.6, 11.2, 0.4, 2.0, "breach"),                   # a hole knocked through
+])
+pose = wall.pose((7, -4), (-7, -4), 0.0)                      # the front is on the left of the way from p0 to p1
+m.solid("south_wall", wall.mesh, pose, "brick_red_weathered", "none")
+m.wall("south_wall_solid", (7, -4), (-7, -4), 0.0, 4.5, 0.34, "brick_red_weathered",
+       openings=wall.collision_openings(), collision_only=True)          # what the Quad meets
+for mesh in wall.loose_bricks(Random(2, "bricks")):                      # the bricks that fell out
+    m.solid("loose_bricks", mesh, pose, "brick_red_weathered", "none")
+```
+
+- **The wall** is one closed mesh: a front skin, a back skin and the walls of the openings. Its courses are 75 mm and its bricks 225 mm, as in `brick_red_weathered`'s picture. Each opening is **stepped** course by course, in half bricks from where it began. A `window` and a `doorway` keep their size and have ragged jambs and a lintel that loses a brick; a window with `sill_gone` has its bottom courses broken away, narrowing like a funnel; a `breach` steps in and out all round and has a stepped top. `ragged` (0 to 1) says how rough. The checks run each kind over 25 seeds and require at least three distinct places on each side and a hole that fills less than 97% of its bounding box.
+- **Bulge and lean.** `bulge` moves the face in and out by up to that many metres, smoothly, dying away at the ends and the foot. `lean` makes the top that much further out than the foot. Both faces move together, so the wall keeps its thickness.
+- **Ledges.** `ledge=0.004` sits each `row_courses` courses (4) up to 4 mm proud of or back from the one below, so the light catches an edge. It costs three times the triangles on a plain wall, and none in or next to the courses an opening steps through, so use it where the wall is seen close and light is raking. `ledge=0` leaves the face smooth.
+- **Loose bricks.** `loose_bricks` scatters bricks (12 triangles each, about 7 for each square metre of hole) at the foot of each opening on both sides, a quarter of them on a sill that is still there. Give it the ground's height with `floor=`.
+- **Colliders.** `collision_openings()` gives the `openings` of `MapBuilder.wall`: a staircase of rectangles, each band of four courses (0.3 m) as wide as every course in the band, so each lies inside what is drawn. The Quad is never stopped by air, and a ragged edge may let a brick's end by.
+- **Triangles.** 10 for each square metre of a wall with no openings, and 38 for the 14 × 4.5 m wall above with three (46 with ledges): the stepping needs a row for every course through each opening. Spend them on walls near flight paths and use boxes elsewhere.
+- **Start a wall on the picture's bricks:** at a whole number of 0.225 m from where the picture's repeat began, so the stepped edges fall on the picture's joints.
+
+### Wandering edges
+
+```python
+from odedge import WanderingEdge
+edge = WanderingEdge([(-16, -7), (16, -7.5)], seed=5, wander=1.4, band=0.6)   # dirt on the left, grass on the right
+weights = edge.weights(ground_mesh[0])                                       # one number from 0 to 1 for each corner
+```
+
+`weight(x, y)` is how much of material B shows through material A, from 0 to 1, a whole number of 255ths. The boundary is the line, bent by layers of noise (`wander` and `wavelength`), the fade is `band` metres wide, and `patches` tears it into tongues and islands. The checks measure the shape in numbers: the boundary stays within `wander`, `band` and a patch's share of the line, strays by tens of centimetres, and no 4 m stretch of it is straight to within 5 cm.
+
+The weights become the vertex colour (`COLOR_0`) of the ground mesh once the vertex-colour blend of [#321](https://github.com/BartoszSolkaBD/OpenDrone/issues/321) is in: the builder's `export_vertex_color` is still `"NONE"`, so nothing writes them to the `.glb` yet. They are one per corner in the corners' order, so that ticket takes them as they are. The mesh needs corners about half the band apart or closer: 0.25 m for a 0.6 m band, which is 32 triangles a square metre and fades in about three steps. Until the blend exists, the test Map draws each triangle in the material its corners weigh most for, which shows the edge at the triangle's size.
+
+### Seeing them
+
+[`assets-src/demos/geometry/build.py`](../assets-src/demos/geometry/build.py) puts every helper in one scene, a yard with a hall and a roof, and prints what each costs. It is not a Map of the Pack, and nothing builds it in CI. To look at it, build it into a folder of your own, give the folder a `map.toml` copied from a Map's, add its name to `MAPS` in `crates/opendrone/src/main.rs` on a checkout of your own, and use `--render-views` ([above](#seeing-the-map-as-the-game-draws-it)).
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the unwrap's plain-Python checks. It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
