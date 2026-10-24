@@ -10,7 +10,7 @@ import plainwork
 
 def make(seed, n):
     diffuse, normal, rough = plainwork.make(seed, n, (168, 170, 172), (184, 184, 182), (80, 72, 60), 0.5, 0.2,
-                                            scratch=(220, 220, 222), fade=0.2, dirt=0.3, relief=1.0)
+                                            scratch=(220, 220, 222), fade=0.2, dirt=0.3, relief=3.0)
     # Bands of red paint across the picture, worn at their edges.
     X, Y = tex.grid(n)
     s = tex.Seeds(seed + 77)

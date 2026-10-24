@@ -136,19 +136,19 @@ As the maintainer confirmed it on #290 (24 October 2026): a textile or engineeri
 
 **The choice made here: an engineering works.** The slice's hall is a single-storey shed with steel trusses, brick pilasters (pillars built into the wall) under each truss and a fallen steel beam, which is how engineering works were built. Textile mills were mostly multi-storey with rows of windows. If the maintainer prefers textile, swap the machine plinths for rows of small loom bolt pads, the crane rail for line-shaft brackets, and add fluff and bobbins to the litter.
 
-**The story, in order.** A light engineering works machined parts here for decades, with an overhead crane down the hall. It closed about 15 years ago and the machines were sold. Thieves stripped the cable, pipes and crane, and knocked through the west wall to drag the last machines out. Then the roof failed: one bay fell in. Squatters camped in the north-east corner, where the roof over it is still whole, until their fire got out of hand and burnt the corner. For the last few years, local FPV pilots have used the site. They fixed the yard gate, cleared a hangout inside the loading door, and fly the hall and the fallen bay.
+**The story, in order.** A light engineering works machined parts here for decades, with an overhead crane down the hall. It closed about 15 years ago and the machines were sold. Thieves stripped the cable, pipes and crane, and knocked through the west wall to drag the last machines out. Then the roof failed: one bay fell in. Squatters camped in the north-east corner, where the roof was still whole, until their fire got out of hand, burnt the corner and shattered the skylight over it. For the last few years, local FPV pilots have used the site. They fixed the yard gate, cleared a hangout inside the loading door, and fly the hall and the fallen bay.
 
 ### The hall corner (the slice)
 
 Where things go uses the slice's frame ([PR #317](https://github.com/BartoszSolkaBD/OpenDrone/pull/317), `assets-src/maps/factory/build.py`): the origin is the hall's south-west corner on the floor, east is +x, north is +y, up is +z, and the hall is 30 × 30 m. The sun is in the south-west, 37° up, so the **shaded, damp side is the north and east walls**, and rain falls through the south slope's openings. Things the slice already has are marked *(have)*. The brick pillars built into the long walls under each truss (at x 5, 10, 15, 20 and 25) are the *pilasters*.
 
 **Rules for every prop:**
-- Nothing blocks a Gap: the breach (west wall, y ≈ 14.5), the loading door (south wall, x 10.7–14.3), the man door (east wall, y 7–8.1) and the vent (east wall, y 12.1–12.9). The slice's pack test checks lines through them.
+- Nothing blocks a Gap: the breach (west wall, y ≈ 14.5), the loading door (south wall, x 10.45–14.55 as broken, at least 3.4 m clear), the man door (east wall, y 7–8.1), the vent (east wall, y 12.1–12.9), the fallen bay's dive (x 10.6–14.4, y 3–10, a 15 m drop), the open skylights and the missing roof sheet. The slice's pack test checks lines through them, and that the aisle is clear north of the heap.
 - The Launch Spot stays open flat ground with 3 m clear.
 - Small props (a bottle, a prop off a quad) are drawn only. Anything a Quad can hit at speed and that is bigger than about 20 cm is solid.
 - Vary each copy's turn, tilt, size and wear.
 
-**Focal point A: the fire corner (north-east), squatters and fire.** *(have: burnt timber and ash at x 24, y 24.5; a burnt pallet at x 21, y 20.6)*
+**Focal point A: the fire corner (north-east), squatters and fire.** *(have: burnt timber and ash at x 24.8, y 24.6, east of the skylight at x 20.9–22.1, y 19–24, which the fire shattered: the roof was whole when they camped)*
 
 | Prop or wear | Where | Condition |
 |---|---|---|
@@ -183,7 +183,7 @@ Where things go uses the slice's frame ([PR #317](https://github.com/BartoszSolk
 
 | Prop or wear | Where | Condition |
 |---|---|---|
-| Machine plinths | Three: x 6, y 20 (3 × 1.6 m); x 12, y 22 (2.4 × 1.4 m); x 18, y 22.5 (2 × 1.2 m); 0.15–0.3 m high | Concrete, edges chipped, anchor bolts cut flush (bright cut faces, rusted); oil-black on top and in a ring around |
+| Machine plinths | Three: x 6, y 20 (3 × 1.6 m); x 8.9, y 23.2 (2.4 × 1.4 m, west of the 3 m aisle at x 11–14); x 18, y 22.5 (2 × 1.2 m); 0.15–0.3 m high | Concrete, edges chipped, anchor bolts cut flush (bright cut faces, rusted); oil-black on top and in a ring around |
 | Crane rail | On brackets on the pilasters along the north and south walls, 6.6 m up, the full 30 m | Rusty; one cut end hanging down at x ≈ 3 |
 | Empty cable tray | Along the north wall at 3.2 m, x 0.5–9.5 | Bent down in one span; a few cut cable ends |
 | Fuse board box | East wall, inside, beside the man door at y ≈ 9.5, 1.5 m up | Door open, empty |
@@ -204,7 +204,7 @@ Where things go uses the slice's frame ([PR #317](https://github.com/BartoszSolk
 - Efflorescence low on the north and east walls.
 - Bird droppings in lines along the trusses at x 5, 10, 15, 20, 25. A nest where the truss at x 25 meets the north wall.
 - Leaves and litter drifts in all four corners and against the plinths. The deepest is in the south-east corner, downwind of the breach and the loading door.
-- Weeds in floor cracks under the openings *(have, partly)*, and one young birch in the rubble heap.
+- Weeds in floor cracks under the openings *(have, partly)*, and one young birch in the rubble that fell in from the breach, x 2.3, y 17.6, under the rust hole in the roof (never in the fallen bay, whose dive must stay clear).
 
 **Crashed-quad bits.** Few, each where a crash would leave it:
 - a whoop's frame caught in the north-west window grid at x 2.5, about 4 m up;

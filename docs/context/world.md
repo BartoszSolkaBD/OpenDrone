@@ -17,7 +17,7 @@ A Map of an abandoned, unfinished building and its site, flown inside and out. T
 _Avoid_: Ruin, abandoned building (as the Map's name)
 
 **Factory**:
-A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is its first slice: one 30 × 30 m bay of a brick hall and its yard ([Building a Map](../building-a-map.md#the-factorys-first-slice)).
+A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is one 30 × 30 m bay of a brick hall and its yard, worn and with the history of an abandoned works in it ([Building a Map](../building-a-map.md#the-factorys-first-slice), [its second slice](../building-a-map.md#the-factorys-second-slice-wear-uneven-shapes-and-history)).
 _Avoid_: Warehouse, plant
 
 **Gap**:
@@ -63,6 +63,10 @@ _Avoid_: Sticker, overlay
 **Wear**:
 The marks of age and use on a Map's surfaces (water runs, moss, rust, soot, scuffs, droppings, cracks and the like), put as decals (see Decal above) by rules that give each mark a cause: water runs below a sill, moss grows low on a shaded wall, soot rises above a fire. A rule is given a wear level from 0 to 1 and a seed, so the same seed gives the same Map, and a Map's author can add a decal by hand or lock a box against the rules. How a script asks for it: [Building a Map](../building-a-map.md#wear).
 _Avoid_: Dirt layer, grunge
+
+**Prop**:
+A loose thing on a Map that tells its history, built from shapes by the Map's script: a pallet, a bottle crate, a bottle, an oil drum, a bed frame, the bits of a crashed quad. A prop bigger than about 20 cm that a Quad can hit is solid; a smaller one is only drawn. Few strong groups of props, each placed for a reason, not an even sprinkle ([the lived-in places research](../research/lived-in-places.md), and how a script builds them: [Building a Map](../building-a-map.md#props)).
+_Avoid_: Clutter, set dressing, asset
 
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.

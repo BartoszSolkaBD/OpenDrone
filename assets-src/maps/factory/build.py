@@ -55,7 +55,6 @@ import odgeom as g  # noqa: E402
 import odplants as plants  # noqa: E402
 import odprops as props  # noqa: E402
 import odruin as ruin  # noqa: E402
-from odcut import merge  # noqa: E402
 from odedge import WanderingEdge  # noqa: E402
 from odground import Dip, Flat, Ground  # noqa: E402
 from odmap import MapBuilder  # noqa: E402
@@ -113,7 +112,11 @@ SOUTH_GLASS = [((0.9, 4.0, 2.1, 10.0), "intact"), ((15.9, 4.0, 17.1, 10.0), "bro
 NORTH_GONE = [(5.9, 20.0, 7.1, 26.0), (20.9, 19.0, 22.1, 24.0)]
 NORTH_GLASS = [((15.9, 20.0, 17.1, 26.0), "intact")]
 NORTH_MISSING_SHEET = 21  # the sheet over x 8 to 9 on the north slope, eave to ridge
-ROOF_TEARS = [("south", 26.5, 12.0, 0.6), ("north", 1.5, 17.0, 0.5)]  # rust holes: slope, x, y, radius
+# Rust holes, and tears round the fallen bay so its edge is ragged, not a
+# rectangle: slope, x, y, radius.
+ROOF_TEARS = [("south", 26.5, 12.0, 0.6), ("north", 1.5, 17.0, 0.5),
+              ("south", 10.7, 3.2, 0.75), ("south", 14.3, 3.1, 0.6), ("south", 10.8, 9.8, 0.65), ("south", 14.2, 9.9, 0.8),
+              ("south", 12.4, 10.1, 0.55), ("south", 10.55, 6.6, 0.5), ("south", 14.45, 7.4, 0.6)]
 
 # The pilots' hangout, and the squatters' fire corner.
 FIRE_PIT = (21.5, 6.5)
@@ -662,7 +665,7 @@ def grassiness(x, y):
     dx = max(-x, 0.0, x - HALL)
     dy = max(-y, 0.0, y - HALL)
     far = math.sqrt(dx * dx + dy * dy) + 8.0 * (fbm2(seed, x, y, 9.0, 3))
-    w = 0.85 * smoothstep((far - 16.0) / 14.0) * (0.55 + 0.45 * smoothstep(fbm2(seed + 1, x, y, 5.0, 3) * 2.0 + 0.5))
+    w = 0.9 * smoothstep((far - 18.0) / 16.0) * smoothstep(fbm2(seed + 1, x, y, 7.0, 3) * 2.5 + 0.6)
     # Strips along the walls' feet where the sun falls and nothing drives.
     for edge in (SOUTH_STRIP, WEST_STRIP, NORTH_STRIP):
         w = max(w, edge.weight(x, y))
@@ -966,7 +969,7 @@ def story(m, rnd, heap, ash, yard_h):
     leaf_a = props.gate_leaf(rnd.child("leaf_a"), 2.9, 2.0)
     solid.add("steel", leaf_a, g.Pose(props.turned(-14.0, -2.5), (g0 + 0.08, -30.0, 0.06)))
     leaf_b = props.gate_leaf(rnd.child("leaf_b"), 2.9, 2.0)
-    solid.add("steel", leaf_b, g.Pose(props.turned(-100.0), (g1 - 0.08, -30.05, 0.05)))
+    solid.add("steel", leaf_b, g.Pose(props.turned(100.0), (g1 - 0.08, -29.95, 0.05)))
     solid.add("concrete", g.box_mesh(0.44, 0.22, 0.2), g.Pose(props.turned(-8.0), (g1 - 0.75, -27.0, yard_h(g1 - 0.75, -27.0) + 0.08)))
     drawn.add("plastic_red", g.annulus_mesh(0.05, 0.075, 0.085, 10), g.Pose(at=(g0, -30.0, 1.85)))
     drawn.add("plastic_red", g.annulus_mesh(0.05, 0.075, 0.085, 10), g.Pose(at=(g0, -30.0, 0.5)))
@@ -1059,7 +1062,7 @@ def wear_face(name, p0, p1, hosts, openings, painted=False):
     return face
 
 
-def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster_ob, story_out, slabs):
+def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster_ob, story_out):
     """Wear where something put it: water under every sill and roof edge,
     moss and salt where it is shaded and damp, rust under the steel, soot from
     the two fires, droppings under the trusses, scuffs where people walk,
@@ -1101,7 +1104,13 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     # in, cracks over the openings, flakes under the plaster.
     for name in ("south_in", "west_in"):
         w.runs_below_openings(faces[name])
-    w.scratches_low(faces["south_in"])
+    # The roof leaks at the eaves and the gables' tops: runs down every inside
+    # face, and scratches low on every face people pass.
+    for name in ("south_in", "north_in", "west_in", "east_in"):
+        w.runs_from_edge(faces[name], gutters={"east_in": [16.0, 4.5], "west_in": [21.0], "north_in": [12.0]}.get(name, []))
+        w.scratches_low(faces[name])
+    w.salt_at_foot(faces["east_in"], inside, damp=[4.5, 16.0])
+    w.salt_at_foot(faces["north_in"], inside, damp=[12.0])
     plaster_face = WearFace("plaster", (20.4, HALL - i - 0.05), (9.6, HALL - i - 0.05), 0.0, 3.4, [plaster_ob, wn], painted=True)
     w.flakes_at_foot(plaster_face, inside)
     h = 0.7071
@@ -1113,10 +1122,10 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     w.damp_at([(d.x, d.y, d.radius) for d in FLOOR_DIPS], inside)
     w.cracks_on_floor((IN, IN, HALL - IN, HALL - IN), inside, 5)
     # Steel: rust under the crane rail's brackets and the trusses' feet.
-    pil = story_out_hosts = [walls_out["pilasters"]]
+    pilasters = [walls_out["pilasters"]]
     for x, y, z, sgn in story_out["brackets"]:
-        w.rust_below([(x, y, z)], (0.0, sgn, 0.0), story_out_hosts)
-        w.rust_below([(x, y, EAVE - 0.5)], (0.0, sgn, 0.0), pil)
+        w.rust_below([(x, y, z)], (0.0, sgn, 0.0), pilasters)
+        w.rust_below([(x, y, EAVE - 0.5)], (0.0, sgn, 0.0), pilasters)
     # Birds on the trusses over the aisle and the fire corner.
     for x, ya, yb in ((10.0, 12.0, 19.0), (15.0, 14.0, 22.0), (25.0, 3.0, 9.0)):
         w.droppings_under((x, ya), (x, yb), inside)
@@ -1153,7 +1162,7 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     # blackened over the ash.
     w.hand("old_tag_east_a", "decal_tag", [we], (HALL - i, 19.0, 1.3), east_f, up, (1.6, 1.3), layer=0, depth=0.6)
     w.hand("old_tag_east_b", "decal_tag", [we], (HALL - i, 21.4, 1.6), east_f, up, (1.3, 1.1), layer=0, depth=0.6)
-    for k, (dx, s, z) in enumerate(((0.2, (5.0, 7.0), 3.3), (-0.5, (3.2, 4.4), 2.1), (0.9, (2.6, 3.4), 1.6))):
+    for k, (dx, s, z) in enumerate(((0.2, (5.0, 7.0), 3.3), (-0.5, (3.2, 4.4), 2.1), (0.9, (2.6, 3.4), 1.6), (0.0, (4.2, 6.0), 2.9))):
         w.hand(f"soot_north_fire_{k}", "decal_soot", [wn], (ax + dx, HALL - i, z), north, up, s, layer=1, depth=0.8)
         w.hand(f"soot_east_fire_{k}", "decal_soot", [we], (HALL - i, ay + 0.3 - dx, z), east_f, up, s, layer=1, depth=0.8)
     w.hand("soot_east_low", "decal_soot", [we], (HALL - i, ay - 2.0, 1.5), east_f, up, (2.6, 3.2), layer=1, depth=0.8)
@@ -1213,7 +1222,7 @@ def build(out):
     story_out = story(m, rnd.child("story"), heap, ash, yard_ground.height)
     ivy(m, rnd.child("ivy"))
     backdrop(m, rnd.child("backdrop"))
-    worn = wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_ground.height, plaster_ob, story_out, slabs)
+    worn = wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_ground.height, plaster_ob, story_out)
     # Every surface here is a picture made from scratch: no flat colours,
     # nothing downloaded (ADR-0024).
     for name in m.materials:

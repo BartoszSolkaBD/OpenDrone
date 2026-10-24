@@ -188,7 +188,12 @@ fn the_hangouts_seats_and_the_bigger_props_are_solid_and_bottles_and_cans_are_dr
     let (map, collision) = factory();
     let solid = |name: &str| map.solid_names.iter().any(|n| n == name);
     let drawn = |name: &str| map.drawing.iter().any(|p| p.name == name);
-    for name in ["story_wood", "story_steel", "story_plastic_blue", "story_concrete"] {
+    for name in [
+        "story_wood",
+        "story_steel",
+        "story_plastic_blue",
+        "story_concrete",
+    ] {
         assert!(solid(name), "{name} is solid");
     }
     for name in ["litter_glass_brown", "litter_glass_green", "litter_can"] {

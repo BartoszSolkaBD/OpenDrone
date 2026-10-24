@@ -185,7 +185,11 @@ class MapBuilder:
 
     def _blend(self, name, me, count, material_b, weights):
         """The mesh's vertex colours: each corner's weight of `material_b`, as
-        grey, a 32-bit number exactly as given."""
+        grey. Blender holds them as 32-bit floats, and its glTF exporter
+        writes `COLOR_0` as 16-bit whole numbers that stand for 0 to 1
+        (normalised unsigned shorts, #324 checked the Factory's `.glb`); a
+        weight that is a whole number of 255ths, as `WanderingEdge` gives,
+        comes through exactly on every computer."""
         assert material_b in self.library, f"{name}: no material {material_b!r} to blend with"
         assert len(weights) == count, f"{name}: {len(weights)} blend weights for {count} corners"
         flat = []

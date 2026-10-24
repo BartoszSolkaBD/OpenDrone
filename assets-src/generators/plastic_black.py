@@ -5,5 +5,5 @@ import plainwork
 
 
 def make(seed, n):
-    return plainwork.make(seed, n, (18, 18, 19), (40, 40, 40), (72, 68, 60), 0.82, 0.38,
-                          scratch=(52, 52, 52), fade=0.4, dirt=0.4)
+    return plainwork.make(seed, n, (18, 18, 19), (62, 62, 60), (86, 80, 70), 0.82, 0.38,
+                          scratch=(60, 60, 60), fade=0.5, dirt=0.55)
