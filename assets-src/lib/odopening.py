@@ -203,7 +203,12 @@ def _brick(u, y, z, r):
     corners, faces = g.box_mesh(BRICK, 0.1125, COURSE * 0.97)
     rows = g.mat_mul(g.rot_z(r.uniform(0, 360)), g.mat_mul(g.rot_y(r.uniform(-10, 10)), g.rot_x(r.uniform(-10, 10))))
     pose = g.Pose(rows, (u, y, z))
-    placed = [pose.apply(c) for c in corners]
+    # Snapped before it is cut into triangles: a turned brick's faces are flat
+    # only to the last bit of a sine, so which diagonal "leaves no dent" on
+    # the unsnapped corners can differ between computers (#324 found the
+    # Factory's `.glb` differing on Linux this way). On the corners the file
+    # stores, every computer decides alike.
+    placed = [g.snap3(pose.apply(c)) for c in corners]
     return placed, g.triangulate(placed, faces, convex=True)
 
 
