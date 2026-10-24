@@ -1,8 +1,9 @@
-"""Worn concrete floor: 3 m of an industrial floor to the picture, four slabs
-of 1.5 m with their saw-cut joints. Trowelled grey with soft cloudy patches
+"""Worn concrete floor: 3 m of an industrial floor to the picture. Trowelled grey with soft cloudy patches
 and swirls, fine aggregate showing in the worn lanes where forklifts and feet
 go, black rubber scuffs, stray hairline cracks, oil stains with a dark core,
-the pale rings left where water stood, and pits where air was trapped."""
+the pale rings left where water stood, and pits where air was trapped. It has no slab joints: a regular grid of them
+repeated with the picture, so a Map lays its slabs out as geometry, each its
+own size, with a real joint between them (#324)."""
 
 import numpy as np
 
@@ -13,9 +14,9 @@ def make(seed, n):
     s = tex.Seeds(seed)
     X, Y = tex.grid(n)
 
-    # Slabs: each is a little lighter or darker than the next.
-    slab = tex.cell_random(np.floor(X * 2.0).astype(np.int64), np.floor(Y * 2.0).astype(np.int64), s())
-    tone = 0.88 + 0.24 * slab
+    # Lighter and darker pours, soft-edged (no slab grid: the Map's slabs
+    # are its own geometry).
+    tone = 0.88 + 0.24 * tex.fbm(X, Y, 2, 2, s())
     cloud = tex.fbm(X, Y, 5, 6, s())
     mid = tex.fbm(X, Y, 16, 4, s())
     # Trowel swirls: noise bent round on itself.
@@ -34,17 +35,6 @@ def make(seed, n):
     albedo = tex.mix(base, tex.colour(178, 164, 138), grains_a * exposed)
     albedo = tex.mix(albedo, tex.colour(130, 138, 148), grains_b * exposed * 0.8)
     albedo = tex.mix(albedo, tex.colour(54, 52, 50), grains_c * 0.28)
-
-    # Saw-cut joints between the slabs: a dark line with a ragged shoulder.
-    across = np.abs(X * 2.0 - np.floor(X * 2.0 + 0.5)) / 2.0
-    down = np.abs(Y * 2.0 - np.floor(Y * 2.0 + 0.5)) / 2.0
-    jd = np.minimum(across, down)
-    ragged = tex.fbm(X, Y, 90, 3, s())
-    groove = 1.0 - tex.smoothstep(0.0012, 0.0032 + 0.003 * ragged, jd)
-    shoulder = (1.0 - tex.smoothstep(0.0, 0.014, jd)) * tex.smoothstep(0.4, 0.7, ragged)
-    dirt_in_joint = (1.0 - tex.smoothstep(0.0, 0.006, jd))
-    albedo = tex.mix(albedo, albedo * 0.8, shoulder * 0.7)
-    albedo = tex.mix(albedo, tex.colour(30, 28, 26), tex.clamp(groove + dirt_in_joint * 0.4) * 0.85)
 
     # Cracks: a few long hairlines that wander across a slab and fork.
     crack = tex.cracks(X, Y, 3, s(), 0.0022, 0.07, 0.0)
@@ -80,14 +70,13 @@ def make(seed, n):
     pit = tex.smoothstep(0.16, 0.05, f1) * has_pit
     albedo = tex.mix(albedo, tex.colour(46, 44, 42), pit * 0.7)
 
-    # Height: a flat floor with its fine unevenness, joints and cracks cut in.
+    # Height: a flat floor with its fine unevenness and cracks cut in.
     micro = tex.fbm(X, Y, 130, 4, s())
-    height = 0.7 + 0.18 * micro + 0.08 * cloud - groove * 0.4 - shoulder * 0.05 - crack_all * 0.4 - pit * 0.3
+    height = 0.7 + 0.18 * micro + 0.08 * cloud - crack_all * 0.4 - pit * 0.3
     height = tex.clamp(height + (grains_a + grains_b) * 0.03 * exposed)
 
     rough = 0.84 - 0.24 * wear_lane * (0.3 + 0.7 * tex.fbm(X, Y, 30, 3, s())) + 0.08 * (1.0 - tone)
     rough = tex.mix(rough, 0.42, oil * 0.7)
     rough = tex.mix(rough, 0.55, inside * 0.25)
     rough = tex.mix(rough, 0.7, scuff * 0.5)
-    rough = rough + groove * 0.1
     return tex.finish(albedo, height, rough, 5.0, seed=seed)

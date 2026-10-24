@@ -7,7 +7,7 @@ Blender's booleans, bevels or random numbers. Everything here is worked out
 from a seed with 64-bit Python numbers, like `odgeom`, and hands back meshes
 `(corners, faces)` already placed in the Map, for `MapBuilder.solid`.
 
-- `Random` gives the same numbers for the same seed and keys on every
+- `Random` (from `odnoise`, the geometry helpers' own) gives the same numbers for the same seed and keys on every
   computer: SHA-256 of the keys, then splitmix64 in Python's whole numbers.
 - `Batch` joins many small solids (bricks, chunks, leaves) into one mesh, so
   a pile of rubble is one part to draw, not hundreds.
@@ -19,50 +19,16 @@ from a seed with 64-bit Python numbers, like `odgeom`, and hands back meshes
 - `lump`, `brick` and `mound` are rubble; `bent_bar` is a beam that has
   buckled.
 """
-import hashlib
 import math
 
 import odgeom as g
+from odnoise import Random  # noqa: F401  (the one Random, shared with the geometry helpers, #322)
 
-MASK = (1 << 64) - 1
 
 # A brick of the Factory's walls (`brick_red_weathered`: eight bricks of
 # 225 mm across 1.8 m, 24 courses of 75 mm) with its share of mortar.
 BRICK = 0.225
 COURSE = 0.075
-
-
-class Random:
-    """Numbers from a seed and any keys, the same on every computer."""
-
-    def __init__(self, seed, *keys):
-        text = repr((seed,) + tuple(keys)).encode()
-        self.state = int.from_bytes(hashlib.sha256(text).digest()[:8], "little")
-
-    def bits(self):
-        self.state = (self.state + 0x9E3779B97F4A7C15) & MASK
-        z = self.state
-        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & MASK
-        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & MASK
-        return z ^ (z >> 31)
-
-    def unit(self):
-        """A number in [0, 1), exact: 53 bits over 2^53."""
-        return (self.bits() >> 11) / 9007199254740992.0
-
-    def uniform(self, a, b):
-        return a + (b - a) * self.unit()
-
-    def chance(self, p):
-        return self.unit() < p
-
-    def pick(self, items):
-        return items[int(self.unit() * len(items))]
-
-    def child(self, *keys):
-        """A new stream for a part, which doesn't move when the parent's
-        other draws change."""
-        return Random(self.bits(), *keys)
 
 
 class Batch:

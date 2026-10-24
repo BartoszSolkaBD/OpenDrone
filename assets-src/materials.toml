@@ -146,7 +146,9 @@ colour    = [0.17, 0.17, 0.15]
 roughness = 0.78
 texture   = "concrete_floor_worn"
 break_repeat   = true
-snap           = [2, 2]
+# No slab joints in the picture (#324): the Factory lays its slabs out as
+# geometry, so tiles may shift and turn by any amount.
+turn_cells     = true
 macro_strength = 0.60
 roughness_map  = true
 
@@ -383,6 +385,68 @@ texture       = "decal_stencil"
 roughness_map = true
 
 # No picture: leaves are a flat colour.
+# Props of the Factory (#324): the loose things its script builds from shapes,
+# each a weathered plain surface (`assets-src/generators/plainwork.py`) or
+# weathered wood, and the worn yellow paint of the floor's walkway lines.
+[materials.wood_weathered]
+colour         = [0.20, 0.18, 0.15]
+roughness      = 0.84
+texture        = "wood_weathered"
+break_repeat   = true
+macro_strength = 0.20
+roughness_map  = true
+
+[materials.plastic_blue]
+colour        = [0.05, 0.10, 0.25]
+roughness     = 0.55
+texture       = "plastic_blue"
+roughness_map = true
+
+[materials.plastic_red]
+colour        = [0.25, 0.06, 0.05]
+roughness     = 0.55
+texture       = "plastic_red"
+roughness_map = true
+
+[materials.plastic_black]
+colour        = [0.01, 0.01, 0.01]
+roughness     = 0.55
+texture       = "plastic_black"
+roughness_map = true
+
+[materials.plastic_white]
+colour        = [0.45, 0.44, 0.40]
+roughness     = 0.6
+texture       = "plastic_white"
+roughness_map = true
+
+[materials.glass_brown]
+colour        = [0.03, 0.01, 0.0]
+roughness     = 0.2
+texture       = "glass_brown"
+roughness_map = true
+
+[materials.glass_green]
+colour        = [0.0, 0.04, 0.01]
+roughness     = 0.2
+texture       = "glass_green"
+roughness_map = true
+
+[materials.can_painted]
+colour        = [0.33, 0.25, 0.25]
+roughness     = 0.35
+texture       = "can_painted"
+roughness_map = true
+metallic      = 0.8
+
+[materials.paint_yellow]
+colour         = [0.35, 0.25, 0.04]
+roughness      = 0.68
+texture        = "paint_yellow"
+break_repeat   = true
+turn_cells     = true
+roughness_map  = true
+
 [materials.foliage]
 colour    = [0.10, 0.24, 0.07]
 roughness = 0.95
@@ -713,6 +777,61 @@ generator = "decal_stencil"
 seed      = 1
 pixels    = 512
 size      = "1.0 m"
+
+# The Factory's props (#324).
+[textures.wood_weathered]
+generator = "wood_weathered"
+seed      = 1
+pixels    = 512
+size      = "1 m"
+
+[textures.plastic_blue]
+generator = "plastic_blue"
+seed      = 1
+pixels    = 512
+size      = "0.5 m"
+
+[textures.plastic_red]
+generator = "plastic_red"
+seed      = 1
+pixels    = 512
+size      = "0.5 m"
+
+[textures.plastic_black]
+generator = "plastic_black"
+seed      = 1
+pixels    = 512
+size      = "0.5 m"
+
+[textures.plastic_white]
+generator = "plastic_white"
+seed      = 1
+pixels    = 512
+size      = "0.5 m"
+
+[textures.glass_brown]
+generator = "glass_brown"
+seed      = 1
+pixels    = 512
+size      = "0.3 m"
+
+[textures.glass_green]
+generator = "glass_green"
+seed      = 1
+pixels    = 512
+size      = "0.3 m"
+
+[textures.can_painted]
+generator = "can_painted"
+seed      = 1
+pixels    = 512
+size      = "0.25 m"
+
+[textures.paint_yellow]
+generator = "paint_yellow"
+seed      = 1
+pixels    = 512
+size      = "1 m"
 
 # Not a material's picture: the large-scale one the [macro] table names.
 [textures.macro_variation]

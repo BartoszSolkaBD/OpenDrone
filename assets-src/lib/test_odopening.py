@@ -263,5 +263,32 @@ class LooseBricks(unittest.TestCase):
                 self.assertGreater(g.length(g.cross(g.sub(cs[b], cs[a]), g.sub(cs[c], cs[a]))), 0.0)
 
 
+class Framed(unittest.TestCase):
+    """#324: a window that still holds its iron frame keeps straight edges."""
+
+    def framed_wall(self):
+        ops = [Opening(2.0, 4.4, 1.2, 5.4, "framed"), Opening(6.0, 7.5, 0.6, 2.2, "breach")]
+        return broken_wall(9.0, 6.0, 0.45, 3, openings=ops, bulge=0.02), ops
+
+    def test_a_framed_opening_keeps_its_straight_edges_course_by_course_and_drops_no_bricks(self):
+        w, ops = self.framed_wall()
+        self.assertEqual(set(ops[0].edges), {(2.0, 4.4)})
+        self.assertEqual(ops[0].first_course, round(1.2 / COURSE))
+        self.assertEqual(len(ops[0].edges), round(5.4 / COURSE) - round(1.2 / COURSE))
+        bricks = w.loose_bricks(Random(3, "b"))
+        self.assertEqual(bricks[0], ([], []))
+        self.assertTrue(bricks[1][1], "the breach beside it still drops bricks")
+
+    def test_a_wall_with_a_framed_opening_is_still_a_closed_solid(self):
+        w, _ = self.framed_wall()
+        cs, tris = snapped(w.mesh)
+        edges = Counter()
+        for t in tris:
+            for k in range(3):
+                edges[(t[k], t[(k + 1) % 3])] += 1
+        for (a, b), n in edges.items():
+            self.assertEqual((n, edges.get((b, a), 0)), (1, 1))
+
+
 if __name__ == "__main__":
     unittest.main()
