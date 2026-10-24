@@ -33,6 +33,21 @@ pub const GENERATED_FOLDER: &str = "assets-src/generated";
 /// for each generator a texture names.
 pub const GENERATORS_FOLDER: &str = "assets-src/generators";
 
+/// Every picture a texture's folder may hold, by file name: the colour and
+/// the normal map, which every texture has, then the roughness, occlusion and
+/// metal pictures (#320) for a material that asks for them, and a decal's mask
+/// (#321). The game reads these names in `crates/opendrone/src/map_drawing.rs`,
+/// and a readable check keeps the two lists the same. A download carries every
+/// one a texture has.
+pub const PICTURES: [&str; 6] = [
+    "diffuse.jpg",
+    "normal.jpg",
+    "roughness.jpg",
+    "ao.jpg",
+    "metallic.jpg",
+    "mask.jpg",
+];
+
 /// The sizes, in pixels, a generated picture may be: the picture is square.
 /// 2K is for hero surfaces and 1K for the rest (ADR-0024).
 pub const GENERATED_SIZES: [u32; 3] = [512, 1024, 2048];
@@ -100,10 +115,22 @@ impl Texture {
     }
 }
 
+/// A picture, beyond the colour and the normal map, that a material asks the
+/// game to read (`roughness_map`, `ao_map` or `metallic_map`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AskedPicture {
+    pub material: String,
+    pub texture: String,
+    /// The file's name, one of [`PICTURES`].
+    pub picture: &'static str,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Manifest {
     /// Each material's name and the texture it uses, if any.
     pub materials: Vec<(String, Option<String>)>,
+    /// The roughness, occlusion and metal pictures materials ask for.
+    pub asked: Vec<AskedPicture>,
     pub textures: Vec<Texture>,
 }
 
@@ -210,6 +237,7 @@ pub fn parse(text: &str) -> Result<Manifest, String> {
         }
     }
     let mut materials = Vec::new();
+    let mut asked = Vec::new();
     if let Some(all) = table(doc.get("materials"), "materials", &mut problems) {
         for (name, entry) in &all {
             let Value::Table(entry) = entry else {
@@ -226,6 +254,21 @@ pub fn parse(text: &str) -> Result<Manifest, String> {
                 problems.push(format!(
                     "the material \"{name}\" uses the texture \"{texture}\", which [textures] doesn't list"
                 ));
+            }
+            if let Some(texture) = &texture {
+                for (key, picture) in [
+                    ("roughness_map", "roughness.jpg"),
+                    ("ao_map", "ao.jpg"),
+                    ("metallic_map", "metallic.jpg"),
+                ] {
+                    if entry.get(key).and_then(Value::as_bool) == Some(true) {
+                        asked.push(AskedPicture {
+                            material: name.clone(),
+                            texture: texture.clone(),
+                            picture,
+                        });
+                    }
+                }
             }
             materials.push((name.clone(), texture));
         }
@@ -251,6 +294,7 @@ pub fn parse(text: &str) -> Result<Manifest, String> {
     if problems.is_empty() {
         Ok(Manifest {
             materials,
+            asked,
             textures,
         })
     } else {

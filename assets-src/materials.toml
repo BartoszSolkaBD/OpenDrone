@@ -113,6 +113,13 @@ texture   = "concrete_floor_worn_001"
 # shifts tiles by whole multiples of 1/u and 1/v of the picture so that its
 # bricks or ridges stay in line (0 for any shift), and `macro_strength` is how
 # strongly the large [macro] picture shows (0 for none).
+# `roughness_map = true` reads the texture's `roughness.jpg` for each pixel's
+# roughness (#320), and `ao_map` and `metallic_map` do the same for an `ao.jpg`
+# and a `metallic.jpg` if the texture's folder has them (the generators make
+# none yet). `metallic` (0 to 1) is how metal the surface is, and with a
+# `metallic_map` it scales the picture. `wetness` (0 to 1) makes the surface
+# darker, glossier and a little more reflective. A material that says none of
+# these is drawn as before.
 # Each names a texture below that a generator makes; the flat colour and the
 # roughness are the picture's averages, what the Map shows without the
 # pictures.
@@ -123,6 +130,7 @@ texture   = "brick_red_weathered"
 break_repeat   = true
 snap           = [8, 12]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.brick_painted_peeling]
 colour    = [0.24, 0.28, 0.20]
@@ -131,6 +139,7 @@ texture   = "brick_painted_peeling"
 break_repeat   = true
 snap           = [8, 12]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.concrete_floor_worn]
 colour    = [0.17, 0.17, 0.15]
@@ -139,6 +148,7 @@ texture   = "concrete_floor_worn"
 break_repeat   = true
 snap           = [2, 2]
 macro_strength = 0.60
+roughness_map  = true
 
 [materials.concrete_wall_rough]
 colour    = [0.20, 0.19, 0.17]
@@ -147,6 +157,7 @@ texture   = "concrete_wall_rough"
 break_repeat   = true
 snap           = [2, 2]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.steel_beam_rusted]
 colour    = [0.10, 0.07, 0.08]
@@ -155,6 +166,8 @@ texture   = "steel_beam_rusted"
 break_repeat   = true
 snap           = [0, 1]
 macro_strength = 0.30
+roughness_map  = true
+metallic       = 0.4
 
 [materials.roof_corrugated_rusted]
 colour    = [0.21, 0.18, 0.16]
@@ -165,6 +178,8 @@ break_repeat   = true
 # would otherwise line up from tile to tile and stripe a whole roof (#295).
 snap           = [12, 0]
 macro_strength = 1.00
+roughness_map  = true
+metallic       = 0.7
 
 [materials.ground_dirt_rubble]
 colour    = [0.12, 0.08, 0.05]
@@ -173,6 +188,7 @@ texture   = "ground_dirt_rubble"
 break_repeat   = true
 turn_cells     = true
 macro_strength = 0.70
+roughness_map  = true
 
 [materials.grass_weeds]
 colour    = [0.09, 0.11, 0.02]
@@ -181,6 +197,36 @@ texture   = "grass_weeds"
 break_repeat   = true
 turn_cells     = true
 macro_strength = 0.60
+roughness_map  = true
+
+# Decals (#321): one picture each, put once on a surface by a Map's script
+# (`MapBuilder.decal`), never a tile, so they ask for no `break_repeat` or
+# `macro_strength`. Each texture's folder has a fourth picture, `mask.jpg`: how
+# much of the decal covers the surface under it. `cover` (0 to 1, 1 if left
+# out) is how much of the decal's own colour shows where the mask is whole, and
+# `wetness` (0 to 1) how wet the decal makes the surface under it there: darker
+# and glossier, with the surface's own picture showing through where `cover`
+# is less than 1. A damp patch is all wetness and no colour.
+[materials.decal_moss]
+colour        = [0.03, 0.04, 0.01]
+roughness     = 0.85
+texture       = "decal_moss"
+roughness_map = true
+
+[materials.decal_stain]
+colour        = [0.02, 0.015, 0.01]
+roughness     = 0.77
+texture       = "decal_stain"
+roughness_map = true
+cover         = 0.85
+wetness       = 0.25
+
+[materials.decal_damp]
+colour    = [0.055, 0.047, 0.036]
+roughness = 0.35
+texture   = "decal_damp"
+cover     = 0.0
+wetness   = 1.0
 
 # Made from scratch for the Factory's slice (#295): the window glass, burnt
 # timber, and the bark and leaves of the plants. The glass's wire mesh keeps
@@ -452,6 +498,26 @@ generator = "graffiti_brick"
 seed      = 1
 pixels    = 1024
 size      = "3.6 m"
+
+# Decals' pictures (#321): `size` is how big the picture was drawn to be; a
+# Map's script gives each decal its own size.
+[textures.decal_moss]
+generator = "decal_moss"
+seed      = 1
+pixels    = 512
+size      = "1.2 m"
+
+[textures.decal_stain]
+generator = "decal_stain"
+seed      = 1
+pixels    = 512
+size      = "1.5 m"
+
+[textures.decal_damp]
+generator = "decal_damp"
+seed      = 1
+pixels    = 512
+size      = "2 m"
 
 # Not a material's picture: the large-scale one the [macro] table names.
 [textures.macro_variation]

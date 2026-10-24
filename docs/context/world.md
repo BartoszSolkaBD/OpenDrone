@@ -49,8 +49,16 @@ The part of OpenDrone that reads a Pack and refuses anything that breaks the Pac
 _Avoid_: Validator, linter
 
 **Baked light**:
-The sun and sky light of a detailed Map, worked out once by Blender's Cycles from the Map's `[light]` values in `map.toml` (where the sun is, the colour and strength of sun and sky) and stored in a light atlas: a picture that lays every drawn surface of the Map flat, so the game lights the Map's parts by looking each spot up on a second set of picture coordinates, with no real-time sun or shadows on them. The Quad isn't in the atlas: the game lights it with the Map's sky values as ambient light and a share of its sun, with no shadows. A Map at another time of day is another Map with its own bake. How one is made: [Building a Map](../building-a-map.md#baked-light).
+The sun and sky light of a detailed Map, worked out once by Blender's Cycles from the Map's `[light]` values in `map.toml` (where the sun is, the colour and strength of sun and sky) and stored in a light atlas: a picture that lays every drawn surface of the Map flat, so the game lights the Map's parts by looking each spot up on a second set of picture coordinates, with no real-time sun or shadows on them. The Quad isn't in the atlas: the game lights it with the Map's sky values as ambient light and a share of its sun, with no shadows. A Map at another time of day is another Map with its own bake. The atlas holds light and no reflections, so a surface that is wet, glossy or metal (it says so in the material library) also shows the Map's sky, as much as the atlas says the spot is open to it ([Wet, rough and metal surfaces](../building-a-map.md#wet-rough-and-metal-surfaces)). How one is made: [Building a Map](../building-a-map.md#baked-light).
 _Avoid_: Static lighting
+
+**Sky**:
+What a baked Map shows behind everything else: a gradient from its sky colour overhead to a paler haze at the horizon, a sun where the Map's `[light]` puts it, a few soft clouds and a dull ground below the horizon, all made by the game from the Map's `[light]` values when the Map loads, with no picture files. A Map with no baked light keeps a flat light blue. How it is made: [Building a Map](../building-a-map.md#what-the-game-does-with-it).
+_Avoid_: Skybox (that is a way to draw one)
+
+**Decal**:
+A picture put once on a Map's surface, over the surface's own repeating picture: a stain, a damp patch, moss at the foot of a wall, a water streak, a crack or a tag. It is a thin mesh of its own that the Map's script cuts from the surfaces under it and lifts 2 mm off them, with a mask that fades it out before its edges, so its rectangle never shows; it is only drawn, never solid, and is lit by the light baked for the spot it lies on. A decal can show its own colour, make the surface under it wet, or both, and overlapping decals are drawn in the order of their layer. How one is made: [Building a Map](../building-a-map.md#decals).
+_Avoid_: Sticker, overlay
 
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.

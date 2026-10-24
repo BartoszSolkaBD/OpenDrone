@@ -82,3 +82,13 @@ _Avoid_: OSD config, HUD layout
 - All camera and video effects together fit in 2 ms of a High-tier frame on the dev machine, and the Map is drawn once per frame ([ADR-0009](../adr/0009-fisheye-from-one-warped-render.md)).
 - Only the camera's own steps count against those 2 ms: the merged pass and what feeds it. The OSD is drawn inside the merged pass, so it counts too. Drawing the Map wider than the picture, for the fisheye, counts as drawing the Map, under the 45 fps promise.
 - Shade sits about 2–3 stops below sun and the inside of a building about 5–6 stops below. Auto-exposure needs those ratios to look right, so a Map's lighting must keep them.
+
+## The Quad's rotors in the picture
+
+The rotors you see at the frame's edges turn with the simulated motors (#319). This is drawing only: it never enters the Simulation, and no flight or Scenario changes.
+
+- Each rotor turns the way its prop turns in the Quad definition (props in or out), by the angle its motor's speed adds in each drawn frame. At rest the blades stand still.
+- A real propeller is a faint translucent disc, a little denser toward the tips, with only a hint of its blades at flight speeds, and separate blades when it turns slowly. The game draws both and cross-fades them by speed.
+- A drawn frame samples the turning, so a rotor that turns a good share of the gap between two blades in one frame would seem to turn slowly or backwards (the wagon-wheel, or stroboscope, effect). So the blades show alone only while a blade moves under 5% of that gap in a frame, and are gone once it moves 25%. After that only the disc shows, and a disc looks the same at every angle. The share is measured against the picture's own frame length, so a slower picture drops its blades at a lower speed.
+- So a pilot sees blades at rest, on the first part of a spin-up and as a motor stops, and the blurred disc at a hover and in flight. A 3-blade prop in a 60 Hz picture is all blades below about 9 rad/s and all disc from about 47 rad/s, a small fraction of a hover's speed.
+- The developer's `--render-views` command takes `rotors=` in a view to draw a speed that isn't the Simulation's: [Seeing the Map as the game draws it](../building-a-map.md#seeing-the-map-as-the-game-draws-it).

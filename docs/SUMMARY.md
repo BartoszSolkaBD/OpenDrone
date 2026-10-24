@@ -84,6 +84,7 @@ the book is built (the Scenario catalogue, the Feel Test logs, the crate list).
   - [Bevy 0.20](research/bevy-0.20.md)
   - [Quad sound](research/quad-sound.md)
   - [The alpha Quads' numbers](research/quad-definitions.md)
+  - [Lived-in places](research/lived-in-places.md)
 
 # Working on OpenDrone
 

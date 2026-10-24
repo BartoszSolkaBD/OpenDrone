@@ -10,7 +10,10 @@ numpy, and never by hand:
 For each texture it runs the script `assets-src/generators/GENERATOR.py` (its
 `make(seed, pixels)` gives three uint8 pictures: colour, normal map and
 roughness) and writes `FOLDER/NAME/diffuse.jpg`, `normal.jpg` and
-`roughness.jpg`; and it writes one contact sheet of every colour picture.
+`roughness.jpg`; and it writes one contact sheet of every colour picture. A
+decal's generator (#321) gives a fourth, its mask (`generators/decalwork.py`),
+which is written as `mask.jpg`; a decal is one picture, not a tile, so it is
+left off the contact sheet of the materials.
 Everything it writes is the same bytes on every computer (`odjpeg.py`).
 
 The pictures: the colour one is saved at a quality of 88 with its colour at
@@ -36,6 +39,11 @@ import odjpeg  # noqa: E402
 DIFFUSE_QUALITY = 88
 NORMAL_QUALITY = 88
 ROUGHNESS_QUALITY = 85
+MASK_QUALITY = 90
+
+# The files a texture's pictures are written to, in the order a generator
+# gives them; a decal has the fourth.
+FILES = ("diffuse.jpg", "normal.jpg", "roughness.jpg", "mask.jpg")
 
 # The contact sheet: every colour picture shrunk to this many pixels across,
 # four to a row.
@@ -44,21 +52,26 @@ SHEET_COLUMNS = 4
 SHEET_QUALITY = 80
 
 
-def encode_pictures(diffuse, normal, roughness):
-    """The three pictures of a texture as JPG bytes."""
-    return (
+def encode_pictures(diffuse, normal, roughness, mask=None):
+    """The three pictures of a texture as JPG bytes, and a decal's mask as
+    the fourth if it has one."""
+    files = (
         odjpeg.encode(diffuse, DIFFUSE_QUALITY, halve_colour=True),
         odjpeg.encode(normal, NORMAL_QUALITY),
         odjpeg.encode(roughness, ROUGHNESS_QUALITY),
     )
+    if mask is None:
+        return files
+    return files + (odjpeg.encode(mask, MASK_QUALITY),)
 
 
 def make_arrays(generator, seed, pixels):
     """What the generator `generator` draws for a seed: three uint8 pictures,
     colour (pixels, pixels, 3), normal map (pixels, pixels, 3) and roughness
-    (pixels, pixels)."""
+    (pixels, pixels), and for a decal its mask (pixels, pixels)."""
     module = importlib.import_module(generator)
     pictures = module.make(seed, pixels)
+    assert len(pictures) in (3, 4), f"{generator} must make three pictures, or four for a decal"
     for picture in pictures:
         assert picture.dtype == np.uint8 and picture.shape[:2] == (pixels, pixels), (
             f"{generator} must make square uint8 pictures of {pixels} pixels"
@@ -67,10 +80,11 @@ def make_arrays(generator, seed, pixels):
 
 
 def make_pictures(generator, seed, pixels):
-    """The three JPG files of a texture, as bytes `(diffuse, normal,
-    roughness)`, and the colour picture as an array (for the contact sheet)."""
-    diffuse, normal, roughness = make_arrays(generator, seed, pixels)
-    return encode_pictures(diffuse, normal, roughness), diffuse
+    """The JPG files of a texture, as bytes `(diffuse, normal, roughness)`
+    and a decal's `mask` too, and the colour picture as an array (for the
+    contact sheet), or None for a decal, which isn't on it."""
+    pictures = make_arrays(generator, seed, pixels)
+    return encode_pictures(*pictures), (pictures[0] if len(pictures) == 3 else None)
 
 
 def shrink(picture, factor):
@@ -133,10 +147,11 @@ def main(argv):
         files, colour = make_pictures(generator, seed, pixels)
         folder = os.path.join(out, name)
         os.makedirs(folder, exist_ok=True)
-        for filename, data in zip(("diffuse.jpg", "normal.jpg", "roughness.jpg"), files):
+        for filename, data in zip(FILES, files):
             with open(os.path.join(folder, filename), "wb") as f:
                 f.write(data)
-        colours.append(colour)
+        if colour is not None:
+            colours.append(colour)
         print(f"odtexgen: {name} ({generator}, seed {seed}, {pixels} px): {sum(len(d) for d in files)} bytes")
     if sheet:
         with open(sheet, "wb") as f:

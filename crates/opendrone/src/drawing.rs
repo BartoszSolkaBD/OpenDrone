@@ -1,6 +1,6 @@
 //! Drawing the flight: the Map from its solid parts, a grid on a Test Map's
-//! floor, the Quad from its collision shapes, and the FPV Camera bolted to
-//! its frame ([`crate::camera`] makes its picture).
+//! floor, the Quad from its collision shapes (its rotors turn: [`crate::rotors`]),
+//! and the FPV Camera bolted to its frame ([`crate::camera`] makes its picture).
 //!
 //! The Simulation counts in 64-bit numbers, east, north and up from the
 //! Map's origin; the picture is drawn in 32-bit numbers, in Bevy's axes:
@@ -14,6 +14,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::camera::visibility::NoCpuCulling;
 use bevy::light::CascadeShadowConfigBuilder;
+use bevy::light::NotShadowCaster;
 use bevy::mesh::PrimitiveTopology;
 use bevy::pbr::Lightmap;
 use bevy::prelude::*;
@@ -24,10 +25,15 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
-use crate::map_drawing::{MapLighting, MaterialLibrary, Surface, part_mesh, read_light_atlas};
+use crate::map_drawing::{
+    Blended, MapLighting, MaterialLibrary, Surface, part_mesh, part_mesh_coloured, read_light_atlas,
+};
 use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
+use crate::rotors::RotorParts;
 use crate::set_up::{FlightPlan, repo_folder};
+use crate::sky::{MapSky, attach_the_sky};
 use crate::stepping::Flight;
+use crate::surface_look::SkyReflection;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
 pub fn point(v: Vec3d) -> Vec3 {
@@ -113,6 +119,7 @@ impl Plugin for DrawingPlugin {
                 ..default()
             })
             .add_systems(Startup, set_up_the_grid)
+            .add_systems(PostUpdate, attach_the_sky)
             .add_systems(
                 RunFixedMainLoop,
                 place_the_quad.in_set(RunFixedMainLoopSystems::AfterFixedMainLoop),
@@ -156,6 +163,7 @@ fn draw_the_world(
         &mut commands,
         &mut meshes,
         &mut materials,
+        &mut images,
         *view,
     );
     drawing.drawn = true;
@@ -170,6 +178,7 @@ fn undraw_the_world(
     for entity in &world {
         commands.entity(entity).despawn();
     }
+    commands.remove_resource::<MapSky>();
     drawing.drawn = false;
 }
 
@@ -202,24 +211,70 @@ fn draw_the_map_from_its_file(
 ) {
     let library = MaterialLibrary::read(&repo_folder());
     let baked = baked_light(plan, images);
-    let mut by_name: BTreeMap<String, DrawnMaterial> = BTreeMap::new();
+    // Each material once, by what it is drawn as: a part's own material, one
+    // with a second blended in (`own+other`), or a decal of a layer
+    // (`name#layer`) (#321). None for a decal whose pictures aren't on disk.
+    let mut by_name: BTreeMap<String, Option<(DrawnMaterial, bool)>> = BTreeMap::new();
+    // Of the materials, how many have their repeat broken (#304) and how many
+    // read a picture of roughness, occlusion or metal (#320); how many parts
+    // are decals and blends (#321), and the decals left undrawn.
+    let (mut repeat_broken, mut surface_pictures) = (0, 0);
+    let (mut decals, mut blends, mut undrawn) = (0, 0, 0);
+    let lit = |surface: &mut Surface| {
+        if let Some((_, lighting)) = &baked {
+            surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
+            if let Some(light) = &plan.map.light {
+                surface.set_sky(&SkyReflection::of(light, lighting));
+            }
+        }
+    };
     for part in &plan.map.drawing {
-        let material = by_name
-            .entry(part.material.clone())
+        let key = match (part.decal, &part.blend) {
+            (Some(layer), _) => format!("{}#{layer}", part.material),
+            (None, Some(blend)) => format!("{}+{}", part.material, blend.material),
+            (None, None) => part.material.clone(),
+        };
+        let drawn = by_name
+            .entry(key)
             .or_insert_with(|| {
-                let mut surface = library.material(&part.material, part.colour, images);
-                if let Some((_, lighting)) = &baked {
-                    surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
-                }
-                match surface {
-                    Surface::Plain(material) => DrawnMaterial::Plain(materials.add(material)),
-                    Surface::Varied(material) => DrawnMaterial::Varied(varied.add(material)),
-                }
+                // The material, and whether the mesh's vertex colours carry the
+                // flat mix of a blend's two colours.
+                let (mut surface, flat_blend) = match (part.decal, &part.blend) {
+                    (Some(layer), _) => (library.decal(&part.material, layer, images)?, false),
+                    (None, Some(blend)) => {
+                        match library.blend(&part.material, &blend.material, images) {
+                            Blended::Drawn(surface) => (surface, false),
+                            Blended::Flat(material) => (Surface::Plain(material), true),
+                        }
+                    }
+                    (None, None) => (library.material(&part.material, part.colour, images), false),
+                };
+                lit(&mut surface);
+                repeat_broken += usize::from(surface.repeat_broken());
+                surface_pictures += usize::from(surface.has_surface_picture());
+                Some(match surface {
+                    Surface::Plain(material) => {
+                        (DrawnMaterial::Plain(materials.add(material)), flat_blend)
+                    }
+                    Surface::Varied(material) => {
+                        (DrawnMaterial::Varied(varied.add(material)), flat_blend)
+                    }
+                })
             })
             .clone();
+        let Some((material, flat_blend)) = drawn else {
+            undrawn += 1;
+            continue;
+        };
+        let mesh = match &part.blend {
+            Some(blend) if flat_blend => part_mesh_coloured(part, |w| {
+                library.flat_blend(part.colour, &blend.material, w)
+            }),
+            _ => part_mesh(part),
+        };
         let mut part_entity = commands.spawn((
             InTheWorld,
-            Mesh3d(meshes.add(part_mesh(part))),
+            Mesh3d(meshes.add(mesh)),
             Transform::IDENTITY,
             Name::new(part.name.clone()),
         ));
@@ -227,6 +282,12 @@ fn draw_the_map_from_its_file(
             DrawnMaterial::Plain(handle) => part_entity.insert(MeshMaterial3d(handle)),
             DrawnMaterial::Varied(handle) => part_entity.insert(MeshMaterial3d(handle)),
         };
+        if part.decal.is_some() {
+            // A picture on a surface: it would shade the surface it lies on.
+            part_entity.insert(NotShadowCaster);
+            decals += 1;
+        }
+        blends += usize::from(part.blend.is_some());
         if let Some((atlas, _)) = &baked
             && !part.light_uvs.is_empty()
         {
@@ -237,17 +298,32 @@ fn draw_the_map_from_its_file(
         }
     }
     info!(
-        "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken",
+        "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken, {} with roughness, occlusion or metal pictures",
         plan.map.name,
         plan.map.drawing.len(),
         by_name.len().min(library.textured()),
         by_name.len(),
-        by_name
-            .values()
-            .filter(|m| matches!(m, DrawnMaterial::Varied(_)))
-            .count()
+        repeat_broken,
+        surface_pictures
     );
+    if decals + blends + undrawn > 0 {
+        info!(
+            "{} has {decals} decals and {blends} parts with a second material blended in",
+            plan.map.name
+        );
+    }
+    if undrawn > 0 {
+        warn!(
+            "{} of {}'s decals aren't drawn: their material isn't in the library, or its pictures or mask.jpg aren't on disk",
+            undrawn, plan.map.name
+        );
+    }
     if let Some((_, lighting)) = baked {
+        // The sky comes from the same `[light]`, and goes behind the Map on
+        // every camera (#315).
+        if let Some(light) = &plan.map.light {
+            commands.insert_resource(MapSky::make(light, images));
+        }
         return light_what_the_atlas_doesnt(commands, &lighting);
     }
     // Sunny early afternoon: the sun about 50° up, from the south-south-east,
@@ -446,6 +522,7 @@ fn draw_the_quad(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
     view: View,
 ) {
     let shape = &plan.quad.parameters.shape;
@@ -456,12 +533,6 @@ fn draw_the_quad(
     });
     let pack = materials.add(StandardMaterial {
         base_color: Color::srgb(0.85, 0.65, 0.1),
-        ..default()
-    });
-    let props = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.25, 0.25, 0.27, 0.3),
-        alpha_mode: AlphaMode::Blend,
-        cull_mode: None,
         ..default()
     });
     let (_, state) = flight.drawn_between();
@@ -484,18 +555,18 @@ fn draw_the_quad(
             MeshMaterial3d(pack),
             Transform::from_translation(point(Vec3d::new(0.0, 0.0, shape.pack_height))),
         ));
-        let disc = meshes.add(Cylinder::new(
-            (shape.prop_diameter / 2.0) as f32,
-            PROP_DISC_THICKNESS as f32,
-        ));
-        for centre in motor_positions(shape) {
-            // Bevy's cylinders stand along their own up axis, so a disc lies
-            // flat in the props' plane as it is.
-            parts.spawn((
-                Mesh3d(disc.clone()),
-                MeshMaterial3d(props.clone()),
-                Transform::from_translation(point(centre)),
-            ));
+        let rotors = RotorParts::new(
+            shape.prop_diameter,
+            plan.quad.props.blades,
+            PROP_DISC_THICKNESS,
+            meshes,
+            images,
+        );
+        let turning = plan.quad.parameters.rotors.turning();
+        for (motor, centre) in motor_positions(shape).into_iter().enumerate() {
+            // Each rotor turns with its motor, as blades or, fast, a blurred
+            // disc, flat in the props' plane.
+            rotors.spawn(parts, materials, motor, turning[motor], point(centre));
             if let Some(rings) = shape.duct_rings {
                 let inside = rings.inside_diameter / 2.0;
                 let outside = inside + rings.wall;

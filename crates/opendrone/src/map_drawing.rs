@@ -23,6 +23,16 @@
 //!   ([`crate::repeat_breaking`]): its picture's repeat is broken when it is
 //!   drawn and the Map's large-scale picture (`[macro]`) is laid over it
 //!   (#304). Every other material is drawn as before.
+//! - **Roughness, occlusion, metal and wetness.** A material with
+//!   `roughness_map`, `ao_map`, `metallic_map`, `metallic` or `wetness` in the
+//!   library is drawn by the same shader ([`crate::surface_look`]), so wet,
+//!   dull, polished and rusty parts differ as they do in life (#320). A
+//!   material that asks for none of it is drawn as before.
+//! - **Two materials on one mesh, and decals (#321).** A part that names a
+//!   second material (`od_blend`) is drawn with both, as much of the second
+//!   showing as its vertex colours say ([`MaterialLibrary::blend`]). A decal
+//!   (`od_decal`) is drawn with its one picture and its mask, over the
+//!   surface under it ([`MaterialLibrary::decal`], [`crate::decals`]).
 //! - **Baked light.** A Map with `[light]` and a light atlas
 //!   ([`MapLighting`], [`read_light_atlas`]) draws its parts lit by the atlas,
 //!   through Bevy's own lightmaps, on each mesh's second picture coordinates
@@ -47,8 +57,10 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use opendrone_pack::{DrawnPart, MapLight};
 
+use crate::decals::decal_depth_bias;
 use crate::light_atlas::read_exr;
 use crate::repeat_breaking::{BreakerSettings, RepeatBreaker, VariedMaterial};
+use crate::surface_look::{Plane, SkyReflection, pack_surface, plane_of, wet};
 
 /// Two faces are one smooth surface when their normals are closer than this
 /// (the cosine of 35°); further apart, the edge between them is sharp.
@@ -71,8 +83,17 @@ fn bevy_point(p: [f32; 3]) -> Vec3 {
 }
 
 /// One part of the Map as a mesh: three corners for every triangle, each
-/// with a smoothed normal, its picture coordinates and a tangent.
+/// with a smoothed normal, its picture coordinates and a tangent. A part that
+/// blends a second material in (#321) has a vertex colour too: white, with
+/// the second material's weight as its alpha, which the shader reads
+/// ([`crate::decals`]).
 pub fn part_mesh(part: &DrawnPart) -> Mesh {
+    part_mesh_coloured(part, |w| [1.0, 1.0, 1.0, w])
+}
+
+/// One part of the Map as a mesh, as [`part_mesh`] makes it, with the vertex
+/// colour of a blended part made from each corner's weight by `colour`.
+pub fn part_mesh_coloured(part: &DrawnPart, colour: impl Fn(f32) -> [f32; 4]) -> Mesh {
     let corners: Vec<Vec3> = part.corners.iter().map(|c| bevy_point(*c)).collect();
     // Each triangle's face, as a normal as long as its area is twice big.
     let faces: Vec<Vec3> = part
@@ -102,6 +123,7 @@ pub fn part_mesh(part: &DrawnPart) -> Mesh {
     let mut uvs = Vec::with_capacity(part.triangles.len() * 3);
     let mut tangents = Vec::with_capacity(part.triangles.len() * 3);
     let mut light_uvs = Vec::new();
+    let mut colours = Vec::new();
     for (index, triangle) in part.triangles.iter().enumerate() {
         let own = faces[index].normalize_or_zero();
         let [a, b, c] = triangle.map(|i| corners[i as usize]);
@@ -136,6 +158,14 @@ pub fn part_mesh(part: &DrawnPart) -> Mesh {
                 );
             }
             tangents.push([t.x, t.y, t.z, sign]);
+            if let Some(blend) = &part.blend {
+                let w = blend
+                    .weights
+                    .get(triangle[k] as usize)
+                    .copied()
+                    .unwrap_or(0.0);
+                colours.push(colour(w));
+            }
         }
     }
     let mesh = Mesh::new(
@@ -146,6 +176,11 @@ pub fn part_mesh(part: &DrawnPart) -> Mesh {
     .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
     .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
     .with_inserted_attribute(Mesh::ATTRIBUTE_TANGENT, tangents);
+    let mesh = if colours.is_empty() {
+        mesh
+    } else {
+        mesh.with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colours)
+    };
     if light_uvs.is_empty() {
         mesh
     } else {
@@ -174,6 +209,13 @@ fn triangle_tangent(p: [Vec3; 3], uv: [[f32; 2]; 3]) -> (Vec3, Vec3) {
 struct Pictures {
     diffuse: PathBuf,
     normal: PathBuf,
+    /// The pictures of roughness, occlusion and metal, if the material asks
+    /// for them and has them: next to the colour picture.
+    roughness: PathBuf,
+    ao: PathBuf,
+    metallic: PathBuf,
+    /// A decal's mask (#321): how much of it covers the surface under it.
+    mask: PathBuf,
 }
 
 /// What a material asks of the game beyond its pictures (#304). A material
@@ -194,11 +236,87 @@ pub struct Variation {
     pub macro_strength: f32,
 }
 
+/// What a material asks of the game for how its surface answers light (#320).
+/// A material asks for none of it, and is drawn as before, unless the library
+/// says so.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct SurfaceAsk {
+    /// `roughness_map`: read `roughness.jpg` for each pixel's roughness, in
+    /// place of the one number.
+    pub roughness_map: bool,
+    /// `ao_map`: read `ao.jpg`, how shut in each pixel is from the light.
+    pub ao_map: bool,
+    /// `metallic_map`: read `metallic.jpg`, which pixels are metal.
+    pub metallic_map: bool,
+    /// `metallic`: how metal the surface is, 0 to 1. With a picture, it
+    /// scales the picture, and is 1 if the library leaves it out.
+    pub metallic: f32,
+    /// `wetness`: how wet the surface is, 0 to 1.
+    pub wetness: f32,
+}
+
+impl SurfaceAsk {
+    /// Whether it asks for anything at all, which is when the shader draws it:
+    /// a picture to read, wetness or metal. A metal has no diffuse light to
+    /// show, so what it reflects of the sky, which the shader works out, is
+    /// all it has.
+    pub fn asks(&self) -> bool {
+        self.any_map() || self.wetness > 0.0 || self.metallic > 0.0
+    }
+
+    fn any_map(&self) -> bool {
+        self.roughness_map || self.ao_map || self.metallic_map
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Entry {
     roughness: f32,
+    /// The flat colour (linear red, green and blue), for when there are no
+    /// pictures: a second material's, which the `.glb` doesn't carry.
+    colour: [f32; 3],
+    /// How many metres one repeat of its picture covers (2 if the library
+    /// doesn't say).
+    tile: f32,
+    /// A decal's `cover`: how much of its own colour shows where its mask is
+    /// whole (1 if the library leaves it out).
+    cover: f32,
     pictures: Option<Pictures>,
     variation: Option<Variation>,
+    surface: SurfaceAsk,
+}
+
+/// What a material asks of the shader for its tiles when it asks for none.
+const NO_VARIATION: Variation = Variation {
+    break_repeat: false,
+    turn_cells: false,
+    snap: [0, 0],
+    macro_strength: 0.0,
+};
+
+/// One material's pictures as the shader takes them: what a part's own
+/// material and a second one blended into it each need (#321).
+struct Layer {
+    diffuse: Handle<Image>,
+    normal: Handle<Image>,
+    surface: Option<Handle<Image>>,
+    roughness_only: bool,
+    variation: Option<Variation>,
+    roughness: f32,
+    ask: SurfaceAsk,
+}
+
+impl Layer {
+    /// Its tiles, as the shader's `snap_turn` says them.
+    fn tiles(&self) -> Vec4 {
+        let v = self.variation.unwrap_or(NO_VARIATION);
+        Vec4::new(
+            v.snap[0] as f32,
+            v.snap[1] as f32,
+            f32::from(u8::from(v.turn_cells)),
+            f32::from(u8::from(v.break_repeat)),
+        )
+    }
 }
 
 /// The large-scale picture over the world (`[macro]` in the library): the
@@ -248,9 +366,37 @@ fn variation_of(entry: &toml::Value) -> Option<Variation> {
     })
 }
 
+/// A number between 0 and 1 in an entry, if it has it (an integer is fine).
+fn unit_number(entry: &toml::Value, key: &str) -> Option<f32> {
+    entry
+        .get(key)
+        .and_then(|v| v.as_float().or_else(|| v.as_integer().map(|i| i as f64)))
+        .map(|v| v.clamp(0.0, 1.0) as f32)
+}
+
+/// What a material's entry asks of its surface (#320).
+fn surface_of(entry: &toml::Value) -> SurfaceAsk {
+    let flag = |key: &str| {
+        entry
+            .get(key)
+            .and_then(toml::Value::as_bool)
+            .unwrap_or(false)
+    };
+    let metallic_map = flag("metallic_map");
+    SurfaceAsk {
+        roughness_map: flag("roughness_map"),
+        ao_map: flag("ao_map"),
+        metallic_map,
+        metallic: unit_number(entry, "metallic").unwrap_or(if metallic_map { 1.0 } else { 0.0 }),
+        wetness: unit_number(entry, "wetness").unwrap_or(0.0),
+    }
+}
+
 /// What `materials.toml` says about a material's drawing. A material that
 /// asks for nothing is a [`StandardMaterial`], and one that does a
 /// [`VariedMaterial`].
+// Made once for each material of a Map and handed on at once: its size is no cost.
+#[allow(clippy::large_enum_variant)]
 pub enum Surface {
     Plain(StandardMaterial),
     Varied(VariedMaterial),
@@ -258,6 +404,27 @@ pub enum Surface {
 
 impl Surface {
     /// The standard material underneath, for what both kinds share.
+    /// Whether the picture's repeat is broken (#304).
+    pub fn repeat_broken(&self) -> bool {
+        matches!(self, Surface::Varied(m) if m.extension.settings.snap_turn.w > 0.5)
+    }
+
+    /// Whether it reads a picture of roughness, occlusion or metal (#320).
+    pub fn has_surface_picture(&self) -> bool {
+        matches!(self, Surface::Varied(m) if m.extension.surface.is_some())
+    }
+
+    /// Gives the surface the Map's sky to reflect, if it is drawn by the
+    /// shader (#320). The plain material has no reflections to give it to.
+    pub fn set_sky(&mut self, sky: &SkyReflection) {
+        if let Surface::Varied(m) = self {
+            let settings = &mut m.extension.settings;
+            settings.sky_zenith = sky.zenith.extend(sky.open);
+            settings.sky_haze = sky.haze.extend(1.0);
+            settings.sky_ground = sky.ground.extend(0.0);
+        }
+    }
+
     pub fn standard_mut(&mut self) -> &mut StandardMaterial {
         match self {
             Surface::Plain(m) => m,
@@ -304,17 +471,44 @@ impl MaterialLibrary {
                                 let pictures = Pictures {
                                     diffuse: folder.join("diffuse.jpg"),
                                     normal: folder.join("normal.jpg"),
+                                    roughness: folder.join("roughness.jpg"),
+                                    ao: folder.join("ao.jpg"),
+                                    metallic: folder.join("metallic.jpg"),
+                                    mask: folder.join("mask.jpg"),
                                 };
                                 (pictures.diffuse.is_file() && pictures.normal.is_file())
                                     .then_some(pictures)
                             })
                         });
+                let colour = entry
+                    .get("colour")
+                    .and_then(toml::Value::as_array)
+                    .map(|c| {
+                        let at = |i: usize| {
+                            c.get(i)
+                                .and_then(|v| {
+                                    v.as_float().or_else(|| v.as_integer().map(|i| i as f64))
+                                })
+                                .unwrap_or(0.8) as f32
+                        };
+                        [at(0), at(1), at(2)]
+                    })
+                    .unwrap_or([0.8, 0.8, 0.8]);
+                let tile = entry
+                    .get("texture")
+                    .and_then(toml::Value::as_str)
+                    .and_then(|texture| metres_of(&doc, texture))
+                    .unwrap_or(2.0);
                 entries.insert(
                     name.clone(),
                     Entry {
                         roughness,
+                        colour,
+                        tile,
+                        cover: unit_number(entry, "cover").unwrap_or(1.0),
                         pictures,
                         variation: variation_of(entry),
+                        surface: surface_of(entry),
                     },
                 );
             }
@@ -342,6 +536,13 @@ impl MaterialLibrary {
             .is_some_and(|e| e.variation.is_some())
     }
 
+    /// Whether the library asks for the material `name` to read pictures of
+    /// roughness, occlusion or metal, to be wet, or to be metal (#320),
+    /// pictures on disk or not.
+    pub fn asks_for_surface(&self, name: &str) -> bool {
+        self.entries.get(name).is_some_and(|e| e.surface.asks())
+    }
+
     /// How many materials are drawn with their repeat broken, of those that
     /// have their pictures on disk.
     pub fn varied(&self) -> usize {
@@ -356,81 +557,274 @@ impl MaterialLibrary {
     pub fn material(&self, name: &str, flat: [f32; 4], images: &mut Assets<Image>) -> Surface {
         let entry = self.entries.get(name);
         let roughness = entry.map_or(0.9, |e| e.roughness);
-        let pictures = entry.and_then(|e| e.pictures.as_ref()).and_then(|p| {
-            Some((
-                load(&p.diffuse, true, images)?,
-                load(&p.normal, false, images)?,
-            ))
-        });
-        match (pictures, entry.and_then(|e| e.variation)) {
-            (Some((diffuse, normal)), Some(variation)) => {
-                let wide = self
-                    .wide
-                    .as_ref()
-                    .filter(|_| variation.macro_strength > 0.0)
-                    .and_then(|w| Some((load(&w.file, false, images)?, w.metres)));
-                let (wide_picture, per_metre) = match wide {
-                    Some((picture, metres)) => (Some(picture), 1.0 / metres),
-                    None => (None, 0.0),
-                };
-                Surface::Varied(ExtendedMaterial {
-                    base: StandardMaterial {
-                        base_color: Color::WHITE,
-                        perceptual_roughness: roughness,
-                        ..default()
-                    },
-                    extension: RepeatBreaker {
-                        settings: BreakerSettings {
-                            snap_turn: Vec4::new(
-                                variation.snap[0] as f32,
-                                variation.snap[1] as f32,
-                                f32::from(u8::from(variation.turn_cells)),
-                                f32::from(u8::from(variation.break_repeat)),
-                            ),
-                            wide: Vec4::new(
-                                if wide_picture.is_some() {
-                                    variation.macro_strength
-                                } else {
-                                    0.0
-                                },
-                                per_metre,
-                                0.0,
-                                0.0,
-                            ),
-                        },
-                        diffuse,
-                        normal,
-                        wide: wide_picture,
-                    },
-                })
+        let ask = entry.map(|e| e.surface).unwrap_or_default();
+        if entry.is_some_and(|e| e.variation.is_some() || e.surface.asks()) {
+            // Asking for a surface and not for the repeat to be broken is the
+            // same shader with the repeat left alone.
+            if let Some(own) = self.layer(name, images) {
+                return Surface::Varied(self.shader_material(&own, images));
             }
-            (Some((diffuse, normal)), None) => Surface::Plain(StandardMaterial {
+        } else if let Some((diffuse, normal)) =
+            entry.and_then(|e| e.pictures.as_ref()).and_then(|p| {
+                Some((
+                    load(&p.diffuse, true, images)?,
+                    load(&p.normal, false, images)?,
+                ))
+            })
+        {
+            return Surface::Plain(StandardMaterial {
                 base_color: Color::WHITE,
                 base_color_texture: Some(diffuse),
                 normal_map_texture: Some(normal),
                 perceptual_roughness: roughness,
+                metallic: ask.metallic,
                 ..default()
-            }),
-            (None, _) => Surface::Plain(StandardMaterial {
-                base_color: Color::linear_rgba(flat[0], flat[1], flat[2], flat[3]),
-                perceptual_roughness: roughness,
+            });
+        }
+        // No pictures, so wetness is worked out here: the colour is darker, the
+        // roughness lower and the reflectance higher.
+        let wet = wet(roughness, ask.wetness);
+        Surface::Plain(StandardMaterial {
+            base_color: Color::linear_rgba(
+                flat[0] * wet.colour,
+                flat[1] * wet.colour,
+                flat[2] * wet.colour,
+                flat[3],
+            ),
+            perceptual_roughness: wet.roughness,
+            reflectance: wet.reflectance,
+            metallic: ask.metallic,
+            ..default()
+        })
+    }
+
+    /// A part whose own material is `own` with the material `other` showing
+    /// through it, as much as its vertex colours say (#321). With both
+    /// materials' pictures on disk it is drawn by the shader, the second on
+    /// its own tiles and at its own size; without them it is
+    /// [`Blended::Flat`]: the mesh's vertex colours carry the mix of the two
+    /// flat colours ([`MaterialLibrary::flat_blend`]).
+    pub fn blend(&self, own: &str, other: &str, images: &mut Assets<Image>) -> Blended {
+        let (Some(a), Some(b)) = (self.layer(own, images), self.layer(other, images)) else {
+            return Blended::Flat(StandardMaterial {
+                base_color: Color::WHITE,
+                perceptual_roughness: self.entries.get(own).map_or(0.9, |e| e.roughness),
                 ..default()
-            }),
+            });
+        };
+        let mut material = self.shader_material(&a, images);
+        let settings = &mut material.extension.settings;
+        settings.blend_tiles = b.tiles();
+        settings.blend = Vec4::new(
+            1.0,
+            self.tile(own) / self.tile(other),
+            b.roughness,
+            b.ask.wetness,
+        );
+        settings.blend_surface = Vec4::new(
+            f32::from(u8::from(b.surface.is_some())),
+            f32::from(u8::from(b.roughness_only)),
+            b.ask.metallic,
+            0.0,
+        );
+        material.extension.blend_diffuse = Some(b.diffuse);
+        material.extension.blend_normal = Some(b.normal);
+        material.extension.blend_surface = b.surface;
+        Blended::Drawn(Surface::Varied(material))
+    }
+
+    /// The vertex colour of a corner of a part that is `own` with `other`
+    /// blended in by `weight`, when the two are drawn in their flat colours:
+    /// the mix of the two (`own`'s from the `.glb`, `other`'s from the
+    /// library).
+    pub fn flat_blend(&self, own: [f32; 4], other: &str, weight: f32) -> [f32; 4] {
+        let b = self
+            .entries
+            .get(other)
+            .map_or([0.8, 0.8, 0.8], |e| e.colour);
+        let mix = |a: f32, b: f32| a + (b - a) * weight.clamp(0.0, 1.0);
+        [mix(own[0], b[0]), mix(own[1], b[1]), mix(own[2], b[2]), 1.0]
+    }
+
+    /// The material of a decal of `layer` (#321): its picture and its mask,
+    /// over the surface under it, with premultiplied alpha, drawn after the
+    /// Map's solid parts and over a lower layer's decals. None if its pictures
+    /// or its mask aren't on disk: a decal in a flat colour would be a
+    /// rectangle, so it isn't drawn at all.
+    pub fn decal(&self, name: &str, layer: u8, images: &mut Assets<Image>) -> Option<Surface> {
+        let entry = self.entries.get(name)?;
+        let mask = load(&entry.pictures.as_ref()?.mask, false, images)?;
+        let mut own = self.layer(name, images)?;
+        // One picture: no tiles and no large picture over it.
+        own.variation = None;
+        let mut material = self.shader_material(&own, images);
+        material.base.alpha_mode = AlphaMode::Premultiplied;
+        material.base.depth_bias = decal_depth_bias(layer);
+        material.extension.settings.decal = Vec4::new(1.0, entry.cover, 0.0, 0.0);
+        material.extension.mask = Some(mask);
+        Some(Surface::Varied(material))
+    }
+
+    /// How many metres one repeat of a material's picture covers.
+    fn tile(&self, name: &str) -> f32 {
+        self.entries.get(name).map_or(2.0, |e| e.tile).max(1e-3)
+    }
+
+    /// A material's pictures, loaded, if they are on disk.
+    fn layer(&self, name: &str, images: &mut Assets<Image>) -> Option<Layer> {
+        let entry = self.entries.get(name)?;
+        let pictures = entry.pictures.as_ref()?;
+        let diffuse = load(&pictures.diffuse, true, images)?;
+        let normal = load(&pictures.normal, false, images)?;
+        let surface = surface_picture(name, pictures, &entry.surface, entry.roughness, images);
+        Some(Layer {
+            diffuse,
+            normal,
+            roughness_only: surface.as_ref().is_some_and(|(_, only)| *only),
+            surface: surface.map(|(handle, _)| handle),
+            variation: entry.variation,
+            roughness: entry.roughness,
+            ask: entry.surface,
+        })
+    }
+
+    /// The shader's material for one material's pictures: its tiles, its
+    /// large picture, its surface picture and its wetness.
+    fn shader_material(&self, own: &Layer, images: &mut Assets<Image>) -> VariedMaterial {
+        let variation = own.variation.unwrap_or(NO_VARIATION);
+        let wide = self
+            .wide
+            .as_ref()
+            .filter(|_| variation.macro_strength > 0.0)
+            .and_then(|w| Some((load(&w.file, false, images)?, w.metres)));
+        let (wide_picture, per_metre) = match wide {
+            Some((picture, metres)) => (Some(picture), 1.0 / metres),
+            None => (None, 0.0),
+        };
+        ExtendedMaterial {
+            base: StandardMaterial {
+                base_color: Color::WHITE,
+                perceptual_roughness: own.roughness,
+                metallic: own.ask.metallic,
+                ..default()
+            },
+            extension: RepeatBreaker {
+                settings: BreakerSettings {
+                    snap_turn: own.tiles(),
+                    wide: Vec4::new(
+                        if wide_picture.is_some() {
+                            variation.macro_strength
+                        } else {
+                            0.0
+                        },
+                        per_metre,
+                        0.0,
+                        0.0,
+                    ),
+                    surface: Vec4::new(
+                        f32::from(u8::from(own.surface.is_some())),
+                        own.ask.wetness,
+                        f32::from(u8::from(own.roughness_only)),
+                        0.0,
+                    ),
+                    ..BreakerSettings::NOTHING
+                },
+                diffuse: own.diffuse.clone(),
+                normal: own.normal.clone(),
+                wide: wide_picture,
+                surface: own.surface.clone(),
+                blend_diffuse: None,
+                blend_normal: None,
+                blend_surface: None,
+                mask: None,
+            },
         }
     }
+}
+
+/// How a part with a second material blended in is drawn (#321).
+#[allow(clippy::large_enum_variant)]
+pub enum Blended {
+    /// By the shader, with both materials' pictures and the weight in the
+    /// mesh's vertex colours' alpha.
+    Drawn(Surface),
+    /// In flat colours: the mesh's vertex colours are the mix, and this
+    /// material is white so they show as they are.
+    Flat(StandardMaterial),
+}
+
+/// The picture of occlusion, roughness and metal a material asks for, packed
+/// into one and added to the images, and whether it holds roughness alone. A
+/// picture it asks for and can't have (no file, or one that isn't a picture)
+/// is said in the log and left out, with what it would have said replaced by
+/// its default; with none to read, there is no picture and the library's
+/// roughness number stands.
+fn surface_picture(
+    name: &str,
+    pictures: &Pictures,
+    ask: &SurfaceAsk,
+    roughness: f32,
+    images: &mut Assets<Image>,
+) -> Option<(Handle<Image>, bool)> {
+    if !ask.any_map() {
+        return None;
+    }
+    let read = |wanted: bool, what: &str, path: &Path| {
+        if !wanted {
+            return None;
+        }
+        let plane = read_plane(path);
+        if plane.is_none() {
+            warn!(
+                "material {name} asks for its {what} picture, and {} can't be read: using the default",
+                path.display()
+            );
+        }
+        plane
+    };
+    let image = pack_surface(
+        read(ask.roughness_map, "roughness", &pictures.roughness),
+        read(ask.ao_map, "occlusion", &pictures.ao),
+        read(ask.metallic_map, "metal", &pictures.metallic),
+        roughness,
+    )?;
+    let roughness_only = image.texture_descriptor.format == TextureFormat::R8Unorm;
+    Some((images.add(with_mipmaps(image)), roughness_only))
+}
+
+/// A grey picture's pixels, from a JPG on disk.
+fn read_plane(path: &Path) -> Option<Plane> {
+    let bytes = fs::read(path).ok()?;
+    let image = Image::from_buffer(
+        &bytes,
+        ImageType::Extension("jpg"),
+        CompressedImageFormats::NONE,
+        false,
+        ImageSampler::default(),
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .ok()?;
+    plane_of(&image)
+}
+
+/// How many metres one repeat of a texture covers, from its `size` in the
+/// library ("1.8 m").
+fn metres_of(doc: &toml::Table, texture: &str) -> Option<f32> {
+    let size = doc.get("textures")?.get(texture)?.get("size")?.as_str()?;
+    let metres: f32 = size.trim().strip_suffix('m')?.trim().parse().ok()?;
+    (metres > 0.0).then_some(metres)
 }
 
 /// The large-scale picture the library's `[macro]` table names, if its
 /// pictures are on disk, with the metres one repeat of it covers.
 fn wide_picture(doc: &toml::Table, repo: &Path) -> Option<WidePicture> {
     let name = doc.get("macro")?.get("texture")?.as_str()?;
-    let size = doc.get("textures")?.get(name)?.get("size")?.as_str()?;
-    let metres: f32 = size.trim().strip_suffix('m')?.trim().parse().ok()?;
+    let metres = metres_of(doc, name)?;
     let file = [TEXTURES, GENERATED]
         .into_iter()
         .map(|folder| repo.join(folder).join(name).join("diffuse.jpg"))
         .find(|file| file.is_file())?;
-    (metres > 0.0).then_some(WidePicture { file, metres })
+    Some(WidePicture { file, metres })
 }
 
 /// Reads a picture from disk, with its mipmaps worked out and its edges
@@ -459,14 +853,15 @@ fn load(path: &Path, is_srgb: bool, images: &mut Assets<Image>) -> Option<Handle
 }
 
 /// The picture with every smaller size down to one pixel, each the average of
-/// the four above it, so far away it doesn't shimmer. The picture must be
-/// four bytes a pixel.
+/// the four above it, so far away it doesn't shimmer. The picture must be one,
+/// two or four bytes a pixel.
 pub fn with_mipmaps(mut image: Image) -> Image {
     let (mut width, mut height) = (image.width() as usize, image.height() as usize);
     let Some(base) = image.data.take() else {
         return image;
     };
-    if base.len() != width * height * 4 {
+    let channels = base.len().checked_div(width * height).unwrap_or(0);
+    if base.len() != width * height * channels || !matches!(channels, 1 | 2 | 4) {
         image.data = Some(base);
         return image;
     }
@@ -475,15 +870,15 @@ pub fn with_mipmaps(mut image: Image) -> Image {
     let mut count = 1;
     while width > 1 || height > 1 {
         let (next_width, next_height) = ((width / 2).max(1), (height / 2).max(1));
-        let mut next = Vec::with_capacity(next_width * next_height * 4);
+        let mut next = Vec::with_capacity(next_width * next_height * channels);
         for y in 0..next_height {
             for x in 0..next_width {
-                for channel in 0..4 {
+                for channel in 0..channels {
                     let mut sum = 0u32;
                     for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
                         let sx = (x * 2 + dx).min(width - 1);
                         let sy = (y * 2 + dy).min(height - 1);
-                        sum += u32::from(level[(sy * width + sx) * 4 + channel]);
+                        sum += u32::from(level[(sy * width + sx) * channels + channel]);
                     }
                     next.push(((sum + 2) / 4) as u8);
                 }

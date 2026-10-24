@@ -13,6 +13,11 @@
 //!   `od_launch_spot`: the compass heading the Quad faces (0 north, 90 east).
 //!   Any other tag starting with `od_` is refused, so a misspelt one never
 //!   passes for nothing.
+//! - **Decals and blends (#321).** `od_decal` marks a drawn-only object as a
+//!   decal, a picture lying on a surface, with its layer (0 to 15) as the
+//!   value: its picture coordinates run from 0 to 1 across the picture.
+//!   `od_blend` names a second material that shows through the object's own
+//!   where its vertex colours (`COLOR_0`, grey, 0 to 1) say so.
 //! - **Axes:** glTF is Y-up (x east, y up, z south); the Simulation counts
 //!   east, north and up. A corner `(x, y, z)` in the file is `(x, -z, y)` in
 //!   the Map.
@@ -33,7 +38,21 @@ use serde_json::Value;
 use crate::document::{Problem, Problems};
 
 /// The tags a Map's objects may carry.
-pub const TAGS: [&str; 3] = ["od_collider", "od_collision_only", "od_launch_spot"];
+pub const TAGS: [&str; 5] = [
+    "od_collider",
+    "od_collision_only",
+    "od_launch_spot",
+    "od_decal",
+    "od_blend",
+];
+
+/// The highest layer a decal may have: a decal of a higher layer is drawn
+/// over one of a lower layer where they overlap.
+pub const TOP_DECAL_LAYER: u8 = 15;
+
+/// How far a decal's picture coordinate may stray outside 0 to 1, for the
+/// rounding of a 32-bit number.
+const DECAL_UV_SLACK: f32 = 1e-3;
 
 /// Extensions that compress or pack a mesh, with what to say about each.
 const COMPRESSED: [(&str, &str); 4] = [
@@ -85,6 +104,23 @@ pub struct DrawnPart {
     pub light_uvs: Vec<[f32; 2]>,
     /// Corner numbers, anticlockwise seen from the front.
     pub triangles: Vec<[u32; 3]>,
+    /// If the part is a decal (`od_decal`), its layer: 0 to
+    /// [`TOP_DECAL_LAYER`], a higher one drawn over a lower one.
+    pub decal: Option<u8>,
+    /// If a second material shows through this one (`od_blend`), which, and
+    /// how much of it at each corner.
+    pub blend: Option<Blend>,
+}
+
+/// A second material that shows through a part's own (`od_blend` and the
+/// mesh's vertex colours, `COLOR_0`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Blend {
+    /// The second material's name, from the material library.
+    pub material: String,
+    /// How much of it shows at each corner, from 0 (none: the part's own
+    /// material) to 1 (all of it), one per corner.
+    pub weights: Vec<f32>,
 }
 
 /// What a Map's `.glb` holds, checked.
@@ -338,6 +374,31 @@ impl Reader<'_> {
                         "object \"{name}\" has od_collision_only {value}, which must be 1 (solid but never drawn) or 0"
                     )),
                 },
+                "od_decal" => match value.as_f64() {
+                    Some(layer)
+                        if layer.fract() == 0.0
+                            && (0.0..=f64::from(TOP_DECAL_LAYER)).contains(&layer) =>
+                    {
+                        tags.decal = Some(layer as u8);
+                    }
+                    _ => {
+                        tags.decal_refused = true;
+                        self.problem(format!(
+                            "object \"{name}\" has od_decal {value}, which must be a whole number from 0 to {TOP_DECAL_LAYER}: the decal's layer, a higher one drawn over a lower one where they overlap"
+                        ));
+                    }
+                },
+                "od_blend" => match value.as_str() {
+                    Some(material) if !material.trim().is_empty() => {
+                        tags.blend = Some(material.to_string());
+                    }
+                    _ => {
+                        tags.blend_refused = true;
+                        self.problem(format!(
+                            "object \"{name}\" has od_blend {value}, which must be the name of a material: the one that shows through the object's own where its vertex colours say so"
+                        ));
+                    }
+                },
                 "od_launch_spot" => match value.as_f64() {
                     Some(heading) if (0.0..360.0).contains(&heading) => {
                         tags.launch_heading = Some(heading);
@@ -379,6 +440,24 @@ impl Reader<'_> {
                 "object \"{name}\" is od_collision_only but its od_collider is \"none\": it would be neither drawn nor solid"
             ));
         }
+        if tags.decal.is_some() {
+            if collider != Collider::None {
+                self.problem(format!(
+                    "object \"{name}\" is a decal (od_decal) but its od_collider is \"{}\": a decal is a picture lying on a surface and is never solid, so its od_collider is \"none\"",
+                    collider_word(collider)
+                ));
+            }
+            if tags.collision_only {
+                self.problem(format!(
+                    "object \"{name}\" is a decal (od_decal) and od_collision_only: a decal is only drawn, never solid"
+                ));
+            }
+            if tags.blend.is_some() {
+                self.problem(format!(
+                    "object \"{name}\" is a decal (od_decal) and has od_blend: a decal is one picture, with nothing to blend"
+                ));
+            }
+        }
         let mesh = node.get("mesh").and_then(Value::as_u64).unwrap_or(0) as usize;
         let Some(primitives) = gltf.primitives(mesh) else {
             self.problem(format!(
@@ -398,7 +477,17 @@ impl Reader<'_> {
                             .iter()
                             .map(|t| [t[0] + offset, t[1] + offset, t[2] + offset]),
                     );
+                    if let Err(why) = self.check_decal_and_blend(tags, &read) {
+                        self.problem(format!("object \"{name}\" {why}"));
+                        continue;
+                    }
                     if !tags.collision_only {
+                        let blend = tags.blend.as_ref().and_then(|material| {
+                            Some(Blend {
+                                material: material.clone(),
+                                weights: read.weights.clone()?,
+                            })
+                        });
                         model.drawing.push(DrawnPart {
                             name: name.to_string(),
                             material: read.material,
@@ -414,6 +503,8 @@ impl Reader<'_> {
                             uvs: read.uvs,
                             light_uvs: read.light_uvs,
                             triangles: read.triangles,
+                            decal: tags.decal,
+                            blend,
                         });
                     }
                 }
@@ -450,6 +541,43 @@ impl Reader<'_> {
                 collider_word(collider),
                 describe(&error.problem)
             )),
+        }
+    }
+}
+
+impl Reader<'_> {
+    /// What a decal's picture coordinates and a blend's vertex colours must
+    /// be (#321), or why a primitive's aren't.
+    fn check_decal_and_blend(&self, tags: &Tags, read: &Primitive) -> Result<(), String> {
+        if tags.decal.is_some() || tags.decal_refused {
+            if read.uvs.len() != read.corners.len() {
+                return Err(
+                    "is a decal (od_decal), so its mesh needs picture coordinates (TEXCOORD_0), one for every corner, to say where its picture lies"
+                        .to_string(),
+                );
+            }
+            let range = -DECAL_UV_SLACK..=1.0 + DECAL_UV_SLACK;
+            if let Some(uv) = read
+                .uvs
+                .iter()
+                .find(|uv| !range.contains(&uv[0]) || !range.contains(&uv[1]))
+            {
+                return Err(format!(
+                    "is a decal (od_decal), so its picture coordinates (TEXCOORD_0) run from 0 to 1 across its one picture, but one is ({}, {}): outside 0 to 1 the picture would repeat, and its edge show as a rectangle",
+                    uv[0], uv[1]
+                ));
+            }
+        }
+        match (&read.weights, tags.blend.is_some() || tags.blend_refused) {
+            (Some(_), false) => Err(
+                "has vertex colours (COLOR_0) but no od_blend: on a Map a vertex colour says how much of a second material shows through the object's own, so name that material with od_blend, or export the mesh without vertex colours"
+                    .to_string(),
+            ),
+            (None, true) => Err(
+                "names a material to blend with (od_blend), but its mesh has no vertex colours (COLOR_0) to say where it shows: give it one grey vertex colour per corner, black for its own material and white for the other"
+                    .to_string(),
+            ),
+            _ => Ok(()),
         }
     }
 }
@@ -492,6 +620,14 @@ struct Tags {
     collider_refused: bool,
     collision_only: bool,
     launch_heading: Option<f64>,
+    /// `od_decal`'s layer, if the object is a decal.
+    decal: Option<u8>,
+    /// `od_decal` is there, but its value is wrong, and a problem says so.
+    decal_refused: bool,
+    /// `od_blend`'s material, if a second one shows through.
+    blend: Option<String>,
+    /// `od_blend` is there, but its value is wrong, and a problem says so.
+    blend_refused: bool,
 }
 
 // ---------- glTF numbers ----------
@@ -601,6 +737,9 @@ struct Primitive {
     triangles: Vec<[u32; 3]>,
     material: String,
     colour: [f32; 4],
+    /// The vertex colours (`COLOR_0`) as blend weights, one per corner, if
+    /// the mesh has them.
+    weights: Option<Vec<f32>>,
 }
 
 impl Gltf<'_> {
@@ -788,6 +927,10 @@ impl Gltf<'_> {
                     .to_string(),
             );
         }
+        let weights = match attributes.get("COLOR_0").and_then(Value::as_u64) {
+            Some(index) => Some(self.blend_weights(index as usize, corners.len())?),
+            None => None,
+        };
         let listed = match primitive.get("indices").and_then(Value::as_u64) {
             Some(index) => self.indices(index as usize)?,
             None => (0..corners.len() as u32).collect(),
@@ -836,7 +979,71 @@ impl Gltf<'_> {
             triangles,
             material,
             colour,
+            weights,
         })
+    }
+
+    /// The vertex colours (`COLOR_0`) of a mesh as blend weights: the red of
+    /// each, which must be grey (the three channels alike, within a 255th)
+    /// and from 0 to 1, one for every corner. glTF lets them be 32-bit
+    /// decimal numbers or whole numbers that stand for 0 to 1, in groups of
+    /// three or four.
+    fn blend_weights(&self, index: usize, corners: usize) -> Result<Vec<f32>, String> {
+        let (component, normalized, kind) = self.component(index);
+        let parts = match kind.as_str() {
+            "VEC3" => 3,
+            "VEC4" => 4,
+            _ => {
+                return Err(
+                    "has vertex colours (COLOR_0) that aren't groups of three or four numbers"
+                        .to_string(),
+                );
+            }
+        };
+        let (width, scale) = match (component, normalized) {
+            (5126, false) => (4, 1.0),
+            (5121, true) => (1, 255.0),
+            (5123, true) => (2, 65535.0),
+            _ => {
+                return Err(
+                    "has vertex colours (COLOR_0) that are neither 32-bit decimal numbers nor whole numbers standing for 0 to 1"
+                        .to_string(),
+                );
+            }
+        };
+        let (bytes, count, stride) = self.accessor_bytes(index, parts * width)?;
+        if count != corners {
+            return Err(
+                "has vertex colours (COLOR_0) that aren't one for every corner".to_string(),
+            );
+        }
+        let mut weights = Vec::with_capacity(count);
+        for i in 0..count {
+            let channel = |k: usize| {
+                let o = i * stride + k * width;
+                match width {
+                    4 => f32::from_le_bytes([bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]]),
+                    2 => f32::from(u16::from_le_bytes([bytes[o], bytes[o + 1]])) / scale,
+                    _ => f32::from(bytes[o]) / scale,
+                }
+            };
+            let [r, g, b] = [channel(0), channel(1), channel(2)];
+            if ![r, g, b]
+                .iter()
+                .all(|c| c.is_finite() && (0.0..=1.0).contains(c))
+            {
+                return Err(format!(
+                    "has a vertex colour (COLOR_0) of ({r}, {g}, {b}), and a blend weight is from 0 to 1"
+                ));
+            }
+            if (g - r).abs() > 1.0 / 255.0 || (b - r).abs() > 1.0 / 255.0 {
+                return Err(format!(
+                    "has a vertex colour (COLOR_0) of ({r}, {g}, {b}), which isn't grey: a vertex colour on a Map is a blend weight, from black (the object's own material) to white (the od_blend one), not a tint"
+                ));
+            }
+            weights.push(r);
+        }
+        Ok(weights)
     }
 }
 

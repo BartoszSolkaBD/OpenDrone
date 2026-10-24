@@ -238,7 +238,7 @@ fn an_unknown_od_tag_is_refused_so_a_misspelt_one_never_passes_for_nothing() {
     assert_eq!(
         problems_of(glb),
         [format!(
-            "{MAP_GLB}: object \"planter\" has the tag \"od_colision_only\", which OpenDrone doesn't know: the tags that start with od_ are od_collider, od_collision_only, od_launch_spot"
+            "{MAP_GLB}: object \"planter\" has the tag \"od_colision_only\", which OpenDrone doesn't know: the tags that start with od_ are od_collider, od_collision_only, od_launch_spot, od_decal, od_blend"
         )]
     );
 }

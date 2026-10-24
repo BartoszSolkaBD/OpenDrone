@@ -12,7 +12,9 @@ runs them too, apart from the one that decodes with Blender's own JPEG reader.
 
 Basis: Rule (ADR-0024: the pictures are committed and a check regenerates
 them, so a generator must give the same bytes for the same seed; a texture
-repeats, so it must have no seam), and Observed for the normal map's shape.
+repeats, so it must have no seam; a decal is put once and its rectangle must
+never show, so its mask is clear along every edge, #321), and Observed for the
+normal map's shape.
 The pictures are made at 512 pixels, to be quick: a generator draws the same
 picture at any size.
 """
@@ -32,6 +34,7 @@ sys.path.insert(0, HERE)
 import odjpeg  # noqa: E402
 import odtex  # noqa: E402
 import odtexgen  # noqa: E402
+import decalwork  # noqa: E402
 
 PIXELS = 512
 
@@ -124,21 +127,29 @@ class EachGenerator(unittest.TestCase):
         for generator, (first, again, _other) in self.made.items():
             self.assertEqual(odtexgen.encode_pictures(*first), odtexgen.encode_pictures(*again), generator)
 
+    def materials(self):
+        """The generators of materials' pictures, which repeat: not decals."""
+        return {g: made for g, made in self.made.items() if len(made[0]) == 3}
+
+    def decals(self):
+        """The generators of decals, which make a fourth picture, the mask."""
+        return {g: made for g, made in self.made.items() if len(made[0]) == 4}
+
     def test_a_different_seed_gives_different_bytes(self):
         for generator, (first, _again, other) in self.made.items():
-            kinds = ("colour", "normal", "roughness")
+            kinds = ("colour", "normal", "roughness", "mask")
             for kind, a, b in zip(kinds, odtexgen.encode_pictures(*first), odtexgen.encode_pictures(*other)):
                 self.assertNotEqual(a, b, f"{generator}'s {kind} picture")
 
     def test_each_picture_repeats_without_a_seam(self):
-        for generator, ((diffuse, normal, roughness), _again, _other) in self.made.items():
+        for generator, ((diffuse, normal, roughness), _again, _other) in self.materials().items():
             for kind, picture in (("colour", diffuse), ("normal", normal), ("roughness", roughness)):
                 for axis, name in ((1, "left to right"), (0, "top to bottom")):
                     wrap, biggest = steps_round_the_tile(picture, axis)
                     self.assertLessEqual(wrap, biggest * 1.25 + 1.0, f"{generator}'s {kind}, {name}")
 
     def test_the_normal_map_leans_out_of_the_surface_and_isnt_flat(self):
-        for generator, ((_d, normal, _r), _again, _other) in self.made.items():
+        for generator, ((_d, normal, _r), _again, _other) in self.materials().items():
             n = normal.astype(np.float64) / 255.0 * 2.0 - 1.0
             self.assertGreater(n[..., 2].min(), 0.0, f"{generator}: every normal points out of the surface")
             self.assertGreater(n[..., 2].mean(), 0.6, generator)
@@ -148,11 +159,33 @@ class EachGenerator(unittest.TestCase):
             self.assertLess(abs(n[..., 1].mean()), 0.1, generator)
 
     def test_the_colour_isnt_blank_and_no_picture_is_one_flat_tone(self):
-        for generator, ((diffuse, normal, roughness), _again, _other) in self.made.items():
+        for generator, ((diffuse, normal, roughness), _again, _other) in self.materials().items():
             self.assertGreater(diffuse.std(), 6.0, generator)
             self.assertGreater(roughness.std(), 1.0, generator)
             self.assertGreater(diffuse.mean(), 25, f"{generator} isn't black")
             self.assertLess(diffuse.mean(), 225, f"{generator} isn't white")
+
+    def test_the_library_makes_decals_of_moss_a_stain_and_a_damp_patch(self):
+        self.assertTrue({"decal_moss", "decal_stain", "decal_damp"} <= set(self.decals()))
+
+    def test_a_decals_mask_is_clear_along_every_edge_so_its_rectangle_never_shows(self):
+        for generator, ((_d, _n, _r, mask), _again, _other) in self.decals().items():
+            edge = max(1, int(decalwork.CLEAR_EDGE * PIXELS))
+            for name, strip in (("top", mask[:edge]), ("bottom", mask[-edge:]),
+                                ("left", mask[:, :edge]), ("right", mask[:, -edge:])):
+                self.assertEqual(strip.max(), 0, f"{generator}'s mask along its {name} edge")
+
+    def test_a_decals_mask_is_nearly_whole_somewhere_and_covers_part_of_it(self):
+        for generator, ((_d, _n, _r, mask), _again, _other) in self.decals().items():
+            self.assertGreaterEqual(mask.max(), 230, generator)
+            covered = (mask > 127).mean()
+            self.assertGreater(covered, 0.05, generator)
+            self.assertLess(covered, 0.75, generator)
+
+    def test_a_decals_normal_map_leans_out_of_the_surface(self):
+        for generator, ((_d, normal, _r, _m), _again, _other) in self.decals().items():
+            n = normal.astype(np.float64) / 255.0 * 2.0 - 1.0
+            self.assertGreater(n[..., 2].min(), 0.0, generator)
 
 
 class TheBuildingBlocks(unittest.TestCase):

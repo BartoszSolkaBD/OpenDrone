@@ -24,6 +24,8 @@ fn part(corners: Vec<[f32; 3]>, triangles: Vec<[u32; 3]>) -> DrawnPart {
         corners,
         light_uvs: Vec::new(),
         triangles,
+        decal: None,
+        blend: None,
     }
 }
 

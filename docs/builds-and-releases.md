@@ -39,7 +39,7 @@ The builds aren't signed by a registered developer yet, so each system warns abo
 **What's inside, beside the game:**
 
 - the built-in Pack (`packs/`) and the Scenarios (`scenarios/`);
-- the Maps' textures and the material library (`assets-src/`);
+- the Maps' textures and the material library (`assets-src/`). Every picture a texture has goes in: the colour and the normal map, and the roughness, occlusion and metal pictures and a decal's mask where it has them. `cargo xtask package` refuses to build when a material asks for a picture its texture lacks, so a download never draws a surface without the roughness or decal it should have.
 - the licences, `THIRD-PARTY-LICENSES.txt` and `CREDITS.md`;
 - a short `README.txt`, which says how to open the build on its system.
 
