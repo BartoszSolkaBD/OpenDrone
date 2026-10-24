@@ -15,6 +15,14 @@ shapes to it and calls `export`. What comes out follows the Pack's Map rules
   object sits at the origin with no turn: nothing in Blender's 32-bit maths
   can differ between computers, and the same script gives the same bytes.
 
+A shape may blend a second material into its own (`solid(..., blend=(material,
+weights))`): its mesh then carries one grey vertex colour per corner
+(`COLOR_0`), how much of the second material shows there, and an `od_blend`
+tag naming it. A script may put **decals** on its shapes (`decal(...)`): thin
+meshes that hug a surface 2 mm above it, with one picture each, tagged
+`od_decal` (their layer) and `od_collider = none` (docs/building-a-map.md,
+"Decals and blended ground").
+
 A script may ask for baked light with `lightmap(texel_cm)`: every drawn mesh
 then gets a second picture-coordinate set (`TEXCOORD_1`, from a deterministic
 unwrap in `odlight`), and `cargo xtask maps --bake <id>` bakes the Map's sun
@@ -34,8 +42,11 @@ import bpy
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import odgeom as g  # noqa: E402
 import odlight  # noqa: E402
+from oddecal import Decal, Host  # noqa: E402
 
 COLLIDERS = ("box", "convex", "trimesh", "none")
+TOP_DECAL_LAYER = 15  # the Pack checker's highest decal layer
+BLEND_ATTRIBUTE = "od_blend"  # the colour attribute the exporter writes as COLOR_0
 
 
 def _arguments():
@@ -81,6 +92,10 @@ class MapBuilder:
         self.light = None  # what `lightmap()` asked for
         self.light_cm = {}  # object name -> its own centimetres per texel
         self.light_result = None  # what the unwrap made, once exported
+        self.shapes = {}  # object name -> (corners, triangles), as handed to Blender
+        self.light_loops = {}  # object name -> its light coordinates, two numbers a triangle corner
+        self.decals = []  # what `decal()` asked for, made at export
+        self.decal_objects = []
 
     # ---------- materials ----------
     def material(self, name):
@@ -115,11 +130,15 @@ class MapBuilder:
         assert self.light is None, "lightmap() is asked for once"
         self.light = {"texel_cm": float(texel_cm), "max_chart": max_chart, "max_size": max_size}
 
-    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None):
+    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None, blend=None):
         """Adds a shape: `mesh` is `(corners, faces)` from `odgeom`, in its own
         axes; `pose` puts it in the Map (None: it is there already).
         `light_cm` is the shape's own centimetres per texel in the light atlas,
-        if the Map asks for one (see `lightmap`)."""
+        if the Map asks for one (see `lightmap`). `blend=(material_b,
+        weights)` shows a second material through this one: `weights` is one
+        number from 0 (only `material`) to 1 (only `material_b`) for each
+        corner of `mesh`, in its order, such as `WanderingEdge.weights`
+        gives."""
         assert collider in COLLIDERS, collider
         corners, faces = g.placed(mesh, pose or g.Pose())
         triangles = g.triangulate(corners, faces, convex=collider == "convex")
@@ -149,15 +168,83 @@ class MapBuilder:
         layer = me.uv_layers.new(name="UVMap")
         layer.uv.foreach_set("vector", flat)
         me.materials.append(self.material(material))
+        if blend is not None:
+            self._blend(name, me, len(corners), *blend)
         ob = bpy.data.objects.new(name, me)
         self.scene.collection.objects.link(ob)
         ob["od_collider"] = collider
         if collision_only:
             ob["od_collision_only"] = 1
+        if blend is not None:
+            ob["od_blend"] = blend[0]
         self.objects.append((ob, collider, collision_only))
+        self.shapes[ob.name] = (corners, triangles)
         if light_cm is not None:
             self.light_cm[ob.name] = float(light_cm)
         return ob
+
+    def _blend(self, name, me, count, material_b, weights):
+        """The mesh's vertex colours: each corner's weight of `material_b`, as
+        grey, a 32-bit number exactly as given."""
+        assert material_b in self.library, f"{name}: no material {material_b!r} to blend with"
+        assert len(weights) == count, f"{name}: {len(weights)} blend weights for {count} corners"
+        flat = []
+        for w in weights:
+            w = float(w)
+            assert 0.0 <= w <= 1.0, f"{name}: a blend weight of {w}"
+            flat += [w, w, w, 1.0]
+        attribute = me.color_attributes.new(name=BLEND_ATTRIBUTE, type="FLOAT_COLOR", domain="POINT")
+        attribute.data.foreach_set("color", flat)
+
+    def decal(self, name, material, on, centre, facing, up, size, layer=0, depth=0.4, max_angle=75.0):
+        """Puts a decal on shapes made already: `material` is a decal material
+        of the library (its picture, its mask, how wet it makes what is under
+        it), `on` the shapes it may lie on (what `solid` and the other shapes
+        return, or their names). It is a `size = (width, height)` metre
+        rectangle round `centre`, facing `facing` (out of the surface), the
+        picture's top toward `up`, reaching `depth` metres into and out of the
+        surface, onto faces turned less than `max_angle` degrees from it
+        (`oddecal.Decal`). Where decals overlap, a higher `layer` (0 to 15) is
+        drawn over a lower one. The mesh is made at export, after the light
+        atlas's coordinates, so it can take the surface's own."""
+        assert material in self.library, f"decal {name}: no material {material!r} in the library"
+        assert int(layer) == layer and 0 <= layer <= TOP_DECAL_LAYER, f"decal {name}: layer {layer} isn't 0 to {TOP_DECAL_LAYER}"
+        hosts = [o if isinstance(o, str) else o.name for o in on]
+        for h in hosts:
+            assert h in self.shapes, f"decal {name} is put on {h!r}, which isn't a shape of this Map"
+        name = self._name(name)
+        self.decals.append(dict(
+            name=name, material=material, hosts=hosts, layer=int(layer),
+            projector=Decal(centre, facing, up, size, depth=depth, max_angle=max_angle),
+        ))
+        return name
+
+    def _make_decals(self):
+        """Each decal's mesh, cut from the shapes it lies on."""
+        for d in self.decals:
+            hosts = []
+            for h in d["hosts"]:
+                corners, triangles = self.shapes[h]
+                flat = self.light_loops.get(h)
+                light = None
+                if flat is not None:
+                    light = [tuple((flat[6 * k + 2 * i], flat[6 * k + 2 * i + 1]) for i in range(3)) for k in range(len(triangles))]
+                hosts.append(Host(corners, triangles, light))
+            corners, triangles, uvs, light = d["projector"].project(hosts)
+            if not triangles:
+                raise SystemExit(f"decal {d['name']} lies on nothing: no face of {', '.join(d['hosts'])} faces it inside its box")
+            me = bpy.data.meshes.new(d["name"])
+            me.from_pydata(corners, [], triangles)
+            # Corners aren't shared, so each triangle corner is its own.
+            me.uv_layers.new(name="UVMap").uv.foreach_set("vector", [x for uv in uvs for x in uv])
+            if light is not None:
+                me.uv_layers.new(name="UVLight").uv.foreach_set("vector", [x for uv in light for x in uv])
+            me.materials.append(self.material(d["material"]))
+            ob = bpy.data.objects.new(d["name"], me)
+            self.scene.collection.objects.link(ob)
+            ob["od_collider"] = "none"
+            ob["od_decal"] = d["layer"]
+            self.decal_objects.append(ob)
 
     def launch_spot(self, x, y, z, heading):
         """The one Launch Spot: where the Quad starts, landed, facing the
@@ -305,6 +392,7 @@ class MapBuilder:
         for ob, flat in zip(drawn, uvs):
             layer = ob.data.uv_layers.new(name="UVLight")
             layer.uv.foreach_set("vector", flat)
+            self.light_loops[ob.name] = list(flat)
         return size, info
 
     def export(self, path):
@@ -326,12 +414,15 @@ class MapBuilder:
         if request is not None:
             size, info = self._light_uvs(request)
             self.light_result = dict(texel_cm=request["texel_cm"], width=size[0], height=size[1], **info)
+        self._make_decals()
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         view_layer = bpy.context.view_layer
         view_layer.update()
         for ob in bpy.data.objects:
             ob.select_set(False)
         for ob, _, _ in self.objects:
+            ob.select_set(True)
+        for ob in self.decal_objects:
             ob.select_set(True)
         self.launch.select_set(True)
         bpy.ops.export_scene.gltf(
@@ -343,7 +434,10 @@ class MapBuilder:
             export_normals=False,
             export_tangents=False,
             export_materials="EXPORT",
-            export_vertex_color="NONE",
+            # Only a blend's weights: a mesh without them has no COLOR_0.
+            export_vertex_color="NAME",
+            export_vertex_color_name=BLEND_ATTRIBUTE,
+            export_all_vertex_colors=False,
             export_attributes=False,
             export_image_format="NONE",
             export_cameras=False,
@@ -376,6 +470,8 @@ class MapBuilder:
         for ob, _, only in self.objects:
             if only:
                 ob.hide_render = True  # solid but never drawn: it casts no shade
+        for ob in self.decal_objects:
+            ob.hide_render = True  # a picture on a surface: it casts no shade on it
         result = odlight.bake(
             drawn,
             light,
@@ -406,4 +502,8 @@ class MapBuilder:
         for ob, collider, only in self.objects:
             kinds[collider] = kinds.get(collider, 0) + 1
             triangles += len(ob.data.polygons)
-        return {"objects": len(self.objects), "triangles": triangles, "colliders": kinds}
+        stats = {"objects": len(self.objects), "triangles": triangles, "colliders": kinds}
+        if self.decal_objects:
+            stats["decals"] = len(self.decal_objects)
+            stats["decal_triangles"] = sum(len(ob.data.polygons) for ob in self.decal_objects)
+        return stats

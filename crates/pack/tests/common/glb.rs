@@ -144,6 +144,50 @@ impl Glb {
         self
     }
 
+    /// Gives the last object's mesh picture coordinates (`TEXCOORD_0`), one
+    /// `[u, v]` per corner.
+    pub fn uvs(mut self, uvs: &[[f32; 2]]) -> Glb {
+        let bytes: Vec<u8> = uvs.iter().flatten().flat_map(|n| n.to_le_bytes()).collect();
+        let accessor = self.add_view(&bytes, uvs.len(), "VEC2", 5126);
+        let mesh = self
+            .meshes
+            .last_mut()
+            .expect("an object to give coordinates to");
+        mesh["primitives"][0]["attributes"]["TEXCOORD_0"] = json!(accessor);
+        self
+    }
+
+    /// Gives the last object's mesh vertex colours (`COLOR_0`) as 32-bit
+    /// decimal numbers, red, green, blue and alpha, one per corner.
+    pub fn colours(mut self, colours: &[[f32; 4]]) -> Glb {
+        let bytes: Vec<u8> = colours
+            .iter()
+            .flatten()
+            .flat_map(|n| n.to_le_bytes())
+            .collect();
+        let accessor = self.add_view(&bytes, colours.len(), "VEC4", 5126);
+        self.set_colours(accessor)
+    }
+
+    /// Gives the last object's mesh vertex colours (`COLOR_0`) as whole
+    /// numbers that stand for 0 to 1 (`normalized` unsigned bytes), red,
+    /// green and blue, one per corner.
+    pub fn byte_colours(mut self, colours: &[[u8; 3]]) -> Glb {
+        let bytes: Vec<u8> = colours.iter().flatten().copied().collect();
+        let accessor = self.add_view(&bytes, colours.len(), "VEC3", 5121);
+        self.accessors[accessor]["normalized"] = json!(true);
+        self.set_colours(accessor)
+    }
+
+    fn set_colours(mut self, accessor: usize) -> Glb {
+        let mesh = self
+            .meshes
+            .last_mut()
+            .expect("an object to give colours to");
+        mesh["primitives"][0]["attributes"]["COLOR_0"] = json!(accessor);
+        self
+    }
+
     /// An object with tags and no mesh, such as the Launch Spot: an empty at
     /// `at` (east, north, up).
     pub fn empty(mut self, name: &str, extras: Value, at: [f32; 3]) -> Glb {

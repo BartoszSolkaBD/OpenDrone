@@ -1,4 +1,5 @@
-"""A test Map for the geometry helpers (#322): not a Map of the Pack.
+"""A test Map for the geometry helpers (#322), decals and blended ground (#321):
+not a Map of the Pack.
 
   blender --background --factory-startup --python-exit-code 1 \
     --python assets-src/demos/geometry/build.py -- --out <file.glb>
@@ -9,7 +10,10 @@ ground with a level Launch Spot, dips and rubble heaped against a wall; a brick
 wall with a window that has lost its sill, a doorway and a breach, and the
 bricks that fell out; a gable roof of rusted iron that sags between its
 trusses, with sheets lifted and curled, one missing, a tear and three
-skylights; and a grass-to-dirt boundary that wanders.
+skylights; and a grass-to-dirt boundary that wanders, drawn as one ground with
+the dirt blended into the grass by its vertex colours. Decals (#321) stain the
+south wall's outside, put moss at its foot, and lay damp patches and a rust
+stain, overlapping, on the hall's floor.
 
 Nothing builds this in CI and nothing commits its `.glb`: it is a way to see
 the helpers, and the numbers it prints are the cost of each. To fly or render
@@ -39,8 +43,14 @@ WALL_H, WALL_T = 4.5, 0.34
 LAUNCH = (0.0, -12.0, 0.0)  # x, y; the ground's own height there is the third number
 
 
-def build(out, yard_amplitude=0.15):
+def build(out, yard_amplitude=0.15, light_cm=None, dressed=True):
+    """`light_cm` asks for baked light at that many centimetres a texel, to
+    see the decals lit by the atlas (`cargo xtask maps --bake` on a copy).
+    `dressed=False` leaves out the decals and the blend (the yard is all
+    grass), to measure what they cost."""
     m = MapBuilder(os.path.join(here, "..", "..", "materials.toml"))
+    if light_cm is not None:
+        m.lightmap(light_cm)
     cost = {}
 
     # ---------- the yard ----------
@@ -72,20 +82,13 @@ def build(out, yard_amplitude=0.15):
         m.solid(f"far_ground_{tag}", g.heightfield_mesh(*rect, 2.0, low), None, "grass_weeds", "trimesh")
 
     # ---------- the grass-to-dirt boundary ----------
-    # Dirt on the north (left of a line running east), grass to the south. The
-    # weights are for the vertex-colour blend of #321; until it merges the
-    # picture draws each triangle in the material its corners weigh most for,
-    # which shows the shape of the edge at the triangle's size.
-    edge = WanderingEdge([(-16.0, -7.0), (16.0, -7.5)], seed=5, wander=1.8, band=0.6, wavelength=6.0)
+    # Dirt on the north (left of a line running east), grass to the south: one
+    # ground, the dirt showing through the grass as much as each corner's
+    # weight says (the vertex-colour blend, #321).
+    edge = WanderingEdge([(-16.0, -7.0), (16.0, -7.5)], seed=5, wander=1.8, band=1.6, wavelength=6.0)
     weights = edge.weights(ground_mesh[0])
-    grass, dirt = [], []
-    for face in ground_mesh[1]:
-        (grass if sum(weights[i] for i in face) / 3.0 < 0.5 else dirt).append(face)
-    for name, faces, material in (("yard_grass", grass, "grass_weeds"), ("yard_dirt", dirt, "ground_dirt_rubble")):
-        used = sorted({i for f in faces for i in f})
-        remap = {old: new for new, old in enumerate(used)}
-        mesh = ([ground_mesh[0][i] for i in used], [tuple(remap[i] for i in f) for f in faces])
-        m.solid(name, mesh, None, material, "trimesh")
+    blend = ("ground_dirt_rubble", weights) if dressed else None
+    yard_ground = m.solid("yard", ground_mesh, None, "grass_weeds", "trimesh", blend=blend)
 
     # ---------- the floor ----------
     floor = Ground(
@@ -95,7 +98,7 @@ def build(out, yard_amplitude=0.15):
     )
     floor_rect = (x0, y0, x1, y1)
     floor_mesh = floor.mesh(floor_rect, 0.35)
-    m.solid("hall_floor", floor_mesh, None, "concrete_floor_worn", "trimesh")
+    hall_floor = m.solid("hall_floor", floor_mesh, None, "concrete_floor_worn", "trimesh")
     cost["hall floor, 0.35 m grid"] = (odcut.triangle_count(floor_mesh), (x1 - x0) * (y1 - y0))
 
     # ---------- the south wall ----------
@@ -106,7 +109,7 @@ def build(out, yard_amplitude=0.15):
     ]
     wall = broken_wall(14.0, WALL_H, WALL_T, seed=2, openings=ops, bulge=0.03, lean=0.05, ledge=0.004)
     pose = wall.pose(wall_p0, wall_p1, 0.0)
-    m.solid("south_wall", wall.mesh, pose, "brick_red_weathered", "none")
+    south_wall = m.solid("south_wall", wall.mesh, pose, "brick_red_weathered", "none")
     m.wall("south_wall_solid", wall_p0, wall_p1, 0.0, WALL_H, WALL_T, "brick_red_weathered",
            openings=wall.collision_openings(), collision_only=True)
     # The wall's own y runs to the south, so a brick at y > 0 is outside, on the yard.
@@ -118,6 +121,29 @@ def build(out, yard_amplitude=0.15):
     flat_wall = broken_wall(14.0, WALL_H, WALL_T, seed=2, openings=ops, bulge=0.03, lean=0.05, ledge=0.0)
     cost["  the same with no ledges"] = (odcut.triangle_count(flat_wall.mesh), 14.0 * WALL_H)
     cost["  bricks that fell out (3 openings)"] = (sum(odcut.triangle_count(b) for b in bricks), 14.0 * WALL_H)
+
+    # ---------- decals (#321) ----------
+    # The south wall's outside faces south. Water has run down from a sill east
+    # of the window and from cracks near the top; moss grows at the foot, on
+    # the ground and up the wall at once (each strip faces out of the corner,
+    # half up and half south), overlapping its neighbours and the stains.
+    south, up = (0.0, -1.0, 0.0), (0.0, 0.0, 1.0)
+    if dressed:
+        m.decal("stain_sill", "decal_stain", [south_wall], (5.9, y0, 1.6), south, up, (1.2, 2.4), layer=0, depth=1.0)
+        m.decal("stain_crack", "decal_stain", [south_wall], (-5.6, y0, 2.6), south, up, (1.4, 2.6), layer=0, depth=1.0)
+        m.decal("stain_door", "decal_stain", [south_wall], (2.5, y0, 2.9), south, up, (1.0, 1.6), layer=1, depth=1.0)
+        # The picture's thick bottom third lies on the ground and the rest climbs
+        # the wall: its middle is a little up the corner's diagonal from the foot.
+        corner = (0.0, -1.0, 1.0)  # out of the corner where the wall meets the ground
+        for k, x in enumerate((6.1, 4.9, 3.7, -1.0, -2.0, -5.0, -6.2)):
+            foot = yard.height(x, y0 - 0.25)
+            m.decal("moss_foot", "decal_moss", [south_wall, yard_ground], (x, y0 + 0.04, foot + 0.24), corner, up,
+                    (1.5, 1.4), layer=1 + k % 2, depth=1.4)
+        # On the hall floor: a damp patch round the dip, another overlapping it, and
+        # a rust stain across both.
+        m.decal("damp_dip", "decal_damp", [hall_floor], (2.0, 0.5, 0.0), up, (0.0, 1.0, 0.0), (3.2, 2.4), layer=0, depth=0.5)
+        m.decal("damp_seep", "decal_damp", [hall_floor], (3.4, 1.6, 0.0), up, (0.6, 1.0, 0.0), (1.8, 1.5), layer=1, depth=0.5)
+        m.decal("rust_floor", "decal_stain", [hall_floor], (2.9, 0.9, 0.0), up, (1.0, 0.3, 0.0), (1.0, 1.6), layer=2, depth=0.5)
 
     # The other three walls are plain boxes.
     m.wall("north_wall", (x0, y1), (x1, y1), 0.0, WALL_H, WALL_T, "brick_red_weathered")
@@ -158,7 +184,9 @@ if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     # `--yard-amplitude 0.6` exaggerates the ground, to see its shape.
     amplitude = float(argv[argv.index("--yard-amplitude") + 1]) if "--yard-amplitude" in argv else 0.15
-    builder, cost = build(argv[argv.index("--out") + 1], amplitude)
+    light_cm = float(argv[argv.index("--light-cm") + 1]) if "--light-cm" in argv else None
+    # `--plain` leaves out the decals and the blend, to measure their cost.
+    builder, cost = build(argv[argv.index("--out") + 1], amplitude, light_cm, dressed="--plain" not in argv)
     print("geometry-test:", builder.stats())
     for name, (tris, area) in cost.items():
         print(f"  {name}: {tris} triangles, {tris / area:.1f} a square metre")
