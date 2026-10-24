@@ -4151,6 +4151,7 @@ version = "0.1.0-alpha.0"
 dependencies = [
  "bevy",
  "flate2",
+ "libm",
  "opendrone-blackbox",
  "opendrone-flight-controller",
  "opendrone-input",
