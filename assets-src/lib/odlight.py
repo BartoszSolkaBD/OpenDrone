@@ -139,9 +139,17 @@ def flatten(meshes, texel_cm, margin=MARGIN, max_chart=DEFAULT_MAX_CHART):
     """Every mesh's charts, flattened and sized. `meshes` is a list of
     `(corners, triangles, cm)`, with `cm` the mesh's own centimetres per texel
     or None for the Map's `texel_cm`. A chart wider than `max_chart` texels is
-    scaled down to it, so a 2 km ground costs the same as a 50 m floor."""
+    scaled down to it, so a 2 km ground costs the same as a 50 m floor.
+
+    A mesh may carry a fourth number, `least` (#339): each of its charts is
+    then stretched to at least that many texels each way. The bake lights a
+    texel only where a triangle covers its middle, so a chart smaller than a
+    texel (a brick's face at 20 cm a texel) would be left black; the kit's
+    small things ask for 2."""
     out = []
-    for m, (corners, triangles, cm) in enumerate(meshes):
+    for m, mesh in enumerate(meshes):
+        corners, triangles, cm = mesh[:3]
+        least = mesh[3] if len(mesh) > 3 else None
         per_metre = 100.0 / (cm if cm is not None else texel_cm)
         for chart, normal in charts_of(corners, triangles):
             u, v = _frame(normal)
@@ -152,9 +160,12 @@ def flatten(meshes, texel_cm, margin=MARGIN, max_chart=DEFAULT_MAX_CHART):
             wm = max(p[0] for p in flat.values()) - u0
             hm = max(p[1] for p in flat.values()) - v0
             scale = min(per_metre, max_chart / max(wm, hm, 1e-9))
-            w = max(1, math.ceil(wm * scale - 1e-9))
-            h = max(1, math.ceil(hm * scale - 1e-9))
-            local = {i: ((p[0] - u0) * scale, (p[1] - v0) * scale) for i, p in flat.items()}
+            su = sv = scale
+            if least:
+                su, sv = max(scale, least / max(wm, 1e-9)), max(scale, least / max(hm, 1e-9))
+            w = max(1, math.ceil(wm * su - 1e-9))
+            h = max(1, math.ceil(hm * sv - 1e-9))
+            local = {i: ((p[0] - u0) * su, (p[1] - v0) * sv) for i, p in flat.items()}
             out.append(Chart(m, chart, local, w + 2 * margin, h + 2 * margin, scale))
     return out
 
@@ -210,7 +221,7 @@ def unwrap(meshes, texel_cm, margin=MARGIN, max_chart=DEFAULT_MAX_CHART, max_siz
     assert texel_cm > 0.0, "texel_cm is centimetres per texel, above zero"
     charts = flatten(meshes, texel_cm, margin, max_chart)
     width, height = pack(charts, max_size)
-    uvs = [[0.0] * (6 * len(t)) for _, t, _ in meshes]
+    uvs = [[0.0] * (6 * len(mesh[1])) for mesh in meshes]
     for c in charts:
         for t in c.triangles:
             tri = meshes[c.mesh][1][t]

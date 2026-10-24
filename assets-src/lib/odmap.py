@@ -91,6 +91,7 @@ class MapBuilder:
         self.launch = None
         self.light = None  # what `lightmap()` asked for
         self.light_cm = {}  # object name -> its own centimetres per texel
+        self.light_least = {}  # object name -> the fewest texels a chart of it spans each way
         self.light_result = None  # what the unwrap made, once exported
         self.shapes = {}  # object name -> (corners, triangles), as handed to Blender
         self.light_loops = {}  # object name -> its light coordinates, two numbers a triangle corner
@@ -130,7 +131,8 @@ class MapBuilder:
         assert self.light is None, "lightmap() is asked for once"
         self.light = {"texel_cm": float(texel_cm), "max_chart": max_chart, "max_size": max_size}
 
-    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None, blend=None):
+    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None, blend=None,
+              light_least=None):
         """Adds a shape: `mesh` is `(corners, faces)` from `odgeom`, in its own
         axes; `pose` puts it in the Map (None: it is there already).
         `light_cm` is the shape's own centimetres per texel in the light atlas,
@@ -138,7 +140,9 @@ class MapBuilder:
         weights)` shows a second material through this one: `weights` is one
         number from 0 (only `material`) to 1 (only `material_b`) for each
         corner of `mesh`, in its order, such as `WanderingEdge.weights`
-        gives."""
+        gives. `light_least` stretches each of the shape's charts in the atlas
+        to at least that many texels each way, so a small thing's faces are
+        lit and not left black (`odlight.flatten`)."""
         assert collider in COLLIDERS, collider
         corners, faces = g.placed(mesh, pose or g.Pose())
         triangles = g.triangulate(corners, faces, convex=collider == "convex")
@@ -181,6 +185,8 @@ class MapBuilder:
         self.shapes[ob.name] = (corners, triangles)
         if light_cm is not None:
             self.light_cm[ob.name] = float(light_cm)
+        if light_least is not None:
+            self.light_least[ob.name] = float(light_least)
         return ob
 
     def _blend(self, name, me, count, material_b, weights):
@@ -385,7 +391,10 @@ class MapBuilder:
             me = ob.data
             corners = [tuple(v.co) for v in me.vertices]
             triangles = [tuple(p.vertices) for p in me.polygons]
-            meshes.append((corners, triangles, self.light_cm.get(ob.name)))
+            if ob.name in self.light_least:
+                meshes.append((corners, triangles, self.light_cm.get(ob.name), self.light_least[ob.name]))
+            else:
+                meshes.append((corners, triangles, self.light_cm.get(ob.name)))
         uvs, size, info = odlight.unwrap(
             meshes, request["texel_cm"], max_chart=request["max_chart"], max_size=request["max_size"]
         )
