@@ -72,10 +72,10 @@ class Placement:
     """One kit item on the Map: its variant's parts turned, scaled and moved
     (`parts`, as `[(material, mesh)]`), where it is, and the rule that put it."""
 
-    def __init__(self, rule, kind, k, parts, at, yaw, support_low, sink):
+    def __init__(self, rule, kind, k, parts, at, yaw, lift, sink):
         self.rule, self.kind, self.k, self.parts = rule, kind, k, parts
         self.at, self.yaw = at, yaw
-        self.support_low = support_low  # its lowest corner's height above what is under it, before sinking
+        self.lift = lift  # how far its lowest corner was put above what is under it (a board on a pile), metres
         self.sink = sink  # how far it was then sunk, metres
 
     def corners(self):
