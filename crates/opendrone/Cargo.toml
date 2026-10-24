@@ -26,6 +26,8 @@ wgpu.workspace = true
 toml.workspace = true
 # Inflates a Map's light atlas, an OpenEXR picture the game reads itself.
 flate2.workspace = true
+# The sky's maths, the same on every computer (#315).
+libm.workspace = true
 
 # No `[lints] workspace = true` here: this crate may use `unsafe`, because
 # it talks to Bevy, SDL and the operating system (#15 §4). Every other crate forbids it.
