@@ -883,6 +883,244 @@ fn a_download_without_its_textures_is_refused_unless_asked_for() {
     assert!(out.contains("flat colours"), "{out}");
 }
 
+// ----- Every picture of a material ---------------------------------------------
+
+/// The pictures `cargo xtask package` carries from a texture's folder, read
+/// from the quoted names in `pub const PICTURES` of
+/// `crates/xtask/src/materials.rs`: the real list, not a copy of it.
+fn the_pictures() -> Vec<String> {
+    let source = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/materials.rs"))
+        .expect("xtask's material code");
+    let list = source
+        .split("pub const PICTURES")
+        .nth(1)
+        .expect("materials.rs has `pub const PICTURES`")
+        .split("];")
+        .next()
+        .unwrap();
+    let names: Vec<String> = list
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect();
+    assert!(!names.is_empty(), "names in {list}");
+    names
+}
+
+/// The five pictures of a surface drawn with roughness, occlusion and metal.
+const SURFACE_PICTURES: [&str; 5] = [
+    "diffuse.jpg",
+    "normal.jpg",
+    "roughness.jpg",
+    "ao.jpg",
+    "metallic.jpg",
+];
+
+/// A material library of two textures made from scratch: `rust`, drawn with
+/// its roughness, occlusion and metal pictures, and `moss`, a decal with a
+/// mask and a roughness picture.
+const THE_PICTURE_LIBRARY: &str = "\
+[materials.rust]
+texture = \"rust\"
+roughness_map = true
+ao_map = true
+metallic_map = true
+
+[materials.moss]
+texture = \"moss\"
+roughness_map = true
+
+[textures.rust]
+generator = \"rust\"
+seed = 1
+pixels = 512
+size = \"2 m\"
+
+[textures.moss]
+generator = \"moss\"
+seed = 1
+pixels = 512
+size = \"1 m\"
+";
+
+const PACKAGE_LINUX: [&str; 9] = [
+    "package",
+    "--game",
+    "built/opendrone",
+    "--os",
+    "linux",
+    "--name",
+    "x",
+    "--out",
+    "dist",
+];
+
+fn with_the_pictures_of(repo: &Repo, texture: &str, pictures: &[&str]) {
+    for picture in pictures {
+        repo.write(
+            &format!("assets-src/generated/{texture}/{picture}"),
+            &format!("{texture} {picture}"),
+        );
+    }
+}
+
+#[test]
+fn a_download_carries_every_picture_a_material_has_not_only_its_colour_and_normal_map() {
+    // Basis: Rule (#332, #320, #321): the game reads a material's roughness,
+    // occlusion and metal pictures and a decal's mask from its texture's
+    // folder, so a download without them would draw no decals and no
+    // roughness.
+    let repo = Repo::new("every-picture");
+    repo.with_the_games_files();
+    repo.write("assets-src/materials.toml", THE_PICTURE_LIBRARY);
+    with_the_pictures_of(&repo, "rust", &SURFACE_PICTURES);
+    with_the_pictures_of(
+        &repo,
+        "moss",
+        &["diffuse.jpg", "normal.jpg", "roughness.jpg", "mask.jpg"],
+    );
+    repo.track();
+    let (ok, out, err) = repo.run(&PACKAGE_LINUX);
+    assert!(ok, "{err}");
+    assert!(out.contains("2 textures (9 pictures)"), "{out}");
+    let entries = unpack(&repo.root.join("dist/OpenDrone-x-linux.tar.gz"));
+    let carried = |name: &str| entries.iter().any(|(n, _, _)| n == name);
+    for picture in &SURFACE_PICTURES {
+        let name = format!("OpenDrone-x-linux/assets-src/generated/rust/{picture}");
+        assert!(carried(&name), "{name}");
+    }
+    for picture in ["diffuse.jpg", "normal.jpg", "roughness.jpg", "mask.jpg"] {
+        let name = format!("OpenDrone-x-linux/assets-src/generated/moss/{picture}");
+        assert!(carried(&name), "{name}");
+    }
+    assert!(
+        !carried("OpenDrone-x-linux/assets-src/generated/moss/ao.jpg"),
+        "a picture a texture doesn't have isn't made up"
+    );
+}
+
+#[test]
+fn a_download_is_refused_when_a_material_asks_for_a_picture_its_texture_lacks() {
+    // Basis: Rule (#332): every material of the library finds the pictures it
+    // asks for in the download, or the build says which one is missing
+    // instead of drawing it without.
+    let repo = Repo::new("lost-picture");
+    repo.with_the_games_files();
+    repo.write("assets-src/materials.toml", THE_PICTURE_LIBRARY);
+    with_the_pictures_of(&repo, "rust", &SURFACE_PICTURES[..4]);
+    with_the_pictures_of(&repo, "moss", &["diffuse.jpg", "normal.jpg", "mask.jpg"]);
+    repo.track();
+    let (ok, _, err) = repo.run(&PACKAGE_LINUX);
+    assert!(!ok);
+    assert!(
+        err.contains("rust asks for metallic.jpg, which the texture rust doesn't have"),
+        "{err}"
+    );
+    assert!(
+        err.contains("moss asks for roughness.jpg, which the texture moss doesn't have"),
+        "{err}"
+    );
+    assert!(!err.contains("ao.jpg"), "{err}");
+}
+
+/// Copies a folder and everything in it.
+fn copy_folder(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let entry = entry.unwrap();
+        let target = to.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_folder(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), target).unwrap();
+        }
+    }
+}
+
+/// The files below a folder, by path from the folder, in name order.
+fn files_below(folder: &Path, from: &str) -> Vec<String> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(folder).unwrap() {
+        let entry = entry.unwrap();
+        let name = format!("{from}{}", entry.file_name().to_string_lossy());
+        if entry.file_type().unwrap().is_dir() {
+            files.extend(files_below(&entry.path(), &format!("{name}/")));
+        } else {
+            files.push(name);
+        }
+    }
+    files.sort();
+    files
+}
+
+#[test]
+fn the_download_of_the_real_material_library_carries_every_picture_its_materials_read() {
+    // Basis: Rule (#332): the committed library, as it stands, packages: each
+    // material finds the pictures it asks for, and every picture committed
+    // for a texture made from scratch (decal masks and roughness pictures
+    // among them) is in the download. Fetched textures, which a checkout may
+    // not have, are stood in for by two files each.
+    let real = repo_root();
+    let repo = Repo::new("real-library");
+    repo.with_the_games_files();
+    let library = fs::read_to_string(real.join("assets-src/materials.toml")).unwrap();
+    repo.write("assets-src/materials.toml", &library);
+    copy_folder(
+        &real.join("assets-src/generated"),
+        &repo.root.join("assets-src/generated"),
+    );
+    let doc: toml::Table = library.parse().unwrap();
+    for (name, texture) in doc["textures"].as_table().unwrap() {
+        if texture.get("generator").is_none() {
+            for picture in ["diffuse.jpg", "normal.jpg"] {
+                repo.write(&format!("assets-src/textures/{name}/{picture}"), "fetched");
+            }
+        }
+    }
+    repo.track();
+    let (ok, _, err) = repo.run(&PACKAGE_LINUX);
+    assert!(ok, "{err}");
+    let entries = unpack(&repo.root.join("dist/OpenDrone-x-linux.tar.gz"));
+    let committed = files_below(&real.join("assets-src/generated"), "");
+    assert!(
+        committed.iter().any(|f| f.ends_with("mask.jpg")),
+        "the decals' masks are committed: {committed:?}"
+    );
+    for file in &committed {
+        let name = format!("OpenDrone-x-linux/assets-src/generated/{file}");
+        assert!(
+            entries.iter().any(|(n, _, _)| n == &name),
+            "{name} is in the download"
+        );
+    }
+}
+
+#[test]
+fn the_game_reads_the_same_picture_names_a_download_carries() {
+    // Basis: Rule (#332): the list of pictures a download carries
+    // (`materials::PICTURES` in crates/xtask/src/materials.rs, read from that
+    // file here) and the names the game reads (map_drawing.rs) are two lists,
+    // and this keeps them one.
+    let source = fs::read_to_string(repo_root().join("crates/opendrone/src/map_drawing.rs"))
+        .expect("the game's drawing code");
+    let mut read: Vec<&str> = source
+        .split("folder.join(\"")
+        .skip(1)
+        .filter_map(|rest| rest.split('"').next())
+        .collect();
+    read.sort_unstable();
+    let mut carried = the_pictures();
+    carried.sort_unstable();
+    assert_eq!(read, carried);
+    // And the fixtures above cover each of them, so a picture added to the
+    // list needs a check of its own.
+    let mut covered: Vec<&str> = SURFACE_PICTURES.to_vec();
+    covered.push("mask.jpg");
+    covered.sort_unstable();
+    assert_eq!(covered, carried);
+}
+
 #[test]
 fn a_build_name_that_cannot_be_a_file_name_is_refused() {
     // Basis: Rule: the name goes into the zip's file name.
