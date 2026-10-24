@@ -72,6 +72,10 @@ _Avoid_: Props (a prop is a propeller), clutter, asset pack
 A rectangle or circle on a Map that the kit's rules leave empty, so a line the pilot flies stays open: an aisle, a Gap's approach, the Launch Spot's 3 m. An item with any corner in it is left out, and a heap is cut away at its edge.
 _Avoid_: Exclusion zone, no-spawn area
 
+**Relief**:
+The depth of a Map's surfaces made as real geometry by its script, not as a picture: ground and floors that rise and fall (ruts, potholes, a swell under a heap, a thick layer of crumbled plaster, worn patches round columns), brick walls laid brick by brick with sunken mortar and missing bricks, and roofs whose sheets buckle over a bent and broken frame. It keeps out of keep-clear zones as the kit does. How a script asks for it: [Building a Map](../building-a-map.md#relief-floors-walls-and-roofs-with-depth).
+_Avoid_: Displacement, terrain detail
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
