@@ -531,13 +531,27 @@ pub fn package(
     let manifest = materials::read(root)?;
     let mut missing = Vec::new();
     let mut textured = 0;
+    let mut pictures_shipped = 0;
+    let mut shipped: Vec<String> = Vec::new();
     for texture in &manifest.textures {
         let folder = texture.folder();
-        let pictures = ["diffuse.jpg", "normal.jpg"].map(|p| format!("{folder}/{p}"));
-        if pictures.iter().all(|p| root.join(p).is_file()) {
+        // Every picture the texture has goes into the download, not only the
+        // colour and the normal map: the game reads the roughness, occlusion,
+        // metal and decal-mask pictures from the same folder (#320, #321).
+        let have: Vec<String> = materials::PICTURES
+            .iter()
+            .map(|p| format!("{folder}/{p}"))
+            .filter(|p| root.join(p).is_file())
+            .collect();
+        if materials::PICTURES[..2]
+            .iter()
+            .all(|p| have.contains(&format!("{folder}/{p}")))
+        {
             textured += 1;
             if options.textures {
-                files.extend(pictures);
+                pictures_shipped += have.len();
+                shipped.extend(have.iter().cloned());
+                files.extend(have);
             }
         } else {
             missing.push(texture.name.clone());
@@ -549,6 +563,34 @@ pub fn package(
              Run `cargo xtask textures` first, or pass --no-textures.",
             missing.join(", ")
         ));
+    }
+    // Every material finds the pictures it asks for in the download.
+    if options.textures {
+        let lost: Vec<String> = manifest
+            .asked
+            .iter()
+            .filter_map(|a| {
+                let folder = manifest
+                    .textures
+                    .iter()
+                    .find(|t| t.name == a.texture)?
+                    .folder();
+                (!shipped.contains(&format!("{folder}/{}", a.picture))).then(|| {
+                    format!(
+                        "{} asks for {}, which the texture {} doesn't have",
+                        a.material, a.picture, a.texture
+                    )
+                })
+            })
+            .collect();
+        if !lost.is_empty() {
+            return Err(format!(
+                "the download would leave out pictures the material library asks for, so these \
+                 materials would be drawn without them:\n{}\n\
+                 Run `cargo xtask generate-textures` for a texture made from scratch.",
+                lost.join("\n")
+            ));
+        }
     }
     let icon = |path: &str| {
         fs::read(root.join(path))
@@ -616,14 +658,14 @@ pub fn package(
     };
 
     let textures_line = if options.textures {
-        format!("{textured} textures")
+        format!("{textured} textures ({pictures_shipped} pictures)")
     } else {
         "no textures (--no-textures): the Maps are drawn in flat colours".to_string()
     };
     Ok(format!(
         "{}: the game ({program_name}), {} files of Packs, Scenarios, licences and credits, and {textures_line}.",
         written.display(),
-        files.len() + 1 - if options.textures { 2 * textured } else { 0 },
+        files.len() + 1 - pictures_shipped,
     ))
 }
 
