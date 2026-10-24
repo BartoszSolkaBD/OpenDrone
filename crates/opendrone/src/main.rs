@@ -35,6 +35,7 @@ const MAPS: [(&str, &str); 4] = [
     ("bando", "opendrone/bando"),
     ("factory", "opendrone/factory"),
     ("flat-floor", "test/flat-floor"),
+    ("grass-field", "test/grass-field"),
 ];
 
 /// The screens `--screen` can open on, for a developer to look at one.
@@ -81,7 +82,8 @@ Launch; after that you land on the Hub, and FLY takes you to the Launch Spot.
                                   did, and read and write no settings file
   opendrone --map flat-floor      a developer command: fly at once over a grid
                                   floor with nothing to hit (a Test Map), with
-                                  no screens and no settings file
+                                  no screens and no settings file; --map
+                                  grass-field is the same over a field of grass
   opendrone --screenshot FILE.bmp [--seconds N] [--size WxH]
                                   a developer command: fly as usual, save the
                                   camera's picture after N seconds (5 if not

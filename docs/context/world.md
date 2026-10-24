@@ -68,6 +68,10 @@ _Avoid_: Dirt layer, grunge
 A loose thing on a Map that tells its history, built from shapes by the Map's script: a pallet, a bottle crate, a bottle, an oil drum, a bed frame, the bits of a crashed quad. A prop bigger than about 20 cm that a Quad can hit is solid; a smaller one is only drawn. Few strong groups of props, each placed for a reason, not an even sprinkle ([the lived-in places research](../research/lived-in-places.md), and how a script builds them: [Building a Map](../building-a-map.md#props)).
 _Avoid_: Clutter, set dressing, asset
 
+**Scatter**:
+Small plants the game grows over a Map's ground, thousands of them, each a real little mesh rather than part of the ground's picture: today grass, a clump of 6 to 12 blades. A ground part asks for it with a tag that names the plant, how many clumps a square metre and how tall; the game places the clumps when the Map is drawn, from a fixed seed, so the same Map always grows the same grass. Scatter is only drawn, never solid: a Quad flies through it. How a Map asks for it: [Building a Map](../building-a-map.md#grass).
+_Avoid_: Foliage, vegetation layer
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode

@@ -54,6 +54,7 @@ pub mod clock;
 pub mod decals;
 pub mod developer;
 pub mod drawing;
+pub mod grass;
 pub mod light_atlas;
 pub mod map_drawing;
 pub mod map_views;

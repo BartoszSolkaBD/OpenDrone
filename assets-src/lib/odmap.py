@@ -130,7 +130,8 @@ class MapBuilder:
         assert self.light is None, "lightmap() is asked for once"
         self.light = {"texel_cm": float(texel_cm), "max_chart": max_chart, "max_size": max_size}
 
-    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None, blend=None):
+    def solid(self, name, mesh, pose, material, collider, collision_only=False, light_cm=None, blend=None,
+              scatter=None):
         """Adds a shape: `mesh` is `(corners, faces)` from `odgeom`, in its own
         axes; `pose` puts it in the Map (None: it is there already).
         `light_cm` is the shape's own centimetres per texel in the light atlas,
@@ -138,7 +139,10 @@ class MapBuilder:
         weights)` shows a second material through this one: `weights` is one
         number from 0 (only `material`) to 1 (only `material_b`) for each
         corner of `mesh`, in its order, such as `WanderingEdge.weights`
-        gives."""
+        gives. `scatter=(kind, density, (shortest, tallest))` makes the shape
+        a ground that grows a plant, such as `("grass", 6, (0.12, 0.38))`:
+        clumps a square metre and their heights in metres (#338); the game
+        grows them on its upward-facing triangles."""
         assert collider in COLLIDERS, collider
         corners, faces = g.placed(mesh, pose or g.Pose())
         triangles = g.triangulate(corners, faces, convex=collider == "convex")
@@ -177,6 +181,11 @@ class MapBuilder:
             ob["od_collision_only"] = 1
         if blend is not None:
             ob["od_blend"] = blend[0]
+        if scatter is not None:
+            kind, density, (shortest, tallest) = scatter
+            ob["od_scatter"] = kind
+            ob["od_scatter_density"] = float(density)
+            ob["od_scatter_height"] = [float(shortest), float(tallest)]
         self.objects.append((ob, collider, collision_only))
         self.shapes[ob.name] = (corners, triangles)
         if light_cm is not None:

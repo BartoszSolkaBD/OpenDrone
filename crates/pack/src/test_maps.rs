@@ -14,6 +14,8 @@ use opendrone_maths::functions::sin_cos;
 use opendrone_maths::{Attitude, Vec3};
 use opendrone_physics::MapShape;
 
+use crate::glb::{DrawnPart, Scatter, ScatterKind};
+
 /// One Test Map.
 pub(crate) struct TestMap {
     /// Its id after `test/`.
@@ -33,6 +35,12 @@ pub(crate) const TEST_MAPS: &[TestMap] = &[
     TestMap {
         name: "flat-floor",
         text: include_str!("../test-maps/flat-floor.toml"),
+        shapes: || vec![ground()],
+    },
+    TestMap {
+        name: "grass-field",
+        text: include_str!("../test-maps/grass-field.toml"),
+        // The grass is only drawn: a Quad flies through it (#338).
         shapes: || vec![ground()],
     },
     TestMap {
@@ -118,6 +126,77 @@ const RAIL_DIAMETER: f64 = 0.06;
 const REBAR_DIAMETER: f64 = 0.03;
 /// How many flat sides a round rail has.
 const RAIL_SIDES: u32 = 16;
+
+/// What a Test Map draws, by its name: nothing, so it is drawn from its solid
+/// parts, except the grass field (#338), whose ground is drawn as a Map's
+/// `.glb` would draw it, with its grass.
+pub(crate) fn test_map_drawing(name: &str) -> Vec<DrawnPart> {
+    if name != "grass-field" {
+        return Vec::new();
+    }
+    let field = GRASS_FIELD / 2.0;
+    let edge = 100.0;
+    // The Skate Park's plain grass and dirt: the materials that break their
+    // repeat need a Map with baked light, as the Factory's have.
+    let mut parts = vec![sheet(
+        "field",
+        "grass",
+        [0.16, 0.26, 0.09, 1.0],
+        [-field, -field, field, field],
+        Some(Scatter {
+            kind: ScatterKind::Grass,
+            density: GRASS_FIELD_DENSITY,
+            height: [0.12, 0.38],
+        }),
+    )];
+    // Bare dirt round it, to the ground's edge.
+    for (name, rect) in [
+        ("dirt_south", [-edge, -edge, edge, -field]),
+        ("dirt_north", [-edge, field, edge, edge]),
+        ("dirt_west", [-edge, -field, -field, field]),
+        ("dirt_east", [field, -field, edge, field]),
+    ] {
+        parts.push(sheet(name, "dirt", [0.36, 0.27, 0.19, 1.0], rect, None));
+    }
+    parts
+}
+
+/// The grass field's side, in metres: a square, its middle the origin.
+pub const GRASS_FIELD: f32 = 100.0;
+
+/// How many clumps of grass grow on a square metre of the grass field.
+pub const GRASS_FIELD_DENSITY: f32 = 6.0;
+
+/// A flat sheet at 0 m over `[west, south, east, north]`, facing up, its
+/// picture 2 m a repeat, as a Map's script lays a material's picture.
+fn sheet(
+    name: &str,
+    material: &str,
+    colour: [f32; 4],
+    [west, south, east, north]: [f32; 4],
+    scatter: Option<Scatter>,
+) -> DrawnPart {
+    let corners = vec![
+        [west, south, 0.0],
+        [east, south, 0.0],
+        [east, north, 0.0],
+        [west, north, 0.0],
+    ];
+    let uvs = corners.iter().map(|c| [c[0] / 2.0, -c[1] / 2.0]).collect();
+    DrawnPart {
+        name: name.to_string(),
+        material: material.to_string(),
+        colour,
+        corners,
+        uvs,
+        light_uvs: Vec::new(),
+        // Anticlockwise seen from above: the sheet faces up.
+        triangles: vec![[0, 1, 2], [0, 2, 3]],
+        decal: None,
+        blend: None,
+        scatter,
+    }
+}
 
 /// The ground every Test Map but empty air stands on: a slab 200 m square and
 /// 2 m thick, its top at 0 m.

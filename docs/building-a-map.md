@@ -616,6 +616,39 @@ A decal costs a triangle for each triangle of the surface under it, so the same 
 
 **A trap.** A decal whose `wetness` is more than 0 adds the sky's sheen where its mask is only partly whole, which on a sunlit wall shows as pale streaks. So the dry decals (`decal_runs`, `decal_rust_bleed`) ask for no wetness; the ones that should look wet (algae, oil) keep theirs.
 
+## Grass
+
+A ground can grow **real grass**: thousands of small clumps of blades, each a little mesh of its own with depth, over the ground's own picture, which still shows between them and takes over in the distance. The Skate Park and Bando grow none, so they, and their render counts, don't change.
+
+![A field of grass seen from 1 m up: clumps of thin blades, green with some dry ones, leaning and curving, thinning out towards the horizon where the ground's picture takes over](images/grass.jpg)
+
+![The same field through the Analog Video Look from 1.2 m up: a thick, uneven sward](images/grass-analog.jpg)
+
+```python
+field = m.solid("yard", yard.mesh((-50, -50, 50, 50), 1.0), None, "grass_weeds", "trimesh",
+                scatter=("grass", 6, (0.12, 0.38)))     # 6 clumps a square metre, 12 to 38 cm tall
+```
+
+- **In the script.** `scatter=(kind, density, (shortest, tallest))` on `MapBuilder.solid` (and so on any shape made with it): the plant (`"grass"` is the one there is), how many clumps grow on a square metre (0.1 to 20), and the shortest and tallest clump in metres. Only the shape's triangles that face up (no steeper than 50°) grow anything, so a slab's sides and a wall don't.
+- **In the `.glb`.** The object carries `od_scatter`, `od_scatter_density` and `od_scatter_height` (two numbers). The [Pack checker](verification/checking-a-pack.md#what-the-glb-holds) refuses a plant it doesn't know, numbers out of range, one tag without the others, and grass on a decal or on a part that is never drawn.
+- **What the game grows.** When the Map is drawn, the game places the clumps over the tagged triangles at random, from a fixed seed and the object's name, so the same Map always grows the same grass, on every run and every computer. A clump has 6 to 12 blades, each two segments and a tip (three triangles), that lean out from its middle and curve over, of its own height between the two the tag gives, its own green (about one in six is drier, nearer straw) and its own width. Blades are darker near the root, where the clump shades itself.
+- **How it is drawn.** The clumps on each 8 m square of ground (a cell) are put together into one mesh and drawn at once, so a field is a couple of hundred draws, not one for each clump. Each clump has a rank from 0 to 1, and the shader draws only the clumps whose rank is under the share kept at their distance from the camera: all of them up to 15 m, then fewer, about as many as one over the distance, and none from 60 m. A clump about to go shrinks into the ground first, so there is no line where the grass stops. A cell further than 60 m from the camera isn't drawn at all. The numbers are in [`grass.rs`](../crates/opendrone/src/grass.rs) and the shader has the same ones; a readable check holds the two in step.
+- **Light.** A clump is lit as the ground it stands on is. On a Map with [baked light](#baked-light), every corner of a clump reads the atlas at the clump's root, because the atlas can't hold the blades themselves; on a Map without, the sun and the sky light it as they light the ground, and the sun's shadows fall on it. Grass casts no shadows.
+- **Wind.** The shader sways the blades a little, more at the tip: slow gusts that roll across the field, so neighbours sway together, with a quick flutter of each clump's own.
+- **Not in the way.** Grass is never solid: a Quad flies straight through it, and it changes nothing the Simulation sees, so no Scenario and no fingerprint moves.
+- **Seeing it.** The Test Map `test/grass-field` is the ground with a field of grass 100 m square in its middle and bare dirt round it: `cargo run --release -p opendrone -- --map grass-field` flies over it, and `--render-views` draws it (the pictures above are its 1 m view and a Video Look one).
+
+**What it costs.** Grass is memory as well as drawing: a clump is about 45 corners of 32 bytes, so the grass field's 60,000 clumps are about 90 MB in the graphics card, and a ground grows its clumps when the Map is drawn, which takes a moment on a big field. On the maintainer's M4 Mac mini, in a release build, with the picture 2560 × 1440 and `--camera-cost` counting the frames in 4 s (the whole frame, CPU and GPU) from the grass field's Launch Spot, a Quad landed in the grass in the middle of the field (the heaviest place: grass all round, right up to the lens), the field draws 723 to 724 frames in the Analog Look against 876 to 935 with the grass switched off, 5.5 ms a frame against 4.3 to 4.6 (about +1 ms), and 851 to 852 in the Digital Look against 1061 to 1143, 4.7 ms against 3.5 to 3.8. From the middle, about 24,000 of the field's 60,000 clumps are kept by distance, all round; the view's own edges leave roughly a third of those on the screen. How far a field reaches doesn't change the cost much, as nothing past 60 m is drawn: a yard of 150 × 100 m costs about what this field costs from its middle.
+
+### Adding a kind of plant
+
+Tall weeds, nettles or reeds are a second kind, alongside grass. To add one:
+
+1. **The tag.** Add its word to `SCATTER_KINDS` and a variant to `ScatterKind` in [`crates/pack/src/glb.rs`](../crates/pack/src/glb.rs), and a row to the `od_scatter` line of [Checking a Pack](verification/checking-a-pack.md#what-the-glb-holds).
+2. **Its look.** In [`grass.rs`](../crates/opendrone/src/grass.rs), give the kind its own blade shape and colours where `clumps_mesh` makes a clump (taller, fewer and wider blades for weeds, perhaps more segments), choosing by the kind. Cells are already kept apart by kind, so each kind is drawn with its own meshes.
+3. **Its distances.** A taller plant reads from further off: if it needs its own draw distance, give its cells their own material with the distances as numbers in the shader's uniform (now only the wind is), and keep `keep` in step.
+4. **Its density.** A Map asks for a sparser kind by its own `od_scatter_density`, as low as 0.1 a square metre.
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers', the decals' and the wear rules'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.

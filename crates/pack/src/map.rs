@@ -12,7 +12,7 @@ use opendrone_physics::{MapShape, World};
 use crate::document::{Document, FORMAT, Item, Problems};
 use crate::glb::{DrawnPart, LaunchSpot};
 use crate::migration::{self, FileKind, PACK_STEPS, Step};
-use crate::test_maps::TEST_MAPS;
+use crate::test_maps::{TEST_MAPS, test_map_drawing};
 use crate::units::{self, Dimension};
 
 /// A checked Map: what the Simulation receives from it.
@@ -123,6 +123,7 @@ pub fn test_map(name: &str) -> Option<Result<MapDefinition, Problems>> {
         )
         .map(|definition| MapDefinition {
             shapes: (map.shapes)(),
+            drawing: test_map_drawing(map.name),
             ..definition
         })
     })

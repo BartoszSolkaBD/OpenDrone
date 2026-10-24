@@ -25,6 +25,7 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
+use crate::grass::{GrassPlugin, draw_the_grass};
 use crate::map_drawing::{
     Blended, MapLighting, MaterialLibrary, Surface, part_mesh, part_mesh_coloured, read_light_atlas,
 };
@@ -60,7 +61,7 @@ pub struct QuadDrawing;
 
 /// Marks everything the flight's world is drawn with: the Map, the Quad and
 /// the lights. They go together when the world does.
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct InTheWorld;
 
 /// Whether the flight's world (the Map, the Quad, its camera and the sun) is
@@ -109,7 +110,7 @@ pub struct DrawingPlugin;
 
 impl Plugin for DrawingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(RepeatBreakingPlugin)
+        app.add_plugins((RepeatBreakingPlugin, GrassPlugin))
             .init_resource::<View>()
             .init_resource::<WorldDrawing>()
             .insert_resource(ClearColor(Color::srgb(0.55, 0.7, 0.9)))
@@ -319,6 +320,20 @@ fn draw_the_map_from_its_file(
         repeat_broken,
         surface_pictures
     );
+    // Grass (#338): grown from the parts tagged with it, after the rest.
+    let grassy: Vec<_> = plan
+        .map
+        .drawing
+        .iter()
+        .filter(|p| p.scatter.is_some())
+        .cloned()
+        .collect();
+    if !grassy.is_empty() {
+        let atlas = baked
+            .as_ref()
+            .map(|(atlas, lighting)| (atlas.clone(), lighting.lightmap_exposure));
+        commands.queue(move |world: &mut World| draw_the_grass(world, grassy, atlas, InTheWorld));
+    }
     if decals + blends + undrawn > 0 {
         info!(
             "{} has {decals} decals and {blends} parts with a second material blended in",
@@ -508,7 +523,8 @@ fn triangle_mesh(corners: &[Vec3d], triangles: &[[u32; 3]]) -> Mesh {
 /// A Test Map's floor gets a grid: a line every metre, and a brighter one
 /// every 10 m, over its whole 200 m.
 fn draw_the_grid(plan: Res<FlightPlan>, mut gizmos: Gizmos) {
-    if !plan.map.id.starts_with("test/") {
+    // A Test Map that draws its own ground, the grass field (#338), has none.
+    if !plan.map.id.starts_with("test/") || !plan.map.drawing.is_empty() {
         return;
     }
     let floor = Isometry3d::new(Vec3::new(0.0, 0.002, 0.0), Quat::from_rotation_x(FRAC_PI_2));

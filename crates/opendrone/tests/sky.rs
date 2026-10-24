@@ -322,6 +322,7 @@ fn plan(light: Option<MapLight>, atlas: Option<PathBuf>) -> FlightPlan {
         triangles: vec![[0, 1, 2], [0, 2, 3]],
         decal: None,
         blend: None,
+        scatter: None,
     }];
     plan.map.light = light;
     plan.map.light_atlas = atlas;
