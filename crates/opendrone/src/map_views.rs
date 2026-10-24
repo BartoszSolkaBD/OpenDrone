@@ -29,7 +29,9 @@ use crate::camera::look::VideoLook;
 use crate::camera::render::FpvDisplay;
 use crate::developer::{OutputPicture, draw_into_an_image};
 use crate::drawing::{QuadDrawing, WorldDrawing, point};
+use crate::rotors::RotorsShown;
 use crate::set_up::FlightPlan;
+use crate::sound::top_speed_and_current;
 
 /// The size of a picture when `--size` doesn't say: 4:3, the shape of the
 /// FPV Camera's own picture, which a Video Look fills.
@@ -67,6 +69,11 @@ pub struct ViewRequest {
     pub pitch: Option<f64>,
     /// The FOV in degrees across the picture's diagonal.
     pub fov: Option<f64>,
+    /// How fast the Quad's rotors turn in the picture, as a share of a
+    /// motor's top speed from 0 (at rest) to 1 (full throttle), whatever the
+    /// Simulation's motors do. `None`: the Simulation's own, which on the
+    /// Launch Spot is at rest.
+    pub rotors: Option<f64>,
     pub kind: Kind,
 }
 
@@ -81,9 +88,18 @@ pub struct ResolvedView {
     pub direction: Vec3d,
     /// In degrees across the picture's diagonal.
     pub fov: f64,
+    /// How fast every rotor turns in the picture, in rad/s, instead of the
+    /// Simulation's motors' speeds.
+    pub rotor_speed: Option<f64>,
 }
 
-const KEYS: [&str; 7] = ["name", "at", "toward", "heading", "pitch", "fov", "look"];
+/// The length of a frame the rotors' blades are judged by when a picture is
+/// saved offline, in seconds: the 60 Hz picture a pilot would see.
+pub const SAVED_FRAME_TIME: f64 = 1.0 / 60.0;
+
+const KEYS: [&str; 8] = [
+    "name", "at", "toward", "heading", "pitch", "fov", "look", "rotors",
+];
 
 impl ViewRequest {
     /// A view that asks for nothing: the Quad's camera on the Launch Spot,
@@ -96,6 +112,7 @@ impl ViewRequest {
             heading: None,
             pitch: None,
             fov: None,
+            rotors: None,
             kind: Kind::Plain,
         }
     }
@@ -138,6 +155,15 @@ impl ViewRequest {
                     view.pitch = Some(pitch);
                 }
                 "fov" => view.fov = Some(number(key, value)?),
+                "rotors" => {
+                    let share = number(key, value)?;
+                    if !(0.0..=1.0).contains(&share) {
+                        return Err(
+                            "rotors takes a share of full speed from 0 (at rest) to 1".to_string()
+                        );
+                    }
+                    view.rotors = Some(share);
+                }
                 _ => {
                     view.kind = match value {
                         "plain" => Kind::Plain,
@@ -220,6 +246,9 @@ impl ViewRequest {
             position,
             direction,
             fov,
+            rotor_speed: self.rotors.map(|share| {
+                share * top_speed_and_current(&plan.quad, plan.map.world.air_density).0
+            }),
         })
     }
 }
@@ -371,11 +400,21 @@ fn place_the_view(
     mut plain: Query<PlainParts, PlainOnly>,
     mut quads: Query<QuadParts, QuadOnly>,
     mounted: Query<&Transform, MountOnly>,
+    mut rotors: ResMut<RotorsShown>,
     mut commands: Commands,
 ) {
     let Some(view) = run.views.get(run.next) else {
         return;
     };
+    // The rotors' blades are judged by a pilot's 60 Hz frames, not by how
+    // fast this picture happens to be drawn.
+    let rotors_wanted = RotorsShown {
+        speed: view.rotor_speed,
+        frame_time: Some(SAVED_FRAME_TIME),
+    };
+    if *rotors != rotors_wanted {
+        *rotors = rotors_wanted;
+    }
     let Some(image) = picture.image.clone() else {
         return;
     };

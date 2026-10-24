@@ -24,6 +24,8 @@
 //!   thread, silent when there's no sound device (#74);
 //! - [`drawing`]: the Map and the Quad drawn from their solid parts, a grid
 //!   on a Test Map's floor, and the FPV Camera on the Quad's frame;
+//! - [`rotors`] (#319): the Quad's rotors turning in the picture, from each
+//!   motor's speed, as blades that fade into a blurred disc as they speed up;
 //! - [`camera`]: the FPV Camera (#66): the Quad's fisheye Lens, the Analog and
 //!   Digital Video Looks, Auto-exposure, Camera Tilt and FOV in flight, and
 //!   Digital's 15 ms late picture, all outside the Simulation;
@@ -56,6 +58,7 @@ pub mod map_views;
 pub mod pilot;
 pub mod reference;
 pub mod repeat_breaking;
+pub mod rotors;
 pub mod save;
 pub mod screens;
 pub mod set_up;
@@ -77,6 +80,7 @@ use bevy::window::PresentMode;
 use crate::camera::CameraPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pilot::{KeyboardPlugin, Pilot, PilotPlugin};
+use crate::rotors::RotorsPlugin;
 use crate::screens::{Screens, ScreensPlugin, ViewPlugin};
 use crate::set_up::FlightPlan;
 use crate::sound::SoundPlugin;
@@ -140,6 +144,7 @@ fn window_game(plan: FlightPlan, pilot: Pilot, flight: Flight) -> App {
         PilotPlugin,
         KeyboardPlugin,
         DrawingPlugin,
+        RotorsPlugin,
         CameraPlugin,
         StatusPlugin,
         SoundPlugin,

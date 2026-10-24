@@ -110,8 +110,11 @@ Launch; after that you land on the Hub, and FLY takes you to the Launch Spot.
                                   look=digital: name, at (east,north,up in
                                   metres), toward (a point) or heading and
                                   pitch (degrees), fov (degrees across the
-                                  picture's diagonal) and look (plain, analog
-                                  or digital). What a view leaves out is the
+                                  picture's diagonal), look (plain, analog
+                                  or digital) and rotors (0 to 1: how fast
+                                  the Quad's rotors turn, as a share of full
+                                  speed; the Simulation's motors if left
+                                  out). What a view leaves out is the
                                   Quad's camera on the Launch Spot. --views
                                   reads one view a line. With none, one view
                                   from the Launch Spot. The picture is

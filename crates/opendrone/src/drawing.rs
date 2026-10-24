@@ -1,6 +1,6 @@
 //! Drawing the flight: the Map from its solid parts, a grid on a Test Map's
-//! floor, the Quad from its collision shapes, and the FPV Camera bolted to
-//! its frame ([`crate::camera`] makes its picture).
+//! floor, the Quad from its collision shapes (its rotors turn: [`crate::rotors`]),
+//! and the FPV Camera bolted to its frame ([`crate::camera`] makes its picture).
 //!
 //! The Simulation counts in 64-bit numbers, east, north and up from the
 //! Map's origin; the picture is drawn in 32-bit numbers, in Bevy's axes:
@@ -26,6 +26,7 @@ use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
 use crate::map_drawing::{MapLighting, MaterialLibrary, Surface, part_mesh, read_light_atlas};
 use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
+use crate::rotors::RotorParts;
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::stepping::Flight;
 
@@ -156,6 +157,7 @@ fn draw_the_world(
         &mut commands,
         &mut meshes,
         &mut materials,
+        &mut images,
         *view,
     );
     drawing.drawn = true;
@@ -446,6 +448,7 @@ fn draw_the_quad(
     commands: &mut Commands,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    images: &mut Assets<Image>,
     view: View,
 ) {
     let shape = &plan.quad.parameters.shape;
@@ -456,12 +459,6 @@ fn draw_the_quad(
     });
     let pack = materials.add(StandardMaterial {
         base_color: Color::srgb(0.85, 0.65, 0.1),
-        ..default()
-    });
-    let props = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.25, 0.25, 0.27, 0.3),
-        alpha_mode: AlphaMode::Blend,
-        cull_mode: None,
         ..default()
     });
     let (_, state) = flight.drawn_between();
@@ -484,18 +481,18 @@ fn draw_the_quad(
             MeshMaterial3d(pack),
             Transform::from_translation(point(Vec3d::new(0.0, 0.0, shape.pack_height))),
         ));
-        let disc = meshes.add(Cylinder::new(
-            (shape.prop_diameter / 2.0) as f32,
-            PROP_DISC_THICKNESS as f32,
-        ));
-        for centre in motor_positions(shape) {
-            // Bevy's cylinders stand along their own up axis, so a disc lies
-            // flat in the props' plane as it is.
-            parts.spawn((
-                Mesh3d(disc.clone()),
-                MeshMaterial3d(props.clone()),
-                Transform::from_translation(point(centre)),
-            ));
+        let rotors = RotorParts::new(
+            shape.prop_diameter,
+            plan.quad.props.blades,
+            PROP_DISC_THICKNESS,
+            meshes,
+            images,
+        );
+        let turning = plan.quad.parameters.rotors.turning();
+        for (motor, centre) in motor_positions(shape).into_iter().enumerate() {
+            // Each rotor turns with its motor, as blades or, fast, a blurred
+            // disc, flat in the props' plane.
+            rotors.spawn(parts, materials, motor, turning[motor], point(centre));
             if let Some(rings) = shape.duct_rings {
                 let inside = rings.inside_diameter / 2.0;
                 let outside = inside + rings.wall;
