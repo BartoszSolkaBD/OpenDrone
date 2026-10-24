@@ -1,0 +1,11 @@
+# Written by `cargo xtask maps --bake decal-test`; never edit it by hand. It says what decal-test's
+# light atlas was baked from, so `maps --check` can tell when the atlas is out of date.
+atlas = "decal-test.light.exr"
+glb_sha256 = "4befa9a9ed1bfe7bf114acd3ce9a41fb3748275d805dda91bb43f01cbe828a0e"
+light_sha256 = "dce9ebf83bac07f6d22db21a41358924d734f05049e00327f3a415b4264b8e42"
+texel_cm = 25.0
+width = 256
+height = 1624
+samples = 1024
+bounces = 6
+bake_seconds = 24.1

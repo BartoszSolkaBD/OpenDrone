@@ -1,0 +1,18 @@
+# Throwaway test Map for #321: never committed.
+format      = 1
+name        = "Decal plain"
+description = "The geometry demo with decals and blended ground, baked."
+model       = "decal-plain.glb"
+preview     = "preview.png"
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+[light]
+sun_elevation = "38 °"
+sun_azimuth   = "200 °"
+sun_colour    = "#fff2d6"
+sun_strength  = "1.5"
+sky_colour    = "#a5c4f0"
+sky_strength  = "0.5"

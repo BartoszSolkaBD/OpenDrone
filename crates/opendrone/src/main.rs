@@ -30,7 +30,9 @@ const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
 
 /// The Maps `--map` takes, with the id each means. The Test Map `flat-floor`
 /// is a developer's: it flies at once, with no screens and nothing saved.
-const MAPS: [(&str, &str); 3] = [
+const MAPS: [(&str, &str); 5] = [
+    ("decal-plain", "opendrone/decal-plain"), // TEMP #321
+    ("decal-test", "opendrone/decal-test"), // TEMP #321
     ("skate-park", "opendrone/skate-park"),
     ("bando", "opendrone/bando"),
     ("flat-floor", "test/flat-floor"),
