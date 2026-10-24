@@ -89,6 +89,7 @@ The Test Maps are simple Maps built into the code for Scenarios only, each with 
 |---|---|
 | `test/empty-air` | Nothing: no floor, no walls. |
 | `test/flat-floor` | The ground. |
+| `test/grass-field` | The ground, drawn with a field of grass 100 m square in its middle and bare dirt round it ([Grass](../building-a-map.md#grass)). The grass is only drawn, so it flies as the flat floor does; it is there for seeing and timing the grass. |
 | `test/wall` | The ground and a wall 20 m wide, 5 m tall and 0.2 m thick, its face 5 m east, facing west. |
 | `test/thin-rail` | The ground, a round rail 6 cm across running north–south at 3 m east, 1 m up, from 5 m south to 5 m north, and a rebar stub 3 cm across standing 2 m tall at 3 m east, 10 m north: the alpha Maps' thinnest parts. |
 | `test/floor-and-ceiling` | A floor and a concrete ceiling 3.1 m above it, as on the Bando's floors: the floor a sheet at 0 m, the ceiling a slab from 3.1 m to 3.3 m, both triangle meshes 40 m square. |

@@ -1,0 +1,12 @@
+# The built-in Test Map test/grass-field (#338): the ground, with a grassy
+# field 100 m square in its middle, for seeing and timing the game's grass.
+# Built into the code (crates/pack/src/test_maps.rs, which also holds its
+# solid parts and its drawn ground); `cargo xtask migrate` rewrites it like
+# any Pack file.
+format      = 1
+name        = "Grass field"
+description = "The ground, 200 m square, with a field of grass 100 m square in its middle. The grass is only drawn: nothing to hit."
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
