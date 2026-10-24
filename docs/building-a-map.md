@@ -155,6 +155,7 @@ A view is a line of `key=value` words, and every key is optional:
 | `pitch` | how far to look up, in degrees: -90 straight down, 90 straight up | the Quad's Camera Tilt |
 | `fov` | the FOV in degrees across the picture's diagonal, as the game's FOV is measured | the Quad's own FOV in a Video Look, 110 in a plain view |
 | `look` | `plain`, `analog` or `digital` | `plain` |
+| `rotors` | how fast the Quad's rotors turn in the picture, from 0 (at rest) to 1 (a motor's top speed): 0 shows the blades standing still, about 0.5 a hover's blurred disc, and a very small number such as 0.002 the blades turning ([the Quad's rotors](context/camera.md#the-quads-rotors-in-the-picture)) | the Simulation's motors, which are at rest on the Launch Spot |
 
 `toward` doesn't go with `heading` or `pitch`. With no view at all, you get one plain view from the Launch Spot, which is what the Quad's camera sees there. The FOV runs from 90° to 170° in a Video Look, as it does in the game, and from 20° to 170° in a plain view.
 
