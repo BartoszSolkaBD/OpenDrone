@@ -114,11 +114,14 @@ pub struct RepeatBreaker {
     // The base material's bindings are 0 to 99.
     #[uniform(100)]
     pub settings: BreakerSettings,
+    /// Every picture but `wide` and `mask` is read through this one sampler:
+    /// they all repeat and filter alike, and a sampler each made 17 in the
+    /// fragment stage with the base material's, over the 16 a Mac allows
+    /// (#339).
     #[texture(101)]
     #[sampler(102)]
     pub diffuse: Handle<Image>,
     #[texture(103)]
-    #[sampler(104)]
     pub normal: Handle<Image>,
     #[texture(105)]
     #[sampler(106)]
@@ -126,17 +129,13 @@ pub struct RepeatBreaker {
     /// Red occlusion, green roughness, blue metal, packed by
     /// [`crate::surface_look::pack_surface`].
     #[texture(107)]
-    #[sampler(108)]
     pub surface: Option<Handle<Image>>,
     /// The second material's colour, normal map and surface picture (#321).
     #[texture(109)]
-    #[sampler(110)]
     pub blend_diffuse: Option<Handle<Image>>,
     #[texture(111)]
-    #[sampler(112)]
     pub blend_normal: Option<Handle<Image>>,
     #[texture(113)]
-    #[sampler(114)]
     pub blend_surface: Option<Handle<Image>>,
     /// A decal's mask: how much of it covers the surface under it (#321).
     #[texture(115)]

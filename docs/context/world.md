@@ -72,6 +72,14 @@ _Avoid_: Clutter, set dressing, asset
 Small plants the game grows over a Map's ground, thousands of them, each a real little mesh rather than part of the ground's picture: today grass, a clump of 6 to 12 blades. A ground part asks for it with a tag that names the plant, how many clumps a square metre and how tall; the game places the clumps when the Map is drawn, from a fixed seed, so the same Map always grows the same grass. Scatter is only drawn, never solid: a Quad flies through it. How a Map asks for it: [Building a Map](../building-a-map.md#grass).
 _Avoid_: Foliage, vegetation layer
 
+**Kit**:
+The loose things a Map's script lays on its floors and yards, made from scratch and solid, not pictures: bricks and brick chunks, concrete lumps with rebar, plaster chips, roof-sheet pieces, planks, boards and pallets, pipes, drums, cable, a tyre, cans and bottles, and the bolt plates and anchor stubs left in a hall floor. Each **kit item** has a few variants, and rules scatter them from a seed: a heap of rubble, debris along a wall's foot, a strewn floor, a row of bolt plates on an old column line, piles of pallets and boards. How a script asks for it: [Building a Map](../building-a-map.md#the-kit-and-the-scatter).
+_Avoid_: Props (a prop is a propeller), clutter, asset pack
+
+**Keep-clear zone**:
+A rectangle or circle on a Map that the kit's rules leave empty, so a line the pilot flies stays open: an aisle, a Gap's approach, the Launch Spot's 3 m. An item with any corner in it is left out, and a heap is cut away at its edge.
+_Avoid_: Exclusion zone, no-spawn area
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
