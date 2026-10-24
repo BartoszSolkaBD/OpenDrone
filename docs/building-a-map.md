@@ -357,7 +357,7 @@ The Factory ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)) is 
 
 | | The Factory as it ships |
 |---|---|
-| Frame | 9.7 ms a frame in Analog and 9.1 ms in Digital (`--camera-cost --seconds 10`, 2560 × 1440, release build, the M4 Mac mini), against 4.8 ms and 4.1 ms for Bando on the same build |
+| Frame | 9.7 ms a frame in Analog and 9.1 ms in Digital (`--camera-cost --seconds 10`, 2560 × 1440, release build, the M4 Mac mini), against 4.8 ms and 4.1 ms for Bando on the same build (the slice the maintainer tested). Measured again after the kit script was merged and the light re-baked, on a quieter computer: 9.5 ms in Analog and 8.1 to 8.3 ms in Digital, with Bando at 5.3 ms and 4.5 ms in the same run |
 | Budget | 8 ms. The Factory is about 1.8 ms over it in Analog, and the maintainer accepted that ("I think it's fine, no need to address"). The frame is bound by the CPU, not the graphics card (the same at 640 × 360): by how many things are drawn, not by triangles |
 | `.glb` | 26.3 MB (slice 2: 13.8 MB) |
 | Triangles | about 484,700 in 322 parts, plus about 23,400 in the decals (batched into 19 draws): 508,192 in the `.glb` |
