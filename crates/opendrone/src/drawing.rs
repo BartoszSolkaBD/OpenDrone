@@ -28,6 +28,7 @@ use crate::map_drawing::{MapLighting, MaterialLibrary, Surface, part_mesh, read_
 use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
 use crate::rotors::RotorParts;
 use crate::set_up::{FlightPlan, repo_folder};
+use crate::sky::{MapSky, attach_the_sky};
 use crate::stepping::Flight;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
@@ -114,6 +115,7 @@ impl Plugin for DrawingPlugin {
                 ..default()
             })
             .add_systems(Startup, set_up_the_grid)
+            .add_systems(PostUpdate, attach_the_sky)
             .add_systems(
                 RunFixedMainLoop,
                 place_the_quad.in_set(RunFixedMainLoopSystems::AfterFixedMainLoop),
@@ -172,6 +174,7 @@ fn undraw_the_world(
     for entity in &world {
         commands.entity(entity).despawn();
     }
+    commands.remove_resource::<MapSky>();
     drawing.drawn = false;
 }
 
@@ -250,6 +253,11 @@ fn draw_the_map_from_its_file(
             .count()
     );
     if let Some((_, lighting)) = baked {
+        // The sky comes from the same `[light]`, and goes behind the Map on
+        // every camera (#315).
+        if let Some(light) = &plan.map.light {
+            commands.insert_resource(MapSky::make(light, images));
+        }
         return light_what_the_atlas_doesnt(commands, &lighting);
     }
     // Sunny early afternoon: the sun about 50° up, from the south-south-east,

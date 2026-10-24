@@ -26,6 +26,7 @@
 //!   on a Test Map's floor, and the FPV Camera on the Quad's frame;
 //! - [`rotors`] (#319): the Quad's rotors turning in the picture, from each
 //!   motor's speed, as blades that fade into a blurred disc as they speed up;
+//! - [`sky`] (#315): the sky behind a baked Map, made from its `[light]`;
 //! - [`camera`]: the FPV Camera (#66): the Quad's fisheye Lens, the Analog and
 //!   Digital Video Looks, Auto-exposure, Camera Tilt and FOV in flight, and
 //!   Digital's 15 ms late picture, all outside the Simulation;
@@ -64,6 +65,7 @@ pub mod screens;
 pub mod set_up;
 pub mod settings;
 pub mod settings_file;
+pub mod sky;
 pub mod sound;
 pub mod status;
 pub mod stepping;

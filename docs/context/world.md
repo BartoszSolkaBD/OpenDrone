@@ -48,6 +48,10 @@ _Avoid_: Validator, linter
 The sun and sky light of a detailed Map, worked out once by Blender's Cycles from the Map's `[light]` values in `map.toml` (where the sun is, the colour and strength of sun and sky) and stored in a light atlas: a picture that lays every drawn surface of the Map flat, so the game lights the Map's parts by looking each spot up on a second set of picture coordinates, with no real-time sun or shadows on them. The Quad isn't in the atlas: the game lights it with the Map's sky values as ambient light and a share of its sun, with no shadows. A Map at another time of day is another Map with its own bake. How one is made: [Building a Map](../building-a-map.md#baked-light).
 _Avoid_: Static lighting
 
+**Sky**:
+What a baked Map shows behind everything else: a gradient from its sky colour overhead to a paler haze at the horizon, a sun where the Map's `[light]` puts it, a few soft clouds and a dull ground below the horizon, all made by the game from the Map's `[light]` values when the Map loads, with no picture files. A Map with no baked light keeps a flat light blue. How it is made: [Building a Map](../building-a-map.md#what-the-game-does-with-it).
+_Avoid_: Skybox (that is a way to draw one)
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
