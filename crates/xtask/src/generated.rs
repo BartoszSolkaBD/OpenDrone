@@ -7,7 +7,8 @@
 //!   `assets-src/generators/<generator>.py` makes its three pictures,
 //!   `diffuse.jpg`, `normal.jpg` and `roughness.jpg`, which are committed in
 //!   `assets-src/generated/<texture>/`, with a contact sheet of all of them in
-//!   `docs/images/`.
+//!   `docs/images/`. A decal's generator makes a fourth, `mask.jpg` (#321),
+//!   and its texture is left off the contact sheet.
 //! - **The same bytes.** The scripts run in the pinned Blender's Python
 //!   (`assets-src/blender-version.toml`, the file `cargo xtask maps` reads
 //!   too), whose numpy is the same on every computer, and write their JPG
@@ -30,6 +31,10 @@ const USAGE: &str = "Usage: cargo xtask generate-textures [--check]";
 
 /// The three pictures each generated texture has.
 pub const PICTURES: [&str; 3] = ["diffuse.jpg", "normal.jpg", "roughness.jpg"];
+
+/// The fourth picture a decal's texture has: how much of it covers the
+/// surface under it (#321).
+pub const MASK: &str = "mask.jpg";
 
 /// The contact sheet of every generated texture, from the repo's root.
 pub const SHEET: &str = "docs/images/materials-made-from-scratch.jpg";
@@ -171,7 +176,11 @@ fn generate(root: &Path, check: bool) -> Result<String, String> {
         let name = &recipe.texture.name;
         let mut sizes = Vec::new();
         let mut texture_total = 0;
-        for picture in PICTURES {
+        // A decal's mask, if the generator made one or one is committed.
+        let decal = [&out, &committed]
+            .iter()
+            .any(|folder| folder.join(name).join(MASK).is_file());
+        for picture in PICTURES.into_iter().chain(decal.then_some(MASK)) {
             let made = fs::read(out.join(name).join(picture))
                 .map_err(|e| format!("Blender wrote no {name}/{picture}: {e}"))?;
             texture_total += made.len();

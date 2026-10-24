@@ -37,7 +37,7 @@ CI rebuilds each Map with Blender on Linux and requires the very same `.glb` as 
 - every solid is cut into triangles by a fixed rule, never by Blender's own triangulation, and a convex solid's four-cornered faces are cut along the diagonal that leaves no dent;
 - no Blender unwrap, no Blender lightmap pack and no bevel or boolean operation, whose output order Blender doesn't keep from run to run ([the research](research/asset-pipeline.md) measured that); the second picture-coordinate set that [baked light](#baked-light) needs is made in plain Python;
 - the picture coordinates are the Map's own metres divided by the material's repeat size, so a picture runs on from one object to the next;
-- the file has no normals (the game works them out) and no pictures, compressed meshes or animations.
+- the file has no normals (the game works them out) and no pictures, compressed meshes or animations, and a mesh has vertex colours only when a second material is blended into it ([Blending two materials](#blending-two-materials)): the builder writes them as 16-bit whole numbers that stand for 0 to 1, from weights that are whole 255ths, so they are exact on every computer.
 
 If you change a script, run `cargo xtask maps` twice and `--check`: the bytes must not change between runs.
 
@@ -186,7 +186,7 @@ A detailed Map (the Factory is the first) doesn't use downloaded pictures: its s
 | `ground_dirt_rubble` | 2 m | 1K | 936 KB |
 | `grass_weeds` | 2 m | 1K | 1.3 MB |
 
-Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map, and draws a part with them as it does a downloaded texture; a material that says `roughness_map = true` has its roughness picture read too ([Wet, rough and metal surfaces](#wet-rough-and-metal-surfaces)). All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or decals ([below](#surfaces-that-dont-repeat)).
+Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map, and draws a part with them as it does a downloaded texture; a material that says `roughness_map = true` has its roughness picture read too ([Wet, rough and metal surfaces](#wet-rough-and-metal-surfaces)). All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or [decals](#decals).
 
 ### In the material library
 
@@ -256,7 +256,7 @@ macro_strength = 0.60       # how strongly the large picture shows; 0 or left ou
 
 **Where it shows.** A part drawn this way needs `assets-src/textures/` or `assets-src/generated/` on disk, as any picture does; without it the part is its flat colour. The Map's script asks for nothing: it names the material as ever.
 
-**Marks that must not repeat.** A picture repeats its marks too, so a mark that appears once to the picture appears over and over, and hex tiling would only scatter the copies. Don't paint one into a generator. Graffiti, a spalled patch with a bare rebar, a stencilled block of marks and a painted band are separate geometry or decals in the Map's script, put where the Map wants them. The two materials that had such marks, `brick_painted_peeling` (graffiti, a chevron band) and `concrete_wall_rough` (the spalled patch and its rebar, a rebar's faint line, a stencilled block), no longer draw them; the Map's script has to add them back. There is no decal system yet, so for now that means geometry.
+**Marks that must not repeat.** A picture repeats its marks too, so a mark that appears once to the picture appears over and over, and hex tiling would only scatter the copies. Don't paint one into a generator. Graffiti, a spalled patch with a bare rebar, a stencilled block of marks and a painted band are separate geometry or decals in the Map's script, put where the Map wants them. The two materials that had such marks, `brick_painted_peeling` (graffiti, a chevron band) and `concrete_wall_rough` (the spalled patch and its rebar, a rebar's faint line, a stencilled block), no longer draw them; the Map's script has to add them back, as geometry or as [decals](#decals).
 
 **Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)): one view from 40 m straight down (`at=0,0,40 pitch=-90`) and one low along a floor show a repeat at once. The game logs how many of a Map's materials are drawn this way ("with the repeat broken"). One or two views a run: more than two stall the command ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)).
 
@@ -284,7 +284,7 @@ wetness       = 0.0        # how wet it is; 0 or left out for dry
 
 The game reads each picture from the folder of the material's colour picture (`assets-src/generated/<texture>/`) and fills in what is missing: nothing shut in, the `roughness` number, and metal as `metallic` says. A material that reads its roughness picture alone, as all eight generated ones do, keeps it as it is, one byte a pixel (1.4 MB of graphics card memory for a 1K picture and 5.6 MB for the 2K floor, with their smaller sizes, so 15 MB for the eight). One that reads an occlusion or a metal picture too has them packed into one picture of four bytes a pixel (occlusion in red, roughness in green, metal in blue), so the shader still looks up once. A picture that is asked for and can't be read is said in the game's log, once, and leaves its default. **The generators make no occlusion or metal picture yet** (`cargo xtask generate-textures` writes three pictures a texture), so `ao_map` and `metallic_map` wait for pictures; a texture that comes with them works the day they are in its folder. Until then metal is a number for the whole surface, which is right for a galvanised roof sheet and a little wrong for a painted and rusted beam, where only the scratches are bare steel.
 
-**Wetness** darkens the colour (a fully wet surface keeps 60% of it), lowers the roughness (a fully wet surface's roughness is 0.05 plus 0.3 times its dry one, so a dry 0.8 becomes 0.29 and a dry 0.3 becomes 0.14), raises how much light it reflects head-on a little (from 0.5 to 0.65 of a plain surface's, which is about 4% to 7%) and keeps 60% of the normal map's slope, since water fills small pits. The numbers are `WET_*` in [`surface_look.rs`](../crates/opendrone/src/surface_look.rs), and the shader has the same ones. Wetness belongs to the material for now, so a wet floor and the same floor dry are two materials with one texture (`concrete_floor_worn` and a `concrete_floor_wet` that says `wetness = 0.8` and names the same texture): a patch of wet in a dry floor, and wetness that decals bring, wait for the decals ticket ([#321](https://github.com/BartoszSolkaBD/OpenDrone/issues/321)).
+**Wetness** darkens the colour (a fully wet surface keeps 60% of it), lowers the roughness (a fully wet surface's roughness is 0.05 plus 0.3 times its dry one, so a dry 0.8 becomes 0.29 and a dry 0.3 becomes 0.14), raises how much light it reflects head-on a little (from 0.5 to 0.65 of a plain surface's, which is about 4% to 7%) and keeps 60% of the normal map's slope, since water fills small pits. The numbers are `WET_*` in [`surface_look.rs`](../crates/opendrone/src/surface_look.rs), and the shader has the same ones. Wetness belongs to the material, so a wet floor and the same floor dry are two materials with one texture (`concrete_floor_worn` and a `concrete_floor_wet` that says `wetness = 0.8` and names the same texture). A patch of wet in a dry floor is a decal: `decal_damp` makes the floor under it wet with the same numbers, and any decal can say how wet it makes what is under it ([Decals](#decals)).
 
 **What a baked Map reflects.** A baked Map is lit by its atlas, which has light and no reflections, so a smooth surface would show no sheen at all. The shader adds the Map's sky: the gradient of its [sky](#what-the-game-does-with-it) in the direction the surface mirrors the camera to, as much as Fresnel and the surface's roughness say (a smooth surface reflects more, and at a low angle more still: the sheen of a wet floor seen from a low camera, the blue-grey of a metal sheet), a rough one showing a smear of the whole sky instead of its detail. It is multiplied by how open to the sky the atlas says the spot is: the light there against the light under an open sky (`sky_strength`), so a hall's inside, which the atlas says is dark, shows little. It goes on every material that asks for any of the keys above and on no other, and a Map with no `[light]` has none of it (its real-time sun lights it as before). The sun's own glint is the share of the Map's sun that already lights a Quad (15%, no shadows): it shows on any smooth surface at the right angle, in shade too, so a very glossy surface in a dark corner can still show one bright glint ([#294](https://github.com/BartoszSolkaBD/OpenDrone/issues/294) chose the share for the Quad's sake).
 
@@ -383,15 +383,91 @@ weights = edge.weights(ground_mesh[0])                                       # o
 
 `weight(x, y)` is how much of material B shows through material A, from 0 to 1, a whole number of 255ths. The boundary is the line, bent by layers of noise (`wander` and `wavelength`), the fade is `band` metres wide, and `patches` tears it into tongues and islands. The checks measure the shape in numbers: the boundary stays within `wander`, `band` and a patch's share of the line, strays by tens of centimetres, and no 4 m stretch of it is straight to within 5 cm.
 
-The weights become the vertex colour (`COLOR_0`) of the ground mesh once the vertex-colour blend of [#321](https://github.com/BartoszSolkaBD/OpenDrone/issues/321) is in: the builder's `export_vertex_color` is still `"NONE"`, so nothing writes them to the `.glb` yet. They are one per corner in the corners' order, so that ticket takes them as they are. The mesh needs corners about half the band apart or closer: 0.25 m for a 0.6 m band, which is 32 triangles a square metre and fades in about three steps. Until the blend exists, the test Map draws each triangle in the material its corners weigh most for, which shows the edge at the triangle's size.
+The weights are the vertex colour (`COLOR_0`) of the ground mesh: hand them to `MapBuilder.solid` as `blend=("ground_dirt_rubble", weights)` ([Blending two materials](#blending-two-materials)). They are one per corner in the corners' order. The mesh needs corners about half the band apart or closer: 0.25 m for a 0.6 m band, which is 32 triangles a square metre and fades in about three steps. A band of 1 to 2 m reads as grass thinning out into dirt; 0.6 m as a mown edge.
 
 ### Seeing them
 
-[`assets-src/demos/geometry/build.py`](../assets-src/demos/geometry/build.py) puts every helper in one scene, a yard with a hall and a roof, and prints what each costs. It is not a Map of the Pack, and nothing builds it in CI. To look at it, build it into a folder of your own, give the folder a `map.toml` copied from a Map's, add its name to `MAPS` in `crates/opendrone/src/main.rs` on a checkout of your own, and use `--render-views` ([above](#seeing-the-map-as-the-game-draws-it)).
+[`assets-src/demos/geometry/build.py`](../assets-src/demos/geometry/build.py) puts every helper in one scene, a yard with a hall and a roof, and prints what each costs; it also has the [decals and the blended ground](#decals-and-blended-ground) of #321. It is not a Map of the Pack, and nothing builds it in CI. To look at it, build it into a folder of your own, give the folder a `map.toml` copied from a Map's, add its name to `MAPS` in `crates/opendrone/src/main.rs` on a checkout of your own, and use `--render-views` ([above](#seeing-the-map-as-the-game-draws-it)). `--light-cm 25` gives it a second UV set for baked light (copy the script into `assets-src/maps/<id>/` on your checkout, give its `map.toml` a `[light]` and run `cargo xtask maps --bake <id>`), and `--plain` leaves out the decals and the blend, to see what they cost.
+
+## Decals and blended ground
+
+Two things put real-world wear on a Map without new geometry: a mesh can show a **second material** through its own where its vertex colours say, so grass thins out into dirt along an edge that wanders, and a Map can put **decals** on its surfaces: one picture each, a stain, a damp patch, moss at the foot of a wall. The Skate Park and Bando have neither, so they, and their render counts, don't change.
+
+![A brick wall with moss growing from the ground up its foot and water stains running down it, a concrete floor with damp patches and a rust stain, and grass that thins out into dirt and stones along a wandering edge, all in the game](images/decals-and-blends.jpg)
+
+### Blending two materials
+
+```python
+from odedge import WanderingEdge
+edge = WanderingEdge([(-16, -7), (16, -7.5)], seed=5, wander=1.8, band=1.6)
+ground = yard.mesh((-16, -14, 16, 10), 0.25)
+m.solid("yard", ground, None, "grass_weeds", "trimesh",
+        blend=("ground_dirt_rubble", edge.weights(ground[0])))     # dirt shows through the grass
+```
+
+- **In the script.** `blend=(material_b, weights)` on `MapBuilder.solid` (and so on any shape made with it): one number from 0 (only the shape's own material) to 1 (only `material_b`) for each corner of the mesh, in the corners' order. [`WanderingEdge.weights`](#wandering-edges) gives them for a ground; any function of a corner will do, such as more dirt in a dip or along a path.
+- **In the `.glb`.** The mesh's vertex colours (`COLOR_0`) are the weights, grey, and the object carries `od_blend` with `material_b`'s name. The [Pack checker](verification/checking-a-pack.md#what-the-glb-holds) refuses one without the other, and colours that aren't grey or aren't one a corner.
+- **What the game draws.** Both materials' pictures, each on its own hex tiles and at its own size, with its own roughness picture and wetness: what material A asks for in the library ([Surfaces that don't repeat](#surfaces-that-dont-repeat)) still holds, and B is drawn as it would be on its own. The weight at a pixel is the corners' weights, smoothly between them, then two things break the edge up so it never runs straight from corner to corner: a noise of two sizes (about 55 and 16 cm) pushes the weight about in the middle of the edge (not where it is 0 or 1), and the two pictures' own light and dark stand in for height, so where both show, B's light stones come through A's dark gaps first and A's light tufts stand over B's dark soil (a height blend). The numbers are in [`decals.rs`](../crates/opendrone/src/decals.rs), and the shader has the same ones. Where the weight is 0, B costs nothing.
+- **Without the pictures** (no `assets-src/textures/` or `generated/` on disk), the part is drawn in the mix of the two flat colours, corner by corner.
+- **Baked light.** The bake bounces light off the shape's own material's flat colour, not B's: a little green spills from grass where it is dirt. The light itself is right.
+
+### Decals
+
+```python
+south, up = (0, -1, 0), (0, 0, 1)
+wall = m.solid("south_wall", ...)
+m.decal("stain", "decal_stain", [wall], (5.9, -4.0, 1.6), south, up, (1.2, 2.4), depth=1.0)
+m.decal("moss_foot", "decal_moss", [wall, yard_ground], (4.9, -3.96, 0.12), (0, -1, 1), up, (1.5, 1.4), layer=1, depth=1.4)
+m.decal("damp", "decal_damp", [floor], (2.0, 0.5, 0.0), up, (0, 1, 0), (3.2, 2.4), depth=0.5)
+```
+
+`MapBuilder.decal(name, material, on, centre, facing, up, size, layer=0, depth=0.4, max_angle=75)` puts a decal on shapes made already ([`oddecal.py`](../assets-src/lib/oddecal.py)):
+
+| Argument | Says |
+|---|---|
+| `material` | a decal material of the library, below |
+| `on` | the shapes it may lie on: what `solid` returns, or their names |
+| `centre`, `size` | the rectangle the picture covers, `(width, height)` metres round `centre` |
+| `facing` | the way the decal faces, out of the surface toward whoever looks at it: `(0, -1, 0)` for a wall's south face, `(0, 0, 1)` for a floor, `(0, -1, 1)` for a strip that bends round the foot of a south wall |
+| `up` | where the picture's top points: `(0, 0, 1)` on a wall, a compass direction on a floor |
+| `depth` | how far into and out of the surface the decal reaches, along `facing`, in metres; it must reach the surface from `centre` |
+| `max_angle` | it lies only on faces turned less than this from `facing`, so a wall's back face, or the side of an opening, is left alone |
+| `layer` | 0 to 15: where decals overlap, a higher layer is drawn over a lower one |
+
+- **What it makes.** Every triangle of the shapes in `on` that faces the decal and lies in its box is cut to the box and lifted 2 mm along `facing`, so the decal hugs the surface: it follows uneven ground and a bulging wall, and a strip facing out of a corner lies on the ground and up the wall at once. Its picture coordinates run from 0 to 1 across the picture. It is drawn only (`od_collider = none`, `od_decal` = its layer), costs a triangle for each triangle of the surface under it (up to five where one is cut by the decal's edge), and isn't solid.
+- **Baked light.** The decal's corners take the surface's own light atlas coordinates, worked out inside the triangle each was cut from, so the game lights it with the very light baked for the spot it lies on. Decals aren't in the unwrap (they take no room in the atlas) and are hidden in the bake (they cast no shade on the surface they lie on), so adding or moving one only needs `cargo xtask maps` and a re-bake to match the new `.glb`, with the same light.
+- **What the game draws.** A decal's picture over the surface, cut out by its mask: as much of its own colour as `cover` says, lit by the atlas as the surface is, with its normal map and roughness picture; and where it is wet, the surface under it darker (as a wet surface is, [above](#wet-rough-and-metal-surfaces)) with a little of the sky's sheen of a film of water (the [`decals.rs`](../crates/opendrone/src/decals.rs) numbers). It is drawn after the Map's solid parts with premultiplied alpha, so edges are soft, and the mask's lowest 3% (the noise its JPG leaves) is nothing, so no rectangle shows. Overlapping decals are drawn in the order of their layer from wherever the camera is, so nothing pops. It casts no shadow. A decal whose pictures or mask aren't on disk isn't drawn at all, rather than as a rectangle, and the game's log says so.
+- **Depth.** The 2 mm lift and a depth bias of 100 of the depth buffer's smallest steps a layer keep a decal in front of its surface from 1 m to 40 m and beyond, with no flicker.
+
+**Decal materials.** A decal names a material of the library like any shape, whose texture has a fourth picture, `mask.jpg`: how much of the decal covers the surface, 0 along every edge of the picture. Two keys say what it does:
+
+```toml
+[materials.decal_stain]
+colour        = [0.02, 0.015, 0.01]
+roughness     = 0.77
+texture       = "decal_stain"
+roughness_map = true
+cover         = 0.85     # how much of its own colour shows where the mask is whole; 1 if left out
+wetness       = 0.25     # how wet it makes the surface under it there; 0 if left out
+```
+
+| Decal | Picture | `cover` | `wetness` | For |
+|---|---|---|---|---|
+| `decal_moss` | 512, 0.38 MB | 1 | 0 | moss at the foot of a wall, thick at the bottom and thinning upward; its bottom third lies on the ground |
+| `decal_stain` | 512, 0.05 MB | 0.85 | 0.25 | water that ran for years from a leak: a dark blotch and streaks down a wall, or a rust stain on a floor |
+| `decal_damp` | 512, 0.05 MB | 0 | 1 | a damp patch: no colour of its own, the surface under it wet |
+
+**Making one.** A decal's generator is a texture generator ([Adding one](#adding-one)) whose `make(seed, pixels)` returns four pictures, the fourth the mask; [`decalwork.py`](../assets-src/generators/decalwork.py) has the frame that clears the edges, an irregular patch and the finish. A decal doesn't repeat, so the rule against marks near the edge doesn't hold for it, and its readable checks are its own: the mask is 0 along every edge, nearly whole somewhere, and covers part of the picture. A decal's texture is left off the contact sheet. Its `size` in the library is only how big it was drawn to be: each decal in a Map gives its own.
+
+**For the wear generators.** A rule that places wear calls `MapBuilder.decal` with a seeded position, size and layer (stains under sills and ledges, moss along wall feet facing out of the corner, damp in a floor's dips), and `blend=` for ground that changes material. A new kind of wear is a new decal material and generator; a decal of the same picture can be any size, turned by `up`, and wetter or drier through its material.
+
+**Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)), with `look=digital` for now ([#316](https://github.com/BartoszSolkaBD/OpenDrone/issues/316)), one or two views a run ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)): a wall from 1 m and from 40 m, a floor from a standing height looking toward the light, and a ground's edge from 1 m up. The game logs how many decals and blended parts a Map has.
+
+**What it costs.** A blended pixel looks both materials up (where the weight is 0 the second costs nothing), and a decal's pixel is a second, see-through layer over the surface. On the maintainer's M4 Mac mini, in a release build, with the picture 2560 × 1440 and `--camera-cost` counting the frames in 4 s (the whole frame, CPU and GPU) from the Launch Spot of the [test Map](#seeing-them), baked at 25 cm, looking at the south wall with its stains and moss and over the yard with dirt blended into its 24,600 triangles of grass: with the 13 decals (1,400 triangles) and the blend it draws 800 to 806 frames in the Analog Look and 958 to 962 in the Digital Look, and with neither (`--plain`) 810 to 811 and 963 to 967, over three runs each. That is 4.98 ms a frame against 4.94 (+0.05 ms, 1%) in Analog and 4.17 against 4.14 (+0.03 ms) in Digital. The three decals' pictures are 0.5 MB on disk and about 10 MB in the graphics card; the moss's normal map is most of it.
 
 ## What CI checks
 
-When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the unwrap's plain-Python checks. It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
+When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers' and the decals'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
 
 The Blender pictures don't show baked light: they are drawn with a plain sun. A Map's look under its baked light is judged with `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)).
 

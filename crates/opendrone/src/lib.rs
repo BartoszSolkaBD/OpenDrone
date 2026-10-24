@@ -51,6 +51,7 @@
 
 pub mod camera;
 pub mod clock;
+pub mod decals;
 pub mod developer;
 pub mod drawing;
 pub mod light_atlas;

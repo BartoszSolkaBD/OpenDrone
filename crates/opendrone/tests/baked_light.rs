@@ -85,6 +85,8 @@ fn ground(light_uvs: Vec<[f32; 2]>) -> DrawnPart {
         uvs: vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
         light_uvs,
         triangles: vec![[0, 1, 2], [0, 2, 3]],
+        decal: None,
+        blend: None,
     }
 }
 

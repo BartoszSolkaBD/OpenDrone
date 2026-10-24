@@ -14,6 +14,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::camera::visibility::NoCpuCulling;
 use bevy::light::CascadeShadowConfigBuilder;
+use bevy::light::NotShadowCaster;
 use bevy::mesh::PrimitiveTopology;
 use bevy::pbr::Lightmap;
 use bevy::prelude::*;
@@ -24,7 +25,9 @@ use opendrone_sim::{MapShape, QuadShape};
 use crate::camera::controls::CameraSettings;
 use crate::camera::look::VideoLook;
 use crate::camera::{EdgeDelay, QuadPoses, drawn_moment, flat_camera};
-use crate::map_drawing::{MapLighting, MaterialLibrary, Surface, part_mesh, read_light_atlas};
+use crate::map_drawing::{
+    Blended, MapLighting, MaterialLibrary, Surface, part_mesh, part_mesh_coloured, read_light_atlas,
+};
 use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
 use crate::rotors::RotorParts;
 use crate::set_up::{FlightPlan, repo_folder};
@@ -208,32 +211,70 @@ fn draw_the_map_from_its_file(
 ) {
     let library = MaterialLibrary::read(&repo_folder());
     let baked = baked_light(plan, images);
-    let mut by_name: BTreeMap<String, DrawnMaterial> = BTreeMap::new();
+    // Each material once, by what it is drawn as: a part's own material, one
+    // with a second blended in (`own+other`), or a decal of a layer
+    // (`name#layer`) (#321). None for a decal whose pictures aren't on disk.
+    let mut by_name: BTreeMap<String, Option<(DrawnMaterial, bool)>> = BTreeMap::new();
     // Of the materials, how many have their repeat broken (#304) and how many
-    // read a picture of roughness, occlusion or metal (#320).
+    // read a picture of roughness, occlusion or metal (#320); how many parts
+    // are decals and blends (#321), and the decals left undrawn.
     let (mut repeat_broken, mut surface_pictures) = (0, 0);
+    let (mut decals, mut blends, mut undrawn) = (0, 0, 0);
+    let lit = |surface: &mut Surface| {
+        if let Some((_, lighting)) = &baked {
+            surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
+            if let Some(light) = &plan.map.light {
+                surface.set_sky(&SkyReflection::of(light, lighting));
+            }
+        }
+    };
     for part in &plan.map.drawing {
-        let material = by_name
-            .entry(part.material.clone())
+        let key = match (part.decal, &part.blend) {
+            (Some(layer), _) => format!("{}#{layer}", part.material),
+            (None, Some(blend)) => format!("{}+{}", part.material, blend.material),
+            (None, None) => part.material.clone(),
+        };
+        let drawn = by_name
+            .entry(key)
             .or_insert_with(|| {
-                let mut surface = library.material(&part.material, part.colour, images);
-                if let Some((_, lighting)) = &baked {
-                    surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
-                    if let Some(light) = &plan.map.light {
-                        surface.set_sky(&SkyReflection::of(light, lighting));
+                // The material, and whether the mesh's vertex colours carry the
+                // flat mix of a blend's two colours.
+                let (mut surface, flat_blend) = match (part.decal, &part.blend) {
+                    (Some(layer), _) => (library.decal(&part.material, layer, images)?, false),
+                    (None, Some(blend)) => {
+                        match library.blend(&part.material, &blend.material, images) {
+                            Blended::Drawn(surface) => (surface, false),
+                            Blended::Flat(material) => (Surface::Plain(material), true),
+                        }
                     }
-                }
+                    (None, None) => (library.material(&part.material, part.colour, images), false),
+                };
+                lit(&mut surface);
                 repeat_broken += usize::from(surface.repeat_broken());
                 surface_pictures += usize::from(surface.has_surface_picture());
-                match surface {
-                    Surface::Plain(material) => DrawnMaterial::Plain(materials.add(material)),
-                    Surface::Varied(material) => DrawnMaterial::Varied(varied.add(material)),
-                }
+                Some(match surface {
+                    Surface::Plain(material) => {
+                        (DrawnMaterial::Plain(materials.add(material)), flat_blend)
+                    }
+                    Surface::Varied(material) => {
+                        (DrawnMaterial::Varied(varied.add(material)), flat_blend)
+                    }
+                })
             })
             .clone();
+        let Some((material, flat_blend)) = drawn else {
+            undrawn += 1;
+            continue;
+        };
+        let mesh = match &part.blend {
+            Some(blend) if flat_blend => part_mesh_coloured(part, |w| {
+                library.flat_blend(part.colour, &blend.material, w)
+            }),
+            _ => part_mesh(part),
+        };
         let mut part_entity = commands.spawn((
             InTheWorld,
-            Mesh3d(meshes.add(part_mesh(part))),
+            Mesh3d(meshes.add(mesh)),
             Transform::IDENTITY,
             Name::new(part.name.clone()),
         ));
@@ -241,6 +282,12 @@ fn draw_the_map_from_its_file(
             DrawnMaterial::Plain(handle) => part_entity.insert(MeshMaterial3d(handle)),
             DrawnMaterial::Varied(handle) => part_entity.insert(MeshMaterial3d(handle)),
         };
+        if part.decal.is_some() {
+            // A picture on a surface: it would shade the surface it lies on.
+            part_entity.insert(NotShadowCaster);
+            decals += 1;
+        }
+        blends += usize::from(part.blend.is_some());
         if let Some((atlas, _)) = &baked
             && !part.light_uvs.is_empty()
         {
@@ -259,6 +306,18 @@ fn draw_the_map_from_its_file(
         repeat_broken,
         surface_pictures
     );
+    if decals + blends + undrawn > 0 {
+        info!(
+            "{} has {decals} decals and {blends} parts with a second material blended in",
+            plan.map.name
+        );
+    }
+    if undrawn > 0 {
+        warn!(
+            "{} of {}'s decals aren't drawn: their material isn't in the library, or its pictures or mask.jpg aren't on disk",
+            undrawn, plan.map.name
+        );
+    }
     if let Some((_, lighting)) = baked {
         // The sky comes from the same `[light]`, and goes behind the Map on
         // every camera (#315).

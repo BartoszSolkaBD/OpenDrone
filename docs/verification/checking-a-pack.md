@@ -148,6 +148,8 @@ It's binary glTF, with every object a node of the file. The checker reads what t
 | `od_collider` | `box`, `convex`, `trimesh` or `none` | **Every object with a mesh carries it.** `box`: the mesh is exactly a box (eight corners), found from them with its turn. `convex`: a closed solid with no dents, whose triangles face outward. `trimesh`: any triangles; a closed mesh is a solid and an open one, such as a bowl's ground, a surface. `none`: drawn, and nothing can touch it. |
 | `od_collision_only` | `1` | The object is solid but never drawn, such as a simple shape standing in for a detailed one. A Map has no invisible walls: this is for shapes that stand where something is drawn. |
 | `od_launch_spot` | a heading, 0 up to 360 | **Exactly one empty carries it**, at the Launch Spot on the ground, with the compass heading the Quad faces (0 north, 90 east). It is also where the pilot stands. |
+| `od_decal` | a whole number, 0 to 15 | The object is a **decal**: a picture lying on a surface, drawn over it ([Decals](../building-a-map.md#decals)). The number is its layer: where decals overlap, a higher layer is drawn over a lower one. A decal's `od_collider` is `none`, and its picture coordinates (`TEXCOORD_0`, one for every corner) run from 0 to 1 across its one picture. |
+| `od_blend` | a material's name | A second material shows through the object's own, as much as the mesh's **vertex colours** (`COLOR_0`) say: one grey colour per corner, black for the object's own material and white for the second ([Blending two materials](../building-a-map.md#blending-two-materials)). |
 
 Any other tag that starts with `od_` is refused, so a misspelt one never passes for nothing. Other custom properties are nobody's business.
 
@@ -157,10 +159,12 @@ The checker refuses, listing every problem with the `.glb`'s file and the object
 - an unknown `od_` tag;
 - no Launch Spot, or more than one (both are named), or a heading that isn't from 0 up to 360;
 - a `box` that isn't a box, a `convex` that is open or dented (the sentence says which), and a part that is `od_collision_only` with a collider of `none`;
+- a decal whose layer isn't a whole number from 0 to 15, one that is solid (an `od_collider` other than `none`) or `od_collision_only`, one with no picture coordinates or with a coordinate outside 0 to 1 (its picture would repeat and its edge show as a rectangle), and one that also has `od_blend`;
+- vertex colours (`COLOR_0`) on an object with no `od_blend`, and `od_blend` on one with none; an `od_blend` that isn't a material's name; vertex colours that aren't one for every corner, aren't grey (they are weights, not a tint), are outside 0 to 1, or are neither 32-bit decimal numbers nor whole numbers that stand for 0 to 1;
 - compressed meshes: Draco, meshopt, quantised (whole-number) corners and GPU instancing, because every program must read the very same corners, and Bevy refuses them too;
 - a file that isn't a binary glTF, one cut short, one with a sparse accessor or a second buffer, and meshes that aren't triangles.
 
-What reaches the Simulation is each solid part, in the file's order and named after its object, and the Launch Spot. They change the Map's fingerprint; the names, the pictures and what is only drawn don't. The game draws every part that isn't `od_collision_only`, with its material's name and flat colour from the file, and gives it its pictures from the material library ([Building a Map](../building-a-map.md)).
+What reaches the Simulation is each solid part, in the file's order and named after its object, and the Launch Spot. They change the Map's fingerprint; the names, the pictures and what is only drawn don't, so decals and vertex colours don't either. The game draws every part that isn't `od_collision_only`, with its material's name and flat colour from the file, and gives it its pictures from the material library ([Building a Map](../building-a-map.md)). A decal takes its pictures and mask from the library too; the checker doesn't read the library, so a decal or a blend that names a material the game doesn't know is drawn in flat colours, or, for a decal, not at all, with a line in the game's log.
 
 `map.toml` names its files, and they must be in the Map's own folder: `model` ends in `.glb`, `preview` is a PNG, and `background_sound.file` is an Ogg file. A broken Map is skipped and the rest of its Pack still loads.
 

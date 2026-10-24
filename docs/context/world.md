@@ -52,6 +52,10 @@ _Avoid_: Static lighting
 What a baked Map shows behind everything else: a gradient from its sky colour overhead to a paler haze at the horizon, a sun where the Map's `[light]` puts it, a few soft clouds and a dull ground below the horizon, all made by the game from the Map's `[light]` values when the Map loads, with no picture files. A Map with no baked light keeps a flat light blue. How it is made: [Building a Map](../building-a-map.md#what-the-game-does-with-it).
 _Avoid_: Skybox (that is a way to draw one)
 
+**Decal**:
+A picture put once on a Map's surface, over the surface's own repeating picture: a stain, a damp patch, moss at the foot of a wall, a water streak, a crack or a tag. It is a thin mesh of its own that the Map's script cuts from the surfaces under it and lifts 2 mm off them, with a mask that fades it out before its edges, so its rectangle never shows; it is only drawn, never solid, and is lit by the light baked for the spot it lies on. A decal can show its own colour, make the surface under it wet, or both, and overlapping decals are drawn in the order of their layer. How one is made: [Building a Map](../building-a-map.md#decals).
+_Avoid_: Sticker, overlay
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode

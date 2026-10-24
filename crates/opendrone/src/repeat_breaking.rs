@@ -28,6 +28,14 @@
 //!   applied last. A material that asks for these and not for its repeat to be
 //!   broken is drawn by it with the repeat left alone.
 //!
+//! - **Two materials on one mesh (#321).** A part whose `.glb` blends a
+//!   second material into its own (`od_blend` and its vertex colours) is
+//!   drawn with both, the second looked up on its own tiles and shown as much
+//!   as the vertex colour says, with an edge that a noise and the two
+//!   pictures' light and dark break up ([`crate::decals::blend_weight`]).
+//! - **Decals (#321).** A decal is drawn by the same shader with its one
+//!   picture and its mask, over the surface under it.
+//!
 //! The shader is `repeat_breaker.wesl`. Nothing here touches the Simulation.
 
 use bevy::asset::embedded_asset;
@@ -67,6 +75,36 @@ pub struct BreakerSettings {
     pub sky_zenith: Vec4,
     pub sky_haze: Vec4,
     pub sky_ground: Vec4,
+    /// The second material, if one shows through (#321): its tiles, as
+    /// `snap_turn` says them for the first.
+    pub blend_tiles: Vec4,
+    /// `x`: 1 if a second material shows through; `y`: its repeats to one of
+    /// the first's (the two pictures' sizes differ); `z`: its roughness
+    /// number; `w`: its wetness.
+    pub blend: Vec4,
+    /// `x`: 1 if its surface picture is bound; `y`: 1 if that holds
+    /// roughness alone; `z`: how metal it is.
+    pub blend_surface: Vec4,
+    /// `x`: 1 if the part is a decal; `y`: how much of its own colour shows
+    /// where its mask is whole (`cover`).
+    pub decal: Vec4,
+}
+
+impl BreakerSettings {
+    /// What a surface that asks for nothing says: no tiles, no large
+    /// picture, no surface picture, no sky, no second material and no decal.
+    pub const NOTHING: BreakerSettings = BreakerSettings {
+        snap_turn: Vec4::ZERO,
+        wide: Vec4::ZERO,
+        surface: Vec4::ZERO,
+        sky_zenith: Vec4::ZERO,
+        sky_haze: Vec4::ZERO,
+        sky_ground: Vec4::ZERO,
+        blend_tiles: Vec4::ZERO,
+        blend: Vec4::ZERO,
+        blend_surface: Vec4::ZERO,
+        decal: Vec4::ZERO,
+    };
 }
 
 /// The extension of the standard material that breaks the repeat of its
@@ -90,6 +128,20 @@ pub struct RepeatBreaker {
     #[texture(107)]
     #[sampler(108)]
     pub surface: Option<Handle<Image>>,
+    /// The second material's colour, normal map and surface picture (#321).
+    #[texture(109)]
+    #[sampler(110)]
+    pub blend_diffuse: Option<Handle<Image>>,
+    #[texture(111)]
+    #[sampler(112)]
+    pub blend_normal: Option<Handle<Image>>,
+    #[texture(113)]
+    #[sampler(114)]
+    pub blend_surface: Option<Handle<Image>>,
+    /// A decal's mask: how much of it covers the surface under it (#321).
+    #[texture(115)]
+    #[sampler(116)]
+    pub mask: Option<Handle<Image>>,
 }
 
 impl MaterialExtension for RepeatBreaker {

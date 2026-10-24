@@ -63,7 +63,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
-pub use glb::{Collider, DrawnPart, LaunchSpot, MapModel};
+pub use glb::{Blend, Collider, DrawnPart, LaunchSpot, MapModel, TOP_DECAL_LAYER};
 pub use input_device::{
     InputDeviceProfile, read_input_device_file, read_input_device_file_with_steps,
 };
