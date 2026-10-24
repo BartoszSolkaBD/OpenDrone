@@ -11,7 +11,8 @@
 //!   metal ([`pack_surface`]). What a picture leaves out is filled in with
 //!   what it means when absent: no occlusion (1), the library's own roughness
 //!   number and fully metal, which the material's `metallic` number then
-//!   scales.
+//!   scales. A material that reads only its roughness picture, which is every
+//!   one so far, has it as a picture of one channel, a quarter of the size.
 //! - **Wetness.** A material with `wetness` between 0 and 1 is drawn darker,
 //!   glossier, a little more reflective and with its small pits filled in, as
 //!   far as it is wet ([`wet`]). The shader (`repeat_breaker.wesl`) makes the
@@ -24,6 +25,10 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use opendrone_pack::MapLight;
+
+use crate::map_drawing::MapLighting;
+use crate::sky::Sky;
 
 /// The share of its colour that a fully wet surface keeps: water darkens what
 /// it soaks into.
@@ -67,6 +72,43 @@ pub fn wet(roughness: f32, wetness: f32) -> Wet {
     }
 }
 
+/// What a surface of a baked Map reflects of the Map's sky (#320): the colours
+/// of the sky's gradient, in the light units the game draws the atlas in, and
+/// how bright the ground under an open sky is.
+///
+/// A baked Map is lit by its atlas, which holds light and no reflections, so
+/// the shader adds one: the sky in the direction a surface mirrors the camera
+/// to, as much as the surface's roughness and Fresnel reflectance say, and as
+/// much as the atlas says the spot is open to the sky (the light there against
+/// `open`). A wet floor shows the sky in its sheen at a low angle, a metal
+/// shows it tinted, a dry rough wall shows next to none, and a hall's inside,
+/// which the atlas says is dark, shows little.
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
+pub struct SkyReflection {
+    pub zenith: Vec3,
+    pub haze: Vec3,
+    pub ground: Vec3,
+    /// What the atlas holds, in the same units, for a white surface facing up
+    /// under the open sky with no sun: `sky_strength` in the game's units.
+    pub open: f32,
+}
+
+impl SkyReflection {
+    /// The sky of a Map's `[light]`, in the units the lightmap is drawn in.
+    pub fn of(light: &MapLight, lighting: &MapLighting) -> SkyReflection {
+        let sky = Sky::of(light);
+        let scale = |c: [f64; 3]| {
+            Vec3::new(c[0] as f32, c[1] as f32, c[2] as f32) * lighting.lightmap_exposure
+        };
+        SkyReflection {
+            zenith: scale(sky.zenith),
+            haze: scale(sky.haze),
+            ground: scale(sky.ground),
+            open: light.sky_strength as f32 * lighting.lightmap_exposure,
+        }
+    }
+}
+
 /// One channel of a picture: its size and a byte a pixel.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Plane {
@@ -104,6 +146,8 @@ pub fn roughness_byte(roughness: f32) -> u8 {
 /// What is missing is filled in with its default (no occlusion, `roughness`,
 /// fully metal), and a picture whose size isn't the first one's is left out
 /// the same way. `None` when no picture is given, as there is nothing to say.
+/// When only roughness is given, the picture is of that one channel (red, in
+/// the graphics card's own format for one), and the shader is told so.
 /// The picture has no smaller sizes yet.
 pub fn pack_surface(
     roughness_picture: Option<Plane>,
@@ -124,25 +168,7 @@ pub fn pack_surface(
     );
     let fill = roughness_byte(roughness);
     let pixels = size.x as usize * size.y as usize;
-    let mut data = Vec::with_capacity(pixels * 4);
-    for i in 0..pixels {
-        data.push(ao.as_ref().map_or(255, |p| p.bytes[i]));
-        data.push(rough.as_ref().map_or(fill, |p| p.bytes[i]));
-        data.push(metal.as_ref().map_or(255, |p| p.bytes[i]));
-        data.push(255);
-    }
-    let mut image = Image::new(
-        Extent3d {
-            width: size.x,
-            height: size.y,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        data,
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::RENDER_WORLD,
-    );
-    image.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
+    let sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
         address_mode_u: ImageAddressMode::Repeat,
         address_mode_v: ImageAddressMode::Repeat,
         mag_filter: ImageFilterMode::Linear,
@@ -151,5 +177,36 @@ pub fn pack_surface(
         anisotropy_clamp: 8,
         ..default()
     });
+    let extent = Extent3d {
+        width: size.x,
+        height: size.y,
+        depth_or_array_layers: 1,
+    };
+    if let (Some(rough), None, None) = (&rough, &ao, &metal) {
+        let mut image = Image::new(
+            extent,
+            TextureDimension::D2,
+            rough.bytes.clone(),
+            TextureFormat::R8Unorm,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        image.sampler = sampler;
+        return Some(image);
+    }
+    let mut data = Vec::with_capacity(pixels * 4);
+    for i in 0..pixels {
+        data.push(ao.as_ref().map_or(255, |p| p.bytes[i]));
+        data.push(rough.as_ref().map_or(fill, |p| p.bytes[i]));
+        data.push(metal.as_ref().map_or(255, |p| p.bytes[i]));
+        data.push(255);
+    }
+    let mut image = Image::new(
+        extent,
+        TextureDimension::D2,
+        data,
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    image.sampler = sampler;
     Some(image)
 }

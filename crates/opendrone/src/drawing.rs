@@ -29,6 +29,7 @@ use crate::repeat_breaking::{RepeatBreakingPlugin, VariedMaterial};
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::sky::{MapSky, attach_the_sky};
 use crate::stepping::Flight;
+use crate::surface_look::SkyReflection;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
 pub fn point(v: Vec3d) -> Vec3 {
@@ -216,6 +217,9 @@ fn draw_the_map_from_its_file(
                 let mut surface = library.material(&part.material, part.colour, images);
                 if let Some((_, lighting)) = &baked {
                     surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
+                    if let Some(light) = &plan.map.light {
+                        surface.set_sky(&SkyReflection::of(light, lighting));
+                    }
                 }
                 repeat_broken += usize::from(surface.repeat_broken());
                 surface_pictures += usize::from(surface.has_surface_picture());

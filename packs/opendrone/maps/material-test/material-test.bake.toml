@@ -1,0 +1,11 @@
+# Written by `cargo xtask maps --bake material-test`; never edit it by hand. It says what material-test's
+# light atlas was baked from, so `maps --check` can tell when the atlas is out of date.
+atlas = "material-test.light.exr"
+glb_sha256 = "18bc6ab869574f6f423e851cf18a8a5c82a779c0d741a3ae04df381a1bf37623"
+light_sha256 = "3647204f90338e618660b740a00ff7f741725088e55aaa606b9e1f8a3d9708a2"
+texel_cm = 25.0
+width = 2048
+height = 564
+samples = 128
+bounces = 6
+bake_seconds = 5.1

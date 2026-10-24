@@ -1,0 +1,18 @@
+# Throwaway test surface for #320: never committed.
+format      = 1
+name        = "Material test"
+description = "A floor, a wall and some metal plates, each dry, wet or metal."
+model       = "material-test.glb"
+preview     = "preview.png"
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+[light]
+sun_elevation = "40 °"
+sun_azimuth   = "160 °"
+sun_colour    = "#fff2d6"
+sun_strength  = "1.5"
+sky_colour    = "#a5c4f0"
+sky_strength  = "0.5"

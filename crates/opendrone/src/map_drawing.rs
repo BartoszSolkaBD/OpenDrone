@@ -24,11 +24,10 @@
 //!   drawn and the Map's large-scale picture (`[macro]`) is laid over it
 //!   (#304). Every other material is drawn as before.
 //! - **Roughness, occlusion, metal and wetness.** A material with
-//!   `roughness_map`, `ao_map`, `metallic_map` or `wetness` in the library is
-//!   drawn by the same shader ([`crate::surface_look`]), so wet, dull,
-//!   polished and rusty parts differ as they do in life (#320). A `metallic`
-//!   number alone is the plain material with its metal turned up. A material
-//!   that asks for none of it is drawn as before.
+//!   `roughness_map`, `ao_map`, `metallic_map`, `metallic` or `wetness` in the
+//!   library is drawn by the same shader ([`crate::surface_look`]), so wet,
+//!   dull, polished and rusty parts differ as they do in life (#320). A
+//!   material that asks for none of it is drawn as before.
 //! - **Baked light.** A Map with `[light]` and a light atlas
 //!   ([`MapLighting`], [`read_light_atlas`]) draws its parts lit by the atlas,
 //!   through Bevy's own lightmaps, on each mesh's second picture coordinates
@@ -55,7 +54,7 @@ use opendrone_pack::{DrawnPart, MapLight};
 
 use crate::light_atlas::read_exr;
 use crate::repeat_breaking::{BreakerSettings, RepeatBreaker, VariedMaterial};
-use crate::surface_look::{Plane, pack_surface, plane_of, wet};
+use crate::surface_look::{Plane, SkyReflection, pack_surface, plane_of, wet};
 
 /// Two faces are one smooth surface when their normals are closer than this
 /// (the cosine of 35°); further apart, the edge between them is sharp.
@@ -226,15 +225,12 @@ pub struct SurfaceAsk {
 }
 
 impl SurfaceAsk {
-    /// Whether the surface needs the shader: a picture to read or wetness. A
-    /// `metallic` number alone is a setting of the plain material.
-    pub fn needs_shader(&self) -> bool {
-        self.roughness_map || self.ao_map || self.metallic_map || self.wetness > 0.0
-    }
-
-    /// Whether it asks for anything at all.
+    /// Whether it asks for anything at all, which is when the shader draws it:
+    /// a picture to read, wetness or metal. A metal has no diffuse light to
+    /// show, so what it reflects of the sky, which the shader works out, is
+    /// all it has.
     pub fn asks(&self) -> bool {
-        self.needs_shader() || self.metallic > 0.0
+        self.any_map() || self.wetness > 0.0 || self.metallic > 0.0
     }
 
     fn any_map(&self) -> bool {
@@ -341,6 +337,17 @@ impl Surface {
     /// Whether it reads a picture of roughness, occlusion or metal (#320).
     pub fn has_surface_picture(&self) -> bool {
         matches!(self, Surface::Varied(m) if m.extension.surface.is_some())
+    }
+
+    /// Gives the surface the Map's sky to reflect, if it is drawn by the
+    /// shader (#320). The plain material has no reflections to give it to.
+    pub fn set_sky(&mut self, sky: &SkyReflection) {
+        if let Surface::Varied(m) = self {
+            let settings = &mut m.extension.settings;
+            settings.sky_zenith = sky.zenith.extend(sky.open);
+            settings.sky_haze = sky.haze.extend(1.0);
+            settings.sky_ground = sky.ground.extend(0.0);
+        }
     }
 
     pub fn standard_mut(&mut self) -> &mut StandardMaterial {
@@ -461,7 +468,7 @@ impl MaterialLibrary {
         });
         let variation = entry.and_then(|e| e.variation);
         match pictures {
-            Some((diffuse, normal)) if variation.is_some() || ask.needs_shader() => {
+            Some((diffuse, normal)) if variation.is_some() || ask.asks() => {
                 // Asking for a surface and not for the repeat to be broken is
                 // the same shader with the repeat left alone.
                 let variation = variation.unwrap_or(Variation {
@@ -482,6 +489,8 @@ impl MaterialLibrary {
                 let surface = entry
                     .and_then(|e| e.pictures.as_ref())
                     .and_then(|p| surface_picture(name, p, &ask, roughness, images));
+                let roughness_only = surface.as_ref().is_some_and(|(_, only)| *only);
+                let surface = surface.map(|(handle, _)| handle);
                 Surface::Varied(ExtendedMaterial {
                     base: StandardMaterial {
                         base_color: Color::WHITE,
@@ -510,9 +519,12 @@ impl MaterialLibrary {
                             surface: Vec4::new(
                                 f32::from(u8::from(surface.is_some())),
                                 ask.wetness,
-                                0.0,
+                                f32::from(u8::from(roughness_only)),
                                 0.0,
                             ),
+                            sky_zenith: Vec4::ZERO,
+                            sky_haze: Vec4::ZERO,
+                            sky_ground: Vec4::ZERO,
                         },
                         diffuse,
                         normal,
@@ -551,17 +563,18 @@ impl MaterialLibrary {
 }
 
 /// The picture of occlusion, roughness and metal a material asks for, packed
-/// into one and added to the images. A picture it asks for and can't have (no
-/// file, or one that isn't a picture) is said in the log and left out, with
-/// what it would have said replaced by its default; with none to read, there
-/// is no picture and the library's roughness number stands.
+/// into one and added to the images, and whether it holds roughness alone. A
+/// picture it asks for and can't have (no file, or one that isn't a picture)
+/// is said in the log and left out, with what it would have said replaced by
+/// its default; with none to read, there is no picture and the library's
+/// roughness number stands.
 fn surface_picture(
     name: &str,
     pictures: &Pictures,
     ask: &SurfaceAsk,
     roughness: f32,
     images: &mut Assets<Image>,
-) -> Option<Handle<Image>> {
+) -> Option<(Handle<Image>, bool)> {
     if !ask.any_map() {
         return None;
     }
@@ -584,7 +597,8 @@ fn surface_picture(
         read(ask.metallic_map, "metal", &pictures.metallic),
         roughness,
     )?;
-    Some(images.add(with_mipmaps(image)))
+    let roughness_only = image.texture_descriptor.format == TextureFormat::R8Unorm;
+    Some((images.add(with_mipmaps(image)), roughness_only))
 }
 
 /// A grey picture's pixels, from a JPG on disk.
@@ -641,14 +655,15 @@ fn load(path: &Path, is_srgb: bool, images: &mut Assets<Image>) -> Option<Handle
 }
 
 /// The picture with every smaller size down to one pixel, each the average of
-/// the four above it, so far away it doesn't shimmer. The picture must be
-/// four bytes a pixel.
+/// the four above it, so far away it doesn't shimmer. The picture must be one,
+/// two or four bytes a pixel.
 pub fn with_mipmaps(mut image: Image) -> Image {
     let (mut width, mut height) = (image.width() as usize, image.height() as usize);
     let Some(base) = image.data.take() else {
         return image;
     };
-    if base.len() != width * height * 4 {
+    let channels = base.len().checked_div(width * height).unwrap_or(0);
+    if base.len() != width * height * channels || !matches!(channels, 1 | 2 | 4) {
         image.data = Some(base);
         return image;
     }
@@ -657,15 +672,15 @@ pub fn with_mipmaps(mut image: Image) -> Image {
     let mut count = 1;
     while width > 1 || height > 1 {
         let (next_width, next_height) = ((width / 2).max(1), (height / 2).max(1));
-        let mut next = Vec::with_capacity(next_width * next_height * 4);
+        let mut next = Vec::with_capacity(next_width * next_height * channels);
         for y in 0..next_height {
             for x in 0..next_width {
-                for channel in 0..4 {
+                for channel in 0..channels {
                     let mut sum = 0u32;
                     for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
                         let sx = (x * 2 + dx).min(width - 1);
                         let sy = (y * 2 + dy).min(height - 1);
-                        sum += u32::from(level[(sy * width + sx) * 4 + channel]);
+                        sum += u32::from(level[(sy * width + sx) * channels + channel]);
                     }
                     next.push(((sum + 2) / 4) as u8);
                 }

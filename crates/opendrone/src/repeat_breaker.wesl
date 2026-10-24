@@ -20,6 +20,8 @@
 // JCGT 2022); nothing here is copied from his code.
 import bevy_pbr::render::{
     pbr_types,
+    pbr_lighting,
+    mesh_view_bindings,
     pbr_functions::{
         alpha_discard,
         apply_normal_mapping,
@@ -37,8 +39,14 @@ struct Breaker {
     snap_turn: vec4<f32>,
     // x: how strongly the large picture shows (0 for none); y: its repeats to a metre.
     wide: vec4<f32>,
-    // x: 1 if the surface picture is bound; y: how wet the surface is, 0 to 1.
+    // x: 1 if the surface picture is bound; y: how wet the surface is, 0 to 1; z: 1 if the picture
+    // holds roughness alone, in its one (red) channel.
     surface: vec4<f32>,
+    // What the surface reflects of a baked Map's sky: the zenith's colour and the sky-lit
+    // ground's brightness; the horizon's colour and 1 if there is a sky; the ground's colour.
+    sky_zenith: vec4<f32>,
+    sky_haze: vec4<f32>,
+    sky_ground: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> breaker: Breaker;
@@ -144,6 +152,12 @@ fn look_at(corner: vec2<i32>, uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> 
     return out;
 }
 
+// The surface picture's occlusion, roughness and metal where `uv` is.
+fn surface_sample(uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> vec3<f32> {
+    let texel = textureSampleGrad(surface_texture, surface_sampler, uv, ddx, ddy).rgb;
+    return select(texel, vec3<f32>(1.0, texel.r, 1.0), breaker.surface.z > 0.5);
+}
+
 struct Surface {
     colour: vec3<f32>,
     // The normal in the surface's own frame, as the normal map holds it, from -1 to 1.
@@ -160,7 +174,7 @@ fn surface_at(uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> Surface {
         out.colour = textureSampleGrad(diffuse_texture, diffuse_sampler, uv, ddx, ddy).rgb;
         out.normal = textureSampleGrad(normal_texture, normal_sampler, uv, ddx, ddy).rgb * 2.0 - 1.0;
         if has_surface {
-            out.pbr = textureSampleGrad(surface_texture, surface_sampler, uv, ddx, ddy).rgb;
+            out.pbr = surface_sample(uv, ddx, ddy);
         }
         return out;
     }
@@ -185,9 +199,9 @@ fn surface_at(uv: vec2<f32>, ddx: vec2<f32>, ddy: vec2<f32>) -> Surface {
     let average = textureSampleLevel(diffuse_texture, diffuse_sampler, vec2<f32>(0.5, 0.5), 16.0).rgb;
     if has_surface {
         // Occlusion, roughness and metal are blended as they are: they have no spread to put back.
-        let pbr_a = textureSampleGrad(surface_texture, surface_sampler, a.uv, a.ddx, a.ddy).rgb;
-        let pbr_b = textureSampleGrad(surface_texture, surface_sampler, b.uv, b.ddx, b.ddy).rgb;
-        let pbr_c = textureSampleGrad(surface_texture, surface_sampler, c.uv, c.ddx, c.ddy).rgb;
+        let pbr_a = surface_sample(a.uv, a.ddx, a.ddy);
+        let pbr_b = surface_sample(b.uv, b.ddx, b.ddy);
+        let pbr_c = surface_sample(c.uv, c.ddx, c.ddy);
         out.pbr = pbr_a * w.x + pbr_b * w.y + pbr_c * w.z;
     }
     let blended = colour_a * w.x + colour_b * w.y + colour_c * w.z;
@@ -220,6 +234,37 @@ fn wide_multiplier(world: vec3<f32>, normal: vec3<f32>) -> vec3<f32> {
     let a = textureSampleLevel(wide_texture, wide_sampler, first, 0.0).rgb * 2.0;
     let b = textureSampleLevel(wide_texture, wide_sampler, second, 0.0).rgb * 2.0;
     return a * b;
+}
+
+// The light from a direction (Bevy's axes) in the gradient of the sky: `Sky::clear_sky_toward` in
+// `sky.rs`, without the sun and the clouds (the sun is a light of its own).
+fn sky_toward(direction: vec3<f32>) -> vec3<f32> {
+    let up = clamp(direction.y, -1.0, 1.0);
+    let high = pow(1.0 - max(up, 0.0), 3.5);
+    let above = mix(breaker.sky_zenith.rgb, breaker.sky_haze.rgb, high);
+    let ground = 1.0 - smoothstep(-0.08, 0.0, up);
+    return mix(above, breaker.sky_ground.rgb, ground);
+}
+
+// What a surface of a baked Map mirrors of the sky (`SkyReflection` in `surface_look.rs`), before
+// the camera's exposure: the sky where the camera's view bounces off the surface, as a surface
+// with this roughness and metal reflects it, and as much as the atlas says the spot is open to
+// the sky. A rough surface sees a smeared sky, the average of the gradient.
+fn sky_reflection(pbr_input: pbr_types::PbrInput) -> vec3<f32> {
+    let n = pbr_input.N;
+    let v = pbr_input.V;
+    let n_dot_v = max(dot(n, v), 0.0001);
+    let roughness = pbr_input.material.perceptual_roughness;
+    let metallic = pbr_input.material.metallic;
+    let reflectance = pbr_input.material.reflectance;
+    let f0 = 0.16 * reflectance * reflectance * (1.0 - metallic) + pbr_input.material.base_color.rgb * metallic;
+    let brdf = pbr_lighting::EnvBRDFApprox(f0, pbr_lighting::F_AB(roughness, n_dot_v));
+    let sharp = sky_toward(reflect(-v, n));
+    let smeared = 0.5 * (breaker.sky_zenith.rgb + breaker.sky_haze.rgb);
+    let seen = mix(sharp, smeared, smoothstep(0.2, 0.8, roughness));
+    let light = dot(pbr_input.lightmap_light, vec3<f32>(0.2126, 0.7152, 0.0722));
+    let open = clamp(light / max(breaker.sky_zenith.w, 0.000001), 0.0, 1.0);
+    return seen * brdf * open * pbr_input.specular_occlusion;
 }
 
 @fragment
@@ -277,6 +322,9 @@ fn fragment(
         out.color = apply_pbr_lighting(pbr_input);
     } else {
         out.color = pbr_input.material.base_color;
+    }
+    if breaker.sky_haze.w > 0.5 {
+        out.color = vec4<f32>(out.color.rgb + sky_reflection(pbr_input) * mesh_view_bindings::view.exposure, out.color.a);
     }
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
     return out;

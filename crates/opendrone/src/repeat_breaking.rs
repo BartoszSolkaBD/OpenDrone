@@ -57,8 +57,16 @@ pub struct BreakerSettings {
     /// repeats to a metre.
     pub wide: Vec4,
     /// `x`: 1 if the surface picture (occlusion, roughness, metal) is bound.
-    /// `y`: how wet the surface is, 0 to 1.
+    /// `y`: how wet the surface is, 0 to 1. `z`: 1 if the picture holds
+    /// roughness alone, in its one channel.
     pub surface: Vec4,
+    /// What the surface reflects of the Map's sky, for a baked Map
+    /// ([`crate::surface_look::SkyReflection`]): the zenith's colour and, in
+    /// its `w`, how bright the sky-lit ground is; the horizon's colour and, in
+    /// its `w`, 1 if there is a sky to reflect; the ground's colour.
+    pub sky_zenith: Vec4,
+    pub sky_haze: Vec4,
+    pub sky_ground: Vec4,
 }
 
 /// The extension of the standard material that breaks the repeat of its
