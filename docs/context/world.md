@@ -17,7 +17,7 @@ A Map of an abandoned, unfinished building and its site, flown inside and out. T
 _Avoid_: Ruin, abandoned building (as the Map's name)
 
 **Factory**:
-A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is one 30 × 30 m bay of a brick hall and its yard, worn and with the history of an abandoned works in it ([Building a Map](../building-a-map.md#the-factorys-first-slice), [its second slice](../building-a-map.md#the-factorys-second-slice-wear-uneven-shapes-and-history)).
+A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is one 30 × 30 m bay of a brick hall and its yard, worn and with the history of an abandoned works in it ([Building a Map](../building-a-map.md#the-factorys-first-slice), [its second slice](../building-a-map.md#the-factorys-second-slice-wear-uneven-shapes-and-history), [its third](../building-a-map.md#the-factorys-third-slice-real-grass-the-kit-and-relief): real grass, rubble and relief).
 _Avoid_: Warehouse, plant
 
 **Gap**:

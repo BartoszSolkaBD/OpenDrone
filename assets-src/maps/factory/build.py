@@ -792,7 +792,7 @@ def grassiness(x, y):
     w = 0.9 * smoothstep((far - 18.0) / 16.0) * smoothstep(fbm2(seed + 1, x, y, 7.0, 3) * 2.5 + 0.6)
     # #341: the yard has gone back to grass everywhere but the track, in
     # patches of thinner grass over gravel where something stood or drove.
-    w = max(w, 0.7 * smoothstep(fbm2(seed + 2, x, y, 6.0, 3) * 3.0 + 0.75))
+    w = max(w, 0.7 * smoothstep(fbm2(seed + 2, x, y, 6.0, 3) * 3.0 + 0.45))
     # Strips along the walls' feet where the sun falls and nothing drives.
     for edge in (SOUTH_STRIP, WEST_STRIP, NORTH_STRIP):
         w = max(w, edge.weight(x, y))
@@ -870,8 +870,9 @@ def grass_split(mesh, bands):
         cy = sum(corners[i][1] for i in f) / len(f)
         w = grassiness(cx, cy)
         r0, r1, r2, r3 = GRASS_REACH
-        if not (r0 <= cx <= r2 and r1 <= cy <= r3) or PATH.weight(cx, cy) > 0.25 or HARD.weight(cx, cy) > 0.25:
-            w = 0.0  # out of reach, or the worn track and the hard standing: bare
+        if (not (r0 <= cx <= r2 and r1 <= cy <= r3) or PATH.weight(cx, cy) > 0.25 or HARD.weight(cx, cy) > 0.25
+                or math.hypot(cx - LAUNCH[0], cy - LAUNCH[1]) < 3.2):
+            w = 0.0  # out of reach, the worn track, the hard standing or the Launch Spot's trodden ground: bare
         k = next((i for i, (least, _) in enumerate(bands) if w >= least), len(bands))
         groups[k].append(f)
     out = []
