@@ -459,18 +459,18 @@ wetness       = 0.25     # how wet it makes the surface under it there; 0 if lef
 | `decal_runs` | 512, 0.06 MB | 0.9 | 0 | water runs: thin dark streaks that fan wider as they go, starting at the top edge of the picture; put under a sill, a roof edge or a broken gutter |
 | `decal_salt` | 512, 0.17 MB | 0.75 | 0 | efflorescence, the white crust and powder damp brings out at the foot of a wall |
 | `decal_lichen` | 512, 0.18 MB | 0.9 | 0 | rosettes of grey-green, yellow and orange lichen, in clumps, for still shaded walls and old stone |
-| `decal_algae` | 512, 0.14 MB | 0.5 | 0.7 | a slimy dark green film on a wet floor or low wall |
+| `decal_algae` | 512, 0.14 MB | 0.6 | 0.7 | a slimy dark green film on a wet floor or low wall |
 | `decal_rust_bleed` | 512, 0.07 MB | 0.9 | 0 | rust that has run down from a fixing: its source is 12% of the way down the picture |
-| `decal_scuffs` | 512, 0.13 MB | 0.66 | 0 | scuffs and dragged grit along a path (the picture's top is the way people walk) |
+| `decal_scuffs` | 512, 0.13 MB | 0.7 | 0 | scuffs and dragged grit along a path (the picture's top is the way people walk) |
 | `decal_scratches` | 512, 0.05 MB | 0.55 | 0 | a patch of fine scrapes and a few gouges on a wall or door |
-| `decal_cracks` | 512, 0.09 MB | 0.9 | 0 | a forking network of hairline cracks that dies out toward the edges |
-| `decal_soot` | 512, 0.07 MB | 0.93 | 0 | fire blackening: a plume black just above the flame at the picture's bottom, fanning up |
-| `decal_oil` | 512, 0.04 MB | 0.3 | 0.5 | glossy dark oil stains, with drips |
-| `decal_droppings` | 512, 0.08 MB | 0.55 | 0 | bird droppings: white splats with a dark middle |
-| `decal_flakes` | 512, 0.20 MB | 0.6 | 0 | flakes of peeling paint lying where they fell, in three faded colours |
-| `decal_cobweb` | 512, 0.08 MB | 0.7 | 0 | a cobweb in a corner: strands from the picture's top middle, which is the corner line |
-| `decal_tag` | 512, 0.06 MB | 0.5 | 0 | a generic spray-painted scrawl in teal, with drips; it spells nothing |
-| `decal_stencil` | 512, 0.07 MB | 0.65 | 0 | a generic stencil, a bar of blank block letters and an arrow, in faded yellow |
+| `decal_cracks` | 512, 0.09 MB | 1 | 0 | a forking network of hairline cracks that dies out toward the edges |
+| `decal_soot` | 512, 0.07 MB | 0.9 | 0 | fire blackening: a plume black just above the flame at the picture's bottom, fanning up |
+| `decal_oil` | 512, 0.04 MB | 0.8 | 0.5 | glossy dark oil stains, with drips |
+| `decal_droppings` | 512, 0.08 MB | 1 | 0 | bird droppings: white splats with a dark middle |
+| `decal_flakes` | 512, 0.20 MB | 1 | 0 | flakes of peeling paint lying where they fell, in three faded colours |
+| `decal_cobweb` | 512, 0.08 MB | 0.8 | 0 | a cobweb in a corner: strands from the picture's top middle, which is the corner line |
+| `decal_tag` | 512, 0.06 MB | 1 | 0 | a generic spray-painted scrawl in teal, with drips; it spells nothing |
+| `decal_stencil` | 512, 0.07 MB | 1 | 0 | a generic stencil, a bar of blank block letters and an arrow, in faded yellow |
 
 **Making one.** A decal's generator is a texture generator ([Adding one](#adding-one)) whose `make(seed, pixels)` returns four pictures, the fourth the mask; [`decalwork.py`](../assets-src/generators/decalwork.py) has the frame that clears the edges, an irregular patch and the finish. A decal doesn't repeat, so the rule against marks near the edge doesn't hold for it, and its readable checks are its own: the mask is 0 along every edge, nearly whole somewhere, and covers part of the picture. A decal's texture is left off the contact sheet. Its `size` in the library is only how big it was drawn to be: each decal in a Map gives its own.
 
