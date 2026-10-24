@@ -30,6 +30,7 @@ use crate::rotors::RotorParts;
 use crate::set_up::{FlightPlan, repo_folder};
 use crate::sky::{MapSky, attach_the_sky};
 use crate::stepping::Flight;
+use crate::surface_look::SkyReflection;
 
 /// A point in the Map (east, north, up, in metres) in Bevy's axes.
 pub fn point(v: Vec3d) -> Vec3 {
@@ -208,6 +209,9 @@ fn draw_the_map_from_its_file(
     let library = MaterialLibrary::read(&repo_folder());
     let baked = baked_light(plan, images);
     let mut by_name: BTreeMap<String, DrawnMaterial> = BTreeMap::new();
+    // Of the materials, how many have their repeat broken (#304) and how many
+    // read a picture of roughness, occlusion or metal (#320).
+    let (mut repeat_broken, mut surface_pictures) = (0, 0);
     for part in &plan.map.drawing {
         let material = by_name
             .entry(part.material.clone())
@@ -215,7 +219,12 @@ fn draw_the_map_from_its_file(
                 let mut surface = library.material(&part.material, part.colour, images);
                 if let Some((_, lighting)) = &baked {
                     surface.standard_mut().lightmap_exposure = lighting.lightmap_exposure;
+                    if let Some(light) = &plan.map.light {
+                        surface.set_sky(&SkyReflection::of(light, lighting));
+                    }
                 }
+                repeat_broken += usize::from(surface.repeat_broken());
+                surface_pictures += usize::from(surface.has_surface_picture());
                 match surface {
                     Surface::Plain(material) => DrawnMaterial::Plain(materials.add(material)),
                     Surface::Varied(material) => DrawnMaterial::Varied(varied.add(material)),
@@ -242,15 +251,13 @@ fn draw_the_map_from_its_file(
         }
     }
     info!(
-        "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken",
+        "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken, {} with roughness, occlusion or metal pictures",
         plan.map.name,
         plan.map.drawing.len(),
         by_name.len().min(library.textured()),
         by_name.len(),
-        by_name
-            .values()
-            .filter(|m| matches!(m, DrawnMaterial::Varied(_)))
-            .count()
+        repeat_broken,
+        surface_pictures
     );
     if let Some((_, lighting)) = baked {
         // The sky comes from the same `[light]`, and goes behind the Map on
