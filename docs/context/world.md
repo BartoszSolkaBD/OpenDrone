@@ -60,6 +60,10 @@ _Avoid_: Sticker, overlay
 The marks of age and use on a Map's surfaces (water runs, moss, rust, soot, scuffs, droppings, cracks and the like), put as decals (see Decal above) by rules that give each mark a cause: water runs below a sill, moss grows low on a shaded wall, soot rises above a fire. A rule is given a wear level from 0 to 1 and a seed, so the same seed gives the same Map, and a Map's author can add a decal by hand or lock a box against the rules. How a script asks for it: [Building a Map](../building-a-map.md#wear).
 _Avoid_: Dirt layer, grunge
 
+**Scatter**:
+Small plants the game grows over a Map's ground, thousands of them, each a real little mesh rather than part of the ground's picture: today grass, a clump of 6 to 12 blades. A ground part asks for it with a tag that names the plant, how many clumps a square metre and how tall; the game places the clumps when the Map is drawn, from a fixed seed, so the same Map always grows the same grass. Scatter is only drawn, never solid: a Quad flies through it. How a Map asks for it: [Building a Map](../building-a-map.md#grass).
+_Avoid_: Foliage, vegetation layer
+
 **Kit**:
 The loose things a Map's script lays on its floors and yards, made from scratch and solid, not pictures: bricks and brick chunks, concrete lumps with rebar, plaster chips, roof-sheet pieces, planks, boards and pallets, pipes, drums, cable, a tyre, cans and bottles, and the bolt plates and anchor stubs left in a hall floor. Each **kit item** has a few variants, and rules scatter them from a seed: a heap of rubble, debris along a wall's foot, a strewn floor, a row of bolt plates on an old column line, piles of pallets and boards. How a script asks for it: [Building a Map](../building-a-map.md#the-kit-and-the-scatter).
 _Avoid_: Props (a prop is a propeller), clutter, asset pack

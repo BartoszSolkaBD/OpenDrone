@@ -150,6 +150,9 @@ It's binary glTF, with every object a node of the file. The checker reads what t
 | `od_launch_spot` | a heading, 0 up to 360 | **Exactly one empty carries it**, at the Launch Spot on the ground, with the compass heading the Quad faces (0 north, 90 east). It is also where the pilot stands. |
 | `od_decal` | a whole number, 0 to 15 | The object is a **decal**: a picture lying on a surface, drawn over it ([Decals](../building-a-map.md#decals)). The number is its layer: where decals overlap, a higher layer is drawn over a lower one. A decal's `od_collider` is `none`, and its picture coordinates (`TEXCOORD_0`, one for every corner) run from 0 to 1 across its one picture. |
 | `od_blend` | a material's name | A second material shows through the object's own, as much as the mesh's **vertex colours** (`COLOR_0`) say: one grey colour per corner, black for the object's own material and white for the second ([Blending two materials](../building-a-map.md#blending-two-materials)). |
+| `od_scatter` | `grass` | The object is a ground that **grows grass**: the game grows clumps of real blades over its upward-facing triangles ([Grass](../building-a-map.md#grass)). It needs the next two tags too. |
+| `od_scatter_density` | a number, 0.1 to 20 | How many clumps grow on a square metre. |
+| `od_scatter_height` | two numbers, each 0.02 to 2 | The shortest and the tallest clump, in metres, the shortest first. |
 
 Any other tag that starts with `od_` is refused, so a misspelt one never passes for nothing. Other custom properties are nobody's business.
 
@@ -161,6 +164,7 @@ The checker refuses, listing every problem with the `.glb`'s file and the object
 - a `box` that isn't a box, a `convex` that is open or dented (the sentence says which), and a part that is `od_collision_only` with a collider of `none`;
 - a decal whose layer isn't a whole number from 0 to 15, one that is solid (an `od_collider` other than `none`) or `od_collision_only`, one with no picture coordinates or with a coordinate outside 0 to 1 (its picture would repeat and its edge show as a rectangle), and one that also has `od_blend`;
 - vertex colours (`COLOR_0`) on an object with no `od_blend`, and `od_blend` on one with none; an `od_blend` that isn't a material's name; vertex colours that aren't one for every corner, aren't grey (they are weights, not a tint), are outside 0 to 1, or are neither 32-bit decimal numbers nor whole numbers that stand for 0 to 1;
+- an `od_scatter` that names a plant the game doesn't grow (it says which it does), an `od_scatter_density` or `od_scatter_height` out of range or not a number (or, for the heights, not two of them, the shortest first), an `od_scatter` without the other two or either of them without `od_scatter`, and grass on a decal or on an `od_collision_only` part, which is never drawn;
 - compressed meshes: Draco, meshopt, quantised (whole-number) corners and GPU instancing, because every program must read the very same corners, and Bevy refuses them too;
 - a file that isn't a binary glTF, one cut short, one with a sparse accessor or a second buffer, and meshes that aren't triangles.
 

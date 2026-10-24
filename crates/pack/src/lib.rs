@@ -54,6 +54,7 @@ pub mod migration;
 mod quad;
 pub mod schema;
 mod test_maps;
+pub use test_maps::{GRASS_FIELD, GRASS_FIELD_DENSITY};
 mod tune;
 pub mod units;
 mod values;
@@ -63,7 +64,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub use document::{Problem, Problems};
-pub use glb::{Blend, Collider, DrawnPart, LaunchSpot, MapModel, TOP_DECAL_LAYER};
+pub use glb::{
+    Blend, Collider, DrawnPart, LaunchSpot, MapModel, SCATTER_DENSITY, SCATTER_HEIGHT,
+    SCATTER_KINDS, Scatter, ScatterKind, TOP_DECAL_LAYER,
+};
 pub use input_device::{
     InputDeviceProfile, read_input_device_file, read_input_device_file_with_steps,
 };

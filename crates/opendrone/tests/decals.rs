@@ -48,6 +48,7 @@ fn ground(weights: Option<Vec<f32>>) -> DrawnPart {
         light_uvs: Vec::new(),
         triangles: vec![[0, 1, 2], [0, 2, 3]],
         decal: None,
+        scatter: None,
         blend: weights.map(|weights| Blend {
             material: "ground_dirt_rubble".to_string(),
             weights,
