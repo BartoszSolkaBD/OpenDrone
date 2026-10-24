@@ -123,6 +123,7 @@ texture   = "brick_red_weathered"
 break_repeat   = true
 snap           = [8, 12]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.brick_painted_peeling]
 colour    = [0.24, 0.28, 0.20]
@@ -131,6 +132,7 @@ texture   = "brick_painted_peeling"
 break_repeat   = true
 snap           = [8, 12]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.concrete_floor_worn]
 colour    = [0.17, 0.17, 0.15]
@@ -139,6 +141,7 @@ texture   = "concrete_floor_worn"
 break_repeat   = true
 snap           = [2, 2]
 macro_strength = 0.60
+roughness_map  = true
 
 [materials.concrete_wall_rough]
 colour    = [0.20, 0.19, 0.17]
@@ -147,6 +150,7 @@ texture   = "concrete_wall_rough"
 break_repeat   = true
 snap           = [2, 2]
 macro_strength = 0.50
+roughness_map  = true
 
 [materials.steel_beam_rusted]
 colour    = [0.10, 0.07, 0.08]
@@ -155,6 +159,7 @@ texture   = "steel_beam_rusted"
 break_repeat   = true
 snap           = [0, 1]
 macro_strength = 0.30
+roughness_map  = true
 
 [materials.roof_corrugated_rusted]
 colour    = [0.21, 0.18, 0.16]
@@ -163,6 +168,7 @@ texture   = "roof_corrugated_rusted"
 break_repeat   = true
 snap           = [12, 1]
 macro_strength = 0.40
+roughness_map  = true
 
 [materials.ground_dirt_rubble]
 colour    = [0.12, 0.08, 0.05]
@@ -171,6 +177,7 @@ texture   = "ground_dirt_rubble"
 break_repeat   = true
 turn_cells     = true
 macro_strength = 0.70
+roughness_map  = true
 
 [materials.grass_weeds]
 colour    = [0.09, 0.11, 0.02]
@@ -179,6 +186,7 @@ texture   = "grass_weeds"
 break_repeat   = true
 turn_cells     = true
 macro_strength = 0.60
+roughness_map  = true
 
 # No picture: leaves are a flat colour.
 [materials.foliage]
