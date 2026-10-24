@@ -30,9 +30,10 @@ const QUADS: [&str; 2] = ["whoop-65", "freestyle-5"];
 
 /// The Maps `--map` takes, with the id each means. The Test Map `flat-floor`
 /// is a developer's: it flies at once, with no screens and nothing saved.
-const MAPS: [(&str, &str); 4] = [
+const MAPS: [(&str, &str); 5] = [
     ("skate-park", "opendrone/skate-park"),
     ("bando", "opendrone/bando"),
+    ("factory", "opendrone/factory"),
     ("flat-floor", "test/flat-floor"),
     ("grass-field", "test/grass-field"),
 ];
@@ -56,7 +57,7 @@ Launch; after that you land on the Hub, and FLY takes you to the Launch Spot.
   opendrone --quad freestyle-5    pick this Quad (or --quad whoop-65), and
                                   keep the choice in your settings
   opendrone --map bando           pick Bando, the unfinished tower (or --map
-                                  skate-park), and keep the choice
+                                  skate-park, or factory), and keep the choice
   opendrone --look digital        see the Digital Video Look (or analog, the
                                   default), and keep the choice
   opendrone --aspect 16:9         a 16:9 picture that crops the top and bottom

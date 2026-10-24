@@ -270,7 +270,9 @@ fn every_texture_the_repo_makes_from_scratch_is_committed_as_three_pictures_of_t
 fn the_pictures_made_from_scratch_stay_within_the_size_budget() {
     // ADR-0024: a generated picture is 2K at most for a hero surface and 1K
     // otherwise, and a Map has a size budget for them. The first slice's
-    // budget is 10 MB for all eight; the PR says what each costs.
+    // budget was 10 MB for all eight; with the decals of #321 and #323 and
+    // the Factory's props (#324) it is 14 MB for all of them (11.7 MB in
+    // #324); the PR says what each costs.
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut total = 0;
     for entry in fs::read_dir(repo.join("assets-src/generated")).unwrap() {
@@ -280,8 +282,8 @@ fn the_pictures_made_from_scratch_stay_within_the_size_budget() {
         }
     }
     assert!(
-        total <= 10_000_000,
-        "the committed pictures take {total} bytes, over the 10 MB budget"
+        total <= 14_000_000,
+        "the committed pictures take {total} bytes, over the 14 MB budget"
     );
 }
 

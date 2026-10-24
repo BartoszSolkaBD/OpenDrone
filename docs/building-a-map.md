@@ -171,9 +171,9 @@ Pictures are drawn with the Map's textures when `cargo xtask textures` has run, 
 
 ## Materials made from scratch
 
-A detailed Map (the Factory is the first) doesn't use downloaded pictures: its surfaces are drawn by scripts that agents write, and the pictures they make are committed ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Nothing is downloaded, no outside picture goes in, and the pictures are CC0 like everything agents make. Skate Park and Bando keep their downloaded textures. The first eight materials, which are the Factory slice's, look like this (the colour picture of each, the way [`cargo xtask generate-textures`](#adding-one) makes it):
+A detailed Map (the Factory is the first) doesn't use downloaded pictures: its surfaces are drawn by scripts that agents write, and the pictures they make are committed ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Nothing is downloaded, no outside picture goes in, and the pictures are CC0 like everything agents make. Skate Park and Bando keep their downloaded textures. The materials, which are the Factory slice's, look like this (the colour picture of each, the way [`cargo xtask generate-textures`](#adding-one) makes it):
 
-![The eight materials made from scratch: painted brick with the plaster peeling, weathered red brick, worn concrete floor and rough concrete wall in the top row; grass and weeds, dirt and rubble ground, rusted corrugated roof and a rusted steel beam in the bottom row](images/materials-made-from-scratch.jpg)
+![The materials made from scratch, in alphabetical order, four to a row: bark, painted brick with the plaster peeling, weathered red brick and worn concrete floor; rough concrete wall, wired glass, graffiti on brick and grass with weeds; dirt and rubble ground, leaves, the large-scale variation picture and rusted corrugated roof; a faded sign, a rusted steel beam and charred timber](images/materials-made-from-scratch.jpg)
 
 | Material | One repeat | Picture | Cost |
 |---|---|---|---|
@@ -185,8 +185,14 @@ A detailed Map (the Factory is the first) doesn't use downloaded pictures: its s
 | `roof_corrugated_rusted` | 1.2 m | 1K | 495 KB |
 | `ground_dirt_rubble` | 2 m | 1K | 936 KB |
 | `grass_weeds` | 2 m | 1K | 1.3 MB |
+| `glass_wired_grimy` (window glass, opaque) | 1 m | 512 | 214 KB |
+| `wood_charred` (burnt timber) | 1 m | 512 | 339 KB |
+| `bark_rough` | 1 m | 512 | 153 KB |
+| `leaves_mixed` (leaves and weeds) | 0.6 m | 512 | 118 KB |
+| `sign_faded` (one board, shown once) | 4 m | 1K | 242 KB |
+| `graffiti_brick` (one patch, shown once) | 3.6 m | 1K | 935 KB |
 
-Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map, and draws a part with them as it does a downloaded texture; a material that says `roughness_map = true` has its roughness picture read too ([Wet, rough and metal surfaces](#wet-rough-and-metal-surfaces)). All eight together are about 6.7 MB, and the contact sheet above is 0.4 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or [decals](#decals).
+Each material has three pictures in `assets-src/generated/<name>/`: `diffuse.jpg` (the colour), `normal.jpg` (the normal map, in the same convention as Poly Haven's) and `roughness.jpg`. The game reads the colour and the normal map, and draws a part with them as it does a downloaded texture; a material that says `roughness_map = true` has its roughness picture read too ([Wet, rough and metal surfaces](#wet-rough-and-metal-surfaces)). All the tiled ones and the large-scale picture together are about 9 MB. Pictures are 2K at most for a hero surface and 1K otherwise. A picture never holds a one-off mark (graffiti, a spalled patch with a rebar, a stencilled block, a painted band): it would show again with every repeat, in plain view. Those are separate geometry or [decals](#decals).
 
 ### In the material library
 
@@ -259,6 +265,112 @@ macro_strength = 0.60       # how strongly the large picture shows; 0 or left ou
 **Marks that must not repeat.** A picture repeats its marks too, so a mark that appears once to the picture appears over and over, and hex tiling would only scatter the copies. Don't paint one into a generator. Graffiti, a spalled patch with a bare rebar, a stencilled block of marks and a painted band are separate geometry or decals in the Map's script, put where the Map wants them. The two materials that had such marks, `brick_painted_peeling` (graffiti, a chevron band) and `concrete_wall_rough` (the spalled patch and its rebar, a rebar's faint line, a stencilled block), no longer draw them; the Map's script has to add them back, as geometry or as [decals](#decals).
 
 **Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)): one view from 40 m straight down (`at=0,0,40 pitch=-90`) and one low along a floor show a repeat at once. The game logs how many of a Map's materials are drawn this way ("with the repeat broken"). One or two views a run: more than two stall the command ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)).
+
+## The Factory's first slice
+
+The first piece of the Factory (`opendrone/factory`, [#295](https://github.com/BartoszSolkaBD/OpenDrone/issues/295)) is one 30 × 30 m bay of an abandoned brick hall and its yard, built by [`assets-src/maps/factory/build.py`](../assets-src/maps/factory/build.py). It is the example for the next detailed Map: every surface is a material made from scratch, the light is baked, and the damage and the plants come from two helpers in `assets-src/lib/`, written the way the rest of a Map is (plain Python from a seed, the same bytes on every computer):
+
+- [`odruin.py`](../assets-src/lib/odruin.py): `Random` (numbers from a seed and keys), `Batch` (many small solids drawn as one part, such as a pile of rubble), `plate` (a flat outline of any shape with a thickness, on any plane: a torn roof sheet, a pane, a skin of plaster), `breach` (a hole broken through a wall, stepped to the bricks, as openings for `wall`), `missing_bricks` (pockets where single bricks fell out, cut from one leaf of a wall built in two), `lump`, `brick`, `scatter` and `mound` (rubble), `bent_bar` (a buckled beam) and `shards` (what is left of a broken pane).
+- [`odplants.py`](../assets-src/lib/odplants.py): `weeds` (a clump of thin, bent blades and a rosette of broad leaves) and `tree` (a leaning trunk, branches and twigs, and a crown of leaf sprays). A leaf is a card drawn from both sides. Leaves and weeds are only drawn, on purpose: a Quad flies through them; the wood is solid.
+
+Their readable checks run with the unwrap's: `python3 -m unittest discover -s assets-src/lib`.
+
+**One-off marks.** A sign or a patch of graffiti must show once, so it is a material of its own whose generator puts the mark in one part of one repeat, and the script lays a thin skin (a box 2 to 4 mm thick) over exactly that part. A picture coordinate is the Map's metres divided by the repeat size, so the skin's corners sit on whole repeats: `sign_faded` repeats every 4 m and its board covers x = 16.4 to 19.6 m and z = 5.2 to 6.8 m of the repeat from 16 to 20 m and 4 to 8 m. Such a material doesn't ask for `break_repeat`.
+
+**What it costs**, measured on the maintainer's M4 Mac mini, so the next detailed Map has a budget to start from:
+
+| | The slice |
+|---|---|
+| Parts and triangles | 483 parts (each a draw), 97,908 triangles; the `.glb` is 6.0 MB |
+| Pictures | 14 materials made from scratch, 8.9 MB in all (the six new for the slice, 2.0 MB) |
+| Light atlas | 2048 × 3632 at 10 cm a texel (7 cm for leaves, 2 to 3 cm for weed blades and window bars, 20 cm for the yard, coarse beyond it); a 14.3 MB EXR, 60 MB in the graphics card |
+| Bake | 379 s at 1024 samples, 47 s at 128 for a quick look |
+| Frame | about 6.0 ms a frame (1661 frames in 10 s, Analog Look, 2560 × 1440, release build), against about 5.2 ms for Bando |
+
+A whole Factory of about 200 × 100 m is some twenty bays like this one: at the same density its atlas would not fit in one 8192 × 8192 picture, so the full Map needs coarser light on its outsides and roofs, or the second atlas that "Not here yet" names.
+
+**Traps, for the next one:**
+
+- A triangle smaller than a texel of the light atlas can cover no texel's middle, and bakes black: leaves at 25 cm a texel came out as black cards. Give thin parts a fine `light_cm` (leaves 7 cm, weed blades 2 cm, window bars 3 cm).
+- A thin box on a slope isn't a box any more once its corners are rounded to 0.1 mm, and the Pack checker refuses it; tag tilted sheets `trimesh`.
+- `prism` wants its outline clockwise (seen with `along` to the right and `up` up). An anticlockwise one makes a solid whose ends face inwards: the bake lights the inside of the face, and the gables came out black.
+- A plain view of `--render-views` can leave out some of a baked Map's parts ([#316](https://github.com/BartoszSolkaBD/OpenDrone/issues/316)): judge a baked Map in a Video Look view (`look=digital` is the cleanest).
+- Openings that nearly meet leave slivers that `wall` can't make; round them to a common grid (the script uses 5 mm).
+- A picture's one-off lines repeat with it: the roof's lap and its row of screws striped a whole roof seen from above until `snap` let tiles shift up and down the ridges (`snap = [12, 0]`).
+- The ground to the horizon gets coarse light (a chart is at most 512 texels across, so 4 m a texel for 2 km), which shows as blotches near the camera: give the yard its own slab with finer light.
+
+## The Factory's second slice: wear, uneven shapes and history
+
+The second slice ([#324](https://github.com/BartoszSolkaBD/OpenDrone/issues/324)) reworks the same hall corner with everything the maintainer's test of the first asked for, and is the example of a Map built with every helper above and below. The script is still [`assets-src/maps/factory/build.py`](../assets-src/maps/factory/build.py); its docstring lists the history's layers and where each is.
+
+- **Nothing is flat or square.** The walls are `broken_wall` meshes ([Broken openings](#broken-openings)) from 0.3 m under the floor, so uneven ground never shows a gap under them, 0.45 m thick (two bricks) and starting on whole bricks; they bulge by up to 2.5 cm, the south and west walls have 4 mm ledges, the breach and the doors are stepped and the windows `framed`. The roof is a `Roof.gable` ([Sagging, damaged roofs](#sagging-damaged-roofs)) on the trusses' own 5 m spacing, sagging up to 12 cm a bay and three times that over the fallen bay, whose edge is torn by seven `Tear`s and hung with bent flaps; the purlins sag with it. The floor is 43 slabs poured in strips of their own widths, each strip cut where its own pour stopped, each slab settled by a few millimetres and tilted its own way, over a dark bed that shows in the 16 mm joints, on a `Ground` with dips where rain falls through the roof. The yard is a `Ground` that rolls by 12 cm, level round the Launch Spot.
+- **Grass fades into dirt.** The yard is dirt with grass blended in by its vertex colours ([Blending two materials](#blending-two-materials)): `WanderingEdge` strips along the walls' feet and patches, more grass away from the hall, and none on the hard standing before the loading door or on the path the pilots have worn from the gate to the Launch Spot and the door.
+- **Wear** ([Wear](#wear)) at level 0.85 with the Map's sun, on all eight wall faces, the floor and the yard, plus about forty decals by hand: soot up the fire corner's walls and under its roof, a light soot fan over the hangout's skylight, stains under most sills, old tags under the soot and new ones over old, drag marks to the breach, bay marks on the pilasters.
+- **Kit items** ([below](#kit-items-placed-by-hand)) for each layer of the history, in a few groups, not an even sprinkle: see the script's docstring and [the research's list](research/lived-in-places.md#6-the-factorys-story).
+
+**What it costs**, on the maintainer's M4 Mac mini:
+
+| | The second slice | The first slice |
+|---|---|---|
+| Parts and triangles | 121 drawn parts and 342 decals, each a draw (463 in all); 269,298 triangles (the colliders' own included) and 24,451 more in the decals; the `.glb` is 13.8 MB | 483 parts, 97,908 triangles, 6.0 MB |
+| Pictures | 23 materials made from scratch, 9 of them new for the kit items (0.74 MB), and 18 decals | 14 materials, 8.9 MB |
+| Light atlas | 1024 × 7944 at 10 cm a texel (20 cm for the yard, 40 beyond, 2 to 7 cm for weeds, leaves, ivy and window bars), 90% of it in charts; a 17.7 MB EXR, 65 MB in the graphics card. That is near the 8192 limit: the whole Factory will need a second atlas or much coarser light outside | 2048 × 3632; 14.3 MB |
+| Bake | 345 s at 1024 samples, 45 s at 128 | 379 s |
+| Frame | 7.8 ms a frame in Analog (1278 frames in 10 s, `--camera-cost`, 2560 × 1440, release build), 6.5 ms in Digital (1539); Bando on the same build: 4.7 ms and 4.0 ms (2121 and 2529 frames). 45 fps is 22 ms | about 6.0 ms, against 5.2 for Bando, on the build of its day |
+
+**Traps, for the next one** (on top of the first slice's):
+
+- A `Roof.collision_mesh` on its default 1.5 m grid stayed shut over the missing 1 m sheet: use a finer step (see [Sagging, damaged roofs](#sagging-damaged-roofs)).
+- A stepped doorway's top corners close in by up to a brick and a half: the loading door's 3.6 m Gap needed a 4.1 m opening to keep 3.4 m clear at every height. Check a broken opening's Gap with lines through it, not its nominal size.
+- A `broken_wall` that leans opens a slit at the corners where it meets a wall that doesn't; the Factory's walls bulge but don't lean. A box set against a bulging wall (a pilaster, a skin of plaster) must reach into it by more than the bulge, or a slit opens behind it.
+- Decals are one draw each: the slice has 342, three quarters of its draws. Prefer a few big hand-placed decals to many small ones, and leave the rules off faces nobody sees.
+- Soot on a shaded wall reads weakly: the baked light there is already dark, so the black adds little. Stack two plumes, or put the soot where light reaches.
+- A wall in the shade with nothing on it still reads clean at FPV distance: stains under the sills (big `decal_stain`s) read where thin `decal_runs` don't.
+
+## The Factory's third slice: real grass, the kit and relief
+
+The third slice ([#341](https://github.com/BartoszSolkaBD/OpenDrone/issues/341)) keeps the second's hall corner, story and wear, and gives it the depth the maintainer asked for after testing it ("still flat, grass is a picture"), with the tools of the depth pass: real grass ([Grass](#grass)), the kit and its rules ([The kit and the scatter](#the-kit-and-the-scatter)) and relief ([Relief](#relief-floors-walls-and-roofs-with-depth)).
+
+- **Real grass in the yard.** Each yard piece is cut by how grassy the ground is under each triangle (`grass_split` in the script): thick, tall grass (7 clumps a square metre, 14 to 50 cm) where the yard has gone back to grass, thin grass (2.5, 8 to 30 cm) over the gravel patches, and none on the track the pilots have worn from the gate to the Launch Spot and the door, or on the hard standing. The ground beyond the yard grows thinner grass, and none past `GRASS_REACH` (about 30 m out), which the camera only sees from where grass is already thinned away.
+- **Rubble heaps with weeds in them.** The fallen bay's heap is now the kit's `heap`, and the yard has two more, the big one in front of the hall leaning on a pallet-high mound; their cores grow tall grass (up to 90 cm in the yard, 45 cm under the fallen bay), so weeds stand out of the rubble (reference 2).
+- **No flat floors.** The hall's floor is the slabs under the relief's crumbled layer (`Relief.crumble`, 13 cm deep along the walls, with the rubble picture blended through the concrete as thick as it lies), worn smooth round the plinths, swelling under the heap. On it the kit puts debris along every wall's foot, a floor strewn in clusters on low beds of fallen render, bolt plates and anchor stubs on two cut column lines, pallets in two corners, boards in two piles, planks, a fallen pipe run, drums and puddles and moss. The yard has ruts where vans came in from the east and stood before the loading door, potholes in the hard standing, rubble along the south wall's foot and odd bits in the grass.
+- **The kit in the Factory's own pictures.** The kit's items ask for the library's downloaded materials; the Factory draws only pictures made from scratch, so `KIT_MATERIALS` turns each into the Factory's nearest own one (rusty steel, weathered wood, rough concrete, its plastics and painted can) before the items are merged, and `KitOnFactory` hands `apply` a builder that does the same for the cores and collision boxes and tags the heaps' cores with grass.
+- **A silhouette.** Two purlins hang bent from the fallen bay's trusses, and the works' chimney, banded in pale render, stands 30 m tall north-east of the hall (reference 1).
+- **Every keep-clear zone** is a flying line, a Gap, a skylight a pilot drops through, or a kit item of the story: the aisle, the loading door, the breach, the man door and the vent, the five open skylights, the plinths, the hangout, the fire corner, the scrap pile, the filing cabinet and the fallen beam.
+
+- **The wear stays, thinned where it read least.** The second slice's rules and hand-placed decals are all kept, but one in three of the rules' runs and cracks and one in two of their scratches and droppings (the marks its report found don't read at FPV distance), 342 decals down to 253 with the kit's puddles and moss.
+
+**Decals are batched.** `MapBuilder.batch_decals()` puts every decal of one material and one layer into one part of the `.glb`, so the Factory's 253 decals are 19 draws. Each decal is still cut from its own shapes; only the parts are joined. Without it, the decals cost about 3 ms of the frame on the M4 (each a draw the CPU sets up), and the slice didn't fit the depth pass's 8 ms.
+
+**The grass on baked light.** The first Map with grass and baked light found a bug in the game: the grass's pipeline failed to build ("cannot find declaration of `uv`"), so no grass was drawn on a baked Map. Bevy's standard fragment, given the atlas's coordinates (`UV_1`) but no picture coordinates, declares the atlas's from picture ones it never declared. The grass shader now hands it picture coordinates of 0 (the clumps have no picture), with no extra vertex data ([`grass.rs`](../crates/opendrone/src/grass.rs)).
+
+**Traps, for the next one:**
+
+- The Factory's frame is bound by the CPU, not the graphics card: at 640 × 360 it takes as long as at 2560 × 1440. What costs is the number of things drawn, not triangles: hundreds of decals (fixed by batching), and each 8 m square of grass (about 1.5 ms for 500 of them, on the ground to 70 m out, most never seen). Keep grass where the camera comes near, and count draws before triangles.
+- The kit's own materials aren't made from scratch: map them (`KIT_MATERIALS`) before `apply` merges, or the same Factory material in a cell is two draws.
+- A worn path made by a `Band` is only half worn at its middle where its edge wanders in: grass grew down the middle of the track until the scatter tag was taken off wherever the path's weight passes 0.25.
+- Merged decals lose culling by distance; on this Map that costs nothing measurable, but a whole Factory's might want them merged by area too.
+
+## What the Factory is, as it ships
+
+The Factory ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)) is the third slice, kept as the maintainer tested it: `./play --map factory` starts it from a fresh checkout. Its kit is one script, `odkit.py`: slice 2's hand-placed pieces and the depth pass's kit items were two scripts that both made pallets, drums, tyres, cans and bottles, and are now one, with one builder for each of those five. Its roof frame also keeps a flying line clear along the whole purlin: `Frame` used to look at three points of each purlin, and a zone narrower than about 2.4 m (a doorway) could slip between them.
+
+| | The Factory as it ships |
+|---|---|
+| Frame | 9.7 ms a frame in Analog and 9.1 ms in Digital (`--camera-cost --seconds 10`, 2560 × 1440, release build, the M4 Mac mini), against 4.8 ms and 4.1 ms for Bando on the same build (the slice the maintainer tested). Measured again after the kit script was merged and the light re-baked, on a quieter computer: 9.5 ms in Analog and 8.1 to 8.3 ms in Digital, with Bando at 5.3 ms and 4.5 ms in the same run |
+| Budget | 8 ms. The Factory is about 1.8 ms over it in Analog, and the maintainer accepted that ("I think it's fine, no need to address"). The frame is bound by the CPU, not the graphics card (the same at 640 × 360): by how many things are drawn, not by triangles |
+| `.glb` | 26.3 MB (slice 2: 13.8 MB) |
+| Triangles | about 484,700 in 322 parts, plus about 23,400 in the decals (batched into 19 draws): 508,192 in the `.glb` |
+| Light atlas | 2048 × 5848 at 10 cm a texel (20 cm for the yard, coarser beyond, 2 to 7 cm for weeds, leaves and window bars), a 33.0 MB EXR; about 12 million of the 67 million texels an 8192 atlas allows, so no second atlas yet. Baked at 1024 samples in 487 s |
+| Kit | 6,960 items in about 180,900 triangles, merged into 80 parts; 32,821 grass clumps in 136 cells |
+
+The spinning rotors show in this Map's frame, and the maintainer accepted that too ("I see them, it's ok"). Its walls and its roof frame are still slice 2's, and look flat in places: the brick-by-brick walls and the buckled roof and frame of [Relief](#relief-floors-walls-and-roofs-with-depth) are not applied to it yet ([#348](https://github.com/BartoszSolkaBD/OpenDrone/issues/348)).
+
+## Kit items placed by hand
+
+[`assets-src/lib/odkit.py`](../assets-src/lib/odkit.py) is the one script for the kit, and it also builds the loose things a history leaves that a script places by hand (#324), each from boxes, cylinders and bars in plain Python, the same bytes on every computer: a cable drum, a bottle crate, a bin bag, a plastic chair (whole or melted), a grill grate, a bed frame with sagging springs, a shopping trolley, a filing cabinet and its drawers, an office chair, a fuse box with its door open, a skip, a machine plinth with chipped corners and its cut bolts, a pile of sorted scrap, a gate leaf, and a crashed quad's frame, a propeller and an antenna. A pallet, an oil drum (dented or not), a tyre, a can (whole or crushed) and a bottle are the kit's own items too, with one builder each (`pallet_mesh`, `drum_mesh`, `tyre_mesh`, `can_mesh`, `bottle_mesh`) that the kit's variants and a script's hand placement share. Each stands on z = 0 in its own axes and takes its own `Random`, so no two copies are the same; `place` and `odruin.Batch` put many into one part. Every kit item is closed solids facing out, so it can be a `trimesh` collider: a Map makes a kit item bigger than about 20 cm solid and a smaller one drawn only. Their readable checks are in [`test_odkit.py`](../assets-src/lib/test_odkit.py), run with the other plain-Python checks.
+
+Their materials are plain colours that have been out in the weather, made by [`plainwork.py`](../assets-src/generators/plainwork.py): faded blue and red plastic (`plastic_blue`, `plastic_red`), black plastic and rubber (`plastic_black`), grimy white plastic (`plastic_white`), brown and green bottle glass (`glass_brown`, `glass_green`) and a can's painted aluminium (`can_painted`); and weathered wood (`wood_weathered`) and worn yellow floor paint (`paint_yellow`). A kit item's picture is fine-grained, 512 pixels over 0.25 to 1 m, since it is seen from a few centimetres to a few metres.
 
 ## Wet, rough and metal surfaces
 
@@ -346,7 +458,7 @@ for tag, roof in (("south", south), ("north", north)):
 - **Each sheet** is `sheet_width` wide (1 m), runs from the eave to the ridge, laps 12 cm under the next one and is solid, 12 mm thick (`thick=0` gives a one-sided sheet, which costs a third). From its own seed a sheet may have its exposed edge **lifted**, its eave end **curled** up, and its ridge end **torn** off and flapping.
 - **Holes.** `missing` leaves a sheet out. A `Skylight` cuts a straight-edged opening in the iron and fills it with a glass panel that is `"intact"`, `"broken"` (a ragged hole most of its size, with the glass that is left round it) or `"gone"` (the opening and no panel). A `Tear` is a ragged hole in the iron. The edges are cut triangles, exactly on the line where the hole's function crosses zero ([`odcut.clip_grid`](../assets-src/lib/odcut.py)), so a tear or a broken panel is as ragged as the grid is fine.
 - **Triangles.** At the default 0.45 m grid, 9 a square metre of roof for an open sheet and 32 for a solid one: 30 × 30 m of gable roof is about 30,000 triangles solid. A sheet with a `Tear` in it is cut on a finer 0.2 m grid (`hole_step`), so the tear's edge is ragged, which costs about 1,100 triangles for each sheet the tear touches. A skylight's straight edge is exact on any grid and costs nothing extra. A hall that the pilot flies under needs solid sheets, whose underside is seen; a roof seen only from above can take `thick=0`.
-- **Colliders.** `collision_mesh(step=1.5)` is a coarse open surface over the sag, left open where sheets are missing, torn or skylights are gone, and shut over the glass that remains. Its edges are not ragged: the Quad meets a straight edge where it sees a ragged one.
+- **Colliders.** `collision_mesh(step=1.5)` is a coarse open surface over the sag, left open where sheets are missing, torn or skylights are gone, and shut over the glass that remains. Its edges are not ragged: the Quad meets a straight edge where it sees a ragged one. **A hole narrower than the step can vanish from it:** the hole is cut where its function crosses zero between two grid corners, so a missing 1 m sheet between corners 1.5 m apart stays shut (#324 found this in the Factory). Use a step under half the narrowest hole (the Factory uses 0.5 m), and check the hole with a line down through it.
 
 ### Broken openings
 
@@ -365,7 +477,7 @@ for mesh in wall.loose_bricks(Random(2, "bricks")):                      # the b
     m.solid("loose_bricks", mesh, pose, "brick_red_weathered", "none")
 ```
 
-- **The wall** is one closed mesh: a front skin, a back skin and the walls of the openings. Its courses are 75 mm and its bricks 225 mm, as in `brick_red_weathered`'s picture. Each opening is **stepped** course by course, in half bricks from where it began. A `window` and a `doorway` keep their size and have ragged jambs and a lintel that loses a brick; a window with `sill_gone` has its bottom courses broken away, narrowing like a funnel; a `breach` steps in and out all round and has a stepped top. `ragged` (0 to 1) says how rough. The checks run each kind over 25 seeds and require at least three distinct places on each side and a hole that fills less than 97% of its bounding box.
+- **The wall** is one closed mesh: a front skin, a back skin and the walls of the openings. Its courses are 75 mm and its bricks 225 mm, as in `brick_red_weathered`'s picture. Each opening is **stepped** course by course, in half bricks from where it began. A `window` and a `doorway` keep their size and have ragged jambs and a lintel that loses a brick; a window with `sill_gone` has its bottom courses broken away, narrowing like a funnel; a `breach` steps in and out all round and has a stepped top; a `framed` opening (#324) keeps straight edges, for a window whose iron frame is still in it, so no brick hangs over the frame and no gap opens beside it, and drops no bricks. `ragged` (0 to 1) says how rough. The checks run each kind over 25 seeds and require at least three distinct places on each side and a hole that fills less than 97% of its bounding box.
 - **Bulge and lean.** `bulge` moves the face in and out by up to that many metres, smoothly, dying away at the ends and the foot. `lean` makes the top that much further out than the foot. Both faces move together, so the wall keeps its thickness.
 - **Ledges.** `ledge=0.004` sits each `row_courses` courses (4) up to 4 mm proud of or back from the one below, so the light catches an edge. It costs three times the triangles on a plain wall, and none in or next to the courses an opening steps through, so use it where the wall is seen close and light is raking. `ledge=0` leaves the face smooth.
 - **Loose bricks.** `loose_bricks` scatters bricks (12 triangles each, about 7 for each square metre of hole) at the foot of each opening on both sides, a quarter of them on a sill that is still there. Give it the ground's height with `floor=`.

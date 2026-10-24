@@ -671,12 +671,19 @@ fn each_quads_collision_shape_comes_from_its_definition() {
 }
 
 #[test]
-fn the_skate_park_and_bando_are_the_built_in_packs_two_maps() {
-    // Basis: Rule (#63 and #64: the Skate Park and Bando are in the built-in
-    // Pack, checked like any dropped one).
+fn the_skate_park_bando_and_the_factory_are_the_built_in_packs_three_maps() {
+    // Basis: Rule (#63, #64 and #295: the Skate Park, Bando and the Factory's
+    // first slice are in the built-in Pack, checked like any dropped one).
     let packs = built_in();
     let ids: Vec<&str> = packs.maps().iter().map(|m| m.id.as_str()).collect();
-    assert_eq!(ids, ["opendrone/bando", "opendrone/skate-park"]);
+    assert_eq!(
+        ids,
+        [
+            "opendrone/bando",
+            "opendrone/factory",
+            "opendrone/skate-park"
+        ]
+    );
     let problems = packs.map("opendrone/factory-hall").unwrap_err();
     assert_eq!(
         problems.to_string(),

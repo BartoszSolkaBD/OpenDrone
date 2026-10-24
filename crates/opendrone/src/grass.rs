@@ -356,6 +356,15 @@ impl MaterialExtension for GrassShader {
         let mut attributes = vec![Mesh::ATTRIBUTE_POSITION.at_shader_location(0)];
         if layout.0.contains(Mesh::ATTRIBUTE_UV_1) {
             attributes.push(Mesh::ATTRIBUTE_UV_1.at_shader_location(3));
+            // #341: with only the atlas's UV_1, Bevy's standard fragment
+            // declares `uv_b` from a `uv` it never declared, and the
+            // pipeline fails (no grass on a baked Map). The clumps have no
+            // picture of their own, so the shader hands it a `uv` of 0
+            // without a vertex buffer for it.
+            descriptor.vertex.shader_defs.push("VERTEX_UVS_A".into());
+            if let Some(fragment) = descriptor.fragment.as_mut() {
+                fragment.shader_defs.push("VERTEX_UVS_A".into());
+            }
         }
         attributes.push(ATTRIBUTE_ROOT.at_shader_location(8));
         attributes.push(ATTRIBUTE_LOOK.at_shader_location(9));

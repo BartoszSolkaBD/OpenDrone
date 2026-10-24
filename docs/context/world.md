@@ -16,6 +16,10 @@ _Avoid_: Skatepark (one word)
 A Map of an abandoned, unfinished building and its site, flown inside and out. The name is FPV slang for an abandoned building.
 _Avoid_: Ruin, abandoned building (as the Map's name)
 
+**Factory**:
+A Map of an abandoned industrial site of about 200 × 100 m, made from scratch and lit by baked light (`opendrone/factory`, [ADR-0024](../adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md)). Today it is one 30 × 30 m bay of a brick hall and its yard, worn and with the history of an abandoned works in it ([Building a Map](../building-a-map.md#the-factorys-first-slice), [its second slice](../building-a-map.md#the-factorys-second-slice-wear-uneven-shapes-and-history), [its third](../building-a-map.md#the-factorys-third-slice-real-grass-the-kit-and-relief): real grass, rubble and relief; [what it costs as it ships](../building-a-map.md#what-the-factory-is-as-it-ships)).
+_Avoid_: Warehouse, plant
+
 **Gap**:
 An opening on a Map that a Quad can fly through, such as a doorway, a window, a ring or the space between slats.
 _Avoid_: Gate (a gate is a racing object), hole
@@ -65,8 +69,10 @@ Small plants the game grows over a Map's ground, thousands of them, each a real 
 _Avoid_: Foliage, vegetation layer
 
 **Kit**:
-The loose things a Map's script lays on its floors and yards, made from scratch and solid, not pictures: bricks and brick chunks, concrete lumps with rebar, plaster chips, roof-sheet pieces, planks, boards and pallets, pipes, drums, cable, a tyre, cans and bottles, and the bolt plates and anchor stubs left in a hall floor. Each **kit item** has a few variants, and rules scatter them from a seed: a heap of rubble, debris along a wall's foot, a strewn floor, a row of bolt plates on an old column line, piles of pallets and boards. How a script asks for it: [Building a Map](../building-a-map.md#the-kit-and-the-scatter).
+The loose things a Map's script lays on its floors and yards, made from scratch and solid, not pictures: bricks and brick chunks, concrete lumps with rebar, plaster chips, roof-sheet pieces, planks, boards and pallets, pipes, drums, cable, a tyre, cans and bottles, and the bolt plates and anchor stubs left in a hall floor, and the bigger pieces a script puts exactly where its story wants them: a bed frame, a shopping trolley, a filing cabinet, a skip, a machine plinth, the bits of a crashed quad. A kit item bigger than about 20 cm that a Quad can hit is solid; a smaller one is only drawn. Each **kit item** that rules place has a few variants, and rules scatter them from a seed: a heap of rubble, debris along a wall's foot, a strewn floor, a row of bolt plates on an old column line, piles of pallets and boards. Few strong groups, each placed for a reason, not an even sprinkle ([the lived-in places research](../research/lived-in-places.md)). How a script asks for it: [Building a Map](../building-a-map.md#the-kit-and-the-scatter).
 _Avoid_: Props (a prop is a propeller), clutter, asset pack
+
+One name clash in the code: the kit's placement rules are in `odscatter.py`, as a class called `Scatter`, a name older than the glossary's **Scatter**. In the docs, Scatter means the plants the game grows (above), and the kit's rules are "the kit's rules" or "the scatter" in lower case; the Python file keeps its name.
 
 **Keep-clear zone**:
 A rectangle or circle on a Map that the kit's rules leave empty, so a line the pilot flies stays open: an aisle, a Gap's approach, the Launch Spot's 3 m. An item with any corner in it is left out, and a heap is cut away at its edge.

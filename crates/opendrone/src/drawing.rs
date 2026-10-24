@@ -7,7 +7,7 @@
 //! east is +x, up is +y and north is −z. A Quad's body axes (forward, left,
 //! up) turn into Bevy's the same way, so forward is +x, up +y and left −z.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::asset::RenderAssetUsages;
@@ -298,12 +298,25 @@ fn draw_the_map_from_its_file(
             });
         }
     }
+    // The Map's own materials, each once (a blend's second one too), and how
+    // many of them have their pictures on disk (#324: this used to print the
+    // smaller of the Map's count and the library's).
+    let own: BTreeSet<&str> = plan
+        .map
+        .drawing
+        .iter()
+        .flat_map(|p| {
+            std::iter::once(p.material.as_str())
+                .chain(p.blend.as_ref().map(|b| b.material.as_str()))
+        })
+        .collect();
+    let pictured = own.iter().filter(|name| library.has_pictures(name)).count();
     info!(
         "drew {} on {} parts, {} of its {} materials with their pictures, {} of them with the repeat broken, {} with roughness, occlusion or metal pictures",
         plan.map.name,
         plan.map.drawing.len(),
-        by_name.len().min(library.textured()),
-        by_name.len(),
+        pictured,
+        own.len(),
         repeat_broken,
         surface_pictures
     );

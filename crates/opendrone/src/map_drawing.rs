@@ -527,6 +527,12 @@ impl MaterialLibrary {
             .count()
     }
 
+    /// Whether the material `name` has its pictures on disk (#324: the log
+    /// counts a Map's own materials by this, not the library's).
+    pub fn has_pictures(&self, name: &str) -> bool {
+        self.entries.get(name).is_some_and(|e| e.pictures.is_some())
+    }
+
     /// Whether the library asks for the material `name` to be drawn with its
     /// repeat broken or the large-scale picture over it (#304), pictures on
     /// disk or not.

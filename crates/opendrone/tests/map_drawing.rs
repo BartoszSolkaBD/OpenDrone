@@ -187,6 +187,17 @@ fn a_material_with_no_pictures_on_disk_is_its_flat_colour_from_the_glb() {
 }
 
 #[test]
+fn the_log_counts_a_material_as_pictured_only_when_its_own_pictures_are_on_disk() {
+    // #324: "N of its M materials with their pictures" counts the Map's own
+    // materials by their own pictures, not the library's count.
+    let with = MaterialLibrary::read(&scratch_repo("own-pictures", true));
+    assert!(with.has_pictures("concrete_plaza"));
+    assert!(!with.has_pictures("no_such_material"));
+    let without = MaterialLibrary::read(&scratch_repo("no-own-pictures", false));
+    assert!(!without.has_pictures("concrete_plaza"));
+}
+
+#[test]
 fn a_picture_that_cant_be_read_falls_back_to_the_flat_colour_too() {
     // The files are there but aren't pictures: the Map is still flyable.
     let repo = scratch_repo("bad-pictures", true);

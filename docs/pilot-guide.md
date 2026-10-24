@@ -26,7 +26,7 @@ If you work from the repo, or from a fresh copy of it (an Orca worktree, say), o
 
 ```sh
 ./play                  # Mac and Linux; on Windows, play.cmd
-./play --map bando      # start on another Map (skate-park, bando or flat-floor)
+./play --map bando      # start on another Map (skate-park, bando, factory or flat-floor)
 ```
 
 It is `cargo xtask play` with a short name, and it says what it is doing and what it skipped, step by step:
@@ -105,9 +105,10 @@ Pick the Video Look and the picture's shape when you start the game: `cargo run 
 
 ## What the alpha will have
 
-- **Free Flight** on two Maps at real-world scale, with no objectives, timers or scoring and no invisible walls:
+- **Free Flight** on these Maps, at real-world scale, with no objectives, timers or scoring and no invisible walls:
   - the **Skate Park**, a sunken concrete park with a pool bowl, a full pipe and a street corner;
-  - **Bando**, a five-floor unfinished tower with brick rooms, an open lift shaft and a tower crane.
+  - **Bando**, a five-floor unfinished tower with brick rooms, an open lift shaft and a tower crane;
+  - and, as a first piece of the coming **Factory**, one bay of an abandoned brick hall and its yard, lit by baked light (`--map factory`): a sagging, broken roof, iron windows, worn and stained walls, a floor deep in crumbled plaster and debris, rubble heaps with weeds growing out of them, a yard of real grass and the works' chimney behind, and the traces of everyone who used it, from the works' machine plinths to a squatters' burnt corner and a fire pit where pilots meet. It is a test of the look, not yet a whole Map.
 - **Two Quads:** the **Whoop 65**, modelled on the BetaFPV Meteor65 Pro, and the **Freestyle 5″**, a typical 5″ freestyle quad.
 - **A Flight Controller that copies Betaflight 2026.6.** Each Quad flies a real quad's Tune, and you can paste your own Rates straight from the Betaflight CLI, so your muscle memory works.
 - **Your Radio or Gamepad.** The Radiomaster Pocket and the DualSense are checked by hand; other EdgeTX and OpenTX radios and other gamepads work too. Every Input Device flies through an emulated ELRS Radio Link, so each one feels like a real link.

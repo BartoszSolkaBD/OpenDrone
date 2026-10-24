@@ -165,12 +165,12 @@ Go through this list for the place, and add what it needs beyond it:
 | Uneven ground and floors | [`odground.py`](../assets-src/lib/odground.py) and [`odrelief.py`](../assets-src/lib/odrelief.py) ([Relief](building-a-map.md#relief-floors-walls-and-roofs-with-depth)) | a shape neither makes, such as a pool's sloped floor with broken tiles |
 | Walls and roofs with thickness | [`odopening.py`](../assets-src/lib/odopening.py), [`odbrick.py`](../assets-src/lib/odbrick.py), [`odroof.py`](../assets-src/lib/odroof.py), [`odframe.py`](../assets-src/lib/odframe.py) | a flat concrete roof, block walls, a curved shell |
 | Real grass | the `scatter=` tag ([Grass](building-a-map.md#grass)): grass only | tall weeds, reeds or nettles: a second kind ([Adding a kind of plant](building-a-map.md#adding-a-kind-of-plant)) |
-| Trees, weeds and ivy | `odplants.py`, which comes to main with the Factory ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)) | a tree or plant it doesn't make |
+| Trees, weeds and ivy | [`odplants.py`](../assets-src/lib/odplants.py) | a tree or plant it doesn't make |
 | Debris and heaps | the kit, [`odkit.py`](../assets-src/lib/odkit.py), and its rules, [`odscatter.py`](../assets-src/lib/odscatter.py) ([The kit and the scatter](building-a-map.md#the-kit-and-the-scatter)) | kit items the place needs: broken tiles, lockers, a trolley |
 | A sky | made by the game from the Map's `[light]` ([What the game does with it](building-a-map.md#what-the-game-does-with-it)) | none for a day; a night sky with stars isn't there |
 | Light with direction, and shafts | the baked sun through every opening ([Baked light](building-a-map.md#baked-light)); a shaft shows where it lands, on the floor and walls | a beam visible in the air needs haze or fog, which the engine doesn't draw ([ADR-0024](adr/0024-detailed-maps-are-made-from-scratch-and-lit-by-a-baked-atlas.md) keeps fog for later) |
 | Light at night | none: the bake knows only a sun and a sky ([`odlight.py`](../assets-src/lib/odlight.py)) | lamps, a lit sign, a fire's glow |
-| History you can read | [the lived-in places research](research/lived-in-places.md), kit items placed by hand (`place`), and the Factory's story objects, which [#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346) merges into the kit | each story object the place needs that nothing makes yet |
+| History you can read | [the lived-in places research](research/lived-in-places.md), kit items placed by hand (`place`), and the Factory's story objects, which [#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346) merged into the kit (one script, `odkit.py`: its hand-placed pieces and its scattered items share one builder each for a pallet, drum, tyre, can and bottle) | each story object the place needs that nothing makes yet |
 | Moving things | none on a Map (spec #290 leaves moving and breakable things out); only the Quad's rotors turn | a flag, a swinging sign, running water |
 
 **Sizing the tickets.** One behaviour a ticket, with its own acceptance criteria, about an hour of authoring. [#320](https://github.com/BartoszSolkaBD/OpenDrone/issues/320) (roughness, then occlusion and metal) and [#321](https://github.com/BartoszSolkaBD/OpenDrone/issues/321) (the blend, then decals) should each have been two: they took about 2 h 20 min and 1 h 55 min and ran one after the other ([#336](https://github.com/BartoszSolkaBD/OpenDrone/issues/336)).
@@ -193,20 +193,20 @@ Show the plan as a table of coordinates and as the plan picture `cargo xtask map
 
 A slice is about 30 × 30 m of the site, built to the finished standard, with every feature the brief names: inside and outside, roof, walls, ground, at least one Gap of each size, a dive, and one focal point for each layer of the story. If the person likes it, the rest is more of the same.
 
-**The order the Factory's script builds in** (`assets-src/maps/factory/build.py`, coming to main with [#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)):
+**The order the Factory's script builds in** ([`assets-src/maps/factory/build.py`](../assets-src/maps/factory/build.py)):
 
 1. The constants: the frame, the Launch Spot, the walls' runs and openings, the roof's holes, the focal points' positions.
 2. `m.lightmap(texel_cm=10)` and `m.batch_decals()`, so the decals are a few parts.
 3. The ground and the floor: `Ground`, then `Relief` with only the flying lines as its keep-clear zones, so the crumbled layer lies against the walls.
 4. The walls: `broken_wall` for each, with pilasters and windows. `brick_face`, which came after the Factory's walls were built, goes only where the Quad passes close.
-5. The roof: `Roof` sheets on trusses and purlins, with its holes. `BuckledRoof` on a broken `Frame` came later too: [#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346) files a ticket to give the Factory both, as its walls and frame still look flat in places.
-6. The kit: one `Scatter` for the hall with keep-clear zones on every flying line, every wall, every column and every story object, built on the relief's height; its rules; `apply` after the floor exists. A second for the yard.
+5. The roof: `Roof` sheets on trusses and purlins, with its holes. `BuckledRoof` on a broken `Frame` came later too: [#348](https://github.com/BartoszSolkaBD/OpenDrone/issues/348) is the ticket to give the Factory both, as its walls and frame still look flat in places.
+6. The kit: one `Scatter` (the class in [`odscatter.py`](../assets-src/lib/odscatter.py), the kit's rules; the glossary's **Scatter** is the grown plants, as in [World and content](context/world.md)) for the hall with keep-clear zones on every flying line, every wall, every column and every story object, built on the relief's height; its rules; `apply` after the floor exists. A second for the yard.
 7. The story objects, by focal point and by layer.
 8. Plants and grass: the yard cut by how grassy it is, real grass on the grassy parts and none on paths.
 9. Wear: `Wear` rules for every wall face and floor, then the story's own marks by `hand`.
 10. A check that every material has a picture made from scratch, the Launch Spot, the export.
 
-Then bake with `cargo xtask maps --bake <id> --samples 1024` (the Factory's took 635 s on the M4) and write the Map's checks in `crates/pack/tests/<id>.rs`: the Launch Spot's ground and clearance, a line through every Gap at several heights, every drop clear from 25 m, the aisle clear, solid where it should be and drawn only where it should be. The Factory's are in `crates/pack/tests/factory.rs` on its branch.
+Then bake with `cargo xtask maps --bake <id> --samples 1024` (the Factory's took 487 s on the M4, and 635 s on an earlier, busier run) and write the Map's checks in `crates/pack/tests/<id>.rs`: the Launch Spot's ground and clearance, a line through every Gap at several heights, every drop clear from 25 m, the aisle clear, solid where it should be and drawn only where it should be. The Factory's are in [`crates/pack/tests/factory.rs`](../crates/pack/tests/factory.rs).
 
 **Traps the Factory found** (from the hand-offs on [PR #317](https://github.com/BartoszSolkaBD/OpenDrone/pull/317) and [#341](https://github.com/BartoszSolkaBD/OpenDrone/issues/341)):
 
@@ -257,7 +257,7 @@ It runs each Video Look for 10 seconds from the Launch Spot and counts the frame
 
 ## The benchmarks
 
-All numbers below are from the Factory's third slice, the hall corner and its yard, on branch `ticket/341-factory-slice-v3` at commit `d599e26`, the Factory as the maintainer tested it, because [#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346), which brings it to main, hadn't merged when this page was written. Its merge (one kit script, a new bake) may move small numbers. [How they were measured](#how-these-numbers-were-measured) is at the end.
+All numbers below are from the Factory as it ships in [PR #350](https://github.com/BartoszSolkaBD/OpenDrone/pull/350) ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)): the third slice, the hall corner and its yard, with one kit script and a new bake, from branch `ticket/341-factory-slice-v3`. The speed table also keeps the measurement of the slice the maintainer tested (commit `d599e26`, before the kit script was merged and the light re-baked), beside the merged one. [How they were measured](#how-these-numbers-were-measured) is at the end.
 
 ### Speed
 
@@ -265,11 +265,13 @@ Measured by [#341](https://github.com/BartoszSolkaBD/OpenDrone/issues/341)'s aut
 
 | | Analog | Digital |
 |---|---|---|
-| Factory slice 3 (hall corner and yard) | 9.7 to 9.8 ms (1,034 and 1,021 frames in 10 s) | 9.1 ms (1,101) |
+| Factory as merged ([PR #350](https://github.com/BartoszSolkaBD/OpenDrone/pull/350)) | 9.5 ms (1,051 and 1,049 frames in 10 s) | 8.1 and 8.3 ms (1,232 and 1,204) |
+| Factory slice 3 at `d599e26` (the one the maintainer tested) | 9.7 to 9.8 ms (1,034 and 1,021 frames in 10 s) | 9.1 ms (1,101) |
 | Factory slice 2 ([PR #335](https://github.com/BartoszSolkaBD/OpenDrone/pull/335)) | 7.9 ms (1,261 and 1,257) | 6.8 ms (1,468 and 1,456) |
-| Bando | 4.8 ms (2,073) | 4.1 ms (2,459) |
+| Bando, same run as the merged Factory | 5.3 ms (1,898 and 1,895) | 4.5 ms (2,236 and 2,228) |
+| Bando, same run as slice 3 at `d599e26` | 4.8 ms (2,073) | 4.1 ms (2,459) |
 
-- **The budget** is about 8 ms a frame (at least 125 frames a second), agreed for the depth pass. The Factory's slice 3 is 1.7 to 1.8 ms over it in Analog, and the maintainer accepted that because he chose depth: "I think it's fine, no need to address" ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)). A new Map aims at 8 ms.
+- **The budget** is about 8 ms a frame (at least 125 frames a second), agreed for the depth pass. The Factory's slice 3 was 1.7 to 1.8 ms over it in Analog (the merged one measured 1.5 ms over, on a quieter computer), and the maintainer accepted that because he chose depth: "I think it's fine, no need to address" ([#346](https://github.com/BartoszSolkaBD/OpenDrone/issues/346)). A new Map aims at 8 ms.
 - **The frame is bound by the processor, not the graphics card:** it took as long at 640 × 360 as at 2560 × 1440. What costs is the number of things drawn, not triangles. Slice 3 draws 243 parts from its `.glb` and 136 cells of grass, about 380 in all.
 - **Where the time went:** before any cut, slice 3 took 11.4 ms. Leaving out every decal saved about 2.8 ms, and leaving out all the grass about 3.1 ms (522 cells then), both measured before the cuts below.
 - **What to cut first,** in this order:
@@ -286,14 +288,14 @@ The near site is the yard's rectangle, 66 × 78 m (5,148 m²), with the 30 × 30
 
 | What | Factory slice 3 | Per 100 m² of site | Grows with | Where it comes from |
 |---|---|---|---|---|
-| `factory.glb` | 26.3 MB (slice 2: 13.8 MB; Bando: 0.9 MB) | 0.51 MB | triangles: about 52 bytes each | the file |
-| Triangles | 508,176: 468,988 drawn, 15,748 for collision only, 23,440 in decals | 9,900 | detail: the kit is 195,000 (with its heaps' cores), plants 86,000, ground 77,000, roof 50,000, walls 40,000 | the build's own count and the `.glb` |
+| `factory.glb` | 26.3 MB (slice 2: 13.8 MB; Bando: 0.9 MB), SHA-256 `f48f82d3…` | 0.51 MB | triangles: about 52 bytes each | the file |
+| Triangles | 508,192: 469,004 drawn, 15,748 for collision only, 23,440 in decals | 9,900 | detail: the kit is 195,000 (with its heaps' cores), plants 86,000, ground 77,000, roof 50,000, walls 40,000 | the build's own count and the `.glb` |
 | Parts to draw | 243 (224 shapes and 19 decal parts), and 98 for collision only | | materials × kit cells, not area | the `.glb` |
-| Light atlas | 2048 × 5844 texels at 10 cm, 158,120 charts filling 93% of it; 33.0 MB as EXR; 95.7 MB in the graphics card (half floats, 8 bytes a texel) | 232,000 texels; 0.64 MB of EXR | surface area over the texel size squared, and the kit's small charts | `factory.bake.toml` and the build's unwrap |
-| Bake | 635 s at 1024 samples on the M4 | | texels × samples | `factory.bake.toml` |
+| Light atlas | 2048 × 5848 texels at 10 cm, 158,140 charts filling 93% of it; 33.0 MB as EXR; 95.8 MB in the graphics card (half floats, 8 bytes a texel) | 233,000 texels; 0.64 MB of EXR | surface area over the texel size squared, and the kit's small charts | `factory.bake.toml` and the build's unwrap |
+| Bake | 487 s at 1024 samples on the M4 (635 s on the slice before the merge, on a busier computer) | | texels × samples | `factory.bake.toml` |
 | Grass | 32,821 clumps in 136 cells of 8 m (32,930 expected from the tags, on 7,175 m² of tagged ground); about 47 MB in the graphics card at 45 corners of 32 bytes a clump | 640 clumps | grassy area × density, cut at `GRASS_REACH` | the game's count, in the [#341](https://github.com/BartoszSolkaBD/OpenDrone/issues/341) hand-off; the tags in the `.glb` |
 | Decals | 253, drawn as 19 parts, 23,440 triangles | | wall and floor area × wear level | the build |
-| Kit | 6,960 items (4,886 in the hall, 2,074 in the yard), 180,858 triangles, 80 merged parts | | floor area × `per_m2` | the kit's `stats()` |
+| Kit | 6,961 items (4,887 in the hall, 2,074 in the yard), 180,890 triangles, 80 merged parts | | floor area × `per_m2` | the kit's `stats()` |
 | Pictures | 41 materials and the large picture: 42 textures, 11.7 MB on disk (9.7 MB surfaces, 2.0 MB decals); 1 at 2048 pixels (the floor), 9 at 1024, 32 at 512 | | one set per material, not per area | `assets-src/generated/` |
 
 ### Density
@@ -377,10 +379,10 @@ From each PR's `createdAt` and `mergedAt` and each ticket's "Started" comment on
 
 ## How these numbers were measured
 
-- **The build.** The Factory's script at `d599e26`, run with the pinned Blender 5.2.2, gives the very same `.glb` as the committed one (SHA-256 `38bc0230…`). A wrapper around it recorded every decal (its material, centre and facing), every kit item (its kind, place and triangles) and each story object added by hand. The script prints most of this itself: `MapBuilder.stats()`, the decals by kind and the kit's `stats()` for the hall and the yard, so a new Map's author gets the same numbers by running its script with Blender as its first lines say.
+- **The build.** The Factory's script on the merged branch, run with the pinned Blender 5.2.2, gives the very same `.glb` as the committed one (SHA-256 `f48f82d3…`; `d599e26`'s was `38bc0230…`). A wrapper around it recorded every decal (its material, centre and facing), every kit item (its kind, place and triangles) and each story object added by hand. The script prints most of this itself: `MapBuilder.stats()`, the decals by kind and the kit's `stats()` for the hall and the yard, so a new Map's author gets the same numbers by running its script with Blender as its first lines say.
 - **The file.** A plain Python reader of the `.glb` counted the parts, the triangles, the decal parts, and the grass the game will grow: the up-facing area of each tagged part times its density, as [`grass.rs`](../crates/opendrone/src/grass.rs) counts it. The game's own count (32,821) is from the #341 hand-off.
 - **The areas.** The hall's floor is the inside of its walls; the yard is the script's yard rectangle less the hall; the walls' area is the vertical faces of the four walls and the gables in the `.glb`. A decal counts for a floor or the yard when it faces up, for a wall when it faces sideways, and for the roof when it faces down.
 - **The light.** `factory.bake.toml` and the unwrap's own report.
-- **The frame times** are the #341 author's, as above. This page's author built no game.
+- **The frame times** of the slice at `d599e26` are the #341 author's. The merged Factory's are the #346 author's: the same release build of the game, `--camera-cost --seconds 10 --size 2560x1440`, the Factory and Bando run back to back twice, with a load average of about 1.8 (the #341 runs were at about 5), so Bando is not the same number as before and the two sets are not to be compared to the tenth of a millisecond. The grass count (32,821) and the numbers of the other rows that did not move are the #341 hand-off's.
 
 The scripts are throwaway and not in the repo. Measure a new Map the same way, and add its row to these tables when it lands.

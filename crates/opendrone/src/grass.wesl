@@ -65,6 +65,8 @@ fn vertex(v: GrassVertex) -> VertexOutput {
     out.position = position_world_to_clip(at);
     // Lit as the ground is: up.
     out.world_normal = vec3<f32>(0.0, 1.0, 0.0);
+    @if(VERTEX_UVS_A)
+    out.uv = vec2<f32>(0.0, 0.0);
     @if(VERTEX_UVS_B)
     out.uv_b = v.uv_b;
     @if(VERTEX_COLORS)

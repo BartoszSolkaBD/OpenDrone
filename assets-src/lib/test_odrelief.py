@@ -217,6 +217,16 @@ class RoofAndFrame(unittest.TestCase):
         # Without the zone, the same seed lets a purlin hang into it.
         self.assertLess(lowest_over_the_aisle(Frame(south, north, 4)), 4.5)
 
+    def test_a_flying_line_narrower_than_a_purlin_span_is_still_kept_clear(self):
+        south, north = roofs()
+        for seed in range(12):
+            for x0 in (-3.9, -1.3, 0.3, 2.6):
+                narrow = Scatter(1)
+                narrow.keep_clear_rect(x0, -6.0, x0 + 0.8, 6.0)  # a doorway's width
+                frame = Frame(south, north, seed, clear=narrow.clearance)
+                low = min(z for x, y, z in frame.mesh()[0] if narrow.clearance(x, y) <= 0.0)
+                self.assertGreater(low, 4.3, (seed, x0))
+
     def test_a_hanging_purlin_keeps_its_length(self):
         south, north = roofs()
         frame = Frame(south, north, 4)

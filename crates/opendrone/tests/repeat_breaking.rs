@@ -299,7 +299,9 @@ fn a_material_that_asks_is_drawn_with_the_settings_the_library_gives_and_one_tha
         panic!("the worn floor asks for its repeat to be broken");
     };
     let settings = floor.extension.settings;
-    assert_eq!(settings.snap_turn.to_array(), [2.0, 2.0, 0.0, 1.0]);
+    // Any shift, and turned (#324: its picture has no slab joints any more;
+    // the Factory lays its slabs out as geometry).
+    assert_eq!(settings.snap_turn.to_array(), [0.0, 0.0, 1.0, 1.0]);
     assert_eq!(settings.wide.x, 0.6);
     assert!(
         (settings.wide.y - 1.0 / 80.0).abs() < 1e-9,

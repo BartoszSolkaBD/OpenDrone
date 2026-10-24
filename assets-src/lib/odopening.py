@@ -69,15 +69,19 @@ class Opening:
     - `"doorway"`: like a window, from `v0` (usually 0), with no sill.
     - `"breach"`: a hole knocked through: steps in and out all round and a
       stepped top.
+    - `"framed"`: an opening that still holds its frame (an iron window, a
+      louvre): its edges stay straight, cut to the frame, so no brick hangs
+      over the frame and no gap opens beside it (#324). It keeps its
+      courses as given, and drops no bricks.
 
     `ragged` (0 to 1) is how rough the edge is; it has a default for each
     kind. `drop` is how many courses a gone sill reaches down (default 3).
     """
 
     def __init__(self, u0, u1, v0, v1, kind="window", ragged=None, sill_gone=False, drop=3):
-        assert kind in ("window", "doorway", "breach"), kind
+        assert kind in ("window", "doorway", "breach", "framed"), kind
         self.u0, self.u1, self.v0, self.v1, self.kind = u0, u1, v0, v1, kind
-        self.ragged = ragged if ragged is not None else {"window": 0.45, "doorway": 0.4, "breach": 0.9}[kind]
+        self.ragged = ragged if ragged is not None else {"window": 0.45, "doorway": 0.4, "breach": 0.9, "framed": 0.0}[kind]
         self.sill_gone = sill_gone and kind == "window"
         self.drop = drop
         self.first_course = 0  # filled in by `broken_wall`: the stepped shape
@@ -90,6 +94,8 @@ def _stepped(op, rnd, run):
     alternates by a half brick from one course to the next, and a gone sill,
     a breach's top and a lintel's corners narrow."""
     j0, j1 = round(op.v0 / COURSE), max(round(op.v1 / COURSE), round(op.v0 / COURSE) + 2)
+    if op.kind == "framed":
+        return j0, [(op.u0, op.u1)] * (j1 - j0)
     drop = op.drop if op.sill_gone else 0
     reach = 1 + int(op.ragged * 3)
     p = 0.2 + 0.5 * op.ragged
@@ -170,6 +176,9 @@ class Wall:
         out = []
         for k, op in enumerate(self.openings):
             r = rnd.child("opening", k)
+            if op.kind == "framed":
+                out.append(([], []))
+                continue
             count = max(3, round(self.hole_area(k) * per_square_metre))
             lo = min(l for l, _ in op.edges)
             hi = max(rr for _, rr in op.edges)
@@ -194,7 +203,12 @@ def _brick(u, y, z, r):
     corners, faces = g.box_mesh(BRICK, 0.1125, COURSE * 0.97)
     rows = g.mat_mul(g.rot_z(r.uniform(0, 360)), g.mat_mul(g.rot_y(r.uniform(-10, 10)), g.rot_x(r.uniform(-10, 10))))
     pose = g.Pose(rows, (u, y, z))
-    placed = [pose.apply(c) for c in corners]
+    # Snapped before it is cut into triangles: a turned brick's faces are flat
+    # only to the last bit of a sine, so which diagonal "leaves no dent" on
+    # the unsnapped corners can differ between computers (#324 found the
+    # Factory's `.glb` differing on Linux this way). On the corners the file
+    # stores, every computer decides alike.
+    placed = [g.snap3(pose.apply(c)) for c in corners]
     return placed, g.triangulate(placed, faces, convex=True)
 
 

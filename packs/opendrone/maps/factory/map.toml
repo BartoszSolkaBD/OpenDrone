@@ -1,0 +1,25 @@
+# The Factory's hall corner (#295, reworked by #324; spec #290, ADR-0024): one
+# 30 x 30 m bay of an abandoned brick hall and its yard, worn and with the
+# history of a works in it, made from scratch and lit by baked light, in sunny
+# mid-afternoon. Its `.glb` is built from
+# assets-src/maps/factory/build.py by `cargo xtask maps`, and its light atlas by
+# `cargo xtask maps --bake factory`; never edit either by hand.
+format      = 1
+name        = "Factory"
+description = "A bay of an abandoned brick hall: a sagging, broken roof, light through its holes, a burnt corner and a fire pit where pilots meet."
+model       = "factory.glb"
+preview     = "preview.png"
+
+[world]
+gravity     = "9.81 m/s²"
+air_density = "1.225 kg/m³"
+
+# The sun in the south-west, 37 ° up, so it shines in through the roof's south
+# slope, the south windows and the breach in the west wall.
+[light]
+sun_elevation = "37 °"
+sun_azimuth   = "215 °"
+sun_colour    = "#fff1dc"
+sun_strength  = "1.0"
+sky_colour    = "#a9c6ec"
+sky_strength  = "0.25"
