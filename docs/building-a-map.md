@@ -456,18 +456,96 @@ wetness       = 0.25     # how wet it makes the surface under it there; 0 if lef
 | `decal_moss` | 512, 0.38 MB | 1 | 0 | moss at the foot of a wall, thick at the bottom and thinning upward; its bottom third lies on the ground |
 | `decal_stain` | 512, 0.05 MB | 0.85 | 0.25 | water that ran for years from a leak: a dark blotch and streaks down a wall, or a rust stain on a floor |
 | `decal_damp` | 512, 0.05 MB | 0 | 1 | a damp patch: no colour of its own, the surface under it wet |
+| `decal_runs` | 512, 0.06 MB | 0.9 | 0 | water runs: thin dark streaks that fan wider as they go, starting at the top edge of the picture; put under a sill, a roof edge or a broken gutter |
+| `decal_salt` | 512, 0.17 MB | 0.75 | 0 | efflorescence, the white crust and powder damp brings out at the foot of a wall |
+| `decal_lichen` | 512, 0.18 MB | 0.9 | 0 | rosettes of grey-green, yellow and orange lichen, in clumps, for still shaded walls and old stone |
+| `decal_algae` | 512, 0.14 MB | 0.6 | 0.7 | a slimy dark green film on a wet floor or low wall |
+| `decal_rust_bleed` | 512, 0.07 MB | 0.9 | 0 | rust that has run down from a fixing: its source is 12% of the way down the picture |
+| `decal_scuffs` | 512, 0.13 MB | 0.7 | 0 | scuffs and dragged grit along a path (the picture's top is the way people walk) |
+| `decal_scratches` | 512, 0.05 MB | 0.55 | 0 | a patch of fine scrapes and a few gouges on a wall or door |
+| `decal_cracks` | 512, 0.09 MB | 1 | 0 | a forking network of hairline cracks that dies out toward the edges |
+| `decal_soot` | 512, 0.07 MB | 0.9 | 0 | fire blackening: a plume black just above the flame at the picture's bottom, fanning up |
+| `decal_oil` | 512, 0.04 MB | 0.8 | 0.5 | glossy dark oil stains, with drips |
+| `decal_droppings` | 512, 0.08 MB | 1 | 0 | bird droppings: white splats with a dark middle |
+| `decal_flakes` | 512, 0.20 MB | 1 | 0 | flakes of peeling paint lying where they fell, in three faded colours |
+| `decal_cobweb` | 512, 0.08 MB | 0.8 | 0 | a cobweb in a corner: strands from the picture's top middle, which is the corner line |
+| `decal_tag` | 512, 0.06 MB | 1 | 0 | a generic spray-painted scrawl in teal, with drips; it spells nothing |
+| `decal_stencil` | 512, 0.07 MB | 1 | 0 | a generic stencil, a bar of blank block letters and an arrow, in faded yellow |
 
 **Making one.** A decal's generator is a texture generator ([Adding one](#adding-one)) whose `make(seed, pixels)` returns four pictures, the fourth the mask; [`decalwork.py`](../assets-src/generators/decalwork.py) has the frame that clears the edges, an irregular patch and the finish. A decal doesn't repeat, so the rule against marks near the edge doesn't hold for it, and its readable checks are its own: the mask is 0 along every edge, nearly whole somewhere, and covers part of the picture. A decal's texture is left off the contact sheet. Its `size` in the library is only how big it was drawn to be: each decal in a Map gives its own.
 
-**For the wear generators.** A rule that places wear calls `MapBuilder.decal` with a seeded position, size and layer (stains under sills and ledges, moss along wall feet facing out of the corner, damp in a floor's dips), and `blend=` for ground that changes material. A new kind of wear is a new decal material and generator; a decal of the same picture can be any size, turned by `up`, and wetter or drier through its material.
+**For the wear rules.** [Wear](#wear) is the rules that call `MapBuilder.decal` for each kind of wear, with a seeded position, size and layer, and `blend=` is still the way to change a ground's material. A new kind of wear is a new decal material and generator, with a layer of its own only if it has to be drawn over or under a kind that already has one: a decal of the same picture can be any size, turned by `up`, and wetter or drier through its material.
 
 **Looking at it.** Use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)), with `look=digital` for now ([#316](https://github.com/BartoszSolkaBD/OpenDrone/issues/316)), one or two views a run ([#308](https://github.com/BartoszSolkaBD/OpenDrone/issues/308)): a wall from 1 m and from 40 m, a floor from a standing height looking toward the light, and a ground's edge from 1 m up. The game logs how many decals and blended parts a Map has.
 
 **What it costs.** A blended pixel looks both materials up (where the weight is 0 the second costs nothing), and a decal's pixel is a second, see-through layer over the surface. On the maintainer's M4 Mac mini, in a release build, with the picture 2560 × 1440 and `--camera-cost` counting the frames in 4 s (the whole frame, CPU and GPU) from the Launch Spot of the [test Map](#seeing-them), baked at 25 cm, looking at the south wall with its stains and moss and over the yard with dirt blended into its 24,600 triangles of grass: with the 13 decals (1,400 triangles) and the blend it draws 800 to 806 frames in the Analog Look and 958 to 962 in the Digital Look, and with neither (`--plain`) 810 to 811 and 963 to 967, over three runs each. That is 4.98 ms a frame against 4.94 (+0.05 ms, 1%) in Analog and 4.17 against 4.14 (+0.03 ms) in Digital. The three decals' pictures are 0.5 MB on disk and about 10 MB in the graphics card; the moss's normal map is most of it.
 
+## Wear
+
+![A brick hall in the game with wear off (top) and on (below): left, a shaded north wall with water runs from the roof edge and under the window, moss and salt at its foot, lichen, cracks and scratches; middle, the floor with droppings and damp, and soot over a fire pit; right, a corner with a cobweb, soot, and rust under a beam's end](images/wear-off-and-on.jpg)
+
+The decals above are only pictures. **Wear** is the rules that say where each one goes, so a Map has a reason for every stain, as a real place does: water runs below a sill, moss grows low on a shaded wall, soot rises above a fire. [`odwear.py`](../assets-src/lib/odwear.py) has one rule for each cause, taken from the "Where things collect" table of the [lived-in places research](research/lived-in-places.md), and puts the result on the Map with `MapBuilder.decal`.
+
+```python
+from odwear import Face, Floor, Wear
+
+wear = Wear(seed=7, level=0.6, sun=(-0.7071, -0.7071))   # a sun in the south-west
+south = Face("south_out", (7.0, -4.0), (-7.0, -4.0), 0.0, 4.5, ["south_wall"], openings=ops)
+yard = Floor(["yard"], yard_ground.height)
+
+wear.runs_below_openings(south)               # water runs below each window sill and breach
+wear.runs_from_edge(south, gutters=[11.0])    # and from the roof edge, a broken gutter for certain
+wear.moss_at_foot(south, yard, damp=[10.4])   # moss where the wall is damp or shaded
+wear.rust_seam((-5, 4), (5, 4), 3.0, (0, -1, 0), ["north_wall"])
+wear.hand("tag_door", "decal_tag", ["south_wall"], (4.0, -4.0, 1.4), (0, -1, 0), (0, 0, 1), (1.0, 1.0), layer=2)
+wear.keep_clear((8, -5, 0), (12, -3, 3))      # a box the rules leave clean
+wear.apply(m)                                 # puts every decal on the MapBuilder `m`
+```
+
+- **Level and seed.** `level` is 0 to 1: 0 puts nothing by rule, and a higher level makes each rule more likely to fire and its marks 0.8 to 1.2 times their size. Each rule draws from `Random(seed, rule, surface, ...)`, so changing one rule, adding one or adding a wall never moves what another rule placed, and the same seed gives the very same `.glb`.
+- **Where the sun is.** `sun` is the direction to the sun as `(east, north)`; the `[light]` of the Map says it as a compass azimuth (225° is south-west, `(-0.7071, -0.7071)`). A wall's shade is 0 facing the sun and 1 facing away: a wall under 0.3 is dry, and grows no moss unless the script says water comes down it (`damp=`, a position along the face), which is how a leak makes moss on a sunny wall.
+- **Surfaces.** A `Face` is one vertical face of a wall: its two ends in the way you walk with the front on your left (the same way as `broken_wall(...).pose(p0, p1)`), its foot, its height, the shapes a decal may lie on, its openings (anything with `u0 u1 v0 v1 kind`, so `odopening.Opening` does) and whether it is `painted`. A `Floor` is the shapes a decal may lie on and the ground's height at `(x, y)`, such as `Ground.height`.
+- **The rules.**
+
+| Rule | Puts | Where, and why |
+|---|---|---|
+| `runs_below_openings` | `decal_runs` | down from the bottom edge of each window or breach, one for each metre or so of its width; none below a doorway |
+| `runs_from_edge` | `decal_runs` | down from the wall's top edge, at each broken gutter for certain and at a few seeded places |
+| `damp_at` | `decal_damp`, `decal_algae` | where water stands (a Dip, under a roof opening); algae too in a big one of a worn place |
+| `moss_at_foot`, `moss_in_corners` | `decal_moss` | low on shaded walls and in shaded corners, lying on the ground and up the wall; near `damp` on a sunny wall |
+| `salt_at_foot` | `decal_salt` | at the foot where damp rises: near `damp`, or on a shaded wall at a lower chance |
+| `lichen_on` | `decal_lichen` | in clumps at arm's reach and above on a shaded wall, never over an opening |
+| `rust_below`, `rust_seam` | `decal_rust_bleed` | its source on each bolt, seam end or beam end, running down |
+| `soot_above`, `soot_over_door`, `soot_ceiling` | `decal_soot` | black just above a fire's flame, fanning up; over a burnt doorway's lintel; on the ceiling over a fire |
+| `scuff_paths` | `decal_scuffs` | along the way between doors and Gaps, more of them toward its ends |
+| `scratches_low` | `decal_scratches` | on a wall, thickest at the height of a bag or a boot and thinning upward |
+| `marks_near_openings` | `decal_tag`, `decal_stencil` | beside a way in, 1.0 to 1.6 m up where someone could stand, never over an opening |
+| `cracks_at_openings`, `cracks_on_floor` | `decal_cracks` | up and out from an opening's top corners, where the lintel settled; across an old slab |
+| `flakes_at_foot` | `decal_flakes` | on the floor along the foot of a painted wall |
+| `cobwebs_in_corners` | `decal_cobweb` | in the upper corners where two walls meet |
+| `droppings_under` | `decal_droppings` | on the floor under a beam, scattered along it and a quarter metre either side |
+| `oil_at` | `decal_oil` | by each machine or drum, not every one |
+
+- **By hand.** `hand(...)` adds a decal of your own on top, with the arguments of `MapBuilder.decal`; it is never moved or dropped by the level, the seed or a clear box. `keep_clear(low, high)` locks a box `(x, y, z)` to `(x, y, z)` against the rules: a decal a rule would put with its centre in it is dropped.
+- **Layers.** The decals are drawn in five layers, because every layer is a separate pipeline in the game: 0 the damp and the runs, 1 what stains (algae, salt, rust, oil, soot), 2 marks of people (tags, stencils), 3 growth (moss, lichen) and 4 loose and scratched things (scuffs, scratches, cracks, flakes, droppings, cobwebs). So moss grows over a tag, and a run is never over a scratch. `LAYER` in `odwear.py` is the table.
+- **The checks.** [`test_odwear.py`](../assets-src/lib/test_odwear.py) runs with plain Python in CI (`python3 -m unittest discover -s assets-src/lib`) and proves each placement rule by its name: a run always starts at an opening or the wall's top edge, no moss on a dry south-facing wall, a rust bleed has its fixing at the top of its picture, soot starts just above the flame, scuffs stay on the path and gather toward its ends, tags stay at arm's reach beside a way in and off openings, the same seed gives the same decals and another seed other ones, a hand-placed decal stays under a clear box, and every kind has a decal material in the library.
+- **Trying it.** [`assets-src/demos/wear/build.py`](../assets-src/demos/wear/build.py) is a brick hall with a doorway, windows, two beams, a fire pit and drums, dressed by the rules: `--wear 0` leaves it clean, `--wear 0.8` is the picture above, and `--seed` changes every choice. To look at it, copy it to `assets-src/maps/wear-demo/build.py` on a checkout of your own, give `packs/opendrone/maps/wear-demo/` a `map.toml` copied from a Map's with a `[light]` (sun at 225°), add the Map to `MAPS` in `crates/opendrone/src/main.rs`, bake it (`cargo xtask maps --bake wear-demo`; the decals take no room in the atlas, so a clean and a dressed build share their light) and use `--render-views` with `look=digital` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)). It isn't a Map of the Pack and nothing builds it in CI.
+
+**What it costs.** Counted on that hall (12 x 8 m, 416 m² of its wall faces and floor, its walls plain boxes), from what the script prints:
+
+| Level | Decals | A square metre | Decal triangles | A square metre |
+|---|---|---|---|---|
+| 0.3 | 48 | 0.12 | 887 | 2.1 |
+| 0.8 | 108 | 0.26 | 2,579 | 6.2 |
+| 1.0 | 128 | 0.31 | 3,238 | 7.8 |
+
+A decal costs a triangle for each triangle of the surface under it, so the same wear on a [broken wall](#broken-openings) of 38 triangles a square metre costs several times what it did on this hall's plain boxes: a 1 m² decal is 2 to 5 triangles on a box and about 40 on a wall of bricks. The 15 new decals' pictures are 1.5 MB on disk together (0.04 to 0.20 MB each, the first slice's moss, 0.38 MB, being still the biggest); 18 decals in all are 2.0 MB. Five layers are five pipelines. The game's own cost is the decals', as measured for the [first slice](#decals-and-blended-ground), not measured again here.
+
+**A trap.** A decal whose `wetness` is more than 0 adds the sky's sheen where its mask is only partly whole, which on a sunlit wall shows as pale streaks. So the dry decals (`decal_runs`, `decal_rust_bleed`) ask for no wetness; the ones that should look wet (algae, oil) keep theirs.
+
 ## What CI checks
 
-When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers' and the decals'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
+When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers', the decals' and the wear rules'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
 
 The Blender pictures don't show baked light: they are drawn with a plain sun. A Map's look under its baked light is judged with `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)).
 
