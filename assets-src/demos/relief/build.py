@@ -23,9 +23,9 @@ given real relief (`assets-src/lib/odrelief.py`, `odbrick.py`,
   them are bent, hanging by one end or gone, so the roof's line against the
   sky is broken.
 
-The scatter (#339) puts the kit down as in the look-test hall, on the relief.
+The kit's placement rules (`odscatter.py`, #339) put the kit down as in the look-test hall, on the relief.
 A 4 m aisle from the Launch Spot through the doorway is a keep-clear zone for
-the scatter and for the relief alike. `--flat` builds the same hall with the
+the placement rules and for the relief alike. `--flat` builds the same hall with the
 look-test hall's flat ground and floor, box walls and no roof: the "before".
 
 Nothing builds this in CI and nothing commits its `.glb`: to fly or render it,

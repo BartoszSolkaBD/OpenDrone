@@ -781,9 +781,9 @@ m.solid("floor", mesh, None, "concrete_floor_worn", "trimesh",
 
 - **Fine where the Quad flies low.** `graded_mesh` cuts the ground into 20 to 30 cm cells inside the rectangles you name (the aisle, the doorway, round a heap, the Launch Spot) and into blocks of about a metre elsewhere, with no crack where they meet. All fine, it costs `2 / fine_step²` triangles a square metre (50 at 20 cm); all coarse, about `4 / coarse_step²` (3 at 1.2 m).
 - **The layer shows.** Seen from above, a 10 cm drift is hard to tell from flat concrete. `blend_weights` gives each corner a weight from how thick the layer is there, and the floor's [blend](#blending-two-materials) shows a rubble picture through the concrete wherever it lies.
-- **Keep-clear zones.** The relief takes the scatter's own zones ([The rules](#the-rules)): inside one, nothing rises more than 2 cm (`clear_rise`) above the plain ground, though a rut or a pothole may stay; it eases back over 60 cm outside. Give it only the flying lines, not the walls, or the layer won't lie against them.
+- **Keep-clear zones.** The relief takes the keep-clear zones of the kit's placement rules (`odscatter.Scatter`, [The rules](#the-rules), not the grass Scatter): inside one, nothing rises more than 2 cm (`clear_rise`) above the plain ground, though a rut or a pothole may stay; it eases back over 60 cm outside. Give it only the flying lines, not the walls, or the layer won't lie against them.
 - **Range.** Nothing takes the ground more than `low` (30 cm) below or `high` (60 cm) above the plain ground.
-- **Under the kit.** Build the [scatter](#the-rules) with the relief's height as its ground, and the kit lies on the drifts and in the ruts.
+- **Under the kit.** Build the kit's placement rules ([`odscatter.Scatter`](#the-rules)) with the relief's height as its ground, and the kit lies on the drifts and in the ruts.
 
 ### Brick walls with depth
 
