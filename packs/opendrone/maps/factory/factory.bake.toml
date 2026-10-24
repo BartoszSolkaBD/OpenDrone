@@ -1,11 +1,11 @@
 # Written by `cargo xtask maps --bake factory`; never edit it by hand. It says what factory's
 # light atlas was baked from, so `maps --check` can tell when the atlas is out of date.
 atlas = "factory.light.exr"
-glb_sha256 = "931e98d1231431ef2b4d457399428e317c33057c221e4127f6ea20d84964d618"
+glb_sha256 = "af45ad71d4760a828df4acd171fc0f3ca77005bcc15daaa2d91b83eb036ee85a"
 light_sha256 = "acc2ec5d1b606d1441bf012e82dcb12aad701a6548b43a4adec0e2c802bd9062"
 texel_cm = 10.0
 width = 2048
-height = 3632
-samples = 1024
+height = 4000
+samples = 128
 bounces = 6
-bake_seconds = 379.2
+bake_seconds = 43.5

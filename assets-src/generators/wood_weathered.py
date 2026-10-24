@@ -16,8 +16,8 @@ def make(seed, n):
     bend = tex.perlin(X, Y, 3, s()) * 0.05
     grain = tex.fbm(X, Y + bend, (2, 64), 3, s())
     fine = tex.fbm(X, Y + bend, (6, 220), 2, s())
-    grey = tex.mix(tex.colour(104, 100, 92), tex.colour(150, 146, 136), grain)
-    brown = tex.mix(tex.colour(110, 82, 52), tex.colour(150, 116, 76), grain)
+    grey = tex.mix(tex.colour(78, 74, 66), tex.colour(118, 112, 100), grain)
+    brown = tex.mix(tex.colour(92, 66, 40), tex.colour(126, 94, 60), grain)
     fresh = tex.smoothstep(0.55, 0.75, tex.fbm(X, Y, (3, 6), 4, s()))
     albedo = tex.mix(grey, brown, fresh * 0.8)
     albedo = albedo * (0.86 + 0.24 * fine)[..., None]

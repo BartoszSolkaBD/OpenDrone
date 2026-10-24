@@ -148,6 +148,59 @@ fn the_bay_where_the_roof_fell_in_is_a_dive_of_more_than_15_metres_from_above_th
 }
 
 #[test]
+fn every_open_skylight_and_the_missing_roof_sheet_is_a_clear_drop_to_the_floor() {
+    // #324: nothing the story puts in the hall (the hangout's fire pit and
+    // seats, the fire corner's ash) blocks a way down through the roof. From
+    // 25 m the line reaches the floor or a fire pit's ash, under 0.3 m up.
+    let (_, map) = factory();
+    for (x, y, what) in [
+        (6.5, 7.0, "the south skylight at x 6.5"),
+        (21.5, 8.5, "the hangout's skylight"),
+        (6.5, 23.0, "the north skylight at x 6.5"),
+        (21.5, 20.0, "the fire corner's shattered skylight"),
+        (8.5, 22.0, "the missing sheet on the north slope"),
+    ] {
+        let landing = first_below(&map, x, y, 25.0);
+        assert!(landing < 0.3, "{what}: the drop ends {landing} m up");
+    }
+}
+
+#[test]
+fn the_aisle_is_clear_from_the_rubble_heap_to_its_north_end() {
+    // #324, the Reviewer's note on #318: the machine plinths stand west of
+    // the 3 m aisle (x 11 to 14), not in it; nothing stands in it north of
+    // the fallen bay's heap, at a plinth's height or a pilot's.
+    let (_, map) = factory();
+    for x in [11.2, 12.5, 13.8] {
+        for z in [0.35, 1.5] {
+            assert!(
+                clear(&map, at(x, 10.6, z), at(x, 26.0, z)),
+                "along the aisle at x {x}, {z} m up"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_hangouts_seats_and_the_bigger_props_are_solid_and_bottles_and_cans_are_drawn_only() {
+    // The research's rule: a prop bigger than about 20 cm that a Quad can
+    // hit is solid; a bottle or a can is only drawn.
+    let (map, collision) = factory();
+    let solid = |name: &str| map.solid_names.iter().any(|n| n == name);
+    let drawn = |name: &str| map.drawing.iter().any(|p| p.name == name);
+    for name in ["story_wood", "story_steel", "story_plastic_blue", "story_concrete"] {
+        assert!(solid(name), "{name} is solid");
+    }
+    for name in ["litter_glass_brown", "litter_glass_green", "litter_can"] {
+        assert!(drawn(name), "{name} is drawn");
+        assert!(!solid(name), "{name} is not solid");
+    }
+    // The cable-drum table at (23.2, 8.3) stops a line at its top, 0.62 m up.
+    let top = first_below(&collision, 23.2, 8.3, 3.0);
+    assert!((top - 0.62).abs() < 0.03, "the table's top is {top} m up");
+}
+
+#[test]
 fn leaves_and_weeds_are_drawn_but_not_solid_and_the_trees_wood_is_solid() {
     let (map, _) = factory();
     let solid = |name: &str| {

@@ -283,12 +283,12 @@ def walls(m, rnd, floor_h, yard_h):
 
     parts = Parts()
     out = {}
-    door = Opening(u_of(SOUTH, 10.7), u_of(SOUTH, 14.3), 0.0, FOOT + 4.4, "doorway", ragged=0.5)
+    door = Opening(u_of(SOUTH, 10.45), u_of(SOUTH, 14.55), 0.0, FOOT + 4.55, "doorway", ragged=0.35)
     ops = [framed(SOUTH, x) for x in WIN_S] + [door]
     out["south"] = hall_wall(m, "wall_south", SOUTH, LONG_RUN, ops, 324 * 3 + 1, 0.025, 0.004, ground_at)
     for x in WIN_S:
         window_parts(parts, SOUTH, u_of(SOUTH, x), rnd.child("ws", x), 0.25)
-    m.box_h("door_lintel", 12.5, 0.0, 4.2, T + 0.04, 4.45, 4.75, STEEL)
+    m.box_h("door_lintel", 12.5, 0.0, 4.7, T + 0.04, 4.45, 4.75, STEEL)
 
     ops = [framed(NORTH, x) for x in WIN_N]
     out["north"] = hall_wall(m, "wall_north", NORTH, LONG_RUN, ops, 324 * 3 + 2, 0.025, 0.0, ground_at)
@@ -311,8 +311,8 @@ def walls(m, rnd, floor_h, yard_h):
 
     for name, x in (("gable_west", 0.0), ("gable_east", HALL)):
         # A little under the roof's line: the sheets sag onto it.
-        profile = [(-T / 2, EAVE), (HALL + T / 2, EAVE), (HALL + T / 2, roof_under(HALL + T / 2) - 0.04)]
-        profile += [(HALL / 2, roof_under(HALL / 2) - 0.04), (-T / 2, roof_under(-T / 2) - 0.04)]
+        profile = [(-T / 2, EAVE), (HALL + T / 2, EAVE), (HALL + T / 2, roof_under(HALL + T / 2) - 0.02)]
+        profile += [(HALL / 2, roof_under(HALL / 2) - 0.04), (-T / 2, roof_under(-T / 2) - 0.02)]
         m.prism(name, list(reversed(profile)), T, (x, 0.0, 0.0), 0.0, BRICK)
 
     # Brick pilasters under each truss on the long walls' inside faces, set
@@ -443,7 +443,10 @@ def roof(m, rnd):
         glass = slope.glass()
         if glass[1]:
             m.solid(f"roof_{side}_glass", glass, None, GLASS, "none")
-        m.solid(f"roof_{side}_solid", slope.collision_mesh(), None, ROOF, "trimesh", collision_only=True)
+        # A 0.5 m grid: on the default 1.5 m one a hole narrower than a cell
+        # (the missing 1 m sheet, a rust hole) falls between two corners and
+        # the collider stays shut over it.
+        m.solid(f"roof_{side}_solid", slope.collision_mesh(step=0.5), None, ROOF, "trimesh", collision_only=True)
     # The eaves' overhang past each gable, flat: the trusses there hold it.
     for side, tilt, (ya, yb) in (("south", math.degrees(math.atan2(RISE, HALL / 2.0)), (-0.6, HALL / 2)),
                                  ("north", -math.degrees(math.atan2(RISE, HALL / 2.0)), (HALL / 2, HALL + 0.6))):
@@ -522,7 +525,7 @@ def sheet(m, name, x0, y0, x1, y1, tilt, material):
 # ---------------------------------------------------------------- floor
 
 STRIPS = [IN, 4.4, 9.05, 13.1, 17.6, 21.9, 26.2, HALL - IN]  # the pours, west to east
-JOINT = 0.004  # half a saw-cut joint
+JOINT = 0.008  # half a joint: a saw cut gone ragged and filled with dirt
 
 
 def floor_ground():
@@ -658,8 +661,8 @@ def grassiness(x, y):
     # Away from the hall, the grass takes over.
     dx = max(-x, 0.0, x - HALL)
     dy = max(-y, 0.0, y - HALL)
-    far = math.sqrt(dx * dx + dy * dy) + 5.0 * (fbm2(seed, x, y, 9.0, 3) )
-    w = smoothstep((far - 10.0) / 9.0)
+    far = math.sqrt(dx * dx + dy * dy) + 8.0 * (fbm2(seed, x, y, 9.0, 3))
+    w = 0.85 * smoothstep((far - 16.0) / 14.0) * (0.55 + 0.45 * smoothstep(fbm2(seed + 1, x, y, 5.0, 3) * 2.0 + 0.5))
     # Strips along the walls' feet where the sun falls and nothing drives.
     for edge in (SOUTH_STRIP, WEST_STRIP, NORTH_STRIP):
         w = max(w, edge.weight(x, y))
@@ -1061,10 +1064,10 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     moss and salt where it is shaded and damp, rust under the steel, soot from
     the two fires, droppings under the trusses, scuffs where people walk,
     tags where they stand."""
-    w = Wear(seed=324, level=0.7, sun=SUN)
+    w = Wear(seed=324, level=0.85, sun=SUN)
     ws, wn, ww, we = (walls_out[k][0] for k in ("south", "north", "west", "east"))
     win = lambda xs: [(x - R, x + R, SILL, SPRING + R, "window") for x in xs]
-    s_ops = win(WIN_S) + [(10.7, 14.3, 0.0, 4.4, "doorway")]
+    s_ops = win(WIN_S) + [(10.45, 14.55, 0.0, 4.4, "doorway")]
     n_ops = win(WIN_N)
     w_ops = win(WIN_W) + [(13.1, 15.9, 0.45, 3.05, "breach")]
     e_ops = [(7.0, 8.1, 0.0, 2.2, "doorway"), (12.1, 12.9, 0.9, 1.5, "window")] + win(WIN_E)
@@ -1098,7 +1101,6 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     # in, cracks over the openings, flakes under the plaster.
     for name in ("south_in", "west_in"):
         w.runs_below_openings(faces[name])
-        w.cracks_at_openings(faces[name])
     w.scratches_low(faces["south_in"])
     plaster_face = WearFace("plaster", (20.4, HALL - i - 0.05), (9.6, HALL - i - 0.05), 0.0, 3.4, [plaster_ob, wn], painted=True)
     w.flakes_at_foot(plaster_face, inside)
@@ -1125,6 +1127,23 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     w.scuff_paths([(12.5, 0.6), (12.5, 2.6), (19.5, 5.0)], inside)
     w.scuff_paths([(12.2, 11.0), (12.8, 25.5)], inside, width=1.4)
 
+    # Water stains under the sills: years of rain off each sill, more on the
+    # weather side, left where a sill still throws it clear.
+    r = Random(SEED, "sill_stains")
+    for name, xs, f, wall, along_x in (("south_out", WIN_S, (0.0, -1.0, 0.0), ws, True), ("south_in", WIN_S, (0.0, 1.0, 0.0), ws, True),
+                                       ("north_out", WIN_N, (0.0, 1.0, 0.0), wn, True), ("west_out", WIN_W, (-1.0, 0.0, 0.0), ww, False),
+                                       ("west_in", WIN_W, (1.0, 0.0, 0.0), ww, False), ("east_out", WIN_E, (1.0, 0.0, 0.0), we, False)):
+        for x in xs:
+            if not r.chance(0.7):
+                continue
+            a = x + r.uniform(-0.6, 0.6)
+            h = r.uniform(1.0, 1.25)
+            if along_x:
+                c = (a, (0.0 if name.startswith("south") else HALL) + f[1] * T / 2, SILL - 0.12 - h / 2)
+            else:
+                c = ((0.0 if name.startswith("west") else HALL) + f[0] * T / 2, a, SILL - 0.12 - h / 2)
+            w.hand(f"sill_stain_{name}_{x}", "decal_stain", [wall], c, f, (0.0, 0.0, 1.0), (r.uniform(1.0, 1.6), h), layer=0, depth=0.6)
+
     # By hand: the story's own marks.
     north, south_f, east_f, west_f = (0.0, -1.0, 0.0), (0.0, 1.0, 0.0), (-1.0, 0.0, 0.0), (1.0, 0.0, 0.0)
     up = (0.0, 0.0, 1.0)
@@ -1134,10 +1153,12 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     # blackened over the ash.
     w.hand("old_tag_east_a", "decal_tag", [we], (HALL - i, 19.0, 1.3), east_f, up, (1.6, 1.3), layer=0, depth=0.6)
     w.hand("old_tag_east_b", "decal_tag", [we], (HALL - i, 21.4, 1.6), east_f, up, (1.3, 1.1), layer=0, depth=0.6)
-    w.hand("soot_north_fire", "decal_soot", [wn], (ax + 0.2, HALL - i, 3.0), north, up, (4.6, 6.4), layer=1, depth=0.8)
-    w.hand("soot_east_fire", "decal_soot", [we], (HALL - i, ay + 0.3, 2.9), east_f, up, (4.4, 6.2), layer=1, depth=0.8)
+    for k, (dx, s, z) in enumerate(((0.2, (5.0, 7.0), 3.3), (-0.5, (3.2, 4.4), 2.1), (0.9, (2.6, 3.4), 1.6))):
+        w.hand(f"soot_north_fire_{k}", "decal_soot", [wn], (ax + dx, HALL - i, z), north, up, s, layer=1, depth=0.8)
+        w.hand(f"soot_east_fire_{k}", "decal_soot", [we], (HALL - i, ay + 0.3 - dx, z), east_f, up, s, layer=1, depth=0.8)
     w.hand("soot_east_low", "decal_soot", [we], (HALL - i, ay - 2.0, 1.5), east_f, up, (2.6, 3.2), layer=1, depth=0.8)
     w.hand("soot_plaster", "decal_soot", [plaster_ob, wn], (19.9, HALL - i, 3.4), north, up, (1.6, 1.8), layer=1, depth=0.8)
+    w.hand("scorch_floor", "decal_soot", [floor_ob], (ax - 0.4, ay - 0.2, floor_h(ax, ay)), up, (-0.7071, -0.7071, 0.0), (6.4, 6.4), layer=1, depth=0.6)
     for k, (x, y, s) in enumerate(((ax, ay, 5.5), (ax + 1.8, ay + 2.6, 4.0), (ax - 2.2, ay + 0.8, 3.6))):
         w.hand(f"soot_roof_{k}", "decal_soot", [iron_n], (x, y, roof_under(y) - 0.1), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0), (s, s), layer=1, depth=1.2)
     # The hangout: a light soot fan round the skylight over the fire pit, a
