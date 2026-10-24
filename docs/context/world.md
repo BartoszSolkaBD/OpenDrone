@@ -60,6 +60,14 @@ _Avoid_: Sticker, overlay
 The marks of age and use on a Map's surfaces (water runs, moss, rust, soot, scuffs, droppings, cracks and the like), put as decals (see Decal above) by rules that give each mark a cause: water runs below a sill, moss grows low on a shaded wall, soot rises above a fire. A rule is given a wear level from 0 to 1 and a seed, so the same seed gives the same Map, and a Map's author can add a decal by hand or lock a box against the rules. How a script asks for it: [Building a Map](../building-a-map.md#wear).
 _Avoid_: Dirt layer, grunge
 
+**Kit**:
+The loose things a Map's script lays on its floors and yards, made from scratch and solid, not pictures: bricks and brick chunks, concrete lumps with rebar, plaster chips, roof-sheet pieces, planks, boards and pallets, pipes, drums, cable, a tyre, cans and bottles, and the bolt plates and anchor stubs left in a hall floor. Each **kit item** has a few variants, and rules scatter them from a seed: a heap of rubble, debris along a wall's foot, a strewn floor, a row of bolt plates on an old column line, piles of pallets and boards. How a script asks for it: [Building a Map](../building-a-map.md#the-kit-and-the-scatter).
+_Avoid_: Props (a prop is a propeller), clutter, asset pack
+
+**Keep-clear zone**:
+A rectangle or circle on a Map that the kit's rules leave empty, so a line the pilot flies stays open: an aisle, a Gap's approach, the Launch Spot's 3 m. An item with any corner in it is left out, and a heap is cut away at its edge.
+_Avoid_: Exclusion zone, no-spawn area
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode

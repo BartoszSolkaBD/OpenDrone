@@ -543,6 +543,84 @@ A decal costs a triangle for each triangle of the surface under it, so the same 
 
 **A trap.** A decal whose `wetness` is more than 0 adds the sky's sheen where its mask is only partly whole, which on a sunlit wall shows as pale streaks. So the dry decals (`decal_runs`, `decal_rust_bleed`) ask for no wetness; the ones that should look wet (algae, oil) keep theirs.
 
+## The kit and the scatter
+
+A real derelict works is never clean: rubble lies in heaps with weeds in it, plaster has come down in drifts along the walls, pallets and boards are piled in corners, and bolt plates stick out of the floor where the columns were cut away. The **kit** is those loose things, made from scratch and solid, and the **scatter** is the rules that put them down, from a seed, leaving **keep-clear zones** open for flying (the terms are in [World and content](context/world.md)). Both are plain Python in [`assets-src/lib/`](../assets-src/lib/), like the [geometry helpers](#geometry-that-isnt-boxes), so a Map built with them has the same bytes on every computer.
+
+### The kit
+
+[`odkit.py`](../assets-src/lib/odkit.py) makes each item in its own axes, standing on z = 0 and centred, at its real size, as one or more closed meshes, one for each material: a concrete lump and its rebar are two. Every item has a few **variants**, and variant k of an item is always the same mesh, built from its own seed, so a thousand bricks are a handful of shapes turned and scaled. The materials are the library's own, so the kit needs no new picture.
+
+| Item | What it is | Material | Triangles |
+|---|---|---|---|
+| `brick`, `brick_chunk` | a whole brick (215 × 102.5 × 65 mm) with chipped corners; a broken half or third | `brick_red_weathered` | 12; 20 |
+| `concrete_lump`, `concrete_chunk` | broken concrete 0.2 to 0.5 m across with one to three bent rebar ends; a fist-sized bit | `concrete_wall_rough`, `steel_rusty` | 100 to 130; 20 |
+| `plaster_chip` | a flake of plaster or render 4 to 12 cm across | `concrete_smooth` | 16 to 24 |
+| `roof_sheet_piece` | a torn, bent piece of corrugated sheet | `roof_corrugated_rusted` | 200 to 270 |
+| `plank`, `board` | a plank 1.5 to 3 m, bowed, sometimes snapped short; an offcut of board | `wood_ramp` | 36; 12 |
+| `pallet`, `pallet_stack` | a Euro pallet (1.2 × 0.8 × 0.144 m) with boards gone or broken; two to six of them stacked by hand | `wood_ramp` | 230 to 240; 460 to 1,420 |
+| `pipe`, `pipe_run` | a length of pipe; two or three lengths still joined at their flanges, kinked where they fell | `steel_rusty` | 96; 290 to 430 |
+| `drum`, `drum_lying` | a 200 litre drum with its hoops, sometimes dented; one on its side | `steel_rusty`, `steel_painted` | 168 |
+| `cable_tangle`, `tyre` | loops of stripped cable; a car tyre, flat or leaning | `concrete_dark` (there is no rubber) | 180; 128 |
+| `can`, `bottle`, `plastic_scrap` | a can, standing, lying or crushed; a bottle, most lying down; a bent piece of crate | `steel_grey`, `container_blue`, `container_red` | 32; 88; 20 |
+| `anchor_stubs`, `bolt_plate` | four anchor bolts cut off near the floor; a column's base plate with its bolts, nuts and often the stub of the column | `steel_rusty` | 70 to 120; 240 |
+
+**Adding a kit item.** Write a function in `odkit.py` that takes a `Random` and returns its parts, `[(material, mesh)]`, built from the blocks at the top of the file (`chipped_box`, `lump`, `slab_outline`, `bar`, `corrugated`, `odgeom`'s cylinders and tubes), and add an `Item` to `KIT` with its name, how many variants, how far it sinks into what it lies on (a share of its height) and whether it is `solid` (big enough for the Quad to hit). Then say in `odscatter.py`'s `TUMBLE`, `SCALES` and `UPRIGHT` how it may lie, and give it a weight in the mixes of the rules that should throw it down. [`test_odkit.py`](../assets-src/lib/test_odkit.py) checks every item the same way without being told: closed and facing out, on z = 0 and centred, its materials in the library, no triangle that rounds to nothing, the same bytes twice and variants that differ.
+
+### The rules
+
+```python
+from odscatter import Scatter
+s = Scatter(seed=7, ground=floor_height)            # any height(x, y): a Ground's, or one of your own
+s.keep_clear_circle(0.0, -16.0, 3.5)                # the Launch Spot
+s.keep_clear_rect(-2.0, -22.0, 2.0, 7.0)            # the aisle through the doorway
+s.heap((15.0, 1.0), 2.8, 1.4)                       # rubble in the yard
+s.heap((-5.5, 7.4), 2.2, 1.1, toward=(0.0, 1.0))    # higher against the north wall
+s.wall_foot((10, 7.85), (-10, 7.85), depth=1.1, core="rubble")   # debris along the north wall's inside
+s.strew((-10, -6, 10, 8), 2.0, bed="rubble")        # the floor under a gone roof
+s.anchor_row((-8, -1.5), (8, -1.5), 4.0)            # bolt plates on a cut column line
+s.pallets(-8.4, -4.4, 0.0)                          # a pile of pallets in a corner
+s.boards(-7.6, 1.2, 75.0)                           # boards and planks thrown in a heap
+s.place("pipe_run", 4.5, 4.6, 8.0)                  # one item by hand
+s.patches((-9.5, -5.5, 9.5, 7.5), 9, on=[floor])    # puddles and moss: decals
+s.apply(m)                                          # onto the MapBuilder, after the shapes the decals lie on
+```
+
+| Rule | Puts | How |
+|---|---|---|
+| `heap` | a pile of rubble `radius` round and `height` tall | a core shape (`core`, a `trimesh` the Quad meets) and about 30 items a square metre on it, the big lumps at its foot and the small ones on top; `toward` leans it higher against a wall |
+| `wall_foot` | debris fallen along a wall's foot | thickest against the wall, thinning out over `depth`, a wedge up to `height` deep, never into the wall; `core` lays the wedge itself as a low bed |
+| `strew` | things over a floor or a yard | `per_m2` items a square metre, most in clusters (a fall of plaster, where a ceiling came down), a share anywhere; `bed` lays a low bed of crumbled stuff, 4 to 10 cm deep, under each cluster, so the floor has relief and not only bits |
+| `anchor_row` | bolt plates and anchor stubs | every `spacing` metres along a line, turned along it, some dug out |
+| `pallets`, `boards` | a pile in a corner | one to three stacks of pallets side by side and a loose one or two; boards and planks, each lying on the ones below |
+| `place` | one item by hand | at a place and a turn you give, upright |
+| `patches` | puddles and moss | `odwear`'s `damp`, `moss` and `algae` decals ([Wear](#wear)), at seeded places, none centred in a keep-clear zone |
+
+- **The same seed, the same mess.** Each rule draws from `Random(seed, rule, its number)`, so adding a rule or changing one never moves what another placed.
+- **Resting.** An item is turned (a brick lands any way up, a plank lies flat, a drum stands), then lowered until its lowest corner touches the surface under that corner, then sunk by its share of its height. On a heap, a wall foot's wedge or a strewn bed, the surface is the ground plus that shape, and flat things lie along its slope.
+- **Keep-clear zones** (`keep_clear_rect`, `keep_clear_circle`). An item with any corner in one is left out, and a heap's, a wedge's or a bed's core is cut away at its edge. Put one on every line a pilot flies: an aisle, a Gap's approach, the Launch Spot. Put one on each wall and column too, or a heap will grow through it.
+- **Few draws.** `apply` merges every item of one material in one `cell` (8 m squares) into one shape, so a whole strewn hall is a few dozen draws, not thousands. `stats()` says the items, the triangles by material and the draws.
+- **Light.** The merged shapes take their light like any other shape: the second UV set, if the Map asks for [baked light](#baked-light). The bake lights a texel only where a triangle covers its middle, so a brick's face, smaller than a 20 cm texel, would come out black: `apply` asks `MapBuilder.solid` for `light_least=2`, which stretches each of the items' charts in the atlas to at least two texels each way. That costs atlas room: about 1.9 million texels for the look-test Map at 20 cm a texel, 15 MB in the graphics card.
+- **Colliders.** Loose items are only drawn: they are small, and the Quad flies over them. A core is a `trimesh` surface, and a big upright item (a pallet stack, a drum) gets a collision-only box.
+
+**Adding a rule.** Write a method on `Scatter` that starts `rnd = self._rnd("<its name>")`, picks places and kit items from `rnd`, and calls `self._put(rule, rnd, kind, x, y, ...)` for each: `_put` turns, rests, sinks and keeps clear for you. A rule that raises the surface (a heap, a bed) passes its own `support(x, y)` and adds its core with `self._core(...)`. Give it a readable check in [`test_odscatter.py`](../assets-src/lib/test_odscatter.py) of what it is for; the checks already there prove that the same seed gives the same scatter and another seed another, that adding a rule never moves what another placed, that items rest on what is under them (neither floating nor buried past their sink), that nothing falls in a keep-clear zone, that a heap is tallest in its middle, higher toward a wall and has its big lumps at its foot, that debris along a wall is thickest against it and never in it, and that the items merge into one shape per material per cell.
+
+### The look-test Map
+
+[`assets-src/demos/kit/build.py`](../assets-src/demos/kit/build.py) is a stripped hall, 20 × 14 m and open to the sky, with a dirt yard: a rubble heap in the yard and one against the north wall, debris along the wall feet, a strewn floor, bolt plates on a cut column line, pallets and boards in corners, a fallen pipe run, drums, puddles and moss, and a 4 m aisle from the Launch Spot through the doorway that the scatter keeps clear. `--plain` leaves the kit out and `--seed` changes every choice. It isn't a Map of the Pack and nothing builds it in CI: to look at it, copy it to `assets-src/maps/kit-demo/build.py` on a checkout of your own (make its `--light-cm` default 20), give `packs/opendrone/maps/kit-demo/` a `map.toml` copied from a Map's with a `[light]` and a `preview`, add `("kit-demo", "opendrone/kit-demo")` to `MAPS` in `crates/opendrone/src/main.rs`, run `cargo xtask maps --bake kit-demo --samples 256`, and use `--render-views` ([Seeing the Map as the game draws it](#seeing-the-map-as-the-game-draws-it)).
+
+**What it costs.** From what the script prints and `--camera-cost --seconds 10 --size 2560x1440` from the Launch Spot, on the M4 Mac mini while other agents' builds ran on it (a load average of 13 to 27, so the frame times are rough):
+
+| | The look-test Map | Bando | The Factory's slice v2 (PR #335) |
+|---|---|---|---|
+| Kit items | 3,195 (542 left out by the keep-clear zones) | none | none of this kit |
+| Triangles | 112,000: 17,000 without the kit, 88,900 in the items, 6,400 in the cores and beds | | |
+| Draws for the kit | 106 merged shapes and 6 cores, 13 decals | | |
+| Frame time, Analog | 5.3 ms (1,881 frames in 10 s) | 5.3 ms (1,886) | 8.9 ms (1,119) |
+| Frame time, Digital | 5.3 ms (1,895) | 4.5 ms (2,206) | 8.7 ms (1,147) |
+
+So a whole hall floor of mess costs about what Bando does, under the depth pass's 8 ms. Plaster chips are the biggest share (25,000 triangles for 1,200 chips) and show least from a few metres away: thin them first, by a lower `per_m2` or a lower weight in the mix, if a Map runs over.
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers', the decals' and the wear rules'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
