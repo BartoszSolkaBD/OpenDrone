@@ -168,6 +168,30 @@ class EachGenerator(unittest.TestCase):
     def test_the_library_makes_decals_of_moss_a_stain_and_a_damp_patch(self):
         self.assertTrue({"decal_moss", "decal_stain", "decal_damp"} <= set(self.decals()))
 
+    def test_the_library_has_at_least_twelve_kinds_of_wear_as_decals(self):
+        # #323: runs, salt, lichen, algae, rust, scuffs, scratches, cracks, soot,
+        # oil, droppings, paint flakes, cobwebs, tags and stencils, with the
+        # first slice's moss, stain and damp.
+        wanted = {"decal_runs", "decal_salt", "decal_lichen", "decal_algae", "decal_rust_bleed", "decal_scuffs",
+                  "decal_scratches", "decal_cracks", "decal_soot", "decal_oil", "decal_droppings", "decal_flakes",
+                  "decal_cobweb", "decal_tag", "decal_stencil", "decal_moss", "decal_stain", "decal_damp"}
+        self.assertTrue(wanted <= set(self.decals()))
+        self.assertGreaterEqual(len(self.decals()), 12)
+
+    def test_a_decals_mask_has_soft_edges_not_a_hard_cut(self):
+        # Where a decal covers at all (mask over 3%), a good part of it is
+        # partly covered, not all or nothing. A stencil's paint and a flake's
+        # edge are the hardest, and still have a tenth of it soft.
+        for generator, ((_d, _n, _r, mask), _again, _other) in self.decals().items():
+            covered = mask > 8
+            partial = ((mask > 8) & (mask < 230)).sum() / max(1, covered.sum())
+            self.assertGreater(partial, 0.08, generator)
+
+    def test_a_decals_colour_is_filled_in_under_its_clear_parts_so_a_blurred_edge_doesnt_darken(self):
+        for generator, ((diffuse, _n, _r, mask), _again, _other) in self.decals().items():
+            clear = mask == 0
+            self.assertGreater(diffuse[clear].mean(), 8, f"{generator}: black under the clear mask")
+
     def test_a_decals_mask_is_clear_along_every_edge_so_its_rectangle_never_shows(self):
         for generator, ((_d, _n, _r, mask), _again, _other) in self.decals().items():
             edge = max(1, int(decalwork.CLEAR_EDGE * PIXELS))
@@ -177,9 +201,10 @@ class EachGenerator(unittest.TestCase):
 
     def test_a_decals_mask_is_nearly_whole_somewhere_and_covers_part_of_it(self):
         for generator, ((_d, _n, _r, mask), _again, _other) in self.decals().items():
-            self.assertGreaterEqual(mask.max(), 230, generator)
+            # A thin mark (a run, a crack, a scratch) is never whole for long.
+            self.assertGreaterEqual(mask.max(), 200, generator)
             covered = (mask > 127).mean()
-            self.assertGreater(covered, 0.05, generator)
+            self.assertGreater(covered, 0.01, generator)
             self.assertLess(covered, 0.75, generator)
 
     def test_a_decals_normal_map_leans_out_of_the_surface(self):

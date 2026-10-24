@@ -51,5 +51,8 @@ def finish(albedo, height, roughness, mask, relief, seed):
     X, Y = tex.grid(n)
     side = np.minimum(np.minimum(X, 1.0 - X), np.minimum(Y, 1.0 - Y))
     mask = np.where(side < CLEAR_EDGE, 0.0, tex.clamp(mask))
+    # A decal whose surface is one roughness all over may pass that number.
+    roughness = np.zeros_like(mask) + roughness
+    height = np.zeros_like(mask) + height
     diffuse, normal, rough = tex.finish(albedo, height, roughness, relief, seed=seed)
     return diffuse, normal, rough, tex.to_u8(mask)
