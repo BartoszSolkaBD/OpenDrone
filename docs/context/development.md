@@ -50,6 +50,18 @@ _Avoid_: Benchmark score, timing
 The local measurement of the 45 fps promise on the dev machine: a recorded flight through the heaviest alpha Map, reporting the average frame rate and the slowest 1% of frames.
 _Avoid_: FPS test, perf test
 
+**Design brief**:
+The one-page spec of a new detailed Map that the person who asked for it approves before anything is built: the place and its story, its size and flying lines, its light, its reference pictures in words, its focal points, what to avoid and its budget. It is filed as an issue whose title starts "Spec: " ([Designing a Map](../designing-a-map.md#2-the-brief)).
+_Avoid_: PRD, pitch
+
+**Look check**:
+The step between a Map's design brief and its first slice: the agent lists every visual feature the place needs, compares it with what the engine and the Map helpers do today, and files a ticket for each gap ([Designing a Map](../designing-a-map.md#3-the-look-check)).
+_Avoid_: Gap analysis (a Gap is an opening on a Map), feature audit
+
+**Slice**:
+About 30 × 30 m of a new detailed Map built to the finished standard, with every feature its brief names, for the person to fly and approve before the rest is built ([Designing a Map](../designing-a-map.md#5-the-slice)).
+_Avoid_: Prototype (a prototype branch is throwaway code), demo
+
 ## Rules
 
 - In Phase 1, one PR covers one ticket. It merges by itself, squashed into one commit, when every required check is green ([ADR-0010](../adr/0010-phase-1-agent-prs-merge-automatically.md)). The maintainer can always merge or close a PR by hand.

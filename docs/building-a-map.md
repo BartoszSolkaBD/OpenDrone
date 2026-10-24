@@ -834,6 +834,10 @@ Those are the best of three runs each, taken in turn, while other agents' builds
 
 **The light atlas.** A baked Map's atlas grows with the surface, not the triangles, so the finer floor costs little: 11,800 texels against 7,900 for the flat one (its charts split where the drifts slope). The brick leaf is the dear part: 68 m² of surface where the flat face had 30, in 9,200 small charts, each with its margin, 263,000 texels (341,000 if each is stretched to two texels, as the kit's are). The roof's sheets take 61,000 and the frame 113,000. Together that is about 0.45 million texels, 3.6 MB in the graphics card, a quarter of what the kit takes and well inside one 8192 atlas. Baked light wasn't tried on the test Map.
 
+## Designing a whole Map
+
+This page says how each tool works. How to take a person's idea to a finished detailed Map with them (the interview, the brief, the look check, slices, the three approvals, and the Factory's numbers for speed, size and density to match) is [Designing a Map](designing-a-map.md).
+
 ## What CI checks
 
 When anything under `assets-src/` or a Pack's `maps/` changes, the **Maps** check downloads the pinned Blender (checking its SHA-256, also pinned in the version file), rebuilds every Map and fails if a committed `.glb` differs, or a Map's baked light is out of date, or the second UV set's hash differs (see [Baked light](#baking-it)). It first runs the plain-Python checks of `assets-src/lib/` (the unwrap's, the geometry helpers', the decals' and the wear rules'). It also renders the pictures above and keeps them as the `map-previews` download, which the [Review Report](review-report.md) points to. `cargo xtask packs` runs the Pack checker over the built-in Pack, the Map included, in every Rust check.
