@@ -82,7 +82,7 @@ pub fn turned(angle: f64, turning: f64, speed: f64, time: f64) -> f64 {
 }
 
 /// How opaque the blurred disc is at `radius`, a share of the prop's radius
-/// from 0 (the hub) to 1 (the blade tips), as a share of [`DISC_OPACITY`]:
+/// from 0 (the hub) to 1 (the blade tips), as a share of `DISC_OPACITY`:
 /// thin inside, densest toward the tips where the blades move fastest, and
 /// nothing beyond them.
 pub fn disc_density(radius: f64) -> f64 {
