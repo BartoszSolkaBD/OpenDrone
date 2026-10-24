@@ -885,15 +885,36 @@ fn a_download_without_its_textures_is_refused_unless_asked_for() {
 
 // ----- Every picture of a material ---------------------------------------------
 
-/// The pictures a texture's folder may hold, which the game reads by these
-/// names (`crates/opendrone/src/map_drawing.rs`).
-const THE_PICTURES: [&str; 6] = [
+/// The pictures `cargo xtask package` carries from a texture's folder, read
+/// from the quoted names in `pub const PICTURES` of
+/// `crates/xtask/src/materials.rs`: the real list, not a copy of it.
+fn the_pictures() -> Vec<String> {
+    let source = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/materials.rs"))
+        .expect("xtask's material code");
+    let list = source
+        .split("pub const PICTURES")
+        .nth(1)
+        .expect("materials.rs has `pub const PICTURES`")
+        .split("];")
+        .next()
+        .unwrap();
+    let names: Vec<String> = list
+        .split('"')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect();
+    assert!(!names.is_empty(), "names in {list}");
+    names
+}
+
+/// The five pictures of a surface drawn with roughness, occlusion and metal.
+const SURFACE_PICTURES: [&str; 5] = [
     "diffuse.jpg",
     "normal.jpg",
     "roughness.jpg",
     "ao.jpg",
     "metallic.jpg",
-    "mask.jpg",
 ];
 
 /// A material library of two textures made from scratch: `rust`, drawn with
@@ -953,7 +974,7 @@ fn a_download_carries_every_picture_a_material_has_not_only_its_colour_and_norma
     let repo = Repo::new("every-picture");
     repo.with_the_games_files();
     repo.write("assets-src/materials.toml", THE_PICTURE_LIBRARY);
-    with_the_pictures_of(&repo, "rust", &THE_PICTURES[..5]);
+    with_the_pictures_of(&repo, "rust", &SURFACE_PICTURES);
     with_the_pictures_of(
         &repo,
         "moss",
@@ -965,7 +986,7 @@ fn a_download_carries_every_picture_a_material_has_not_only_its_colour_and_norma
     assert!(out.contains("2 textures (9 pictures)"), "{out}");
     let entries = unpack(&repo.root.join("dist/OpenDrone-x-linux.tar.gz"));
     let carried = |name: &str| entries.iter().any(|(n, _, _)| n == name);
-    for picture in &THE_PICTURES[..5] {
+    for picture in &SURFACE_PICTURES {
         let name = format!("OpenDrone-x-linux/assets-src/generated/rust/{picture}");
         assert!(carried(&name), "{name}");
     }
@@ -987,7 +1008,7 @@ fn a_download_is_refused_when_a_material_asks_for_a_picture_its_texture_lacks() 
     let repo = Repo::new("lost-picture");
     repo.with_the_games_files();
     repo.write("assets-src/materials.toml", THE_PICTURE_LIBRARY);
-    with_the_pictures_of(&repo, "rust", &THE_PICTURES[..4]);
+    with_the_pictures_of(&repo, "rust", &SURFACE_PICTURES[..4]);
     with_the_pictures_of(&repo, "moss", &["diffuse.jpg", "normal.jpg", "mask.jpg"]);
     repo.track();
     let (ok, _, err) = repo.run(&PACKAGE_LINUX);
@@ -1078,8 +1099,9 @@ fn the_download_of_the_real_material_library_carries_every_picture_its_materials
 #[test]
 fn the_game_reads_the_same_picture_names_a_download_carries() {
     // Basis: Rule (#332): the list of pictures a download carries
-    // (xtask's materials::PICTURES) and the names the game reads
-    // (map_drawing.rs) are two lists, and this keeps them one.
+    // (`materials::PICTURES` in crates/xtask/src/materials.rs, read from that
+    // file here) and the names the game reads (map_drawing.rs) are two lists,
+    // and this keeps them one.
     let source = fs::read_to_string(repo_root().join("crates/opendrone/src/map_drawing.rs"))
         .expect("the game's drawing code");
     let mut read: Vec<&str> = source
@@ -1088,9 +1110,15 @@ fn the_game_reads_the_same_picture_names_a_download_carries() {
         .filter_map(|rest| rest.split('"').next())
         .collect();
     read.sort_unstable();
-    let mut carried = THE_PICTURES.to_vec();
+    let mut carried = the_pictures();
     carried.sort_unstable();
     assert_eq!(read, carried);
+    // And the fixtures above cover each of them, so a picture added to the
+    // list needs a check of its own.
+    let mut covered: Vec<&str> = SURFACE_PICTURES.to_vec();
+    covered.push("mask.jpg");
+    covered.sort_unstable();
+    assert_eq!(covered, carried);
 }
 
 #[test]
