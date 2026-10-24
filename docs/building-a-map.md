@@ -694,7 +694,7 @@ m.solid("floor", mesh, None, "concrete_floor_worn", "trimesh",
 
 Build the wall in two: a [`broken_wall`](#broken-openings) 10 cm (`LEAF`) thinner than the whole, set back, and the leaf in front of it, with the same openings. `cill` makes a window cill; pilasters and a string course are plain boxes. The test Map's south wall shows all of it.
 
-It costs about 10 triangles a brick, close to 600 a square metre: 16,500 triangles for the 10.8 m of wall round the test Map's doorway and window. So lay it brick by brick only on the walls the Quad flies past close (an aisle's doorway, a Gap), and use the plain wall elsewhere: its picture has its own bumpy normal map, and from 5 m on the two are hard to tell apart in a moving picture. No shader trick was needed.
+It costs about 10 triangles a brick, close to 600 a square metre: 16,400 triangles (1,400 bricks) for the 9.5 m of wall round the test Map's doorway and window. So lay it brick by brick only on the walls the Quad flies past close (an aisle's doorway, a Gap), and use the plain wall elsewhere: its picture has its own bumpy normal map, and from 5 m on the two are hard to tell apart in a moving picture. No shader trick was needed.
 
 ### Buckled roofs on a broken frame
 
@@ -704,17 +704,21 @@ It costs about 10 triangles a brick, close to 600 a square metre: 16,500 triangl
 
 [`assets-src/demos/relief/build.py`](../assets-src/demos/relief/build.py) is the kit's [look-test hall](#the-look-test-map) given relief: ruts, potholes and a swell under the heap in the yard, the crumbled layer over the hall's floor, the south wall laid brick by brick round its doorway and window, and a buckled roof over a broken frame, most of the south slope's sheets gone. The kit lies on the relief. `--flat` builds the same hall the way the look-test hall is (flat ground and floor, plain walls, no roof): the "before". It isn't a Map of the Pack and nothing builds it in CI; to look at it, do as for the look-test hall, with `relief-demo` for `kit-demo`.
 
-**What it costs.** From what the script prints, the atlas sizes `odlight.flatten` works out at 20 cm a texel, and `--camera-cost --seconds 10 --size 2560x1440` from the Launch Spot on the M4 Mac mini, with no baked light:
+![The relief test Map, as the game draws it with no baked light: at 1 m, the wall's missing bricks, the crumbled floor and the bent purlins; at 5 m, the south wall from the yard, the hall's floor and the frame from inside; at 40 m, the site, the roof's broken line and the Launch Spot's Analog view](images/relief.jpg)
+
+**What it costs.** From what the script prints, the atlas sizes `odlight.flatten` works out at 20 cm a texel, and `--camera-cost --seconds 10 --size 2560x1440` from the Launch Spot on the M4 Mac mini, in a release build with no baked light (the whole frame, CPU and GPU):
 
 | | Before (`--flat`) | With relief | Bando |
 |---|---|---|---|
 | Yard ground | 14,600 triangles (50 cm cells) | 12,200 (30 cm fine, 1.2 m coarse) | |
 | Hall floor | 2,200 (50 cm cells) | 14,400 (20 cm cells) | |
-| South wall | 24 boxes | 16,500 in the brick leaf, 3,500 in the core | |
+| South wall | 24 boxes | 16,400 in the brick leaf, 3,500 in the core | |
 | Roof and frame | none | 13,200 in the sheets, 6,200 in the frame (186 members) | |
-| Whole Map | 111,900 triangles, 136 parts | 162,900 triangles, 279 parts | |
-| Frame time, Analog | FRAME_FLAT_A | FRAME_RELIEF_A | FRAME_BANDO_A |
-| Frame time, Digital | FRAME_FLAT_D | FRAME_RELIEF_D | FRAME_BANDO_D |
+| Whole Map | 111,900 triangles, 136 parts | 162,800 triangles, 279 parts | |
+| Frame time, Analog | 5.9 ms (1,687 frames in 10 s) | 6.4 ms (1,559) | 5.3 ms (1,879) |
+| Frame time, Digital | 5.1 ms (1,959) | 5.6 ms (1,792) | 4.5 ms (2,214) |
+
+Those are the best of three runs each, taken in turn, while other agents' builds ran on the Mac mini (a load average of 3 to 10), so they are rough. The relief costs about half a millisecond a frame in either Look, and the hall with it stays well under the depth pass's 8 ms. If a Map runs over, thin the brick-by-brick leaf first: it is the most triangles for the least area, and from 5 m on the picture does nearly as well.
 
 **The light atlas.** A baked Map's atlas grows with the surface, not the triangles, so the finer floor costs little: 11,800 texels against 7,900 for the flat one (its charts split where the drifts slope). The brick leaf is the dear part: 68 m² of surface where the flat face had 30, in 9,200 small charts, each with its margin, 263,000 texels (341,000 if each is stretched to two texels, as the kit's are). The roof's sheets take 61,000 and the frame 113,000. Together that is about 0.45 million texels, 3.6 MB in the graphics card, a quarter of what the kit takes and well inside one 8192 atlas. Baked light wasn't tried on the test Map.
 

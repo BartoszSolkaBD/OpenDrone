@@ -14,7 +14,7 @@ given real relief (`assets-src/lib/odrelief.py`, `odbrick.py`,
   thickest along the north and west walls, worn smooth round the columns
   and a machine's plinth, on 0.2 m cells;
 - the south wall, which the aisle flies through, is brick laid brick by brick
-  for 10.8 m round its doorway and window: sunken mortar, bricks missing in
+  for 9.45 m round its doorway and window: sunken mortar, bricks missing in
   patches and one by one, faces gone, islands of render, the doorway's and
   the window's broken edges, a window cill and two pilasters; the rest of it
   is the picture on a plain face;
@@ -130,7 +130,7 @@ def build(out, seed=7, flat=False, light_cm=None):
         m.wall("south_wall", (x1, y0), (x0, y0), 0.0, WALL_H, WALL_T, "brick_red_weathered", openings=[door])
     else:
         # A core, LEAF thinner than the whole wall, its front face where the
-        # outer leaf stands; the leaf is laid brick by brick over 10.8 m round
+        # outer leaf stands; the leaf is laid brick by brick over 9.45 m round
         # the doorway and the window, and is a plain face elsewhere.
         face = y0 - WALL_T / 2.0 + LEAF  # the core's front face, facing south
         core_line = y0 + LEAF / 2.0
@@ -153,7 +153,8 @@ def build(out, seed=7, flat=False, light_cm=None):
                 holes.append((l - u_start, r - u_start, z, z + 0.075))
         leaf = brick_face(run, WALL_H, seed=12, holes=holes,
                           patches=[(1.0, 0.5, 0.45), (8.9, 3.0, 0.55), (4.4, 4.5, 0.35), (2.4, 2.6, 0.3)],
-                          render=[(8.3, 1.3, 1.6, 1.1), (1.4, 3.9, 1.3, 0.9)], loose=0.03, faced=0.05)
+                          render=[(8.3, 1.3, 1.6, 1.1), (1.4, 3.9, 1.3, 0.9)], loose=0.03, faced=0.05,
+                          stagger_odd=False)  # this wall runs west: its even courses are the picture's shifted ones
         leaf_pose = g.aiming((x1 - u_start, face, 0.0), (x0, face, 0.0))
         m.solid("south_leaf", leaf.brick, leaf_pose, "brick_red_weathered", "none")
         m.solid("south_render", leaf.render, leaf_pose, "concrete_smooth", "none")
