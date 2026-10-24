@@ -1,4 +1,5 @@
-//! Surfaces whose picture doesn't visibly repeat (#304).
+//! Surfaces whose picture doesn't visibly repeat (#304), and that read their
+//! roughness, occlusion and metal from pictures and can be wet (#320).
 //!
 //! A material's picture is one 1 to 3 m tile laid edge to edge, which shows
 //! as blocks on a big floor and as the same stripe again and again on a long
@@ -19,6 +20,13 @@
 //!   asks, by where a surface is, so stained patches, clean and dirty areas
 //!   and bleached or damp zones carry on from one mesh and wall to the next
 //!   ([`wide_lookups`] says where in the picture a point looks).
+//!
+//! - **Roughness, occlusion, metal and wetness.** A material that asks for
+//!   them ([`crate::surface_look`]) is drawn by the same shader, with its
+//!   picture of the three (red occlusion, green roughness, blue metal) looked
+//!   up the same way as the colour, so the tiles agree, and its wetness
+//!   applied last. A material that asks for these and not for its repeat to be
+//!   broken is drawn by it with the repeat left alone.
 //!
 //! The shader is `repeat_breaker.wesl`. Nothing here touches the Simulation.
 
@@ -48,6 +56,17 @@ pub struct BreakerSettings {
     /// `x`: how strongly the large picture shows (0 for none). `y`: its
     /// repeats to a metre.
     pub wide: Vec4,
+    /// `x`: 1 if the surface picture (occlusion, roughness, metal) is bound.
+    /// `y`: how wet the surface is, 0 to 1. `z`: 1 if the picture holds
+    /// roughness alone, in its one channel.
+    pub surface: Vec4,
+    /// What the surface reflects of the Map's sky, for a baked Map
+    /// ([`crate::surface_look::SkyReflection`]): the zenith's colour and, in
+    /// its `w`, how bright the sky-lit ground is; the horizon's colour and, in
+    /// its `w`, 1 if there is a sky to reflect; the ground's colour.
+    pub sky_zenith: Vec4,
+    pub sky_haze: Vec4,
+    pub sky_ground: Vec4,
 }
 
 /// The extension of the standard material that breaks the repeat of its
@@ -66,6 +85,11 @@ pub struct RepeatBreaker {
     #[texture(105)]
     #[sampler(106)]
     pub wide: Option<Handle<Image>>,
+    /// Red occlusion, green roughness, blue metal, packed by
+    /// [`crate::surface_look::pack_surface`].
+    #[texture(107)]
+    #[sampler(108)]
+    pub surface: Option<Handle<Image>>,
 }
 
 impl MaterialExtension for RepeatBreaker {
