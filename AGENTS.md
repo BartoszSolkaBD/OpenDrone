@@ -25,3 +25,7 @@ One PR per ticket. Every PR gets a Reviewer, a fresh agent with none of the auth
 ### Delegating tickets
 
 A **Delegator** session works through the ready tickets. It starts an author for each ticket and a Reviewer for each PR, each on the model its job needs, keeps one PR in review per Lane, and merges what passes. To run a batch, start a session and point it at `docs/agents/delegator.md`. Authors follow `docs/agents/author.md`. After main is merged into a PR that already passed, a short check is enough: `docs/agents/merge-update.md`.
+
+### Designing a Map
+
+An agent asked for a new Map ("make me a map of an abandoned swimming pool") uses the `design-map` skill, in `.claude/skills/design-map/SKILL.md`, where Claude Code finds it by itself. It starts with an interview and walks the stages of `docs/designing-a-map.md`: the brief, the look check, a slice, the full Map, and the three points where the person approves.
