@@ -61,6 +61,7 @@ from odmap import MapBuilder  # noqa: E402
 from odnoise import Random, fbm2, noise2, smoothstep  # noqa: E402
 from odopening import Opening, broken_wall  # noqa: E402
 from odroof import Roof, Skylight, Tear  # noqa: E402
+from odscatter import Scatter  # noqa: E402
 from odwear import Face as WearFace  # noqa: E402
 from odwear import Floor, Wear  # noqa: E402
 
@@ -557,7 +558,7 @@ def slab_layout(rnd):
     return slabs
 
 
-def floor_and_clutter(m, rnd, floor, slabs):
+def floor_and_clutter(m, rnd, floor, slabs, kit):
     """The floor's slabs over a dark bed that shows in the joints, the
     rubble, the fallen roof, burnt timber and fallen beams."""
     def slab_h(s):
@@ -573,13 +574,9 @@ def floor_and_clutter(m, rnd, floor, slabs):
     m.box_h("floor_bed", HALL / 2, HALL / 2, HALL - T, HALL - T, -0.14, -0.1, FLOOR, collider="none", light_cm=40)
     m.solid("floor_solid", floor.collision_mesh((IN, IN, HALL - IN, HALL - IN), 1.0), None, FLOOR, "trimesh", collision_only=True)
 
-    # Under the fallen bay: a heap of rubble, sheets and a purlin on it.
-    heap = ruin.mound(12.5, 6.5, 3.2, 3.8, 0.7, rnd.child("heap"))
-    m.heightfield("rubble_heap", 9.3, 2.7, 15.7, 10.3, 0.25, heap, DIRT)
-    lumps = ruin.Batch()
-    ruin.scatter(lumps, rnd.child("heap_lumps"), (12.5, 6.5), 3.4, 60, lambda q: ruin.lump(q.uniform(0.15, 0.45), q), z=lambda x, y: max(0.0, heap(x, y)))
-    ruin.scatter(lumps, rnd.child("heap_bricks"), (12.5, 6.5), 3.8, 50, ruin.brick, z=lambda x, y: max(0.0, heap(x, y)))
-    m.solid("rubble_heap_chunks", lumps.mesh(), None, "concrete_wall_rough", "trimesh")
+    # Under the fallen bay: a heap of rubble from the kit (#339), the roof's
+    # sheets and a purlin on it.
+    heap = kit.heap((12.5, 6.5), 3.3, 0.85, core=DIRT)
     fallen = ruin.Batch()
     for cx, cy, yaw, pitch, roll in ((11.6, 5.0, 12.0, 8.0, 14.0), (13.6, 7.8, -30.0, -12.0, 6.0), (10.6, 8.6, 70.0, 4.0, -18.0)):
         fallen.add(g.box_mesh(1.0, 2.6, SHEET), g.Pose(ruin.turned(yaw, pitch, roll), (cx, cy, max(0.05, heap(cx, cy)) + 0.15)))
@@ -652,6 +649,133 @@ def aisle_lines(m, slabs, floor):
     m.solid("aisle_lines", lines.mesh(), None, "paint_yellow", "none")
 
 
+# ---------------------------------------------------------------- the kit (#341)
+
+# The kit's own materials (#339) are the library's downloaded ones; the
+# Factory draws only pictures made from scratch, so each becomes the
+# Factory's nearest own material.
+KIT_MATERIALS = {
+    "steel_rusty": STEEL, "steel_painted": STEEL, "wood_ramp": WOOD, "concrete_smooth": "concrete_wall_rough",
+    "concrete_dark": "plastic_black", "steel_grey": "can_painted", "container_blue": "plastic_blue",
+    "container_red": "plastic_red", "rubble": DIRT,
+}
+
+
+class KitOnFactory:
+    """The MapBuilder as the kit's `apply` sees it: every material put
+    through `KIT_MATERIALS`, and the shapes named in `grow` given a scatter
+    tag, so a heap's core grows grass and weeds out of the rubble."""
+
+    def __init__(self, m, grow=None):
+        self.m, self.grow = m, grow or {}
+
+    def solid(self, name, mesh, pose, material, collider, **kw):
+        if name in self.grow:
+            kw["scatter"] = self.grow[name]
+        return self.m.solid(name, mesh, pose, KIT_MATERIALS.get(material, material), collider, **kw)
+
+    def box(self, name, size, centre, material, **kw):
+        return self.m.box(name, size, centre, KIT_MATERIALS.get(material, material), **kw)
+
+    def __getattr__(self, name):
+        return getattr(self.m, name)
+
+
+def kit_on_factory(kit):
+    """Turns every part the kit has put down into the Factory's materials
+    before `apply` merges them, so one material in one cell is one draw."""
+    for p in kit.placements:
+        p.parts = [(KIT_MATERIALS.get(mat, mat), mesh) for mat, mesh in p.parts]
+    kit.cores = [(rule, KIT_MATERIALS.get(mat, mat), mesh) for rule, mat, mesh in kit.cores]
+
+
+SKY_DROPS = [(6.5, 7.0), (21.5, 8.5), (6.5, 23.0), (21.5, 20.0), (8.5, 22.0)]  # crates/pack/tests/factory.rs
+
+
+def hall_kit(floor_h):
+    """The hall's mess, from the kit's rules (#339): keep-clear zones round
+    every line a pilot flies and every prop the story already placed."""
+    s = Scatter(SEED + 60, floor_h, cell=15.0)
+    for x0, y0, x1, y1 in ((-1.0, -1.0, IN + 0.02, HALL + 1.0), (HALL - IN - 0.02, -1.0, HALL + 1.0, HALL + 1.0),
+                           (-1.0, -1.0, HALL + 1.0, IN + 0.02), (-1.0, HALL - IN - 0.02, HALL + 1.0, HALL + 1.0)):
+        s.keep_clear_rect(x0, y0, x1, y1)  # the walls themselves
+    s.keep_clear_rect(11.0, 10.2, 14.0, HALL)  # the aisle north of the heap
+    s.keep_clear_rect(10.2, -1.0, 14.8, 2.6)  # the loading door's way in
+    s.keep_clear_rect(-1.0, 12.6, 3.2, 16.4)  # the breach and its rubble
+    s.keep_clear_rect(27.6, 6.6, 31.0, 8.6)  # the man door
+    s.keep_clear_rect(28.4, 11.9, 31.0, 13.1)  # the vent hole
+    for x, y in SKY_DROPS:
+        s.keep_clear_circle(x, y, 0.7)
+    for x, y, sx, sy in ((6.0, 20.0, 3.0, 1.6), (8.9, 23.2, 2.4, 1.4), (18.0, 22.5, 2.0, 1.2)):
+        s.keep_clear_rect(x - sx / 2 - 0.3, y - sy / 2 - 0.3, x + sx / 2 + 0.3, y + sy / 2 + 0.3)  # the plinths
+    s.keep_clear_circle(21.6, 7.2, 3.3)  # the pilots' hangout
+    s.keep_clear_circle(ASH[0], ASH[1], 2.5)  # the fire corner's ash
+    s.keep_clear_rect(1.2, IN, 4.8, 2.4)  # the scrap pile
+    s.keep_clear_rect(6.4, 24.6, 10.8, 28.6)  # the filing cabinet and the chair
+    s.keep_clear_rect(20.6, 12.6, 27.0, 18.0)  # the fallen beam
+    return s
+
+
+def hall_mess(m, kit, floor_ob):
+    """Thickness and mess on the hall's floor (references 3 and 4 of #341):
+    crumbled plaster and brick along every wall's foot, a floor strewn in
+    clusters on low beds of fallen render, bolt plates and anchor stubs where
+    a column line was cut, pallets and boards piled in corners, a plank and
+    a pipe run, puddles and moss."""
+    kit.wall_foot((0.4, IN), (HALL - 0.4, IN), depth=1.0, height=0.12, core="concrete_wall_rough")
+    kit.wall_foot((HALL - IN, 0.4), (HALL - IN, HALL - 0.4), depth=0.9, height=0.12, core="concrete_wall_rough")
+    kit.wall_foot((HALL - 0.4, HALL - IN), (0.4, HALL - IN), depth=1.3, height=0.16, core="concrete_wall_rough")
+    kit.wall_foot((IN, HALL - 0.4), (IN, 0.4), depth=1.1, height=0.14, core="concrete_wall_rough")
+    kit.strew((IN, IN, HALL - IN, HALL - IN), 1.5, bed="concrete_wall_rough", bed_height=(0.05, 0.12))
+    kit.anchor_row((16.5, 11.4), (28.5, 11.4), 4.0, missing=0.0)
+    kit.anchor_row((3.6, 3.6), (3.6, 11.4), 3.9)
+    kit.pallets(2.4, 27.4, 0.0, stacks=(2, 3))
+    kit.pallets(26.2, 1.7, 0.0)
+    kit.boards(4.9, 9.2, 75.0)
+    kit.boards(16.6, 27.2, 8.0)
+    kit.place("plank", 17.4, 14.6, 22.0)
+    kit.place("plank", 8.2, 13.2, 100.0)
+    kit.place("pipe_run", 16.2, 18.0, 84.0)
+    kit.place("drum", 28.5, 28.3, 0.0, k=0)
+    kit.place("drum_lying", 27.6, 3.9, 70.0)
+    kit.place("cable_tangle", 9.4, 4.0, 0.0)
+    kit.patches((IN + 0.5, IN + 0.5, HALL - IN - 0.5, HALL - IN - 0.5), 14, on=[floor_ob])
+
+
+def yard_kit(m, yard_h, yard_pieces):
+    """The yard's mess: a rubble heap in front of the hall with tall grass
+    and weeds growing out of it (reference 2), a smaller one by the west
+    trees, rubble fallen from the south wall, odd bits in the grass and
+    puddles on the track."""
+    s = Scatter(SEED + 70, yard_h, cell=24.0)
+    s.keep_clear_circle(LAUNCH[0], LAUNCH[1], 3.8)
+    for a, b in zip(PATH.line, PATH.line[1:]):
+        n = max(1, int(math.hypot(b[0] - a[0], b[1] - a[1]) / 0.8))
+        for k in range(n):
+            s.keep_clear_circle(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, 0.75)
+    s.keep_clear_rect(9.0, -6.0, 16.0, 0.0)  # the hard standing before the loading door
+    s.keep_clear_rect(-1.0, -0.2, HALL + 1.0, HALL + 1.0)  # the hall
+    s.keep_clear_rect(-2.6, 12.4, 0.0, 16.6)  # the breach's way in
+    s.keep_clear_rect(-15.0, -31.0, -7.0, -26.0)  # the gate
+    for x, y, r in ((-6.0, -6.5, 0.7), (-9.5, 9.0, 0.7), (27.0, -8.0, 0.7), (-4.5, 26.0, 0.7), (24.4, -14.8, 2.2),
+                    (6.0, -9.0, 0.7), (-4.2, -3.2, 1.0), (31.6, -1.8, 0.6), (15.6, -12.0, 0.9)):
+        s.keep_clear_circle(x, y, r)  # the yard's trees and the story's props
+    tall = s.heap((22.4, -6.6), 2.7, 1.3, toward=(0.0, 1.0))
+    s.heap((-7.2, -13.0), 2.0, 0.8)
+    s.wall_foot((HALL + 0.2, -IN), (-0.2, -IN), depth=0.9, height=0.1, core=DIRT)
+    s.strew((-12.0, -24.0, 40.0, 40.0), 0.06)
+    s.place("tyre", 19.6, -8.4, 0.0)
+    s.place("drum_lying", 25.6, -5.0, 120.0)
+    s.place("pipe", 4.0, -4.6, 30.0)
+    kit_on_factory(s)
+    s.apply(KitOnFactory(m, {"yard_kit_heap": ("grass", 9, (0.25, 0.9))}), name="yard_kit", light_cm=20)
+    track = Scatter(SEED + 71, yard_h)
+    track.keep_clear_circle(LAUNCH[0], LAUNCH[1], 3.0)
+    track.patches((4.0, -20.0, 16.0, -1.0), 7, on=yard_pieces, kinds=("damp", "damp", "algae"), size=(0.9, 2.2))
+    track.apply(m, name="yard_puddles")
+    return s.stats(), tall
+
+
 # ---------------------------------------------------------------- yard
 
 def grassiness(x, y):
@@ -666,6 +790,9 @@ def grassiness(x, y):
     dy = max(-y, 0.0, y - HALL)
     far = math.sqrt(dx * dx + dy * dy) + 8.0 * (fbm2(seed, x, y, 9.0, 3))
     w = 0.9 * smoothstep((far - 18.0) / 16.0) * smoothstep(fbm2(seed + 1, x, y, 7.0, 3) * 2.5 + 0.6)
+    # #341: the yard has gone back to grass everywhere but the track, in
+    # patches of thinner grass over gravel where something stood or drove.
+    w = max(w, 0.7 * smoothstep(fbm2(seed + 2, x, y, 6.0, 3) * 3.0 + 0.75))
     # Strips along the walls' feet where the sun falls and nothing drives.
     for edge in (SOUTH_STRIP, WEST_STRIP, NORTH_STRIP):
         w = max(w, edge.weight(x, y))
@@ -719,6 +846,50 @@ MID = (-70.0, -70.0, 110.0, 110.0)  # beyond it, coarser, fading to level
 GATE = (-14.0, -8.0)  # the boundary wall's opening on y = -30, west to east
 
 
+# Real grass (#338) by how grassy the ground is under each triangle's middle:
+# (least grassiness, the scatter tag). The yard's near ground grows it thick
+# and tall; the ground beyond, which the camera sees from further off, thinner.
+YARD_GRASS = [(0.5, ("grass", 7, (0.14, 0.5))), (0.15, ("grass", 2.5, (0.08, 0.3)))]
+MID_GRASS = [(0.5, ("grass", 2.0, (0.15, 0.45))), (0.15, ("grass", 0.8, (0.08, 0.3)))]
+
+
+GRASS_REACH = (-40.0, -54.0, 70.0, 68.0)  # no real grass past this: the camera never sees it near
+
+
+def grass_split(mesh, bands):
+    """Cuts a ground's `(corners, faces)` into a mesh for each band of
+    `bands` (and one for the bare rest) by the grassiness under each face's
+    middle. Returns `[(scatter tag or None, mesh)]`, in a fixed order, leaving
+    out empty ones. Ground outside `GRASS_REACH` grows none: every 8 m
+    square of grass is one more thing the game handles each frame, drawn or
+    not, and from the yard the grass that far off is gone by distance."""
+    corners, faces = mesh
+    groups = [[] for _ in range(len(bands) + 1)]
+    for f in faces:
+        cx = sum(corners[i][0] for i in f) / len(f)
+        cy = sum(corners[i][1] for i in f) / len(f)
+        w = grassiness(cx, cy)
+        r0, r1, r2, r3 = GRASS_REACH
+        if not (r0 <= cx <= r2 and r1 <= cy <= r3):
+            w = 0.0
+        k = next((i for i, (least, _) in enumerate(bands) if w >= least), len(bands))
+        groups[k].append(f)
+    out = []
+    for k, fs in enumerate(groups):
+        if not fs:
+            continue
+        index = {}
+        for f in fs:
+            for i in f:
+                if i not in index:
+                    index[i] = len(index)
+        own = [None] * len(index)
+        for i, j in index.items():
+            own[j] = corners[i]
+        out.append((bands[k][1] if k < len(bands) else None, (own, [[index[i] for i in f] for f in fs])))
+    return out
+
+
 def yard(m, rnd):
     """Outside: uneven yard ground of dirt with grass thinning into it, a
     path worn through it, trees, weeds and the boundary wall's gate. Returns
@@ -729,10 +900,13 @@ def yard(m, rnd):
     x0, y0, x1, y1 = YARD
     # The yard in four pieces round the hall (the hall's floor is its own),
     # on one grid so no crack shows between them.
+    # Each piece is cut by how grassy it is (#341): real grass grows thick
+    # where the yard has gone back to grass, thin over the gravel patches,
+    # and none on the track the pilots have worn.
     for tag, rect in (("south", (x0, y0, x1, 0.0)), ("north", (x0, HALL, x1, y1)), ("west", (x0, 0.0, 0.0, HALL)), ("east", (HALL, 0.0, x1, HALL))):
-        mesh = ground.mesh(rect, 0.5)
-        pieces.append(m.solid("yard", mesh, None, DIRT, "trimesh", light_cm=20,
-                              blend=(GRASS, [grassiness(c[0], c[1]) for c in mesh[0]])))
+        for grow, mesh in grass_split(ground.mesh(rect, 0.5), YARD_GRASS):
+            pieces.append(m.solid("yard", mesh, None, DIRT, "trimesh", light_cm=20, scatter=grow,
+                                  blend=(GRASS, [grassiness(c[0], c[1]) for c in mesh[0]])))
     # Beyond, to 70 m out: the same ground on a 2 m grid, easing to level at
     # its edge, reaching 2 m in under the yard and 2 cm lower so no seam shows.
     def mid_h(x, y):
@@ -740,9 +914,9 @@ def yard(m, rnd):
         return (ground.height(x, y) - 0.02) * smoothstep(edge / 12.0) - 0.02 * (1.0 - smoothstep(edge / 12.0))
     for tag, rect in (("west", (MID[0], MID[1], x0 + 2.0, MID[3])), ("east", (x1 - 2.0, MID[1], MID[2], MID[3])),
                       ("south", (x0 + 2.0, MID[1], x1 - 2.0, y0 + 2.0)), ("north", (x0 + 2.0, y1 - 2.0, x1 - 2.0, MID[3]))):
-        mesh = g.heightfield_mesh(*rect, 2.0, mid_h)
-        m.solid("ground_near", mesh, None, DIRT, "trimesh", light_cm=40,
-                blend=(GRASS, [max(grassiness(c[0], c[1]), smoothstep((min(c[0] - MID[0], MID[2] - c[0], c[1] - MID[1], MID[3] - c[1]) - 0.0) / -1.0 + 1.0)) for c in mesh[0]]))
+        for grow, mesh in grass_split(g.heightfield_mesh(*rect, 2.0, mid_h), MID_GRASS):
+            m.solid("ground_near", mesh, None, DIRT, "trimesh", light_cm=40, scatter=grow,
+                    blend=(GRASS, [max(grassiness(c[0], c[1]), smoothstep((min(c[0] - MID[0], MID[2] - c[0], c[1] - MID[1], MID[3] - c[1]) - 0.0) / -1.0 + 1.0)) for c in mesh[0]]))
     m.slab("ground", -1000.0, -1000.0, 1000.0, 1000.0, -0.02, 0.3, GRASS, holes=[MID])
 
     weeds = ruin.Batch()
@@ -786,6 +960,28 @@ def yard(m, rnd):
     m.solid("tree", wood.mesh(), None, "bark_rough", "trimesh")
     m.solid("tree_leaves", crown.mesh(), None, "leaves_mixed", "none", light_cm=7)
     return ground, pieces
+
+
+CHIMNEY = (38.5, 36.0)  # the works' chimney, north-east of the hall, beyond the yard
+
+
+def silhouette(m):
+    """What makes the hall corner an object against the sky (references 1 and
+    2 of #341): purlins that came down with the fallen bay hang bent from its
+    trusses, and the works' tall chimney, banded in pale render, stands
+    behind the hall."""
+    for name, pts in (("purlin_hanging", [(10.0, 3.6, 9.4), (11.4, 3.7, 8.3), (12.2, 3.75, 6.9)]),
+                      ("purlin_hanging", [(15.0, 9.4, 10.8), (13.9, 9.3, 9.6), (13.4, 9.25, 8.1)])):
+        for a, b in zip(pts, pts[1:]):
+            m.beam(name, a, b, 0.1, 0.12, STEEL, collider="box")
+    x, y = CHIMNEY
+    m.box_h("chimney_base", x, y, 4.2, 4.2, -0.3, 2.4, BRICK, light_cm=30)
+    z, r = 2.4, 1.7
+    for k, (rise, material) in enumerate(((7.0, BRICK), (0.8, "concrete_wall_rough"), (6.0, BRICK), (0.8, "concrete_wall_rough"),
+                                          (6.0, BRICK), (0.8, "concrete_wall_rough"), (4.6, BRICK))):
+        top = r - 0.035 * rise
+        m.solid("chimney", g.cylinder_mesh(rise, r, top, 16), g.Pose(at=(x, y, z)), material, "convex", light_cm=30)
+        z, r = z + rise, top
 
 
 def backdrop(m, rnd):
@@ -1191,16 +1387,30 @@ def wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_h, plaster
     # beside the aisle.
     for x, y, f in ((10.0, IN + 0.28, south_f), (15.0, IN + 0.28, south_f)):
         w.hand(f"scuff_pilaster_{int(x)}", "decal_scratches", [walls_out["pilasters"]], (x, y, 0.8), f, up, (0.7, 0.9), layer=4, depth=0.2)
+    # #341: every decal is a draw, and the frame had to fit 8 ms with the
+    # grass and the kit; the marks that read least at FPV distance (runs,
+    # cracks, scratches and droppings, by the slice v2 report) are thinned.
+    thin = {"runs": 3, "cracks": 3, "scratches": 2, "droppings": 2}
+    seen = {}
+    kept = []
+    for spec in w.specs:
+        n = seen.get(spec.kind, 0)
+        seen[spec.kind] = n + 1
+        if spec.hand or n % thin.get(spec.kind, 1) == 0:
+            kept.append(spec)
+    w.specs = kept
     w.apply(m)
     return w
 
 
 FLOOR_DIPS = []
+KIT_STATS = []
 
 
 def build(out):
     m = MapBuilder(os.path.join(here, "..", "..", "materials.toml"))
     m.lightmap(texel_cm=10)
+    m.batch_decals()  # #341: hundreds of decals are a few dozen draws
     rnd = Random(SEED, "factory")
     floor, dips = floor_ground()
     FLOOR_DIPS[:] = dips
@@ -1217,9 +1427,16 @@ def build(out):
     plaster_ob = plaster(m, rnd.child("plaster"))
     graffiti(m)
     roof_out = roof(m, rnd.child("roof"))
-    floor_ob, heap, ash = floor_and_clutter(m, rnd.child("floor"), floor, slabs)
+    silhouette(m)
+    kit = hall_kit(floor_h)
+    floor_ob, heap, ash = floor_and_clutter(m, rnd.child("floor"), floor, slabs, kit)
     aisle_lines(m, slabs, floor)
     story_out = story(m, rnd.child("story"), heap, ash, yard_ground.height)
+    hall_mess(m, kit, floor_ob)
+    kit_on_factory(kit)
+    kit.apply(KitOnFactory(m, {"kit_heap": ("grass", 2.0, (0.12, 0.45))}))
+    yard_stats, _ = yard_kit(m, yard_ground.height, yard_pieces)
+    KIT_STATS[:] = [kit.stats(), yard_stats]
     ivy(m, rnd.child("ivy"))
     backdrop(m, rnd.child("backdrop"))
     worn = wear(m, walls_out, roof_out, floor_ob, floor_h, yard_pieces, yard_ground.height, plaster_ob, story_out)
@@ -1239,6 +1456,8 @@ if __name__ == "__main__":
     builder, worn = build(out)
     print("factory:", builder.stats())
     print("  decals by kind:", ", ".join(f"{k} {v}" for k, v in sorted(worn.counts().items())))
+    for where, st in zip(("hall", "yard"), KIT_STATS):
+        print(f"  kit in the {where}:", st)
     if builder.light_result:
         print("  light atlas:", builder.light_result.get("width"), "x", builder.light_result.get("height"))
     if "--previews" in argv:

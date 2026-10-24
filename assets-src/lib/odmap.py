@@ -97,6 +97,15 @@ class MapBuilder:
         self.light_loops = {}  # object name -> its light coordinates, two numbers a triangle corner
         self.decals = []  # what `decal()` asked for, made at export
         self.decal_objects = []
+        self.batched_decals = False
+
+    def batch_decals(self):
+        """Puts every decal of one material and one layer into one part of the
+        `.glb`, so the game draws them at once: a Map with hundreds of
+        decals is otherwise hundreds of draws, and the frame pays for each
+        (#341). Each decal is still cut from its own shapes as before; only
+        the parts are joined, in the order the decals were asked for."""
+        self.batched_decals = True
 
     # ---------- materials ----------
     def material(self, name):
@@ -238,7 +247,9 @@ class MapBuilder:
         return name
 
     def _make_decals(self):
-        """Each decal's mesh, cut from the shapes it lies on."""
+        """Each decal's mesh, cut from the shapes it lies on, one part each,
+        or one part for each material and layer if `batch_decals` was asked."""
+        made = []
         for d in self.decals:
             hosts = []
             for h in d["hosts"]:
@@ -251,6 +262,23 @@ class MapBuilder:
             corners, triangles, uvs, light = d["projector"].project(hosts)
             if not triangles:
                 raise SystemExit(f"decal {d['name']} lies on nothing: no face of {', '.join(d['hosts'])} faces it inside its box")
+            made.append((d, corners, triangles, uvs, light))
+        if self.batched_decals:
+            groups = {}
+            for d, corners, triangles, uvs, light in made:
+                key = (d["material"], d["layer"])
+                if key not in groups:
+                    groups[key] = ({"name": f"decals_{d['material']}_{d['layer']}", "material": d["material"],
+                                    "layer": d["layer"]}, [], [], [], [] if light is not None else None)
+                _, cs, ts, us, ls = groups[key]
+                first = len(cs)
+                cs.extend(corners)
+                ts.extend(tuple(first + i for i in t) for t in triangles)
+                us.extend(uvs)
+                if ls is not None:
+                    ls.extend(light)
+            made = list(groups.values())
+        for d, corners, triangles, uvs, light in made:
             me = bpy.data.meshes.new(d["name"])
             me.from_pydata(corners, [], triangles)
             # Corners aren't shared, so each triangle corner is its own.
