@@ -385,7 +385,7 @@ texture       = "decal_stencil"
 roughness_map = true
 
 # No picture: leaves are a flat colour.
-# Props of the Factory (#324): the loose things its script builds from shapes,
+# Kit items of the Factory (#324): the loose things its script builds from shapes,
 # each a weathered plain surface (`assets-src/generators/plainwork.py`) or
 # weathered wood, and the worn yellow paint of the floor's walkway lines.
 [materials.wood_weathered]
@@ -778,7 +778,7 @@ seed      = 1
 pixels    = 512
 size      = "1.0 m"
 
-# The Factory's props (#324).
+# The Factory's kit items (#324).
 [textures.wood_weathered]
 generator = "wood_weathered"
 seed      = 1

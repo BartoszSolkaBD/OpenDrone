@@ -105,8 +105,12 @@ class Frame:
                         continue
                     # Over a keep-clear zone a purlin may be gone but never
                     # bent or hanging down into the flying line.
-                    over_clear = clear is not None and min(clear(p0[0], p0[1]), clear(p1[0], p1[1]),
-                                                           clear((p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0)) <= 0.0
+                    # The span is sampled every 0.25 m, so a zone as narrow as
+                    # a doorway cannot slip between the samples.
+                    steps = max(1, math.ceil(g.length(g.sub(p1, p0)) / 0.25))
+                    over_clear = clear is not None and any(
+                        clear(p0[0] + (p1[0] - p0[0]) * i / steps, p0[1] + (p1[1] - p0[1]) * i / steps) <= 0.0
+                        for i in range(steps + 1))
                     if open_bay and r.chance(hang) and not over_clear:
                         # Hanging by one end: swung down about that end.
                         if r.chance(0.5):

@@ -52,8 +52,8 @@ import sys
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(here, "..", "..", "lib"))
 import odgeom as g  # noqa: E402
+import odkit  # noqa: E402
 import odplants as plants  # noqa: E402
-import odprops as props  # noqa: E402
 import odruin as ruin  # noqa: E402
 from odedge import WanderingEdge  # noqa: E402
 from odground import Dip, Flat, Ground  # noqa: E402
@@ -694,7 +694,7 @@ SKY_DROPS = [(6.5, 7.0), (21.5, 8.5), (6.5, 23.0), (21.5, 20.0), (8.5, 22.0)]  #
 
 def hall_kit(floor_h):
     """The hall's mess, from the kit's rules (#339): keep-clear zones round
-    every line a pilot flies and every prop the story already placed."""
+    every line a pilot flies and every piece the story already placed."""
     s = Scatter(SEED + 60, floor_h, cell=15.0)
     for x0, y0, x1, y1 in ((-1.0, -1.0, IN + 0.02, HALL + 1.0), (HALL - IN - 0.02, -1.0, HALL + 1.0, HALL + 1.0),
                            (-1.0, -1.0, HALL + 1.0, IN + 0.02), (-1.0, HALL - IN - 0.02, HALL + 1.0, HALL + 1.0)):
@@ -759,7 +759,7 @@ def yard_kit(m, yard_h, yard_pieces):
     s.keep_clear_rect(-15.0, -31.0, -7.0, -26.0)  # the gate
     for x, y, r in ((-6.0, -6.5, 0.7), (-9.5, 9.0, 0.7), (27.0, -8.0, 0.7), (-4.5, 26.0, 0.7), (24.4, -14.8, 2.2),
                     (6.0, -9.0, 0.7), (-4.2, -3.2, 1.0), (31.6, -1.8, 0.6), (15.6, -12.0, 0.9)):
-        s.keep_clear_circle(x, y, r)  # the yard's trees and the story's props
+        s.keep_clear_circle(x, y, r)  # the yard's trees and the story's pieces
     tall = s.heap((22.4, -6.6), 2.7, 1.3, toward=(0.0, 1.0))
     s.heap((-7.2, -13.0), 2.0, 0.8)
     s.wall_foot((HALL + 0.2, -IN), (-0.2, -IN), depth=0.9, height=0.1, core=DIRT)
@@ -1036,10 +1036,10 @@ def backdrop(m, rnd):
         m.solid("backdrop_tree_leaves", crown.mesh(), None, "leaves_mixed", "none", light_cm=12)
 
 
-# ---------------------------------------------------------------- the story's props
+# ---------------------------------------------------------------- the story's kit pieces
 
 def story(m, rnd, heap, ash, yard_h):
-    """The props of each layer of the Factory's history, few and placed for
+    """The kit pieces of each layer of the Factory's history, few and placed for
     a reason (docs/research/lived-in-places.md, "The Factory's story").
     Returns what the wear rules need to know: where machines stood, where the
     plinths and the crane rail's brackets are."""
@@ -1050,8 +1050,8 @@ def story(m, rnd, heap, ash, yard_h):
     plinths = [(6.0, 20.0, 3.0, 1.6, 0.25), (8.9, 23.2, 2.4, 1.4, 0.2), (18.0, 22.5, 2.0, 1.2, 0.3)]
     for k, (x, y, sx, sy, h) in enumerate(plinths):
         r = rnd.child("plinth", k)
-        solid.add("concrete", props.plinth(r, sx, sy, h), g.Pose(props.turned(r.uniform(-1.5, 1.5)), (x, y, -0.02)))
-        drawn.add("steel", props.bolts(sx, sy, h), g.Pose(props.turned(), (x, y, -0.02)))
+        solid.add("concrete", odkit.plinth(r, sx, sy, h), g.Pose(odkit.turned(r.uniform(-1.5, 1.5)), (x, y, -0.02)))
+        drawn.add("steel", odkit.bolts(sx, sy, h), g.Pose(odkit.turned(), (x, y, -0.02)))
     out["plinths"] = [(x, y) for x, y, *_ in plinths]
     brackets = []
     for y_wall, sgn in ((IN, 1.0), (HALL - IN, -1.0)):
@@ -1084,30 +1084,30 @@ def story(m, rnd, heap, ash, yard_h):
 
     # ---- 2. Closure and stripping: the fuse box, the scrap pile, the
     # filing cabinet and the office chair the thieves left.
-    solid.add("steel_painted", props.fuse_box(110.0), g.Pose(props.turned(-90.0), (HALL - IN, 9.5, 1.15)))
-    solid.add("steel", props.metal_pile(rnd.child("pile")), g.Pose(props.turned(4.0), (3.0, 1.15, 0.0)))
-    solid.add("steel_painted", props.filing_cabinet(rnd.child("cabinet")), g.Pose(props.turned(-30.0, 0.0, 90.0), (8.0, 27.2, 0.235)))
+    solid.add("steel_painted", odkit.fuse_box(110.0), g.Pose(odkit.turned(-90.0), (HALL - IN, 9.5, 1.15)))
+    solid.add("steel", odkit.metal_pile(rnd.child("pile")), g.Pose(odkit.turned(4.0), (3.0, 1.15, 0.0)))
+    solid.add("steel_painted", odkit.filing_cabinet(rnd.child("cabinet")), g.Pose(odkit.turned(-30.0, 0.0, 90.0), (8.0, 27.2, 0.235)))
     for k, (x, y, yaw, roll) in enumerate(((8.9, 26.0, 12.0, 0.0), (7.0, 26.1, 70.0, 180.0), (9.3, 27.8, -40.0, 0.0))):
-        drawer = props.drawer()
+        drawer = odkit.drawer()
         z = 0.0 if roll == 0.0 else 0.32
-        solid.add("steel_painted", drawer, g.Pose(props.turned(yaw, 0.0, roll), (x, y, z)))
-    solid.add("plastic_black", props.office_chair(), g.Pose(props.turned(140.0, 0.0, 90.0), (10.0, 25.2, 0.31)))
+        solid.add("steel_painted", drawer, g.Pose(odkit.turned(yaw, 0.0, roll), (x, y, z)))
+    solid.add("plastic_black", odkit.office_chair(), g.Pose(odkit.turned(140.0, 0.0, 90.0), (10.0, 25.2, 0.31)))
 
     # ---- 4. The squatters and their fire, in the north-east corner.
     ax, ay = ASH
     bed_z = max(0.0, ash(ax + 0.8, ay + 1.0)) - 0.06
-    solid.add("steel", props.bed_frame(rnd.child("bed"), 0.16), g.Pose(props.turned(2.0, 2.0, 0.0), (ax + 0.8, ay + 1.0, bed_z)))
-    solid.add("steel", props.trolley(rnd.child("trolley")), g.Pose(props.turned(30.0, 0.0, 88.0), (ax - 2.1, ay - 1.6, 0.28)))
+    solid.add("steel", odkit.bed_frame(rnd.child("bed"), 0.16), g.Pose(odkit.turned(2.0, 2.0, 0.0), (ax + 0.8, ay + 1.0, bed_z)))
+    solid.add("steel", odkit.trolley(rnd.child("trolley")), g.Pose(odkit.turned(30.0, 0.0, 88.0), (ax - 2.1, ay - 1.6, 0.28)))
     for k in range(5):
         r = rnd.child("tin", k)
         x, y = ax + r.uniform(-1.5, 1.2), ay + r.uniform(-1.2, 1.0)
-        drawn.add("steel", props.can(r, crushed=r.uniform(0.3, 0.9)), g.Pose(props.turned(r.uniform(0, 360), r.uniform(-20, 20), 90.0), (x, y, max(0.0, ash(x, y)) + 0.02)))
-    solid.add("chair", props.plastic_chair(rnd.child("chair"), melt=0.75), g.Pose(props.turned(200.0), (ax - 1.6, ay + 1.6, 0.0)))
+        drawn.add("steel", odkit.can_mesh(r, crushed=r.uniform(0.3, 0.9)), g.Pose(odkit.turned(r.uniform(0, 360), r.uniform(-20, 20), 90.0), (x, y, max(0.0, ash(x, y)) + 0.02)))
+    solid.add("chair", odkit.plastic_chair(rnd.child("chair"), melt=0.75), g.Pose(odkit.turned(200.0), (ax - 1.6, ay + 1.6, 0.0)))
     # The windbreak: two pallets stood on edge against the east wall, the
     # north one charred.
     for k, (y, key) in enumerate(((20.4, WOOD), (21.7, CHAR))):
-        p = props.pallet(rnd.child("windbreak", k), 0.2, 0.3)
-        solid.add(key, p, g.Pose(props.turned(90.0, 0.0, -78.0), (HALL - IN - 0.18, y, 0.6)))
+        p = odkit.pallet_mesh(rnd.child("windbreak", k), 0.2, 0.3)
+        solid.add(key, p, g.Pose(odkit.turned(90.0, 0.0, -78.0), (HALL - IN - 0.18, y, 0.6)))
 
     # ---- 5. The pilots' hangout under the skylight inside the loading door.
     fx, fy = FIRE_PIT
@@ -1115,35 +1115,35 @@ def story(m, rnd, heap, ash, yard_h):
     for k in range(13):
         a = 360.0 * k / 13 + rnd.uniform(-6, 6)
         r = 0.42 + rnd.uniform(-0.03, 0.04)
-        ring.add(g.box_mesh(0.215, 0.1, 0.065), g.Pose(props.turned(a + 90.0 + rnd.uniform(-12, 12), rnd.uniform(-6, 6)),
+        ring.add(g.box_mesh(0.215, 0.1, 0.065), g.Pose(odkit.turned(a + 90.0 + rnd.uniform(-12, 12), rnd.uniform(-6, 6)),
                                                        (fx + r * math.cos(math.radians(a)), fy + r * math.sin(math.radians(a)), 0.035)))
     solid.add("brick", ring.mesh())
     pit_ash = ruin.mound(fx, fy, 0.38, 0.38, 0.06, rnd.child("pit_ash"))
     drawn.add("char", g.heightfield_mesh(fx - 0.38, fy - 0.38, fx + 0.38, fy + 0.38, 0.1, pit_ash))
     for a, length in ((20.0, 0.9), (110.0, 0.7)):
-        drawn.add("char", g.box_mesh(length, 0.1, 0.022), g.Pose(props.turned(a, 8.0), (fx + 0.05, fy - 0.05, 0.08)))
+        drawn.add("char", g.box_mesh(length, 0.1, 0.022), g.Pose(odkit.turned(a, 8.0), (fx + 0.05, fy - 0.05, 0.08)))
     bx, by = 19.8, 6.8  # the BBQ: a grate on two stacks of three bricks
     for sx in (-1, 1):
         for k in range(3):
-            solid.add("brick", g.box_mesh(0.215, 0.1, 0.065), g.Pose(props.turned(90.0 + rnd.uniform(-5, 5)), (bx, by + sx * 0.2, 0.0325 + 0.065 * k)))
-    drawn.add("steel", props.grill(rnd.child("grill")), g.Pose(props.turned(92.0), (bx, by, 0.195)))
+            solid.add("brick", g.box_mesh(0.215, 0.1, 0.065), g.Pose(odkit.turned(90.0 + rnd.uniform(-5, 5)), (bx, by + sx * 0.2, 0.0325 + 0.065 * k)))
+    drawn.add("steel", odkit.grill(rnd.child("grill")), g.Pose(odkit.turned(92.0), (bx, by, 0.195)))
     cx, cy = 23.2, 8.3
-    solid.add("wood", props.cable_drum(), g.Pose(at=(cx, cy, 0.0)))
+    solid.add("wood", odkit.cable_drum(), g.Pose(at=(cx, cy, 0.0)))
     out["table"] = (cx, cy, 0.62)
     for k, (x, y, yaw) in enumerate(((fx, fy - 1.65, 3.0), (fx + 1.65, fy - 0.3, 87.0))):
         for level in range(2):
-            p = props.pallet(rnd.child("bench", k, level))
-            solid.add("wood", p, g.Pose(props.turned(yaw + rnd.uniform(-6, 6)), (x, y, 0.144 * level)))
+            p = odkit.pallet_mesh(rnd.child("bench", k, level), 0.25, 0.25)
+            solid.add("wood", p, g.Pose(odkit.turned(yaw + rnd.uniform(-6, 6)), (x, y, 0.144 * level)))
     for k, (x, y, key, cracked) in enumerate(((20.35, 7.75, "blue", False), (20.4, 5.35, "red", False), (19.2, 8.5, "blue", True))):
         r = rnd.child("crate", k)
-        solid.add("plastic_" + key, props.crate(r, cracked), g.Pose(props.turned(r.uniform(0, 90)), (x, y, 0.0)))
+        solid.add("plastic_" + key, odkit.crate(r, cracked), g.Pose(odkit.turned(r.uniform(0, 90)), (x, y, 0.0)))
     # A crate of empties by the table.
     r = rnd.child("empties")
-    solid.add("plastic_red", props.crate(r), g.Pose(props.turned(15.0), (24.25, 9.05, 0.0)))
+    solid.add("plastic_red", odkit.crate(r), g.Pose(odkit.turned(15.0), (24.25, 9.05, 0.0)))
     for k in range(6):
         kx, ky = (k % 3 - 1) * 0.12, (k // 3 - 0.5) * 0.13
-        p = g.Pose(props.turned(15.0), (24.25, 9.05, 0.012)).apply((kx, ky, 0.0))
-        drawn.add("glass_" + ("brown" if k % 2 else "green"), props.bottle(r), g.Pose(props.turned(r.uniform(0, 360)), p))
+        p = g.Pose(odkit.turned(15.0), (24.25, 9.05, 0.012)).apply((kx, ky, 0.0))
+        drawn.add("glass_" + ("brown" if k % 2 else "green"), odkit.bottle_mesh(r), g.Pose(odkit.turned(r.uniform(0, 360)), p))
     # Bottles and cans in a loose ring round the seats, a few on the table.
     r = rnd.child("litter")
     for k in range(22):
@@ -1154,37 +1154,37 @@ def story(m, rnd, heap, ash, yard_h):
             continue
         lying = r.chance(0.7)
         if r.chance(0.5):
-            drawn.add("can", props.can(r, crushed=r.uniform(0.0, 0.9) if r.chance(0.5) else 0.0),
-                      g.Pose(props.turned(r.uniform(0, 360), 0.0, 90.0 if lying else 0.0), (x, y, 0.033 if lying else 0.0)))
+            drawn.add("can", odkit.can_mesh(r, crushed=r.uniform(0.0, 0.9) if r.chance(0.5) else 0.0),
+                      g.Pose(odkit.turned(r.uniform(0, 360), 0.0, 90.0 if lying else 0.0), (x, y, 0.033 if lying else 0.0)))
         else:
             key = "glass_brown" if r.chance(0.5) else "glass_green"
-            drawn.add(key, props.bottle(r), g.Pose(props.turned(r.uniform(0, 360), 0.0, 90.0 if lying else 0.0), (x, y, 0.032 if lying else 0.0)))
+            drawn.add(key, odkit.bottle_mesh(r), g.Pose(odkit.turned(r.uniform(0, 360), 0.0, 90.0 if lying else 0.0), (x, y, 0.032 if lying else 0.0)))
     for k, (dx, dy) in enumerate(((-0.2, 0.15), (0.25, -0.1), (0.1, 0.3))):
-        drawn.add("can" if k != 1 else "glass_brown", props.can(r) if k != 1 else props.bottle(r), g.Pose(at=(cx + dx, cy + dy, 0.62)))
+        drawn.add("can" if k != 1 else "glass_brown", odkit.can_mesh(r) if k != 1 else odkit.bottle_mesh(r), g.Pose(at=(cx + dx, cy + dy, 0.62)))
     # The charging spot on the table: a power bank, a roll of tape, cut zip ties.
-    drawn.add("plastic_black", g.box_mesh(0.15, 0.07, 0.022), g.Pose(props.turned(20.0), (cx - 0.1, cy - 0.25, 0.631)))
+    drawn.add("plastic_black", g.box_mesh(0.15, 0.07, 0.022), g.Pose(odkit.turned(20.0), (cx - 0.1, cy - 0.25, 0.631)))
     drawn.add("plastic_white", g.annulus_mesh(0.025, 0.025, 0.05, 12), g.Pose(at=(cx + 0.2, cy - 0.3, 0.62)))
     for k in range(5):
-        drawn.add("plastic_black", g.box_mesh(0.1, 0.004, 0.002), g.Pose(props.turned(r.uniform(0, 180)), (cx + r.uniform(-0.3, 0.3), cy + r.uniform(-0.3, 0.0), 0.621)))
+        drawn.add("plastic_black", g.box_mesh(0.1, 0.004, 0.002), g.Pose(odkit.turned(r.uniform(0, 180)), (cx + r.uniform(-0.3, 0.3), cy + r.uniform(-0.3, 0.0), 0.621)))
     # The bin bag against the pilaster at x = 20 on the south wall, and the
     # litter blown along the wall's foot.
-    solid.add("plastic_black", props.bin_bag(rnd.child("bag")), g.Pose(props.turned(30.0, 6.0), (19.45, 0.62, 0.0)))
+    solid.add("plastic_black", odkit.bin_bag(rnd.child("bag")), g.Pose(odkit.turned(30.0, 6.0), (19.45, 0.62, 0.0)))
     r = rnd.child("wall_litter")
     for k in range(9):
         x, y = r.uniform(15.0, 24.0), IN + r.uniform(0.1, 0.5)
         if 19.5 < x < 20.5:
             continue
         if r.chance(0.6):
-            drawn.add("can", props.can(r, crushed=r.uniform(0.3, 1.0)), g.Pose(props.turned(r.uniform(0, 360), 0.0, 90.0), (x, y, 0.03)))
+            drawn.add("can", odkit.can_mesh(r, crushed=r.uniform(0.3, 1.0)), g.Pose(odkit.turned(r.uniform(0, 360), 0.0, 90.0), (x, y, 0.03)))
         else:
-            drawn.add("plastic_red", g.box_mesh(0.18, 0.12, 0.004), g.Pose(props.turned(r.uniform(0, 360), r.uniform(-8, 8)), (x, y, 0.006)))
+            drawn.add("plastic_red", g.box_mesh(0.18, 0.12, 0.004), g.Pose(odkit.turned(r.uniform(0, 360), r.uniform(-8, 8)), (x, y, 0.006)))
 
     # ---- Crashed-quad bits, each where a crash would leave it.
-    drawn.add("plastic_black", props.quad_frame(rnd.child("whoop"), 0.075), g.Pose(props.turned(10.0, 0.0, 90.0), (2.5, HALL - 0.02, 4.05)))
-    drawn.add("plastic_red", props.prop_blades(rnd.child("prop5")), g.Pose(props.turned(40.0, 14.0), (12.3, 6.2, heap(12.3, 6.2) + 0.06)))
-    drawn.add("plastic_black", props.quad_frame(rnd.child("arm"), 0.25, arms_gone=3), g.Pose(props.turned(220.0), (21.5, 13.75, 0.0)))
-    drawn.add("plastic_black", props.antenna(), g.Pose(props.turned(70.0), (21.9, 13.4, 0.0)))
-    drawn.add("plastic_black", props.quad_frame(rnd.child("lost"), 0.25), g.Pose(props.turned(30.0), (15.0, 19.0, EAVE - 0.35 + 0.08)))
+    drawn.add("plastic_black", odkit.quad_frame(rnd.child("whoop"), 0.075), g.Pose(odkit.turned(10.0, 0.0, 90.0), (2.5, HALL - 0.02, 4.05)))
+    drawn.add("plastic_red", odkit.propeller(rnd.child("prop5")), g.Pose(odkit.turned(40.0, 14.0), (12.3, 6.2, heap(12.3, 6.2) + 0.06)))
+    drawn.add("plastic_black", odkit.quad_frame(rnd.child("arm"), 0.25, arms_gone=3), g.Pose(odkit.turned(220.0), (21.5, 13.75, 0.0)))
+    drawn.add("plastic_black", odkit.antenna(), g.Pose(odkit.turned(70.0), (21.9, 13.4, 0.0)))
+    drawn.add("plastic_black", odkit.quad_frame(rnd.child("lost"), 0.25), g.Pose(odkit.turned(30.0), (15.0, 19.0, EAVE - 0.35 + 0.08)))
 
     # ---- The yard: the repaired gate, the launch pad, a skip, a tyre, a
     # stack of pallets grass grows through, an oil drum.
@@ -1193,33 +1193,33 @@ def story(m, rnd, heap, ash, yard_h):
         solid.add("steel", g.box_mesh(0.12, 0.12, 2.5), g.Pose(at=(x, -30.0, 1.15)))
     # The west leaf hangs from its hinges, dropped at its free end and strapped
     # to its post; the east one is propped open against a block.
-    leaf_a = props.gate_leaf(rnd.child("leaf_a"), 2.9, 2.0)
-    solid.add("steel", leaf_a, g.Pose(props.turned(-14.0, -2.5), (g0 + 0.08, -30.0, 0.06)))
-    leaf_b = props.gate_leaf(rnd.child("leaf_b"), 2.9, 2.0)
-    solid.add("steel", leaf_b, g.Pose(props.turned(100.0), (g1 - 0.08, -29.95, 0.05)))
-    solid.add("concrete", g.box_mesh(0.44, 0.22, 0.2), g.Pose(props.turned(-8.0), (g1 - 0.75, -27.0, yard_h(g1 - 0.75, -27.0) + 0.08)))
+    leaf_a = odkit.gate_leaf(rnd.child("leaf_a"), 2.9, 2.0)
+    solid.add("steel", leaf_a, g.Pose(odkit.turned(-14.0, -2.5), (g0 + 0.08, -30.0, 0.06)))
+    leaf_b = odkit.gate_leaf(rnd.child("leaf_b"), 2.9, 2.0)
+    solid.add("steel", leaf_b, g.Pose(odkit.turned(100.0), (g1 - 0.08, -29.95, 0.05)))
+    solid.add("concrete", g.box_mesh(0.44, 0.22, 0.2), g.Pose(odkit.turned(-8.0), (g1 - 0.75, -27.0, yard_h(g1 - 0.75, -27.0) + 0.08)))
     drawn.add("plastic_red", g.annulus_mesh(0.05, 0.075, 0.085, 10), g.Pose(at=(g0, -30.0, 1.85)))
     drawn.add("plastic_red", g.annulus_mesh(0.05, 0.075, 0.085, 10), g.Pose(at=(g0, -30.0, 0.5)))
     # A bright new chain and padlock on the rusty leaf.
-    lx, ly = g.Pose(props.turned(-14.0), (g0 + 0.08, -30.0, 0.0)).apply((2.75, 0.0, 0.0))[:2]
+    lx, ly = g.Pose(odkit.turned(-14.0), (g0 + 0.08, -30.0, 0.0)).apply((2.75, 0.0, 0.0))[:2]
     for k in range(7):
-        drawn.add("can", g.annulus_mesh(0.01, 0.012, 0.022, 8), g.Pose(props.turned(0.0, 0.0, 90.0 if k % 2 else 0.0), (lx, ly - 0.03, 1.1 - 0.035 * k)))
+        drawn.add("can", g.annulus_mesh(0.01, 0.012, 0.022, 8), g.Pose(odkit.turned(0.0, 0.0, 90.0 if k % 2 else 0.0), (lx, ly - 0.03, 1.1 - 0.035 * k)))
     drawn.add("can", g.box_mesh(0.05, 0.025, 0.06), g.Pose(at=(lx, ly - 0.03, 0.82)))
     pad = (15.6, -12.0)
-    drawn.add("wood", g.box_mesh(1.0, 1.0, 0.018), g.Pose(props.turned(12.0), (pad[0], pad[1], yard_h(*pad) + 0.012)))
+    drawn.add("wood", g.box_mesh(1.0, 1.0, 0.018), g.Pose(odkit.turned(12.0), (pad[0], pad[1], yard_h(*pad) + 0.012)))
     for a in (45.0, -45.0):
-        drawn.add("paint", g.box_mesh(0.7, 0.08, 0.002), g.Pose(props.turned(12.0 + a), (pad[0], pad[1], yard_h(*pad) + 0.022)))
-    solid.add("steel", props.skip(rnd.child("skip")), g.Pose(props.turned(20.0, 0.0, 84.0), (24.0, -15.5, 0.86)))
+        drawn.add("paint", g.box_mesh(0.7, 0.08, 0.002), g.Pose(odkit.turned(12.0 + a), (pad[0], pad[1], yard_h(*pad) + 0.022)))
+    solid.add("steel", odkit.skip(rnd.child("skip")), g.Pose(odkit.turned(20.0, 0.0, 84.0), (24.0, -15.5, 0.86)))
     spill = ruin.mound(24.8, -14.0, 1.4, 1.0, 0.35, rnd.child("skip_spill"))
     drawn.add("dirt", g.heightfield_mesh(23.4, -15.0, 26.2, -13.0, 0.25, lambda x, y: spill(x, y) + yard_h(x, y)))
     lumps = ruin.Batch()
     ruin.scatter(lumps, rnd.child("skip_lumps"), (24.9, -14.0), 1.3, 14, lambda q: ruin.lump(q.uniform(0.15, 0.35), q), z=lambda x, y: spill(x, y) + yard_h(x, y))
     solid.add("concrete", lumps.mesh())
-    solid.add("black", props.tyre(), g.Pose(props.turned(0.0, 12.0), (6.0, -9.0, yard_h(6.0, -9.0) + 0.02)))
+    solid.add("black", odkit.tyre_mesh(), g.Pose(odkit.turned(0.0, 12.0), (6.0, -9.0, yard_h(6.0, -9.0) + 0.02)))
     for k in range(5):
-        p = props.pallet(rnd.child("stack", k), 0.1, 0.1)
-        solid.add("wood", p, g.Pose(props.turned(25.0 + rnd.uniform(-7, 7)), (-4.2, -3.2, yard_h(-4.2, -3.2) + 0.144 * k)))
-    solid.add("steel", props.drum(rnd.child("drum"), 1.0), g.Pose(props.turned(30.0), (31.6, -1.8, yard_h(31.6, -1.8) - 0.02)))
+        p = odkit.pallet_mesh(rnd.child("stack", k), 0.1, 0.1)
+        solid.add("wood", p, g.Pose(odkit.turned(25.0 + rnd.uniform(-7, 7)), (-4.2, -3.2, yard_h(-4.2, -3.2) + 0.144 * k)))
+    solid.add("steel", odkit.drum_mesh(rnd.child("drum"), 1.0), g.Pose(odkit.turned(30.0), (31.6, -1.8, yard_h(31.6, -1.8) - 0.02)))
     out["drums"] = [(31.6, -1.8)]
 
     names = {

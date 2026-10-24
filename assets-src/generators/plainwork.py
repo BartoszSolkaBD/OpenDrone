@@ -1,11 +1,11 @@
-"""What the plain-coloured materials of a Map's props share (#324): a surface
+"""What the plain-coloured materials of a Map's kit items share (#324): a surface
 of one colour (a plastic crate, a bin bag, a bottle's glass, a can's paint)
 that has been out in the weather. It is the colour, faded in soft patches by
 the sun, with grime settled in blotches and specks, fine scratches that show a
 lighter or darker colour under it, and a roughness that is glossier where it
 is clean.
 
-A prop is small, so its picture is seen across a few centimetres to a metre:
+A kit item is small, so its picture is seen across a few centimetres to a metre:
 the marks are fine, and there is no one-off mark that would show again with
 every repeat. The blocks are odtex's, so the rules at the top of `odtex.py`
 hold: whole numbers and `+ - * /`, `sqrt` and `floor`, the same bytes
