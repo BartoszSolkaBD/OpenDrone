@@ -278,6 +278,110 @@ colour    = [0.12, 0.07, 0.06]
 roughness = 0.76
 texture   = "graffiti_brick"
 
+# Wear decals (#323): the same kind of material, one for each kind of wear that
+# the rules in `assets-src/lib/odwear.py` put on a Map.
+[materials.decal_runs]
+colour        = [0.03, 0.025, 0.02]
+roughness     = 0.76
+texture       = "decal_runs"
+roughness_map = true
+cover         = 0.9
+
+[materials.decal_salt]
+colour        = [0.7, 0.68, 0.6]
+roughness     = 0.92
+texture       = "decal_salt"
+roughness_map = true
+cover         = 0.75
+
+[materials.decal_lichen]
+colour        = [0.18, 0.2, 0.09]
+roughness     = 0.9
+texture       = "decal_lichen"
+roughness_map = true
+cover         = 0.9
+
+[materials.decal_algae]
+colour        = [0.02, 0.03, 0.015]
+roughness     = 0.5
+texture       = "decal_algae"
+roughness_map = true
+cover         = 0.6
+wetness       = 0.7
+
+[materials.decal_rust_bleed]
+colour        = [0.12, 0.04, 0.012]
+roughness     = 0.85
+texture       = "decal_rust_bleed"
+roughness_map = true
+cover         = 0.9
+
+[materials.decal_scuffs]
+colour        = [0.3, 0.28, 0.25]
+roughness     = 0.66
+texture       = "decal_scuffs"
+roughness_map = true
+cover         = 0.7
+
+[materials.decal_scratches]
+colour        = [0.4, 0.37, 0.3]
+roughness     = 0.6
+texture       = "decal_scratches"
+roughness_map = true
+cover         = 0.55
+
+[materials.decal_cracks]
+colour        = [0.02, 0.018, 0.015]
+roughness     = 0.9
+texture       = "decal_cracks"
+roughness_map = true
+
+[materials.decal_soot]
+colour        = [0.008, 0.008, 0.007]
+roughness     = 0.93
+texture       = "decal_soot"
+roughness_map = true
+cover         = 0.9
+
+[materials.decal_oil]
+colour        = [0.015, 0.012, 0.009]
+roughness     = 0.3
+texture       = "decal_oil"
+roughness_map = true
+cover         = 0.8
+wetness       = 0.5
+
+[materials.decal_droppings]
+colour        = [0.6, 0.58, 0.5]
+roughness     = 0.55
+texture       = "decal_droppings"
+roughness_map = true
+
+[materials.decal_flakes]
+colour        = [0.3, 0.35, 0.28]
+roughness     = 0.6
+texture       = "decal_flakes"
+roughness_map = true
+
+[materials.decal_cobweb]
+colour        = [0.5, 0.5, 0.47]
+roughness     = 0.7
+texture       = "decal_cobweb"
+roughness_map = true
+cover         = 0.8
+
+[materials.decal_tag]
+colour        = [0.01, 0.2, 0.2]
+roughness     = 0.5
+texture       = "decal_tag"
+roughness_map = true
+
+[materials.decal_stencil]
+colour        = [0.5, 0.35, 0.04]
+roughness     = 0.65
+texture       = "decal_stencil"
+roughness_map = true
+
 # No picture: leaves are a flat colour.
 [materials.foliage]
 colour    = [0.10, 0.24, 0.07]
@@ -518,6 +622,97 @@ generator = "decal_damp"
 seed      = 1
 pixels    = 512
 size      = "2 m"
+
+# Wear decals' pictures (#323).
+[textures.decal_runs]
+generator = "decal_runs"
+seed      = 1
+pixels    = 512
+size      = "1.5 m"
+
+[textures.decal_salt]
+generator = "decal_salt"
+seed      = 1
+pixels    = 512
+size      = "1.2 m"
+
+[textures.decal_lichen]
+generator = "decal_lichen"
+seed      = 1
+pixels    = 512
+size      = "1.0 m"
+
+[textures.decal_algae]
+generator = "decal_algae"
+seed      = 1
+pixels    = 512
+size      = "2 m"
+
+[textures.decal_rust_bleed]
+generator = "decal_rust_bleed"
+seed      = 1
+pixels    = 512
+size      = "1.2 m"
+
+[textures.decal_scuffs]
+generator = "decal_scuffs"
+seed      = 1
+pixels    = 512
+size      = "1.5 m"
+
+[textures.decal_scratches]
+generator = "decal_scratches"
+seed      = 1
+pixels    = 512
+size      = "0.8 m"
+
+[textures.decal_cracks]
+generator = "decal_cracks"
+seed      = 1
+pixels    = 512
+size      = "1.2 m"
+
+[textures.decal_soot]
+generator = "decal_soot"
+seed      = 1
+pixels    = 512
+size      = "2 m"
+
+[textures.decal_oil]
+generator = "decal_oil"
+seed      = 1
+pixels    = 512
+size      = "1.0 m"
+
+[textures.decal_droppings]
+generator = "decal_droppings"
+seed      = 1
+pixels    = 512
+size      = "0.6 m"
+
+[textures.decal_flakes]
+generator = "decal_flakes"
+seed      = 1
+pixels    = 512
+size      = "0.8 m"
+
+[textures.decal_cobweb]
+generator = "decal_cobweb"
+seed      = 1
+pixels    = 512
+size      = "0.9 m"
+
+[textures.decal_tag]
+generator = "decal_tag"
+seed      = 1
+pixels    = 512
+size      = "1.0 m"
+
+[textures.decal_stencil]
+generator = "decal_stencil"
+seed      = 1
+pixels    = 512
+size      = "1.0 m"
 
 # Not a material's picture: the large-scale one the [macro] table names.
 [textures.macro_variation]

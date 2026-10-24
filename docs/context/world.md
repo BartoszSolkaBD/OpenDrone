@@ -60,6 +60,10 @@ _Avoid_: Skybox (that is a way to draw one)
 A picture put once on a Map's surface, over the surface's own repeating picture: a stain, a damp patch, moss at the foot of a wall, a water streak, a crack or a tag. It is a thin mesh of its own that the Map's script cuts from the surfaces under it and lifts 2 mm off them, with a mask that fades it out before its edges, so its rectangle never shows; it is only drawn, never solid, and is lit by the light baked for the spot it lies on. A decal can show its own colour, make the surface under it wet, or both, and overlapping decals are drawn in the order of their layer. How one is made: [Building a Map](../building-a-map.md#decals).
 _Avoid_: Sticker, overlay
 
+**Wear**:
+The marks of age and use on a Map's surfaces (water runs, moss, rust, soot, scuffs, droppings, cracks and the like), put as decals (see Decal above) by rules that give each mark a cause: water runs below a sill, moss grows low on a shaded wall, soot rises above a fire. A rule is given a wear level from 0 to 1 and a seed, so the same seed gives the same Map, and a Map's author can add a decal by hand or lock a box against the rules. How a script asks for it: [Building a Map](../building-a-map.md#wear).
+_Avoid_: Dirt layer, grunge
+
 **Free Flight**:
 The game mode with no objectives, timers or scoring: the pilot just flies a Map.
 _Avoid_: Sandbox, practice mode
