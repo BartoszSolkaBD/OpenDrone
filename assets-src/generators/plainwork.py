@@ -15,7 +15,7 @@ everywhere.
 import odtex as tex
 
 
-def make(seed, n, base, faded, grime, rough, gloss, scratch=None, relief=2.0, fade=0.5, dirt=0.5):
+def make(seed, n, base, faded, grime, rough, gloss, scratch=None, relief=3.0, fade=0.5, dirt=0.5):
     """The three pictures of a weathered plain surface.
 
     - `base`, `faded`, `grime`: 0-255 colours: the surface's own colour, what

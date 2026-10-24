@@ -41,4 +41,4 @@ def make(seed, n):
 
     height = tex.clamp(0.6 + 0.2 * grain * (1.0 - fresh * 0.5) + 0.06 * fine - split * 0.5 - knot * 0.1)
     rough = tex.clamp(0.82 + 0.08 * (1.0 - fresh) - 0.06 * mould)
-    return tex.finish(tex.clamp(albedo), height, rough, 4.0, seed=seed)
+    return tex.finish(tex.clamp(albedo), height, rough, 8.0, seed=seed)

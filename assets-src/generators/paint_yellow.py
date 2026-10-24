@@ -20,4 +20,4 @@ def make(seed, n):
     albedo = tex.mix(albedo, tex.colour(60, 56, 50), grit * 0.5)
     height = tex.clamp(0.6 + 0.08 * (1.0 - worn) - grit * 0.1)
     rough = tex.clamp(0.58 + 0.25 * worn + 0.1 * scuff)
-    return tex.finish(tex.clamp(albedo), height, rough, 2.0, seed=seed)
+    return tex.finish(tex.clamp(albedo), height, rough, 4.0, seed=seed)
