@@ -26,6 +26,7 @@ fn part(corners: Vec<[f32; 3]>, triangles: Vec<[u32; 3]>) -> DrawnPart {
         triangles,
         decal: None,
         blend: None,
+        scatter: None,
     }
 }
 

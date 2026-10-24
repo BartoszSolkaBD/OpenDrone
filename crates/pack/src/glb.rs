@@ -18,6 +18,10 @@
 //!   value: its picture coordinates run from 0 to 1 across the picture.
 //!   `od_blend` names a second material that shows through the object's own
 //!   where its vertex colours (`COLOR_0`, grey, 0 to 1) say so.
+//! - **Scatter (#338).** `od_scatter` marks a drawn ground as growing a kind
+//!   of plant (`grass`), with `od_scatter_density` (clumps a square metre)
+//!   and `od_scatter_height` (the shortest and tallest clump, in metres). The
+//!   game grows the clumps; nothing here places them.
 //! - **Axes:** glTF is Y-up (x east, y up, z south); the Simulation counts
 //!   east, north and up. A corner `(x, y, z)` in the file is `(x, -z, y)` in
 //!   the Map.
@@ -38,13 +42,27 @@ use serde_json::Value;
 use crate::document::{Problem, Problems};
 
 /// The tags a Map's objects may carry.
-pub const TAGS: [&str; 5] = [
+pub const TAGS: [&str; 8] = [
     "od_collider",
     "od_collision_only",
     "od_launch_spot",
     "od_decal",
     "od_blend",
+    "od_scatter",
+    "od_scatter_density",
+    "od_scatter_height",
 ];
+
+/// The kinds of plant a ground can grow (`od_scatter`), by the word the tag
+/// carries.
+pub const SCATTER_KINDS: [(&str, ScatterKind); 1] = [("grass", ScatterKind::Grass)];
+
+/// The fewest and most clumps a square metre a ground may grow
+/// (`od_scatter_density`).
+pub const SCATTER_DENSITY: (f64, f64) = (0.1, 20.0);
+
+/// The shortest and tallest a clump may be, in metres (`od_scatter_height`).
+pub const SCATTER_HEIGHT: (f64, f64) = (0.02, 2.0);
 
 /// The highest layer a decal may have: a decal of a higher layer is drawn
 /// over one of a lower layer where they overlap.
@@ -110,6 +128,36 @@ pub struct DrawnPart {
     /// If a second material shows through this one (`od_blend`), which, and
     /// how much of it at each corner.
     pub blend: Option<Blend>,
+    /// If the part grows plants (`od_scatter`), which and how many.
+    pub scatter: Option<Scatter>,
+}
+
+/// A kind of plant a ground grows (#338).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ScatterKind {
+    /// Short grass: clumps of thin blades that lean and sway.
+    Grass,
+}
+
+impl ScatterKind {
+    /// The word `od_scatter` carries for this kind.
+    pub fn word(self) -> &'static str {
+        match self {
+            ScatterKind::Grass => "grass",
+        }
+    }
+}
+
+/// What a ground grows (`od_scatter`, `od_scatter_density` and
+/// `od_scatter_height`): the game places the clumps on its upward-facing
+/// triangles, from a fixed seed.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Scatter {
+    pub kind: ScatterKind,
+    /// Clumps a square metre of ground.
+    pub density: f32,
+    /// The shortest and the tallest clump, in metres.
+    pub height: [f32; 2],
 }
 
 /// A second material that shows through a part's own (`od_blend` and the
@@ -399,6 +447,45 @@ impl Reader<'_> {
                         ));
                     }
                 },
+                "od_scatter" => match value
+                    .as_str()
+                    .and_then(|word| SCATTER_KINDS.iter().find(|(w, _)| *w == word))
+                {
+                    Some((_, kind)) => tags.scatter = Some(*kind),
+                    None => {
+                        tags.scatter_refused = true;
+                        self.problem(format!(
+                            "object \"{name}\" has od_scatter {value}, which isn't a kind of plant OpenDrone grows: the kinds are {}",
+                            SCATTER_KINDS
+                                .iter()
+                                .map(|(w, _)| format!("\"{w}\""))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ));
+                    }
+                },
+                "od_scatter_density" => match value.as_f64() {
+                    Some(d) if (SCATTER_DENSITY.0..=SCATTER_DENSITY.1).contains(&d) => {
+                        tags.scatter_density = Some(d as f32);
+                    }
+                    _ => {
+                        tags.scatter_refused = true;
+                        self.problem(format!(
+                            "object \"{name}\" has od_scatter_density {value}, which must be a number from {} to {}: how many clumps grow on a square metre",
+                            SCATTER_DENSITY.0, SCATTER_DENSITY.1
+                        ));
+                    }
+                },
+                "od_scatter_height" => match scatter_height(value) {
+                    Some(height) => tags.scatter_height = Some(height),
+                    None => {
+                        tags.scatter_refused = true;
+                        self.problem(format!(
+                            "object \"{name}\" has od_scatter_height {value}, which must be two numbers in metres, the shortest clump then the tallest, each from {} to {}, the first no taller than the second",
+                            SCATTER_HEIGHT.0, SCATTER_HEIGHT.1
+                        ));
+                    }
+                },
                 "od_launch_spot" => match value.as_f64() {
                     Some(heading) if (0.0..360.0).contains(&heading) => {
                         tags.launch_heading = Some(heading);
@@ -458,6 +545,7 @@ impl Reader<'_> {
                 ));
             }
         }
+        let scatter = self.scatter(name, tags);
         let mesh = node.get("mesh").and_then(Value::as_u64).unwrap_or(0) as usize;
         let Some(primitives) = gltf.primitives(mesh) else {
             self.problem(format!(
@@ -505,6 +593,7 @@ impl Reader<'_> {
                             triangles: read.triangles,
                             decal: tags.decal,
                             blend,
+                            scatter,
                         });
                     }
                 }
@@ -546,6 +635,49 @@ impl Reader<'_> {
 }
 
 impl Reader<'_> {
+    /// What a ground grows (#338), if its three scatter tags are there and
+    /// agree with the rest of its tags; a problem for each that isn't.
+    fn scatter(&mut self, name: &str, tags: &Tags) -> Option<Scatter> {
+        let any = tags.scatter.is_some()
+            || tags.scatter_density.is_some()
+            || tags.scatter_height.is_some();
+        if !any || tags.scatter_refused {
+            return None;
+        }
+        let Some(kind) = tags.scatter else {
+            self.problem(format!(
+                "object \"{name}\" has od_scatter_density or od_scatter_height but no od_scatter: say which plant grows on it, such as od_scatter \"grass\""
+            ));
+            return None;
+        };
+        let (Some(density), Some(height)) = (tags.scatter_density, tags.scatter_height) else {
+            self.problem(format!(
+                "object \"{name}\" grows {} (od_scatter) but doesn't say how much and how tall: it needs od_scatter_density (clumps a square metre) and od_scatter_height (the shortest and tallest clump, in metres)",
+                kind.word()
+            ));
+            return None;
+        };
+        if tags.collision_only {
+            self.problem(format!(
+                "object \"{name}\" grows {} (od_scatter) but is od_collision_only: plants grow on a ground that is drawn",
+                kind.word()
+            ));
+            return None;
+        }
+        if tags.decal.is_some() {
+            self.problem(format!(
+                "object \"{name}\" is a decal (od_decal) and grows {} (od_scatter): plants grow on a ground, not on a picture lying on it",
+                kind.word()
+            ));
+            return None;
+        }
+        Some(Scatter {
+            kind,
+            density,
+            height,
+        })
+    }
+
     /// What a decal's picture coordinates and a blend's vertex colours must
     /// be (#321), or why a primitive's aren't.
     fn check_decal_and_blend(&self, tags: &Tags, read: &Primitive) -> Result<(), String> {
@@ -628,6 +760,27 @@ struct Tags {
     blend: Option<String>,
     /// `od_blend` is there, but its value is wrong, and a problem says so.
     blend_refused: bool,
+    /// `od_scatter`'s kind of plant, if the ground grows one.
+    scatter: Option<ScatterKind>,
+    /// `od_scatter_density`, clumps a square metre.
+    scatter_density: Option<f32>,
+    /// `od_scatter_height`, the shortest and tallest clump in metres.
+    scatter_height: Option<[f32; 2]>,
+    /// A scatter tag is there, but its value is wrong, and a problem says so.
+    scatter_refused: bool,
+}
+
+/// `od_scatter_height`'s two heights, if it is two numbers in range with the
+/// first no taller than the second.
+fn scatter_height(value: &Value) -> Option<[f32; 2]> {
+    let list = value.as_array()?;
+    let [low, high] = list.as_slice() else {
+        return None;
+    };
+    let (low, high) = (low.as_f64()?, high.as_f64()?);
+    let range = SCATTER_HEIGHT.0..=SCATTER_HEIGHT.1;
+    (range.contains(&low) && range.contains(&high) && low <= high)
+        .then_some([low as f32, high as f32])
 }
 
 // ---------- glTF numbers ----------
