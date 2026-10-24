@@ -152,9 +152,10 @@ class MapBuilder:
         gives. `scatter=(kind, density, (shortest, tallest))` makes the shape
         a ground that grows a plant, such as `("grass", 6, (0.12, 0.38))`:
         clumps a square metre and their heights in metres (#338); the game
-        grows them on its upward-facing triangles. `light_least` stretches each of the shape's charts in the atlas
-        to at least that many texels each way, so a small thing's faces are
-        lit and not left black (`odlight.flatten`)."""
+        grows them on its upward-facing triangles. `light_least` stretches
+        each of the shape's charts in the atlas to at least that many texels
+        each way, so a small thing's faces are lit and not left black
+        (`odlight.flatten`)."""
         assert collider in COLLIDERS, collider
         corners, faces = g.placed(mesh, pose or g.Pose())
         triangles = g.triangulate(corners, faces, convex=collider == "convex")
