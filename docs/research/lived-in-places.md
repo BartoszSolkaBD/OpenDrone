@@ -136,7 +136,7 @@ As the maintainer confirmed it on #290 (24 October 2026): a textile or engineeri
 
 **The choice made here: an engineering works.** The slice's hall is a single-storey shed with steel trusses, brick pilasters (pillars built into the wall) under each truss and a fallen steel beam, which is how engineering works were built. Textile mills were mostly multi-storey with rows of windows. If the maintainer prefers textile, swap the machine plinths for rows of small loom bolt pads, the crane rail for line-shaft brackets, and add fluff and bobbins to the litter.
 
-**The story, in order.** A light engineering works machined parts here for decades, with an overhead crane down the hall. It closed about 15 years ago and the machines were sold. Thieves stripped the cable, pipes and crane, and knocked through the west wall to drag the last machines out. Then the roof failed: one bay fell in. Squatters camped in the dry north-east corner until their fire got out of hand and burnt the corner. For the last few years, local FPV pilots have used the site. They fixed the yard gate, cleared a hangout inside the loading door, and fly the hall and the fallen bay.
+**The story, in order.** A light engineering works machined parts here for decades, with an overhead crane down the hall. It closed about 15 years ago and the machines were sold. Thieves stripped the cable, pipes and crane, and knocked through the west wall to drag the last machines out. Then the roof failed: one bay fell in. Squatters camped in the north-east corner, where the roof over it is still whole, until their fire got out of hand and burnt the corner. For the last few years, local FPV pilots have used the site. They fixed the yard gate, cleared a hangout inside the loading door, and fly the hall and the fallen bay.
 
 ### The hall corner (the slice)
 
@@ -152,7 +152,7 @@ Where things go uses the slice's frame ([PR #317](https://github.com/BartoszSolk
 
 | Prop or wear | Where | Condition |
 |---|---|---|
-| Bed frame with springs | In the ash, x ≈ 25, y ≈ 25.5, along the north wall | Steel, rusted orange-black, sagging; no mattress left |
+| Bed frame with springs | In the ash, x ≈ 25, y ≈ 25.5, its long side east-west | Steel, rusted orange-black, sagging; no mattress left |
 | Shopping trolley | On its side at the ash's south-west edge, x ≈ 22.5, y ≈ 23 | Blackened, one wheel missing |
 | Food tins, a few | In and around the ash | Black, crushed |
 | A melted plastic chair | x ≈ 23, y ≈ 26 | Slumped, half black |
