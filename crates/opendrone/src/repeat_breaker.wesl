@@ -69,19 +69,14 @@ struct Breaker {
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(100) var<uniform> breaker: Breaker;
 @group(constants::MATERIAL_BIND_GROUP) @binding(101) var diffuse_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(102) var diffuse_sampler: sampler;
+@group(constants::MATERIAL_BIND_GROUP) @binding(102) var diffuse_sampler: sampler;  // the material's own pictures and the second material's share it (#339)
 @group(constants::MATERIAL_BIND_GROUP) @binding(103) var normal_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(104) var normal_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(105) var wide_texture: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(106) var wide_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(107) var surface_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(108) var surface_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(109) var blend_diffuse_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(110) var blend_diffuse_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(111) var blend_normal_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(112) var blend_normal_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(113) var blend_surface_texture: texture_2d<f32>;
-@group(constants::MATERIAL_BIND_GROUP) @binding(114) var blend_surface_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(115) var mask_texture: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(116) var mask_sampler: sampler;
 
@@ -370,7 +365,7 @@ fn fragment(
     var own: Pictures;
     own.tiles = breaker.snap_turn;
     own.surface = breaker.surface;
-    var surface = surface_at(diffuse_texture, diffuse_sampler, normal_texture, normal_sampler, surface_texture, surface_sampler, own, in.uv, ddx, ddy);
+    var surface = surface_at(diffuse_texture, diffuse_sampler, normal_texture, diffuse_sampler, surface_texture, diffuse_sampler, own, in.uv, ddx, ddy);
     // Roughness and metal of the surface's own material: its picture's, or its numbers.
     var roughness = select(pbr_input.material.perceptual_roughness, surface.pbr.g, breaker.surface.x > 0.5);
     var metallic = pbr_input.material.metallic * surface.pbr.b;
@@ -383,11 +378,11 @@ fn fragment(
         other.tiles = breaker.blend_tiles;
         other.surface = vec4<f32>(breaker.blend_surface.x, 0.0, breaker.blend_surface.y, 0.0);
         let scale = breaker.blend.y;
-        let second = surface_at(blend_diffuse_texture, blend_diffuse_sampler, blend_normal_texture, blend_normal_sampler, blend_surface_texture, blend_surface_sampler, other, in.uv * scale, ddx * scale, ddy * scale);
+        let second = surface_at(blend_diffuse_texture, diffuse_sampler, blend_normal_texture, diffuse_sampler, blend_surface_texture, diffuse_sampler, other, in.uv * scale, ddx * scale, ddy * scale);
         var share = 1.0;
         if w < 1.0 {
             let average_a = textureSampleLevel(diffuse_texture, diffuse_sampler, vec2<f32>(0.5, 0.5), 16.0).rgb;
-            let average_b = textureSampleLevel(blend_diffuse_texture, blend_diffuse_sampler, vec2<f32>(0.5, 0.5), 16.0).rgb;
+            let average_b = textureSampleLevel(blend_diffuse_texture, diffuse_sampler, vec2<f32>(0.5, 0.5), 16.0).rgb;
             share = blend_weight(w, in.world_position.xyz, in.world_normal, surface.colour, average_a, second.colour, average_b);
         }
         let roughness_b = select(breaker.blend.z, second.pbr.g, breaker.blend_surface.x > 0.5);
