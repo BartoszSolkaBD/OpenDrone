@@ -64,7 +64,7 @@ sdl3-sys = { version = "=0.7.2", default-features = false }
 # placeholder style's font, and `bevy_picking` with `ui_picking` is how the
 # mouse reaches them. On Linux it draws on X11 and Wayland, as Bevy's own
 # default does.
-bevy = { version = "=0.20.0", default-features = false, features = [
+bevy = { version = "=0.20.1", default-features = false, features = [
     "std",
     "multi_threaded",
     "async_executor",
